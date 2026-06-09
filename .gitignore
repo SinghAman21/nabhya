@@ -8,6 +8,11 @@ dist
 build
 *.tsbuildinfo
 
+# Generated JS files from tsc
+apps/server/src/**/*.js
+apps/server/src/**/*.js.map
+apps/server/*.config.js
+
 # Generated files
 apps/web/src/routeTree.gen.ts
 

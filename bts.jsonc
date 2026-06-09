@@ -16,7 +16,7 @@
   "reproducibleCommand": "bun create better-t-stack@latest my-better-t-app --frontend none --backend hono --runtime node --database postgres --orm drizzle --api none --auth none --payments none --addons biome husky turborepo --examples none --db-setup supabase --web-deploy none --server-deploy none --no-git --package-manager bun --no-install",
   "database": "postgres",
   "orm": "drizzle",
-  "backend": "hono",
+  "backend": "nestjs",
   "runtime": "node",
   "frontend": [],
   "addons": ["biome", "husky", "turborepo"],

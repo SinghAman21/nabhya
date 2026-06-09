@@ -1,31 +1,18 @@
+import "reflect-metadata";
 import { env } from "@my-better-t-app/env/server";
-import { Hono } from "hono";
-import { cors } from "hono/cors";
-import { logger } from "hono/logger";
+import { NestFactory } from "@nestjs/core";
+import { AppModule } from "./app/app.module";
 
-const app = new Hono();
+async function bootstrap() {
+	const app = await NestFactory.create(AppModule);
 
-app.use(logger());
-app.use(
-  "/*",
-  cors({
-    origin: env.CORS_ORIGIN,
-    allowMethods: ["GET", "POST", "OPTIONS"],
-  }),
-);
+	app.enableCors({
+		origin: env.CORS_ORIGIN,
+		methods: ["GET", "POST", "OPTIONS"],
+	});
 
-app.get("/", (c) => {
-  return c.text("OK");
-});
+	await app.listen(3000);
+	console.log("Server is running on http://localhost:3000");
+}
 
-import { serve } from "@hono/node-server";
-
-serve(
-  {
-    fetch: app.fetch,
-    port: 3000,
-  },
-  (info) => {
-    console.log(`Server is running on http://localhost:${info.port}`);
-  },
-);
+bootstrap();
