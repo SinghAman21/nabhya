@@ -41,6 +41,9 @@
 			"correctness": {
 				"useExhaustiveDependencies": "info"
 			},
+			"suspicious": {
+				"noUnknownAtRules": "off"
+			},
 			"nursery": {
 				"useSortedClasses": {
 					"level": "warn",
