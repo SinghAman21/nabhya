@@ -7,6 +7,13 @@ module.exports = {
 	presets: [require("nativewind/preset")],
 	theme: {
 		extend: {
+			fontFamily: {
+				sans: ["NeutralFace", "system-ui", "sans-serif"],
+				serif: ["NeutralFace", "Georgia", "serif"],
+				rounded: ["LineSeedSans-Regular", "sans-serif"],
+				display: ["LineSeedSans-Bold", "sans-serif"],
+				mono: ["SFMono-Regular", "monospace"],
+			},
 			colors: {
 				border: "hsl(var(--border))",
 				input: "hsl(var(--input))",

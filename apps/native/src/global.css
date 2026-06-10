@@ -2,6 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+	font-family: "NeutralFace";
+	src: url("@/assets/fonts/NeutralFace.otf") format("opentype");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "NeutralFace-Bold";
+	src: url("@/assets/fonts/NeutralFace-Bold.otf") format("opentype");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "LineSeedSans-Regular";
+	src: url("@/assets/fonts/LINESeedSans-Regular.otf") format("opentype");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "LineSeedSans-Bold";
+	src: url("@/assets/fonts/LINESeedSans-Bold.otf") format("opentype");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "MonaSans-Regular";
+	src: url("@/assets/fonts/MonaSans-Regular.otf") format("opentype");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
 @layer base {
 	:root {
 		--background: 0 0% 100%;
@@ -59,13 +99,14 @@
 
 :root {
 	--font-display:
-		Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,
-		Segoe UI Symbol, Noto Color Emoji;
+		"LineSeedSans-Bold", "NeutralFace", Spline Sans, Inter, ui-sans-serif, system-ui,
+		sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
 	--font-mono:
 		ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono,
 		Courier New, monospace;
 	--font-rounded:
-		"SF Pro Rounded", "Hiragino Maru Gothic ProN", Meiryo, "MS PGothic",
-		sans-serif;
-	--font-serif: Georgia, "Times New Roman", serif;
+		"LineSeedSans-Regular", "SF Pro Rounded", "Hiragino Maru Gothic ProN",
+		Meiryo, "MS PGothic", sans-serif;
+	--font-serif:
+		"NeutralFace", "MonaSans-Regular", Georgia, "Times New Roman", serif;
 }

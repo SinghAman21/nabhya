@@ -7,7 +7,12 @@ import { HintRow } from "@/components/hint-row";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { WebBadge } from "@/components/web-badge";
-import { BottomTabInset, MaxContentWidth, Spacing } from "@/constants/theme";
+import {
+	BottomTabInset,
+	Fonts,
+	MaxContentWidth,
+	Spacing,
+} from "@/constants/theme";
 
 function getDevMenuHint() {
 	if (Platform.OS === "web") {
@@ -39,7 +44,7 @@ export default function HomeScreen() {
 					</ThemedText>
 				</ThemedView>
 
-				<ThemedText type="code" style={styles.code}>
+				<ThemedText type="code" style={styles.code} className="text-red-400">
 					get started
 				</ThemedText>
 
@@ -84,9 +89,11 @@ const styles = StyleSheet.create({
 	},
 	title: {
 		textAlign: "center",
+		fontFamily: Fonts.sans,
 	},
 	code: {
 		textTransform: "uppercase",
+		color: "red",
 	},
 	stepContainer: {
 		gap: Spacing.three,
