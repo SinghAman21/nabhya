@@ -6,14 +6,12 @@
 			"dependsOn": ["^build"],
 			"inputs": ["$TURBO_DEFAULT$", ".env*", "src/**"],
 			"outputs": ["dist/**", ".next/**"],
-			"env": ["NODE_ENV", "DATABASE_URL", "CORS_ORIGIN"],
-			"dotenv": true
+			"env": ["NODE_ENV", "DATABASE_URL", "CORS_ORIGIN"]
 		},
 		"dev": {
 			"cache": false,
 			"persistent": true,
-			"dependsOn": ["^build"],
-			"dotenv": true
+			"dependsOn": ["^build"]
 		},
 		"lint": {
 			"dependsOn": ["^lint"],
@@ -25,25 +23,21 @@
 		},
 		"db:push": {
 			"cache": false,
-			"dependsOn": ["^build"],
-			"dotenv": true
+			"dependsOn": ["^build"]
 		},
 		"db:generate": {
-			"cache": false,
-			"dotenv": true
+			"cache": false
 		},
 		"db:migrate": {
 			"cache": false,
-			"persistent": true,
-			"dotenv": true
+			"persistent": true
 		},
 		"db:studio": {
 			"cache": false,
 			"persistent": true
 		},
 		"start": {
-			"dependsOn": ["^build"],
-			"dotenv": true
+			"dependsOn": ["^build"]
 		},
 		"//native": {
 			"dependsOn": ["^build"],
