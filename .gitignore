@@ -48,6 +48,9 @@ lerna-debug.log*
 # Better-T-Stack
 .alchemy
 
+# pnpm
+.pnpm-store
+
 # Testing
 coverage
 .nyc_output

@@ -4,30 +4,49 @@
 	"tasks": {
 		"build": {
 			"dependsOn": ["^build"],
-			"inputs": ["$TURBO_DEFAULT$", ".env*"],
-			"outputs": ["dist/**"]
-		},
-		"lint": {
-			"dependsOn": ["^lint"]
-		},
-		"check-types": {
-			"dependsOn": ["^check-types"]
+			"inputs": ["$TURBO_DEFAULT$", ".env*", "src/**"],
+			"outputs": ["dist/**", ".next/**"],
+			"env": ["NODE_ENV", "DATABASE_URL", "CORS_ORIGIN"],
+			"dotenv": true
 		},
 		"dev": {
 			"cache": false,
-			"persistent": true
+			"persistent": true,
+			"dependsOn": ["^build"],
+			"dotenv": true
+		},
+		"lint": {
+			"dependsOn": ["^lint"],
+			"inputs": ["src/**", "*.config.*", "tsconfig.json"]
+		},
+		"check-types": {
+			"dependsOn": ["^check-types"],
+			"inputs": ["src/**", "tsconfig.json"]
 		},
 		"db:push": {
-			"cache": false
+			"cache": false,
+			"dependsOn": ["^build"],
+			"dotenv": true
 		},
 		"db:generate": {
-			"cache": false
+			"cache": false,
+			"dotenv": true
 		},
 		"db:migrate": {
 			"cache": false,
-			"persistent": true
+			"persistent": true,
+			"dotenv": true
 		},
 		"db:studio": {
+			"cache": false,
+			"persistent": true
+		},
+		"start": {
+			"dependsOn": ["^build"],
+			"dotenv": true
+		},
+		"//native": {
+			"dependsOn": ["^build"],
 			"cache": false,
 			"persistent": true
 		}

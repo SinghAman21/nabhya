@@ -23,7 +23,7 @@
   "examples": [],
   "auth": "none",
   "payments": "none",
-  "packageManager": "bun",
+  "packageManager": "pnpm",
   "dbSetup": "supabase",
   "api": "none",
   "webDeploy": "none",
