@@ -39,7 +39,8 @@
 		"rules": {
 			"recommended": true,
 			"correctness": {
-				"useExhaustiveDependencies": "info"
+				"useExhaustiveDependencies": "info",
+				"noUnusedFunctionParameters": "off"
 			},
 			"suspicious": {
 				"noUnknownAtRules": "off"
@@ -70,6 +71,9 @@
 	"javascript": {
 		"formatter": {
 			"quoteStyle": "double"
+		},
+		"parser": {
+			"unsafeParameterDecoratorsEnabled": true
 		}
 	},
 	"css": {

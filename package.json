@@ -7,6 +7,7 @@
 		"build": "turbo build",
 		"check-types": "turbo check-types",
 		"dev:server": "turbo -F server dev",
+		"db:setup": "tsx scripts/setup.ts",
 		"db:push": "turbo -F @my-better-t-app/db db:push",
 		"db:studio": "turbo -F @my-better-t-app/db db:studio",
 		"db:generate": "turbo -F @my-better-t-app/db db:generate",
@@ -20,11 +21,17 @@
 		"zod": "catalog:"
 	},
 	"devDependencies": {
+		"@astrojs/cli-kit": "^0.4.1",
 		"@biomejs/biome": "^2.4.16",
+		"@clack/prompts": "^1.2.0",
 		"@my-better-t-app/config": "workspace:*",
+		"@neondatabase/serverless": "^1.0.2",
 		"@types/node": "catalog:",
 		"husky": "^9.1.7",
 		"lint-staged": "^17.0.7",
+		"log-update": "^6.1.0",
+		"open": "^11.0.0",
+		"tsx": "^4.19.2",
 		"turbo": "^2.9.16",
 		"typescript": "catalog:"
 	},
