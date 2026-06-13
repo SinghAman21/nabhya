@@ -1,45 +1,59 @@
-import "./../global.css";
-
+import "../global.css";
 import { PortalHost } from "@rn-primitives/portal";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
-import { ThemeProvider } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
-import { useColorScheme } from "react-native";
+import { SplashScreen, Stack } from "expo-router";
+import { useEffect, useState } from "react";
+import { View } from "react-native";
+import { ThemeProvider } from "@/hooks/useAppTheme";
+import { queryClient } from "@/lib/api";
+import { storage } from "@/lib/storage";
+import { useAuthStore } from "@/store/auth-store";
 
-import { AnimatedSplashOverlay } from "@/components/animated-icon";
-import AppTabs from "@/components/app-tabs";
-import { NAV_THEME } from "@/lib/theme";
+const THEME_KEY = "nabhya-theme";
 
 SplashScreen.preventAutoHideAsync();
 
-export default function TabLayout() {
-	const colorScheme = useColorScheme();
-	const theme = colorScheme === "dark" ? NAV_THEME.dark : NAV_THEME.light;
-
-	const [loaded, error] = useFonts({
-		"LineSeedSans-Bold": require("@/assets/fonts/LINESeedSans-Bold.otf"),
-		"LineSeedSans-Regular": require("@/assets/fonts/LINESeedSans-Regular.otf"),
-		"MonaSans-Regular": require("@/assets/fonts/MonaSans-Regular.otf"),
-		"NeutralFace-Bold": require("@/assets/fonts/NeutralFace-Bold.otf"),
+export default function RootLayout() {
+	const [fontsLoaded, fontsError] = useFonts({
+		MonaSans: require("@/assets/fonts/MonaSans-Regular.otf"),
+		"MonaSans-Bold": require("@/assets/fonts/MonaSans-Bold.otf"),
+		"MonaSans-Medium": require("@/assets/fonts/MonaSans-Medium.otf"),
+		"MonaSans-Light": require("@/assets/fonts/MonaSans-Light.otf"),
 		NeutralFace: require("@/assets/fonts/NeutralFace.otf"),
+		"NeutralFace-Bold": require("@/assets/fonts/NeutralFace-Bold.otf"),
 	});
 
+	const [themeRestored, setThemeRestored] = useState(false);
+	const isAuthHydrated = useAuthStore((s) => s.isHydrated);
+
 	useEffect(() => {
-		if (loaded || error) {
+		storage.get(THEME_KEY).then(() => setThemeRestored(true));
+	}, []);
+
+	const ready = (fontsLoaded || fontsError) && themeRestored && isAuthHydrated;
+
+	useEffect(() => {
+		if (ready) {
 			SplashScreen.hideAsync();
 		}
-	}, [loaded, error]);
+	}, [ready]);
 
-	if (!loaded && !error) {
-		return null;
-	}
+	if (!ready) return null;
 
 	return (
-		<ThemeProvider value={theme}>
-			<AnimatedSplashOverlay />
-			<AppTabs />
-			<PortalHost />
-		</ThemeProvider>
+		<QueryClientProvider client={queryClient}>
+			<ThemeProvider>
+				<View style={{ flex: 1 }}>
+					<Stack screenOptions={{ headerShown: false }}>
+						<Stack.Screen name="index" />
+						<Stack.Screen name="(auth)" />
+						<Stack.Screen name="(onboarding)" />
+						<Stack.Screen name="(app)" />
+					</Stack>
+					<PortalHost />
+				</View>
+			</ThemeProvider>
+		</QueryClientProvider>
 	);
 }
