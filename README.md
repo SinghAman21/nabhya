@@ -1,4 +1,4 @@
-# my-better-t-app
+# nabhya
 
 This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines Hono, and more.
 
@@ -50,7 +50,7 @@ The API is running at [http://localhost:3000](http://localhost:3000).
 ## Project Structure
 
 ```
-my-better-t-app/
+nabhya/
 ├── apps/
 │   └── server/      # Backend API (Hono)
 ├── packages/

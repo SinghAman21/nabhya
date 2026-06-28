@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { db } from "@my-better-t-app/db";
+import { db } from "@nabhya/db";
 import { Global, Logger, Module, type OnModuleInit } from "@nestjs/common";
 
 export const DB_TOKEN = "DRIZZLE_DB";
@@ -36,16 +36,12 @@ export class DatabaseModule implements OnModuleInit {
 
 	private runPush(): Promise<void> {
 		return new Promise((resolve, reject) => {
-			const child = spawn(
-				"pnpm",
-				["--filter", "@my-better-t-app/db", "db:push"],
-				{
-					stdio: "pipe",
-					shell: true,
-					// Run from the monorepo root regardless of CWD
-					cwd: process.cwd(),
-				},
-			);
+			const child = spawn("pnpm", ["--filter", "@nabhya/db", "db:push"], {
+				stdio: "pipe",
+				shell: true,
+				// Run from the monorepo root regardless of CWD
+				cwd: process.cwd(),
+			});
 
 			let stderr = "";
 			child.stderr?.on("data", (chunk: Buffer) => {

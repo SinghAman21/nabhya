@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { env } from "@my-better-t-app/env/server";
+import { env } from "@nabhya/env/server";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app/app.module";

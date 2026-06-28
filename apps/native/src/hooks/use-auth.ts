@@ -22,7 +22,7 @@ export function useSignIn() {
 			return data.data;
 		},
 		onSuccess: (data) => {
-			setAuth(data.user, data.tokens);
+			setAuth(data.user.email, data.tokens);
 			queryClient.invalidateQueries({ queryKey: ["me"] });
 		},
 	});
@@ -41,7 +41,7 @@ export function useSignUp() {
 			return data.data;
 		},
 		onSuccess: (data) => {
-			setAuth(data.user, data.tokens);
+			setAuth(data.user.email, data.tokens);
 			queryClient.invalidateQueries({ queryKey: ["me"] });
 		},
 	});

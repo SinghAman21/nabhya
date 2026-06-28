@@ -57,7 +57,7 @@ export async function pushSchema(dryRun = false) {
 		label: "Pushing schema (drizzle-kit push)",
 		// Run from monorepo root via pnpm filter
 		command: "pnpm",
-		args: ["--filter", "@my-better-t-app/db", "db:push"],
+		args: ["--filter", "@nabhya/db", "db:push"],
 		dryRun,
 	});
 }
