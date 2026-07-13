@@ -7,14 +7,17 @@ import {
 	ApiOperation,
 	ApiTags,
 } from "@nestjs/swagger";
-import { Public } from "../../common/decorators";
+import { CurrentUser, Public } from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthService } from "./auth.service";
-import type { LoginDto, RegisterDto } from "./dto/auth.dto";
+import type { LoginDto, RefreshTokenDto, RegisterDto } from "./dto/auth.dto";
 import {
+	AuthResponseDto,
 	LoginBodyDto,
 	LoginSchema,
 	MessageResponseDto,
+	RefreshTokenBodyDto,
+	RefreshTokenSchema,
 	RegisterBodyDto,
 	RegisterSchema,
 } from "./dto/auth.dto";
@@ -25,26 +28,59 @@ export class AuthController {
 	constructor(private readonly authService: AuthService) {}
 
 	@Public()
+	@Post("register")
+	@HttpCode(HttpStatus.CREATED)
+	@ApiOperation({ summary: "Register a new user with role selection" })
+	@ApiBody({ type: RegisterBodyDto })
+	@ApiCreatedResponse({
+		type: AuthResponseDto,
+		description: "User registered successfully",
+	})
+	@ApiBadRequestResponse({ description: "Validation failed or email exists" })
+	async register(
+		@Body(new ZodValidationPipe(RegisterSchema)) body: RegisterDto,
+	) {
+		return this.authService.register(body);
+	}
+
+	@Public()
 	@Post("login")
 	@HttpCode(HttpStatus.OK)
 	@ApiOperation({ summary: "Log in with email and password" })
 	@ApiBody({ type: LoginBodyDto })
-	@ApiOkResponse({ type: MessageResponseDto, description: "Login successful" })
-	@ApiBadRequestResponse({ description: "Validation failed" })
-	login(@Body(new ZodValidationPipe(LoginSchema)) body: LoginDto) {
+	@ApiOkResponse({
+		type: AuthResponseDto,
+		description: "Login successful",
+	})
+	@ApiBadRequestResponse({ description: "Invalid credentials" })
+	async login(@Body(new ZodValidationPipe(LoginSchema)) body: LoginDto) {
 		return this.authService.login(body);
 	}
 
-	@Public()
-	@Post("register")
-	@ApiOperation({ summary: "Register a new user account" })
-	@ApiBody({ type: RegisterBodyDto })
-	@ApiCreatedResponse({
-		type: MessageResponseDto,
-		description: "User registered successfully",
+	@Post("refresh")
+	@HttpCode(HttpStatus.OK)
+	@ApiOperation({ summary: "Refresh access token" })
+	@ApiBody({ type: RefreshTokenBodyDto })
+	@ApiOkResponse({
+		type: AuthResponseDto,
+		description: "Token refreshed successfully",
 	})
-	@ApiBadRequestResponse({ description: "Validation failed" })
-	register(@Body(new ZodValidationPipe(RegisterSchema)) body: RegisterDto) {
-		return this.authService.register(body);
+	@ApiBadRequestResponse({ description: "Invalid refresh token" })
+	async refresh(
+		@Body(new ZodValidationPipe(RefreshTokenSchema))
+		body: RefreshTokenDto,
+	) {
+		return this.authService.refreshToken(body.refreshToken);
+	}
+
+	@Post("logout")
+	@HttpCode(HttpStatus.OK)
+	@ApiOperation({ summary: "Logout user" })
+	@ApiOkResponse({
+		type: MessageResponseDto,
+		description: "Logout successful",
+	})
+	async logout(@CurrentUser() user: any) {
+		return this.authService.logout(user.accessToken);
 	}
 }

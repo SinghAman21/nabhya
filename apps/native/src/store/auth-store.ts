@@ -1,9 +1,9 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import type { AuthTokens, User } from "@/lib/api/types";
 import { storage } from "@/lib/storage";
+import type { AuthTokens, User } from "@/lib/types";
 
-interface AuthState {
+export interface AuthState {
 	user: User | null;
 	tokens: AuthTokens | null;
 	isOnboarded: boolean;

@@ -4,13 +4,14 @@ import {
 	AUTH,
 	apiClient,
 	type LoginInput,
-	type LoginResponse,
 	type SignUpInput,
 } from "@/lib/api";
+import type { LoginResponse } from "@/lib/types";
+import type { AuthState } from "@/store/auth-store";
 import { useAuthStore } from "@/store/auth-store";
 
 export function useSignIn() {
-	const setAuth = useAuthStore((s) => s.setAuth);
+	const setAuth = useAuthStore((state: AuthState) => state.setAuth);
 	const queryClient = useQueryClient();
 
 	return useMutation({
@@ -21,34 +22,40 @@ export function useSignIn() {
 			);
 			return data.data;
 		},
-		onSuccess: (data) => {
-			setAuth(data.user, data.tokens);
+		onSuccess: (data: LoginResponse) => {
+			setAuth(data.user, {
+				accessToken: data.accessToken,
+				refreshToken: data.refreshToken,
+			});
 			queryClient.invalidateQueries({ queryKey: ["me"] });
 		},
 	});
 }
 
 export function useSignUp() {
-	const setAuth = useAuthStore((s) => s.setAuth);
+	const setAuth = useAuthStore((state: AuthState) => state.setAuth);
 	const queryClient = useQueryClient();
 
 	return useMutation({
 		mutationFn: async (input: SignUpInput) => {
 			const { data } = await apiClient.post<ApiResponse<LoginResponse>>(
-				AUTH.SIGNUP,
+				AUTH.REGISTER,
 				input,
 			);
 			return data.data;
 		},
-		onSuccess: (data) => {
-			setAuth(data.user, data.tokens);
+		onSuccess: (data: LoginResponse) => {
+			setAuth(data.user, {
+				accessToken: data.accessToken,
+				refreshToken: data.refreshToken,
+			});
 			queryClient.invalidateQueries({ queryKey: ["me"] });
 		},
 	});
 }
 
 export function useSignOut() {
-	const signOut = useAuthStore((s) => s.signOut);
+	const signOut = useAuthStore((state: AuthState) => state.signOut);
 	const queryClient = useQueryClient();
 
 	return useMutation({
