@@ -9,11 +9,12 @@ export default function SignUp() {
 	const { colors, borderRadius, spacing } = useTheme();
 	const signUp = useSignUp();
 	const router = useRouter();
+	const [name, setName] = useState("");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 
 	const handleSignUp = () => {
-		signUp.mutate({ email, password });
+		signUp.mutate({ name, email, password });
 	};
 
 	return (
@@ -26,6 +27,25 @@ export default function SignUp() {
 			}}
 		>
 			<H1 style={{ marginBottom: spacing[8] }}>Create account</H1>
+
+			<TextInput
+				placeholder="Name"
+				placeholderTextColor={colors.text.quaternary}
+				value={name}
+				onChangeText={setName}
+				autoCapitalize="words"
+				style={{
+					fontFamily: "MonaSans",
+					fontSize: 16,
+					color: colors.text.primary,
+					backgroundColor: colors.background.primary,
+					borderColor: colors.border.medium,
+					borderWidth: 1,
+					borderRadius: borderRadius.md,
+					padding: spacing[4],
+					marginBottom: spacing[4],
+				}}
+			/>
 
 			<TextInput
 				placeholder="Email"

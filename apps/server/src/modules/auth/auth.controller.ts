@@ -7,7 +7,7 @@ import {
 	ApiOperation,
 	ApiTags,
 } from "@nestjs/swagger";
-import { CurrentUser, Public } from "../../common/decorators";
+import { Public } from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthService } from "./auth.service";
 import type { LoginDto, RefreshTokenDto, RegisterDto } from "./dto/auth.dto";
@@ -80,7 +80,7 @@ export class AuthController {
 		type: MessageResponseDto,
 		description: "Logout successful",
 	})
-	async logout(@CurrentUser() user: any) {
-		return this.authService.logout(user.accessToken);
+	async logout() {
+		return this.authService.logout();
 	}
 }
