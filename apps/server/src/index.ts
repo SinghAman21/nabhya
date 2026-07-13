@@ -4,7 +4,6 @@ import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app/app.module";
 import { GlobalExceptionFilter } from "./common/filters";
-import { JwtGuard, RolesGuard } from "./common/guards";
 import { ResponseTransformInterceptor } from "./common/interceptors";
 
 async function bootstrap() {
@@ -23,13 +22,6 @@ async function bootstrap() {
 
 	// Global response envelope — wraps all success responses in { success, data, timestamp }
 	app.useGlobalInterceptors(new ResponseTransformInterceptor());
-
-	// Global guards — JWT authentication and role-based access control
-	const reflector = app.get(require("@nestjs/core").Reflector);
-	app.useGlobalGuards(
-		new JwtGuard(reflector, app.get(require("@nestjs/jwt").JwtService)),
-		new RolesGuard(reflector),
-	);
 
 	// ─── Swagger / OpenAPI ────────────────────────────────────────────────────
 	const swaggerConfig = new DocumentBuilder()

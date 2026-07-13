@@ -10,6 +10,7 @@ export interface EnvValues {
 	DIRECT_URL: string;
 	CORS_ORIGIN: string;
 	NODE_ENV: string;
+	NEON_AUTH_JWKS_URL: string;
 }
 
 export function envExists(): boolean {
@@ -49,6 +50,9 @@ export function writeEnv(values: EnvValues): void {
 		"# Server config",
 		`CORS_ORIGIN=${values.CORS_ORIGIN}`,
 		`NODE_ENV=${values.NODE_ENV}`,
+		"",
+		"# Auth Config",
+		`NEON_AUTH_JWKS_URL="${values.NEON_AUTH_JWKS_URL}"`,
 		"",
 	].join("\n");
 	writeFileSync(ENV_PATH, content, "utf8");

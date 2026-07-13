@@ -15,8 +15,7 @@ export const env = createEnv({
 		NODE_ENV: z
 			.enum(["development", "production", "test"])
 			.default("development"),
-		ACCESS_TOKEN_SECRET: z.string().min(32),
-		REFRESH_TOKEN_SECRET: z.string().min(32),
+		NEON_AUTH_JWKS_URL: z.string().url(),
 	},
 	runtimeEnv: process.env,
 	emptyStringAsUndefined: true,

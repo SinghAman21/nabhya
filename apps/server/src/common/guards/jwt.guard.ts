@@ -1,23 +1,29 @@
+import type { db as dbType } from "@my-better-t-app/db";
+import { users } from "@my-better-t-app/db/schema";
 import { env } from "@my-better-t-app/env/server";
 import {
 	type CanActivate,
 	type ExecutionContext,
+	Inject,
 	Injectable,
 	UnauthorizedException,
 } from "@nestjs/common";
-import type { Reflector } from "@nestjs/core";
-import type { JwtService } from "@nestjs/jwt";
+import { Reflector } from "@nestjs/core";
+import { eq } from "drizzle-orm";
+import { createRemoteJWKSet, jwtVerify } from "jose";
+import { DB_TOKEN } from "../database";
 import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
-import type { JwtPayload } from "../types";
 
 @Injectable()
 export class JwtGuard implements CanActivate {
+	private readonly jwks = createRemoteJWKSet(new URL(env.NEON_AUTH_JWKS_URL));
+
 	constructor(
-		private reflector: Reflector,
-		private jwtService: JwtService,
+		@Inject(Reflector) private reflector: Reflector,
+		@Inject(DB_TOKEN) private db: typeof dbType,
 	) {}
 
-	canActivate(context: ExecutionContext): boolean {
+	async canActivate(context: ExecutionContext): Promise<boolean> {
 		const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
 			context.getHandler(),
 			context.getClass(),
@@ -41,19 +47,40 @@ export class JwtGuard implements CanActivate {
 		}
 
 		try {
-			const payload = this.jwtService.verify<JwtPayload>(token, {
-				secret: env.ACCESS_TOKEN_SECRET,
-			});
+			const { payload } = await jwtVerify(token, this.jwks);
 
-			if (payload.type !== "access") {
-				throw new UnauthorizedException("Invalid token type");
+			if (!payload.sub || !payload.email) {
+				throw new UnauthorizedException(
+					"Invalid token payload: missing sub or email",
+				);
 			}
 
-			// Attach user to request
+			// Upsert user in the database (Find or Create)
+			let dbUser = await this.db.query.users.findFirst({
+				where: eq(users.id, payload.sub),
+			});
+
+			if (!dbUser) {
+				const [newUser] = await this.db
+					.insert(users)
+					.values({
+						id: payload.sub,
+						email: payload.email as string,
+						name: (payload.name as string) || null,
+					})
+					.returning();
+
+				if (!newUser) {
+					throw new UnauthorizedException("Could not create user profile");
+				}
+				dbUser = newUser;
+			}
+
+			// Attach fully loaded user to request
 			request.user = {
-				id: payload.sub,
-				email: payload.email,
-				role: payload.role,
+				id: dbUser.id,
+				email: dbUser.email,
+				role: dbUser.role,
 			};
 
 			return true;
