@@ -1,6 +1,6 @@
-import type { db as dbType } from "@my-better-t-app/db";
-import { roles, userRoles, users } from "@my-better-t-app/db/schema";
-import { env } from "@my-better-t-app/env/server";
+import type { db as dbType } from "@nabhya/db";
+import { roles, userRoles, users } from "@nabhya/db/schema";
+import { env } from "@nabhya/env/server";
 import {
 	type CanActivate,
 	type ExecutionContext,
