@@ -1,23 +1,26 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SignUpInput, signUpSchema } from "@nabhya/shared";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Pressable } from "react-native";
+import { Alert, Pressable } from "react-native";
 import { AuthSplitLayout } from "@/components/auth-split-layout";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/useTheme";
+import { authClient } from "@/lib/auth-client";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function SignUp() {
 	const { colors, spacing } = useTheme();
-	const signUp = useAuthStore((s) => s.signUp);
+	const setUser = useAuthStore((s) => s.setUser);
 	const router = useRouter();
+	const [loading, setLoading] = useState(false);
 	const form = useForm<SignUpInput>({
 		// biome-ignore lint/suspicious/noExplicitAny: @hookform/resolvers v5 Zod v4 incompatibility
 		resolver: zodResolver(signUpSchema as any),
-		defaultValues: { email: "" },
+		defaultValues: { email: "", password: "", name: "" },
 	});
 
 	const inputStyle = {
@@ -26,6 +29,29 @@ export default function SignUp() {
 		backgroundColor: colors.background.tertiary,
 		paddingVertical: spacing[3.5],
 	} as const;
+
+	const onSubmit = form.handleSubmit(async (data) => {
+		setLoading(true);
+		try {
+			const { data: result, error } = await authClient.signUp.email({
+				email: data.email,
+				password: data.password,
+				name: data.name,
+			});
+			if (error) {
+				Alert.alert("Sign up failed", error.message ?? "Please try again");
+				return;
+			}
+			if (result?.user) {
+				setUser(result.user);
+			}
+			router.replace("/(app)/success" as any);
+		} catch {
+			Alert.alert("Error", "An unexpected error occurred");
+		} finally {
+			setLoading(false);
+		}
+	});
 
 	return (
 		<AuthSplitLayout
@@ -42,8 +68,17 @@ export default function SignUp() {
 		>
 			<H2 style={{ marginBottom: spacing[1] }}>Register your NGO</H2>
 			<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
-				Enter your organization email to get started
+				Create your account to get started
 			</Body>
+
+			<FormField
+				control={form.control}
+				name="name"
+				label="Full name"
+				placeholder="Your full name"
+				autoCapitalize="words"
+				style={inputStyle}
+			/>
 
 			<FormField
 				control={form.control}
@@ -55,11 +90,18 @@ export default function SignUp() {
 				style={inputStyle}
 			/>
 
+			<FormField
+				control={form.control}
+				name="password"
+				label="Password"
+				placeholder="Create a strong password"
+				secureTextEntry
+				style={inputStyle}
+			/>
+
 			<Button
-				onPress={form.handleSubmit((data) => {
-					signUp(data.email);
-					router.replace("/(onboarding)");
-				})}
+				onPress={onSubmit}
+				loading={loading}
 				style={{ marginTop: spacing[6] }}
 			>
 				Create account

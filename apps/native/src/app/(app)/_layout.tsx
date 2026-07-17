@@ -8,6 +8,7 @@ export default function AppLayout() {
 			<Stack>
 				<Stack.Screen name="index" options={{ title: "Home" }} />
 				<Stack.Screen name="profile" options={{ title: "Profile" }} />
+				<Stack.Screen name="success" options={{ title: "Success" }} />
 			</Stack>
 			<ThemeToggle />
 		</View>

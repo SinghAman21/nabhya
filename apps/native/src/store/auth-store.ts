@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import type { AuthTokens } from "@/lib/api/types";
 import { storage } from "@/lib/storage";
 
 export interface OrgProfile {
@@ -17,6 +16,16 @@ export interface OrgProfile {
 	website: string;
 }
 
+export interface BetterUser {
+	id: string;
+	email: string;
+	name: string;
+	emailVerified: boolean;
+	image?: string | null;
+	createdAt: Date;
+	updatedAt: Date;
+}
+
 const emptyProfile: OrgProfile = {
 	orgName: "",
 	phone: "",
@@ -31,18 +40,17 @@ const emptyProfile: OrgProfile = {
 	website: "",
 };
 
-interface AuthState {
+export interface AuthState {
+	user: BetterUser | null;
 	email: string | null;
 	orgProfile: OrgProfile;
-	tokens: AuthTokens | null;
 	isOnboarded: boolean;
 	isVerified: boolean;
 	isSkipped: boolean;
 	isHydrated: boolean;
-	signUp: (email: string) => void;
+	setUser: (user: BetterUser) => void;
 	mergeProfile: (fields: Partial<OrgProfile>) => void;
-	setAuth: (email: string, tokens: AuthTokens) => void;
-	setTokens: (tokens: AuthTokens) => void;
+	setAuth: (email: string) => void;
 	setOnboarded: () => void;
 	setVerified: () => void;
 	setSkipped: () => void;
@@ -54,27 +62,19 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()(
 	persist(
 		(set) => ({
+			user: null,
 			email: null,
 			orgProfile: { ...emptyProfile },
-			tokens: null,
 			isOnboarded: false,
 			isVerified: false,
 			isSkipped: false,
 			isHydrated: false,
-			signUp: (email) =>
-				set({
-					email,
-					orgProfile: { ...emptyProfile },
-					isOnboarded: false,
-					isVerified: false,
-					isSkipped: false,
-				}),
+			setUser: (user) => set({ user, email: user.email }),
 			mergeProfile: (fields) =>
 				set((state) => ({
 					orgProfile: { ...state.orgProfile, ...fields },
 				})),
-			setAuth: (email, tokens) => set({ email, tokens }),
-			setTokens: (tokens) => set({ tokens }),
+			setAuth: (email) => set({ email }),
 			setOnboarded: () => set({ isOnboarded: true }),
 			setVerified: () => set({ isVerified: true, isSkipped: false }),
 			setSkipped: () =>
@@ -82,22 +82,21 @@ export const useAuthStore = create<AuthState>()(
 					isSkipped: true,
 					isOnboarded: true,
 					isVerified: false,
-					tokens: null,
 				}),
 			setGuestMode: () =>
 				set({
 					email: "guest@nabhya.app",
+					user: null,
 					orgProfile: { ...emptyProfile },
-					tokens: null,
 					isOnboarded: true,
 					isVerified: false,
 					isSkipped: true,
 				}),
 			signOut: () =>
 				set({
+					user: null,
 					email: null,
 					orgProfile: { ...emptyProfile },
-					tokens: null,
 					isOnboarded: false,
 					isVerified: false,
 					isSkipped: false,
@@ -119,9 +118,9 @@ export const useAuthStore = create<AuthState>()(
 				},
 			})),
 			partialize: (state) => ({
+				user: state.user,
 				email: state.email,
 				orgProfile: state.orgProfile,
-				tokens: state.tokens,
 				isOnboarded: state.isOnboarded,
 				isVerified: state.isVerified,
 				isSkipped: state.isSkipped,

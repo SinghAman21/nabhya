@@ -1,19 +1,22 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SignInInput, signInSchema } from "@nabhya/shared";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Pressable } from "react-native";
+import { Alert, Pressable } from "react-native";
 import { AuthSplitLayout } from "@/components/auth-split-layout";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/useTheme";
+import { authClient } from "@/lib/auth-client";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function Login() {
 	const { colors, spacing } = useTheme();
-	const signUp = useAuthStore((s) => s.signUp);
+	const setUser = useAuthStore((s) => s.setUser);
 	const router = useRouter();
+	const [loading, setLoading] = useState(false);
 	const form = useForm<SignInInput>({
 		// biome-ignore lint/suspicious/noExplicitAny: @hookform/resolvers v5 Zod v4 incompatibility
 		resolver: zodResolver(signInSchema as any),
@@ -26,6 +29,28 @@ export default function Login() {
 		backgroundColor: colors.background.tertiary,
 		paddingVertical: spacing[3.5],
 	} as const;
+
+	const onSubmit = form.handleSubmit(async (data) => {
+		setLoading(true);
+		try {
+			const { data: result, error } = await authClient.signIn.email({
+				email: data.email,
+				password: data.password,
+			});
+			if (error) {
+				Alert.alert("Sign in failed", error.message ?? "Please try again");
+				return;
+			}
+			if (result?.user) {
+				setUser(result.user);
+			}
+			router.replace("/(app)/success" as any);
+		} catch {
+			Alert.alert("Error", "An unexpected error occurred");
+		} finally {
+			setLoading(false);
+		}
+	});
 
 	return (
 		<AuthSplitLayout
@@ -65,10 +90,8 @@ export default function Login() {
 			/>
 
 			<Button
-				onPress={form.handleSubmit((data) => {
-					signUp(data.email);
-					router.replace("/(app)");
-				})}
+				onPress={onSubmit}
+				loading={loading}
 				style={{ marginTop: spacing[6] }}
 			>
 				Sign in
