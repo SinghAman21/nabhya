@@ -293,6 +293,9 @@ importers:
       drizzle-kit:
         specifier: ^0.31.8
         version: 0.31.10
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -6781,7 +6784,9 @@ snapshots:
       metro-runtime: 0.84.4
     transitivePeerDependencies:
       - '@babel/core'
+      - bufferutil
       - supports-color
+      - utf-8-validate
 
   '@react-native/normalize-colors@0.74.89': {}
 

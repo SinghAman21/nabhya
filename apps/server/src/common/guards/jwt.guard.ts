@@ -1,5 +1,5 @@
 import type { db as dbType } from "@my-better-t-app/db";
-import { users } from "@my-better-t-app/db/schema";
+import { roles, userRoles, users } from "@my-better-t-app/db/schema";
 import { env } from "@my-better-t-app/env/server";
 import {
 	type CanActivate,
@@ -58,29 +58,55 @@ export class JwtGuard implements CanActivate {
 			// Upsert user in the database (Find or Create)
 			let dbUser = await this.db.query.users.findFirst({
 				where: eq(users.id, payload.sub),
+				with: {
+					userRoles: {
+						with: {
+							role: true,
+						},
+					},
+				},
 			});
+
+			let assignedRoles: string[] = [];
 
 			if (!dbUser) {
 				const [newUser] = await this.db
 					.insert(users)
 					.values({
 						id: payload.sub,
+						neonUserId: payload.sub,
 						email: payload.email as string,
-						name: (payload.name as string) || null,
+						fullName: (payload.name as string) || null,
 					})
 					.returning();
 
 				if (!newUser) {
 					throw new UnauthorizedException("Could not create user profile");
 				}
-				dbUser = newUser;
+
+				// Look for the default USER role
+				const defaultRole = await this.db.query.roles.findFirst({
+					where: eq(roles.name, "USER"),
+				});
+
+				if (defaultRole) {
+					await this.db.insert(userRoles).values({
+						userId: newUser.id,
+						roleId: defaultRole.id,
+					});
+					assignedRoles = [defaultRole.name];
+				}
+
+				dbUser = { ...newUser, userRoles: [] } as any; // Cast as any just for local assignment, roles handle explicitly
+			} else {
+				assignedRoles = dbUser.userRoles?.map((ur: any) => ur.role.name) || [];
 			}
 
 			// Attach fully loaded user to request
 			request.user = {
-				id: dbUser.id,
-				email: dbUser.email,
-				role: dbUser.role,
+				id: dbUser!.id,
+				email: dbUser!.email,
+				roles: assignedRoles,
 			};
 
 			return true;
