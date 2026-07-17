@@ -1,10 +1,15 @@
 import { Stack } from "expo-router";
+import { View } from "react-native";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function AppLayout() {
 	return (
-		<Stack>
-			<Stack.Screen name="index" options={{ title: "Home" }} />
-			<Stack.Screen name="profile" options={{ title: "Profile" }} />
-		</Stack>
+		<View style={{ flex: 1 }}>
+			<Stack>
+				<Stack.Screen name="index" options={{ title: "Home" }} />
+				<Stack.Screen name="profile" options={{ title: "Profile" }} />
+			</Stack>
+			<ThemeToggle />
+		</View>
 	);
 }

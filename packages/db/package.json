@@ -1,5 +1,5 @@
 {
-	"name": "@my-better-t-app/db",
+	"name": "@nabhya/db",
 	"type": "module",
 	"exports": {
 		".": {
@@ -20,14 +20,14 @@
 		"db:seed": "tsx src/seed.ts"
 	},
 	"dependencies": {
-		"@my-better-t-app/env": "workspace:*",
+		"@nabhya/env": "workspace:*",
 		"dotenv": "catalog:",
 		"drizzle-orm": "^0.45.1",
 		"pg": "^8.17.1",
 		"zod": "catalog:"
 	},
 	"devDependencies": {
-		"@my-better-t-app/config": "workspace:*",
+		"@nabhya/config": "workspace:*",
 		"@types/pg": "^8.16.0",
 		"drizzle-kit": "^0.31.8",
 		"tsx": "^4.22.4",

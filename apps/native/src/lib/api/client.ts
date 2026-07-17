@@ -1,9 +1,10 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
+import { API_URL } from "@/lib/env";
 import { useAuthStore } from "@/store/auth-store";
 import { AUTH } from "./endpoints";
 
 const apiClient = axios.create({
-	baseURL: process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000",
+	baseURL: API_URL,
 	timeout: 30000,
 	headers: { "Content-Type": "application/json" },
 });

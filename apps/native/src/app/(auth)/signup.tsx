@@ -1,128 +1,69 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { type SignUpInput, signUpSchema } from "@nabhya/shared";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { ActivityIndicator, Pressable, TextInput, View } from "react-native";
-import { Body, Caption, H1 } from "@/components/ui/typography";
-import { useSignUp } from "@/hooks/use-auth";
+import { useForm } from "react-hook-form";
+import { Pressable } from "react-native";
+import { AuthSplitLayout } from "@/components/auth-split-layout";
+import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form";
+import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuthStore } from "@/store/auth-store";
 
 export default function SignUp() {
-	const { colors, borderRadius, spacing } = useTheme();
-	const signUp = useSignUp();
+	const { colors, spacing } = useTheme();
+	const signUp = useAuthStore((s) => s.signUp);
 	const router = useRouter();
-	const [name, setName] = useState("");
-	const [email, setEmail] = useState("");
-	const [password, setPassword] = useState("");
+	const form = useForm<SignUpInput>({
+		// biome-ignore lint/suspicious/noExplicitAny: @hookform/resolvers v5 Zod v4 incompatibility
+		resolver: zodResolver(signUpSchema as any),
+		defaultValues: { email: "" },
+	});
 
-	const handleSignUp = () => {
-		signUp.mutate({ name, email, password });
-	};
+	const inputStyle = {
+		borderWidth: 0,
+		borderRadius: 12,
+		backgroundColor: colors.background.tertiary,
+		paddingVertical: spacing[3.5],
+	} as const;
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				justifyContent: "center",
-				backgroundColor: colors.background.warm,
-				padding: spacing[6],
-			}}
+		<AuthSplitLayout
+			alternateLink={
+				<Pressable onPress={() => router.push("/(auth)/login")}>
+					<Caption color="secondary">
+						Already have an account?{" "}
+						<Caption color={colors.primary.main as string} weight="medium">
+							Sign in
+						</Caption>
+					</Caption>
+				</Pressable>
+			}
 		>
-			<H1 style={{ marginBottom: spacing[8] }}>Create account</H1>
+			<H2 style={{ marginBottom: spacing[1] }}>Register your NGO</H2>
+			<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
+				Enter your organization email to get started
+			</Body>
 
-			<TextInput
-				placeholder="Name"
-				placeholderTextColor={colors.text.quaternary}
-				value={name}
-				onChangeText={setName}
-				autoCapitalize="words"
-				style={{
-					fontFamily: "MonaSans",
-					fontSize: 16,
-					color: colors.text.primary,
-					backgroundColor: colors.background.primary,
-					borderColor: colors.border.medium,
-					borderWidth: 1,
-					borderRadius: borderRadius.md,
-					padding: spacing[4],
-					marginBottom: spacing[4],
-				}}
-			/>
-
-			<TextInput
-				placeholder="Email"
-				placeholderTextColor={colors.text.quaternary}
-				value={email}
-				onChangeText={setEmail}
-				autoCapitalize="none"
+			<FormField
+				control={form.control}
+				name="email"
+				label="Organization email"
+				placeholder="org@example.org"
 				keyboardType="email-address"
-				style={{
-					fontFamily: "MonaSans",
-					fontSize: 16,
-					color: colors.text.primary,
-					backgroundColor: colors.background.primary,
-					borderColor: colors.border.medium,
-					borderWidth: 1,
-					borderRadius: borderRadius.md,
-					padding: spacing[4],
-					marginBottom: spacing[4],
-				}}
+				autoCapitalize="none"
+				style={inputStyle}
 			/>
 
-			<TextInput
-				placeholder="Password"
-				placeholderTextColor={colors.text.quaternary}
-				value={password}
-				onChangeText={setPassword}
-				secureTextEntry
-				style={{
-					fontFamily: "MonaSans",
-					fontSize: 16,
-					color: colors.text.primary,
-					backgroundColor: colors.background.primary,
-					borderColor: colors.border.medium,
-					borderWidth: 1,
-					borderRadius: borderRadius.md,
-					padding: spacing[4],
-					marginBottom: spacing[6],
-				}}
-			/>
-
-			{signUp.error && (
-				<Caption
-					color={colors.error.main as string}
-					style={{ marginBottom: spacing[3] }}
-				>
-					{signUp.error.message}
-				</Caption>
-			)}
-
-			<Pressable
-				onPress={handleSignUp}
-				disabled={signUp.isPending}
-				style={{
-					backgroundColor: colors.primary.main,
-					padding: spacing[4],
-					borderRadius: borderRadius.lg,
-					alignItems: "center",
-					opacity: signUp.isPending ? 0.6 : 1,
-				}}
+			<Button
+				onPress={form.handleSubmit((data) => {
+					signUp(data.email);
+					router.replace("/(onboarding)");
+				})}
+				style={{ marginTop: spacing[6] }}
 			>
-				{signUp.isPending ? (
-					<ActivityIndicator color={colors.primary.contrast} />
-				) : (
-					<Body color={colors.primary.contrast as string} weight="bold">
-						Create account
-					</Body>
-				)}
-			</Pressable>
-
-			<Pressable
-				onPress={() => router.push("/(auth)/login")}
-				style={{ marginTop: spacing[4] }}
-			>
-				<Caption color="secondary" style={{ textAlign: "center" }}>
-					Already have an account? Sign in
-				</Caption>
-			</Pressable>
-		</View>
+				Create account
+			</Button>
+		</AuthSplitLayout>
 	);
 }

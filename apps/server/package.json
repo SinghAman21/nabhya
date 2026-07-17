@@ -8,8 +8,8 @@
 		"start": "node dist/index.mjs"
 	},
 	"dependencies": {
-		"@my-better-t-app/db": "workspace:*",
-		"@my-better-t-app/env": "workspace:*",
+		"@nabhya/db": "workspace:*",
+		"@nabhya/env": "workspace:*",
 		"@nestjs/common": "^11.0.0",
 		"@nestjs/core": "^11.0.0",
 		"@nestjs/platform-express": "^11.0.0",
@@ -22,7 +22,7 @@
 		"zod": "catalog:"
 	},
 	"devDependencies": {
-		"@my-better-t-app/config": "workspace:*",
+		"@nabhya/config": "workspace:*",
 		"@types/express": "^5.0.6",
 		"@types/node": "catalog:",
 		"cross-env": "^7.0.3",

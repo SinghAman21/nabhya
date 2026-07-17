@@ -1,108 +1,78 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { type SignInInput, signInSchema } from "@nabhya/shared";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { ActivityIndicator, Pressable, TextInput, View } from "react-native";
-import { Body, Caption, H1 } from "@/components/ui/typography";
-import { useSignIn } from "@/hooks/use-auth";
+import { useForm } from "react-hook-form";
+import { Pressable } from "react-native";
+import { AuthSplitLayout } from "@/components/auth-split-layout";
+import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form";
+import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuthStore } from "@/store/auth-store";
 
 export default function Login() {
-	const { colors, borderRadius, spacing } = useTheme();
-	const signIn = useSignIn();
+	const { colors, spacing } = useTheme();
+	const signUp = useAuthStore((s) => s.signUp);
 	const router = useRouter();
-	const [email, setEmail] = useState("");
-	const [password, setPassword] = useState("");
+	const form = useForm<SignInInput>({
+		// biome-ignore lint/suspicious/noExplicitAny: @hookform/resolvers v5 Zod v4 incompatibility
+		resolver: zodResolver(signInSchema as any),
+		defaultValues: { email: "", password: "" },
+	});
 
-	const handleLogin = () => {
-		signIn.mutate({ email, password });
-	};
+	const inputStyle = {
+		borderWidth: 0,
+		borderRadius: 12,
+		backgroundColor: colors.background.tertiary,
+		paddingVertical: spacing[3.5],
+	} as const;
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				justifyContent: "center",
-				backgroundColor: colors.background.warm,
-				padding: spacing[6],
-			}}
+		<AuthSplitLayout
+			alternateLink={
+				<Pressable onPress={() => router.push("/(auth)/signup")}>
+					<Caption color="secondary">
+						Don't have an account?{" "}
+						<Caption color={colors.primary.main as string} weight="medium">
+							Sign up
+						</Caption>
+					</Caption>
+				</Pressable>
+			}
 		>
-			<H1 style={{ marginBottom: spacing[8] }}>Welcome back</H1>
+			<H2 style={{ marginBottom: spacing[1] }}>Welcome back</H2>
+			<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
+				Sign back in to your organization
+			</Body>
 
-			<TextInput
-				placeholder="Email"
-				placeholderTextColor={colors.text.quaternary}
-				value={email}
-				onChangeText={setEmail}
-				autoCapitalize="none"
+			<FormField
+				control={form.control}
+				name="email"
+				label="Organization email"
+				placeholder="org@example.org"
 				keyboardType="email-address"
-				style={{
-					fontFamily: "MonaSans",
-					fontSize: 16,
-					color: colors.text.primary,
-					backgroundColor: colors.background.primary,
-					borderColor: colors.border.medium,
-					borderWidth: 1,
-					borderRadius: borderRadius.md,
-					padding: spacing[4],
-					marginBottom: spacing[4],
-				}}
+				autoCapitalize="none"
+				style={inputStyle}
 			/>
 
-			<TextInput
-				placeholder="Password"
-				placeholderTextColor={colors.text.quaternary}
-				value={password}
-				onChangeText={setPassword}
+			<FormField
+				control={form.control}
+				name="password"
+				label="Password"
+				placeholder="Enter your password"
 				secureTextEntry
-				style={{
-					fontFamily: "MonaSans",
-					fontSize: 16,
-					color: colors.text.primary,
-					backgroundColor: colors.background.primary,
-					borderColor: colors.border.medium,
-					borderWidth: 1,
-					borderRadius: borderRadius.md,
-					padding: spacing[4],
-					marginBottom: spacing[6],
-				}}
+				style={inputStyle}
 			/>
 
-			{signIn.error && (
-				<Caption
-					color={colors.error.main as string}
-					style={{ marginBottom: spacing[3] }}
-				>
-					{signIn.error.message}
-				</Caption>
-			)}
-
-			<Pressable
-				onPress={handleLogin}
-				disabled={signIn.isPending}
-				style={{
-					backgroundColor: colors.primary.main,
-					padding: spacing[4],
-					borderRadius: borderRadius.lg,
-					alignItems: "center",
-					opacity: signIn.isPending ? 0.6 : 1,
-				}}
+			<Button
+				onPress={form.handleSubmit((data) => {
+					signUp(data.email);
+					router.replace("/(app)");
+				})}
+				style={{ marginTop: spacing[6] }}
 			>
-				{signIn.isPending ? (
-					<ActivityIndicator color={colors.primary.contrast} />
-				) : (
-					<Body color={colors.primary.contrast as string} weight="bold">
-						Sign in
-					</Body>
-				)}
-			</Pressable>
-
-			<Pressable
-				onPress={() => router.push("/(auth)/signup")}
-				style={{ marginTop: spacing[4] }}
-			>
-				<Caption color="secondary" style={{ textAlign: "center" }}>
-					Don't have an account? Sign up
-				</Caption>
-			</Pressable>
-		</View>
+				Sign in
+			</Button>
+		</AuthSplitLayout>
 	);
 }
