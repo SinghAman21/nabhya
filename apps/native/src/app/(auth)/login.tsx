@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/useTheme";
-import { authClient } from "@/lib/auth-client";
+import { authService } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function Login() {
@@ -33,20 +33,16 @@ export default function Login() {
 	const onSubmit = form.handleSubmit(async (data) => {
 		setLoading(true);
 		try {
-			const { data: result, error } = await authClient.signIn.email({
+			const result = await authService.login({
 				email: data.email,
 				password: data.password,
 			});
-			if (error) {
-				Alert.alert("Sign in failed", error.message ?? "Please try again");
-				return;
-			}
 			if (result?.user) {
 				setUser(result.user);
 			}
 			router.replace("/(app)/success" as any);
 		} catch {
-			Alert.alert("Error", "An unexpected error occurred");
+			Alert.alert("Error", "Sign in failed. Please try again.");
 		} finally {
 			setLoading(false);
 		}

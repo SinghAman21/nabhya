@@ -6,9 +6,9 @@ async function main() {
 	console.log("Seeding database...");
 
 	const defaultRoles = [
-		{ name: "USER", description: "Default user role" },
-		{ name: "ORG_ADMIN", description: "Organization administrator" },
-		{ name: "SUPER_ADMIN", description: "System super administrator" },
+		{ name: "volunteer", description: "Default volunteer role" },
+		{ name: "organisation", description: "Organization account role" },
+		{ name: "superadmin", description: "System super administrator" },
 	];
 
 	for (const role of defaultRoles) {

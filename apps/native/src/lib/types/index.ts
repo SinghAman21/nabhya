@@ -1,6 +1,5 @@
 export * from "./auth";
 
-import type { UserRole } from "./auth";
 export interface ApiResponse<T> {
 	data: T;
 	message?: string;
@@ -31,5 +30,4 @@ export interface SignUpInput {
 	email: string;
 	password: string;
 	name: string;
-	role?: UserRole;
 }

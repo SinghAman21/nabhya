@@ -15,6 +15,7 @@ export const env = createEnv({
 		NODE_ENV: z
 			.enum(["development", "production", "test"])
 			.default("development"),
+		NEON_AUTH_URL: z.string().url(),
 		NEON_AUTH_JWKS_URL: z.string().url(),
 	},
 	runtimeEnv: process.env,

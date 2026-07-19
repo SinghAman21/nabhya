@@ -3,13 +3,13 @@ import { type SignUpInput, signUpSchema } from "@nabhya/shared";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Alert, Pressable } from "react-native";
+import { Alert, Pressable, View } from "react-native";
 import { AuthSplitLayout } from "@/components/auth-split-layout";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/useTheme";
-import { authClient } from "@/lib/auth-client";
+import { authService } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function SignUp() {
@@ -33,21 +33,17 @@ export default function SignUp() {
 	const onSubmit = form.handleSubmit(async (data) => {
 		setLoading(true);
 		try {
-			const { data: result, error } = await authClient.signUp.email({
+			const result = await authService.signup({
 				email: data.email,
 				password: data.password,
 				name: data.name,
 			});
-			if (error) {
-				Alert.alert("Sign up failed", error.message ?? "Please try again");
-				return;
-			}
 			if (result?.user) {
 				setUser(result.user);
 			}
 			router.replace("/(app)/success" as any);
 		} catch {
-			Alert.alert("Error", "An unexpected error occurred");
+			Alert.alert("Error", "Sign up failed. Please try again.");
 		} finally {
 			setLoading(false);
 		}

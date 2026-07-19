@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { authClient } from "@/lib/auth-client";
+import { authService } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/auth-store";
 
 export function useSignIn() {
@@ -8,9 +8,7 @@ export function useSignIn() {
 
 	return useMutation({
 		mutationFn: async (input: { email: string; password: string }) => {
-			const { data, error } = await authClient.signIn.email(input);
-			if (error) throw error;
-			return data;
+			return authService.login(input);
 		},
 		onSuccess: (data) => {
 			if (data?.user) setUser(data.user);
@@ -29,9 +27,7 @@ export function useSignUp() {
 			password: string;
 			name: string;
 		}) => {
-			const { data, error } = await authClient.signUp.email(input);
-			if (error) throw error;
-			return data;
+			return authService.signup(input);
 		},
 		onSuccess: (data) => {
 			if (data?.user) setUser(data.user);
@@ -46,7 +42,7 @@ export function useSignOut() {
 
 	return useMutation({
 		mutationFn: async () => {
-			await authClient.signOut();
+			await authService.logout();
 		},
 		onSettled: () => {
 			queryClient.clear();

@@ -9,7 +9,7 @@ import { ResponseTransformInterceptor } from "./common/interceptors";
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
 
-	// Global prefix for all routes — e.g. /api/auth/login
+	// Global prefix for all routes — e.g. /api/users/me
 	app.setGlobalPrefix("api");
 
 	app.enableCors({

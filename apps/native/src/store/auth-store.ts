@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { storage } from "@/lib/storage";
+import type { User } from "@/lib/types";
 
 export interface OrgProfile {
 	orgName: string;
@@ -14,16 +15,6 @@ export interface OrgProfile {
 	foundingYear: number;
 	description: string;
 	website: string;
-}
-
-export interface BetterUser {
-	id: string;
-	email: string;
-	name: string;
-	emailVerified: boolean;
-	image?: string | null;
-	createdAt: Date;
-	updatedAt: Date;
 }
 
 const emptyProfile: OrgProfile = {
@@ -41,14 +32,14 @@ const emptyProfile: OrgProfile = {
 };
 
 export interface AuthState {
-	user: BetterUser | null;
+	user: User | null;
 	email: string | null;
 	orgProfile: OrgProfile;
 	isOnboarded: boolean;
 	isVerified: boolean;
 	isSkipped: boolean;
 	isHydrated: boolean;
-	setUser: (user: BetterUser) => void;
+	setUser: (user: User) => void;
 	mergeProfile: (fields: Partial<OrgProfile>) => void;
 	setAuth: (email: string) => void;
 	setOnboarded: () => void;
@@ -92,7 +83,8 @@ export const useAuthStore = create<AuthState>()(
 					isVerified: false,
 					isSkipped: true,
 				}),
-			signOut: () =>
+			signOut: () => {
+				void storage.remove("accessToken");
 				set({
 					user: null,
 					email: null,
@@ -100,7 +92,8 @@ export const useAuthStore = create<AuthState>()(
 					isOnboarded: false,
 					isVerified: false,
 					isSkipped: false,
-				}),
+				});
+			},
 			hydrate: () => set({ isHydrated: true }),
 		}),
 		{

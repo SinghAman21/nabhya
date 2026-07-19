@@ -6,6 +6,7 @@ import {
 	type ExecutionContext,
 	Inject,
 	Injectable,
+	Logger,
 	UnauthorizedException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
@@ -13,10 +14,14 @@ import { eq } from "drizzle-orm";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { DB_TOKEN } from "../database";
 import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
+import type { NeonJwtPayload } from "../types";
 
 @Injectable()
 export class JwtGuard implements CanActivate {
-	private readonly jwks = createRemoteJWKSet(new URL(env.NEON_AUTH_JWKS_URL));
+	private readonly logger = new Logger(JwtGuard.name);
+	private readonly neonJwks = createRemoteJWKSet(
+		new URL(env.NEON_AUTH_JWKS_URL),
+	);
 
 	constructor(
 		@Inject(Reflector) private reflector: Reflector,
@@ -40,14 +45,14 @@ export class JwtGuard implements CanActivate {
 			throw new UnauthorizedException("Authorization header missing");
 		}
 
-		const token = authHeader.replace("Bearer ", "");
+		const [scheme, token] = authHeader.split(" ");
 
-		if (!token) {
+		if (scheme !== "Bearer" || !token) {
 			throw new UnauthorizedException("Token missing");
 		}
 
 		try {
-			const { payload } = await jwtVerify(token, this.jwks);
+			const { payload } = await jwtVerify<NeonJwtPayload>(token, this.neonJwks);
 
 			if (!payload.sub || !payload.email) {
 				throw new UnauthorizedException(
@@ -55,63 +60,99 @@ export class JwtGuard implements CanActivate {
 				);
 			}
 
-			// Upsert user in the database (Find or Create)
-			let dbUser = await this.db.query.users.findFirst({
-				where: eq(users.id, payload.sub),
-				with: {
-					userRoles: {
-						with: {
-							role: true,
-						},
-					},
-				},
+			const dbUser = await this.syncNeonUser(payload);
+
+			const roleRows = await this.db.query.userRoles.findMany({
+				where: eq(userRoles.userId, dbUser.id),
+				with: { role: true },
 			});
 
-			let assignedRoles: string[] = [];
-
-			if (!dbUser) {
-				const [newUser] = await this.db
-					.insert(users)
-					.values({
-						id: payload.sub,
-						neonUserId: payload.sub,
-						email: payload.email as string,
-						fullName: (payload.name as string) || null,
-					})
-					.returning();
-
-				if (!newUser) {
-					throw new UnauthorizedException("Could not create user profile");
-				}
-
-				// Look for the default USER role
-				const defaultRole = await this.db.query.roles.findFirst({
-					where: eq(roles.name, "USER"),
-				});
-
-				if (defaultRole) {
-					await this.db.insert(userRoles).values({
-						userId: newUser.id,
-						roleId: defaultRole.id,
-					});
-					assignedRoles = [defaultRole.name];
-				}
-
-				dbUser = { ...newUser, userRoles: [] } as any; // Cast as any just for local assignment, roles handle explicitly
-			} else {
-				assignedRoles = dbUser.userRoles?.map((ur: any) => ur.role.name) || [];
-			}
+			const assignedRoles = roleRows.map((ur) => ur.role.name);
 
 			// Attach fully loaded user to request
 			request.user = {
-				id: dbUser!.id,
-				email: dbUser!.email,
+				id: dbUser.id,
+				email: dbUser.email,
+				role: assignedRoles[0] ?? "volunteer",
 				roles: assignedRoles,
+				name: dbUser.fullName,
 			};
 
 			return true;
 		} catch (error) {
+			if (error instanceof UnauthorizedException) throw error;
+			this.logger.warn(
+				`Neon JWT verification failed: ${error instanceof Error ? error.message : String(error)}`,
+			);
 			throw new UnauthorizedException("Token validation failed");
 		}
+	}
+
+	private async syncNeonUser(payload: NeonJwtPayload) {
+		let dbUser = await this.db.query.users.findFirst({
+			where: eq(users.neonUserId, payload.sub),
+		});
+
+		if (!dbUser) {
+			const existingByEmail = await this.db.query.users.findFirst({
+				where: eq(users.email, payload.email.toLowerCase()),
+			});
+
+			if (existingByEmail) {
+				const [updatedUser] = await this.db
+					.update(users)
+					.set({
+						neonUserId: payload.sub,
+						fullName: payload.name ?? existingByEmail.fullName,
+						updatedAt: new Date(),
+					})
+					.where(eq(users.id, existingByEmail.id))
+					.returning();
+				dbUser = updatedUser;
+			} else {
+				const [createdUser] = await this.db
+					.insert(users)
+					.values({
+						neonUserId: payload.sub,
+						email: payload.email.toLowerCase(),
+						fullName: payload.name ?? null,
+						status: "ACTIVE",
+						verificationStatus: "PENDING",
+					})
+					.returning();
+				dbUser = createdUser;
+			}
+		}
+
+		if (!dbUser || dbUser.status !== "ACTIVE") {
+			throw new UnauthorizedException("User account is not active");
+		}
+
+		const currentRoles = await this.db.query.userRoles.findMany({
+			where: eq(userRoles.userId, dbUser.id),
+		});
+		if (currentRoles.length === 0) {
+			let volunteerRole = await this.db.query.roles.findFirst({
+				where: eq(roles.name, "volunteer"),
+			});
+			if (!volunteerRole) {
+				const [createdRole] = await this.db
+					.insert(roles)
+					.values({
+						name: "volunteer",
+						description: "Default application role",
+					})
+					.returning();
+				volunteerRole = createdRole;
+			}
+			if (volunteerRole) {
+				await this.db.insert(userRoles).values({
+					userId: dbUser.id,
+					roleId: volunteerRole.id,
+				});
+			}
+		}
+
+		return dbUser;
 	}
 }

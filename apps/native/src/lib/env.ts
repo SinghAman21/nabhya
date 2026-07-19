@@ -12,9 +12,19 @@ const devFallback = Platform.select({
 
 function resolveApiUrl(): string {
 	const url = process.env.EXPO_PUBLIC_API_URL;
-	if (url) return url;
-	if (__DEV__) return devFallback;
-	throw new Error("EXPO_PUBLIC_API_URL must be set in production builds");
+	const resolvedUrl = url || (__DEV__ ? devFallback : undefined);
+	if (!resolvedUrl) {
+		throw new Error("EXPO_PUBLIC_API_URL must be set in production builds");
+	}
+
+	return resolvedUrl.replace(/\/+$/, "").replace(/\/api$/, "");
 }
 
 export const API_URL = resolveApiUrl();
+
+const neonAuthUrl = process.env.EXPO_PUBLIC_NEON_AUTH_URL;
+if (!neonAuthUrl) {
+	throw new Error("EXPO_PUBLIC_NEON_AUTH_URL must be set for Neon Auth");
+}
+
+export const NEON_AUTH_URL = neonAuthUrl;
