@@ -54,13 +54,15 @@ Use **`drizzle-zod`** to generate base Zod schemas from tables so DB ⇄ validat
 
 Migrations: generated via `drizzle-kit generate` and applied in CI/deploy — no `drizzle-kit push` against prod.
 
-## Auth (real implementation, replacing stubs)
+## Auth — Better Auth (adopted)
 
-- **argon2** (or bcrypt) password hashing.
-- **JWT access token** (short-lived, ~15m) + **refresh token with rotation** (hashed, stored in `refresh_tokens`, revocable → logout actually works).
-- Global NestJS **auth guard**, opted out per-route with the existing `@Public()` decorator (it currently guards nothing).
-- `@CurrentUser()` decorator resolves the JWT payload.
-- Rate limiting (`@nestjs/throttler`) on `/auth/*`.
+Auth is handled by **Better Auth** (wired with Neon Auth), not hand-rolled JWT:
+
+- Better Auth owns the `user`, `session`, `account`, `verification` tables — no custom password hashing, refresh-token, or email-verification tables.
+- App-specific user fields (`role: 'ngo' | 'volunteer' | 'admin'`, `phone`, `profile_photo`, `verification_status`) live as Better Auth additional fields or a 1:1 `user_profile` table.
+- NestJS guard validates the Better Auth session; `@Public()` opts routes out, `@CurrentUser()` resolves the session user.
+- Rate limiting (`@nestjs/throttler`) still applies on auth routes.
+- See `schema.md` → Amendments for the full DB reconciliation.
 
 ## Onboarding state lives server-side
 

@@ -41,7 +41,7 @@ export default function SignUp() {
 			if (result?.user) {
 				setUser(result.user);
 			}
-			router.replace("/(app)/success" as any);
+			router.replace("/success" as any);
 		} catch {
 			Alert.alert("Error", "Sign up failed. Please try again.");
 		} finally {

@@ -6,6 +6,7 @@ import { useAuthStore } from "@/store/auth-store";
 
 export default function Index() {
 	const email = useAuthStore((s) => s.email);
+	const role = useAuthStore((s) => s.role);
 	const isOnboarded = useAuthStore((s) => s.isOnboarded);
 	const { colors } = useTheme();
 	const router = useRouter();
@@ -13,12 +14,16 @@ export default function Index() {
 	useEffect(() => {
 		if (!email) {
 			router.replace("/(auth)/login");
-		} else if (!isOnboarded) {
+		} else if (!role) {
+			router.replace("/role-select" as any);
+		} else if (role === "ngo" && !isOnboarded) {
 			router.replace("/(onboarding)");
+		} else if (role === "ngo") {
+			router.replace("/(ngo)" as any);
 		} else {
-			router.replace("/(app)");
+			router.replace("/(volunteer)" as any);
 		}
-	}, [email, isOnboarded, router]);
+	}, [email, role, isOnboarded, router]);
 
 	return (
 		<View

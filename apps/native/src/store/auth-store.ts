@@ -31,15 +31,19 @@ const emptyProfile: OrgProfile = {
 	website: "",
 };
 
+export type UserRole = "ngo" | "volunteer";
+
 export interface AuthState {
 	user: User | null;
 	email: string | null;
+	role: UserRole | null;
 	orgProfile: OrgProfile;
 	isOnboarded: boolean;
 	isVerified: boolean;
 	isSkipped: boolean;
 	isHydrated: boolean;
 	setUser: (user: User) => void;
+	setRole: (role: UserRole) => void;
 	mergeProfile: (fields: Partial<OrgProfile>) => void;
 	setAuth: (email: string) => void;
 	setOnboarded: () => void;
@@ -55,12 +59,14 @@ export const useAuthStore = create<AuthState>()(
 		(set) => ({
 			user: null,
 			email: null,
+			role: null,
 			orgProfile: { ...emptyProfile },
 			isOnboarded: false,
 			isVerified: false,
 			isSkipped: false,
 			isHydrated: false,
 			setUser: (user) => set({ user, email: user.email }),
+			setRole: (role) => set({ role }),
 			mergeProfile: (fields) =>
 				set((state) => ({
 					orgProfile: { ...state.orgProfile, ...fields },
@@ -78,6 +84,7 @@ export const useAuthStore = create<AuthState>()(
 				set({
 					email: "guest@nabhya.app",
 					user: null,
+					role: "volunteer",
 					orgProfile: { ...emptyProfile },
 					isOnboarded: true,
 					isVerified: false,
@@ -88,6 +95,7 @@ export const useAuthStore = create<AuthState>()(
 				set({
 					user: null,
 					email: null,
+					role: null,
 					orgProfile: { ...emptyProfile },
 					isOnboarded: false,
 					isVerified: false,
@@ -113,6 +121,7 @@ export const useAuthStore = create<AuthState>()(
 			partialize: (state) => ({
 				user: state.user,
 				email: state.email,
+				role: state.role,
 				orgProfile: state.orgProfile,
 				isOnboarded: state.isOnboarded,
 				isVerified: state.isVerified,
