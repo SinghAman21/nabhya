@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { env } from "@nabhya/env/server";
 import { NestFactory } from "@nestjs/core";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app/app.module";
 import { GlobalExceptionFilter } from "./common/filters";
@@ -9,10 +10,21 @@ import { ResponseTransformInterceptor } from "./common/interceptors";
 async function bootstrap() {
 	// rawBody is required by the payment webhook: its signature is computed over
 	// the exact bytes sent, so a re-serialised JSON body would never verify.
-	const app = await NestFactory.create(AppModule, { rawBody: true });
+	const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+		rawBody: true,
+	});
 
 	// Global prefix for all routes — e.g. /api/users/me
 	app.setGlobalPrefix("api");
+
+	// Behind a load balancer the socket address is the proxy's. Without this
+	// every request looks like one client and rate limiting would throttle the
+	// entire user base together.
+	app.set("trust proxy", 1);
+
+	// Give in-flight requests a chance to finish on SIGTERM instead of dropping
+	// them mid-transaction during a rolling deploy.
+	app.enableShutdownHooks();
 
 	app.enableCors({
 		origin: env.CORS_ORIGIN,

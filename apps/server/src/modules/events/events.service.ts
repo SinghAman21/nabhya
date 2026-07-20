@@ -206,10 +206,11 @@ export class EventsService {
 					acceptedCount: events.acceptedCount,
 					coverImage: events.coverImage,
 					createdAt: events.createdAt,
+					// Table-qualified on purpose: an unqualified "id" here binds to
+					// event_applications.id, not events.id, and silently returns 0.
 					pendingApplications: sql<number>`(
-						select count(*)::int from ${eventApplications}
-						where ${eventApplications.eventId} = ${events.id}
-						  and ${eventApplications.status} = 'PENDING'
+						select count(*)::int from event_applications ea
+						where ea.event_id = events.id and ea.status = 'PENDING'
 					)`,
 				})
 				.from(events)

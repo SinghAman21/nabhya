@@ -192,6 +192,22 @@ export class PublishingController {
 		return this.impact.getVolunteerImpact(user.id);
 	}
 
+	/**
+	 * Closes events whose end time has passed.
+	 *
+	 * Nothing transitions an event out of PUBLISHED on its own, so without this
+	 * the "Past" filter stays empty and finished events keep accepting
+	 * applications. Exposed for a scheduler to call — see the deployment notes
+	 * in CLAUDE.md — and manually runnable from the admin console meanwhile.
+	 */
+	@Post("admin/events/close-finished")
+	@Roles("superadmin")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({ summary: "Mark finished events COMPLETED (idempotent)" })
+	closeFinishedEvents() {
+		return this.impact.closeFinishedEvents();
+	}
+
 	@Public()
 	@Get("organizations/:id/impact")
 	@ApiOperation({ summary: "An organization's public impact figures" })

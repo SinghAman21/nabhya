@@ -23,6 +23,7 @@ import {
 	Query,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import { CurrentUser, Public, Roles } from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthUser } from "../../common/types";
@@ -72,6 +73,7 @@ export class EngagementController {
 		return this.engagementService.listReviews(id, query);
 	}
 
+	@Throttle({ strict: { limit: 10, ttl: 60_000 } })
 	@Post("organizations/:id/reviews")
 	@Roles("volunteer")
 	@ApiBearerAuth("access-token")

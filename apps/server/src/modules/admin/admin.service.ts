@@ -212,18 +212,21 @@ export class AdminService {
 						fullName: users.fullName,
 						email: users.email,
 					},
+					// Table-qualified literals: inside a select-field template an
+					// unqualified "id" binds to the subquery's own table, so these
+					// silently counted zero.
 					pendingDocuments: sql<number>`(
-						select count(*)::int from ${organizationDocuments}
-						where ${organizationDocuments.organizationId} = ${organizations.id}
-						  and ${organizationDocuments.verificationStatus} = 'PENDING'
+						select count(*)::int from organization_documents od
+						where od.organization_id = organizations.id
+						  and od.verification_status = 'PENDING'
 					)`,
 					eventCount: sql<number>`(
-						select count(*)::int from ${events}
-						where ${events.organizationId} = ${organizations.id}
+						select count(*)::int from events e
+						where e.organization_id = organizations.id
 					)`,
 					needCount: sql<number>`(
-						select count(*)::int from ${organizationNeeds}
-						where ${organizationNeeds.organizationId} = ${organizations.id}
+						select count(*)::int from organization_needs n
+						where n.organization_id = organizations.id
 					)`,
 				})
 				.from(organizations)
@@ -462,24 +465,26 @@ export class AdminService {
 					status: users.status,
 					onboardedAt: users.onboardedAt,
 					createdAt: users.createdAt,
+					// Aliased and table-qualified. Interpolating the columns here
+					// rendered them unqualified, making "id" ambiguous between
+					// user_roles and roles — which made this endpoint throw 500.
 					roles: sql<string[]>`coalesce((
-						select array_agg(${roles.name})
-						from ${userRoles}
-						join ${roles} on ${roles.id} = ${userRoles.roleId}
-						where ${userRoles.userId} = ${users.id}
+						select array_agg(r.name)
+						from user_roles ur
+						join roles r on r.id = ur.role_id
+						where ur.user_id = users.id
 					), '{}')`,
 					applicationCount: sql<number>`(
-						select count(*)::int from ${eventApplications}
-						where ${eventApplications.volunteerId} = ${users.id}
+						select count(*)::int from event_applications ea
+						where ea.volunteer_id = users.id
 					)`,
 					acceptedCount: sql<number>`(
-						select count(*)::int from ${eventApplications}
-						where ${eventApplications.volunteerId} = ${users.id}
-						  and ${eventApplications.status} = 'ACCEPTED'
+						select count(*)::int from event_applications ea
+						where ea.volunteer_id = users.id and ea.status = 'ACCEPTED'
 					)`,
 					pledgeCount: sql<number>`(
-						select count(*)::int from ${needPledges}
-						where ${needPledges.userId} = ${users.id}
+						select count(*)::int from need_pledges np
+						where np.user_id = users.id
 					)`,
 				})
 				.from(users)

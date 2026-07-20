@@ -1,8 +1,10 @@
 import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { AuditModule } from "../common/audit";
 import { DatabaseModule } from "../common/database";
 import { JwtGuard, RolesGuard } from "../common/guards";
+import { throttlerConfig } from "../common/guards/throttler.config";
 import { StorageModule } from "../common/storage";
 import { AdminModule } from "../modules/admin/admin.module";
 import { CategoriesModule } from "../modules/categories/categories.module";
@@ -21,6 +23,7 @@ import { AppController } from "./app.controller";
 
 @Module({
 	imports: [
+		ThrottlerModule.forRoot(throttlerConfig),
 		DatabaseModule, // global — provides db to the whole app
 		AuditModule, // global — provides the activity trail writer
 		StorageModule, // global — provides object storage (R2, or a dev stub)
@@ -39,6 +42,12 @@ import { AppController } from "./app.controller";
 		AdminModule,
 	],
 	providers: [
+		// Order matters — guards run top to bottom. Rate limiting comes first so
+		// a flood is rejected before it costs a JWT verification and two queries.
+		{
+			provide: APP_GUARD,
+			useClass: ThrottlerGuard,
+		},
 		{
 			provide: APP_GUARD,
 			useClass: JwtGuard,

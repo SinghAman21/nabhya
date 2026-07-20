@@ -213,3 +213,49 @@ describe("NeedsService", () => {
 		});
 	});
 });
+
+describe("NeedsService — correlated counts", () => {
+	let db: TestDb;
+	let close: () => Promise<void>;
+	let service: NeedsService;
+
+	beforeAll(async () => {
+		({ db, close } = await createTestDb());
+		const audit = new AuditService(db as never);
+		service = new NeedsService(
+			db as never,
+			audit,
+			new OrganizationsService(db as never, audit, null as never),
+			new NotificationsService(db as never),
+		);
+	});
+
+	afterAll(async () => {
+		await close();
+	});
+
+	beforeEach(async () => {
+		await truncateAll(db);
+		await seedRoles(db);
+	});
+
+	it("reports the real number of pledges awaiting review", async () => {
+		const owner = await createUser(db, { role: "organisation" });
+		const org = await createOrganization(db, owner.id);
+		const need = await createNeed(db, org.id);
+
+		for (let i = 0; i < 2; i++) {
+			const volunteer = await createUser(db, { role: "volunteer" });
+			await createPledge(db, need.id, volunteer.id, { status: "PENDING" });
+		}
+		const accepted = await createUser(db, { role: "volunteer" });
+		await createPledge(db, need.id, accepted.id, { status: "ACCEPTED" });
+
+		const result = await service.listForMyOrganization(owner.id, {
+			page: 1,
+			limit: 20,
+		});
+
+		expect(result.items[0]?.pendingPledges).toBe(2);
+	});
+});

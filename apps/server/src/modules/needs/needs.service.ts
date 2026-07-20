@@ -216,10 +216,11 @@ export class NeedsService {
 					city: organizationNeeds.city,
 					expiresAt: organizationNeeds.expiresAt,
 					createdAt: organizationNeeds.createdAt,
+					// Table-qualified: see the note in EventsService — an unqualified
+					// "id" binds to need_pledges.id and the count is always zero.
 					pendingPledges: sql<number>`(
-						select count(*)::int from ${needPledges}
-						where ${needPledges.needId} = ${organizationNeeds.id}
-						  and ${needPledges.status} = 'PENDING'
+						select count(*)::int from need_pledges np
+						where np.need_id = organization_needs.id and np.status = 'PENDING'
 					)`,
 				})
 				.from(organizationNeeds)

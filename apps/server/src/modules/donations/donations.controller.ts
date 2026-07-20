@@ -13,6 +13,7 @@ import {
 	Req,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { SkipThrottle, Throttle } from "@nestjs/throttler";
 import type { Request } from "express";
 import {
 	CurrentUser,
@@ -33,6 +34,7 @@ export class DonationsController {
 	) {}
 
 	@OptionalAuth()
+	@Throttle({ strict: { limit: 10, ttl: 60_000 } })
 	@Post("donations/checkout")
 	@ApiOperation({
 		summary:
@@ -55,6 +57,10 @@ export class DonationsController {
 	 * authenticity comes from the signature over the raw body, not from auth.
 	 */
 	@Public()
+	// Never throttled: the provider retries on failure, and a 429 would drop a
+	// payment confirmation we can never reconstruct. Authenticity comes from the
+	// signature, so the endpoint is not open to meaningful abuse.
+	@SkipThrottle()
 	@Post("donations/webhook")
 	@ApiOperation({ summary: "Payment provider webhook (signature-verified)" })
 	handleWebhook(@Req() request: Request & { rawBody?: Buffer }) {

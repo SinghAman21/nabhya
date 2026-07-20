@@ -325,3 +325,55 @@ describe("EventsService", () => {
 		});
 	});
 });
+
+describe("EventsService — correlated counts", () => {
+	let db: TestDb;
+	let close: () => Promise<void>;
+	let service: EventsService;
+
+	beforeAll(async () => {
+		({ db, close } = await createTestDb());
+		const audit = new AuditService(db as never);
+		service = new EventsService(
+			db as never,
+			audit,
+			new OrganizationsService(db as never, audit, null as never),
+			new NotificationsService(db as never),
+		);
+	});
+
+	afterAll(async () => {
+		await close();
+	});
+
+	beforeEach(async () => {
+		await truncateAll(db);
+		await seedRoles(db);
+	});
+
+	it("reports the real number of applicants awaiting review", async () => {
+		// This drives the "N awaiting review" badge on the NGO events screen.
+		// A correlated subquery with unqualified columns silently resolves to the
+		// wrong table and returns 0 forever, which reads as "nothing to do".
+		const owner = await createUser(db, { role: "organisation" });
+		const org = await createOrganization(db, owner.id);
+		const event = await createEvent(db, org.id);
+
+		for (let i = 0; i < 3; i++) {
+			const volunteer = await createUser(db, { role: "volunteer" });
+			await createApplication(db, event.id, volunteer.id, {
+				status: "PENDING",
+			});
+		}
+		const accepted = await createUser(db, { role: "volunteer" });
+		await createApplication(db, event.id, accepted.id, { status: "ACCEPTED" });
+
+		const result = await service.listForMyOrganization(owner.id, {
+			page: 1,
+			limit: 20,
+		});
+
+		expect(result.items).toHaveLength(1);
+		expect(result.items[0]?.pendingApplications).toBe(3);
+	});
+});

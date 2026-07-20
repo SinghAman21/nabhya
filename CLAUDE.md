@@ -52,6 +52,17 @@ Root scripts: `dev`, `build`, `check`, `db:setup|push|studio|generate|migrate`.
 Server scripts worth knowing: `pnpm --filter server test` (Vitest), `test:watch`,
 `test:coverage`, and `verify:di` — see trap 0.
 
+### Deploying
+
+- **Probes.** `GET /api` is liveness (process up). `GET /api/health` is readiness
+  and actually queries the database, so point the load balancer at that one — and
+  check its `storage` field, which reads `stub` when R2 is unconfigured.
+- **Behind a proxy** the app calls `set("trust proxy", 1)`. Without a proxy in
+  front, remove it, or every client shares one rate-limit bucket.
+- **`POST /api/admin/events/close-finished`** must run on a schedule (hourly is
+  plenty). Nothing else moves an event out of PUBLISHED, so without it the
+  "Past" filter stays empty and finished events keep taking applications.
+
 **There is no web app.** `notes.md` plans `apps/web` as Next.js — not scaffolded yet.
 The superadmin console likely belongs there, not in Expo.
 
@@ -170,6 +181,12 @@ notifications, announcements, financial reports, and file uploads (see traps).
   `VERIFIED` + `ACTIVE`, so unverified or suspended NGOs can never surface.
 - Counter mutations (`events.accepted_count`, `needs.fulfilled_quantity`) happen inside
   a transaction with `SELECT … FOR UPDATE` on the parent row.
+- **Correlated subqueries in a `select()` must be written with literal,
+  table-qualified SQL.** Drizzle renders an interpolated `${table.column}`
+  *unqualified* inside a select-field template, so `${events.id}` becomes `"id"`
+  and binds to the subquery's own FROM. That silently compares a table to
+  itself — every such count read zero — or errors as ambiguous. Write
+  `from event_applications ea where ea.event_id = events.id` by hand instead.
 - Client data access is `lib/api/services.ts` (thin, typed) → `hooks/use-*.ts`
   (TanStack Query) → screens. Query keys are centralised in `lib/api/query-keys.ts`.
 - **Tests live in `apps/server/test/` (integration) and beside the source as

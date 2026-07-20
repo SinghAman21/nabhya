@@ -92,6 +92,9 @@ export const organizations = pgTable(
 		// Drives the superadmin verification queue.
 		index("organizations_verification_status_idx").on(table.verificationStatus),
 		index("organizations_city_idx").on(table.city),
+		// Proximity search filters on a latitude bounding box before computing
+		// haversine, so this is what keeps "NGOs near me" off a full scan.
+		index("organizations_latitude_idx").on(table.latitude),
 	],
 );
 

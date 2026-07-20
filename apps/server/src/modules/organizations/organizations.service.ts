@@ -181,39 +181,44 @@ export class OrganizationsService {
 			eq(organizations.status, "ACTIVE"),
 			isNotNull(organizations.latitude),
 			isNotNull(organizations.longitude),
+			// Cheap bounding box first, so the trig below runs on far fewer rows.
 			sql`${organizations.latitude}::float8
 				between ${latitude - latDelta} and ${latitude + latDelta}`,
 			sql`${organizations.longitude}::float8
 				between ${longitude - lonDelta} and ${longitude + lonDelta}`,
+			// The box is square; this trims the corners to a true radius. It lives
+			// in WHERE rather than HAVING because nothing here is aggregated — and
+			// that also lets the count query reuse the identical predicate.
+			sql`${distance} <= ${radiusKm}`,
 		);
 
-		const rows = await this.db
-			.select({
-				id: organizations.id,
-				organizationName: organizations.organizationName,
-				description: organizations.description,
-				logo: organizations.logo,
-				city: organizations.city,
-				state: organizations.state,
-				latitude: organizations.latitude,
-				longitude: organizations.longitude,
-				distanceKm: distance,
-			})
-			.from(organizations)
-			.where(where)
-			// The box is square; this trims the corners to a true radius.
-			.having(sql`${distance} <= ${radiusKm}`)
-			.groupBy(organizations.id)
-			.orderBy(distance)
-			.limit(limit)
-			.offset(offset);
+		const [rows, [totals]] = await Promise.all([
+			this.db
+				.select({
+					id: organizations.id,
+					organizationName: organizations.organizationName,
+					description: organizations.description,
+					logo: organizations.logo,
+					city: organizations.city,
+					state: organizations.state,
+					latitude: organizations.latitude,
+					longitude: organizations.longitude,
+					distanceKm: distance,
+				})
+				.from(organizations)
+				.where(where)
+				.orderBy(distance)
+				.limit(limit)
+				.offset(offset),
+			this.db.select({ value: count() }).from(organizations).where(where),
+		]);
 
 		return paginate(
 			rows.map((row) => ({
 				...row,
 				distanceKm: Math.round(Number(row.distanceKm) * 10) / 10,
 			})),
-			rows.length,
+			totals?.value ?? 0,
 			query,
 		);
 	}

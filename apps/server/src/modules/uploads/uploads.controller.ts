@@ -7,6 +7,7 @@ import {
 	ApiResponse,
 	ApiTags,
 } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import { CurrentUser } from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthUser } from "../../common/types";
@@ -25,6 +26,9 @@ export class UploadsController {
 		@Inject(UploadsService) private readonly uploadsService: UploadsService,
 	) {}
 
+	// Each ticket is a signed write into our bucket; a loose limit here is an
+	// invitation to fill it.
+	@Throttle({ strict: { limit: 20, ttl: 60_000 } })
 	@Post("intent")
 	@ApiOperation({ summary: "Get a pre-signed URL to upload a file" })
 	@ApiResponse({

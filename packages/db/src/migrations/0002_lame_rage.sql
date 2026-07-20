@@ -1,0 +1,1 @@
+CREATE INDEX "organizations_latitude_idx" ON "organizations" USING btree ("latitude");
