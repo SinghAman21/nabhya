@@ -1,4 +1,5 @@
 export * from "./auth";
+export * from "./domain";
 
 export interface ApiResponse<T> {
 	data: T;

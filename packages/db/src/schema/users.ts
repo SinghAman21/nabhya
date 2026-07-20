@@ -8,6 +8,7 @@ import {
 	uuid,
 	varchar,
 } from "drizzle-orm/pg-core";
+import { organizationAdmins, organizations } from "./organizations";
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 export const verificationStatusEnum = pgEnum("verification_status", [
@@ -37,11 +38,20 @@ export const users = pgTable("users", {
 	email: varchar("email").unique().notNull(),
 	phone: varchar("phone"),
 	profileImage: text("profile_image"),
+	bio: text("bio"),
+	city: varchar("city"),
+	state: varchar("state"),
 	emailVerified: boolean("email_verified").default(false),
 	verificationStatus: verificationStatusEnum("verification_status").default(
 		"PENDING",
 	),
 	status: userStatusEnum("status").default("ACTIVE"),
+	suspendedReason: text("suspended_reason"),
+	// Set when the role-specific onboarding flow is submitted. For an
+	// organisation the authoritative signal is still "does an organization row
+	// exist", but volunteers have no such row, so this is what gates their
+	// entry into the app.
+	onboardedAt: timestamp("onboarded_at"),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -86,6 +96,12 @@ export const userDocuments = pgTable("user_documents", {
 export const usersRelations = relations(users, ({ many }) => ({
 	userRoles: many(userRoles),
 	userDocuments: many(userDocuments),
+	ownedOrganizations: many(organizations),
+	organizationAdmins: many(organizationAdmins),
+	// Applications and pledges are intentionally not exposed as reverse
+	// relations: both child tables reference users twice (actor + reviewer),
+	// which Drizzle cannot disambiguate without relationName. Query those from
+	// the child side instead — e.g. eventApplications where volunteerId = ?
 }));
 
 export const rolesRelations = relations(roles, ({ many }) => ({

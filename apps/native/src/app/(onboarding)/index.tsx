@@ -7,14 +7,17 @@ import {
 	step2AddressSchema,
 	step4TeamSchema,
 } from "@nabhya/shared";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Pressable, ScrollView, View } from "react-native";
+import { Alert, Pressable, ScrollView, View } from "react-native";
 import { StepIndicator } from "@/components/step-indicator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Body, Caption, H2, Label } from "@/components/ui/typography";
+import { useCompleteOrgOnboarding } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/useTheme";
+import { apiErrorMessage } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 
 const STEPS = ["Org", "Address", "Docs", "Team", "Done"];
@@ -29,13 +32,49 @@ const ORG_TYPES = [
 export default function OnboardingFlow() {
 	const { colors, spacing } = useTheme();
 	const [step, setStep] = useState(0);
+	const router = useRouter();
 	const mergeProfile = useAuthStore((s) => s.mergeProfile);
 	const orgProfile = useAuthStore((s) => s.orgProfile);
-	const setOnboarded = useAuthStore((s) => s.setOnboarded);
 	const setSkipped = useAuthStore((s) => s.setSkipped);
+	const completeOnboarding = useCompleteOrgOnboarding();
 
 	const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
 	const back = () => setStep((s) => Math.max(s - 1, 0));
+
+	/**
+	 * The wizard collects into the local store step by step; this is the single
+	 * write to the server. Zeroed numeric fields mean "not provided" — the API
+	 * schema treats them as optional but rejects 0.
+	 */
+	const submit = () => {
+		completeOnboarding.mutate(
+			{
+				orgName: orgProfile.orgName,
+				phone: orgProfile.phone,
+				orgType: orgProfile.orgType as
+					| "trust"
+					| "society"
+					| "section8"
+					| "others",
+				address: orgProfile.address,
+				city: orgProfile.city,
+				state: orgProfile.state,
+				pincode: orgProfile.pincode,
+				teamSize: orgProfile.teamSize || undefined,
+				foundingYear: orgProfile.foundingYear || undefined,
+				description: orgProfile.description || undefined,
+				website: orgProfile.website || undefined,
+			},
+			{
+				onSuccess: () => router.replace("/success"),
+				onError: (error) =>
+					Alert.alert(
+						"Could not finish setup",
+						apiErrorMessage(error, "Please check your details and try again."),
+					),
+			},
+		);
+	};
 
 	return (
 		<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
@@ -92,11 +131,11 @@ export default function OnboardingFlow() {
 				)}
 				{step === 4 && (
 					<StepReview
-						onComplete={() => {
-							setOnboarded();
-						}}
+						submitting={completeOnboarding.isPending}
+						onComplete={submit}
 						onSkip={() => {
 							setSkipped();
+							router.replace("/(volunteer)");
 						}}
 					/>
 				)}
@@ -607,9 +646,11 @@ function StepTeam({
 function StepReview({
 	onComplete,
 	onSkip,
+	submitting,
 }: {
 	onComplete: () => void;
 	onSkip: () => void;
+	submitting: boolean;
 }) {
 	const { colors, spacing } = useTheme();
 	const profile = useAuthStore((s) => s.orgProfile);
@@ -726,11 +767,15 @@ function StepReview({
 				from settings. Documents can be uploaded after verification.
 			</Body>
 
-			<Button onPress={onComplete} style={{ marginBottom: spacing[3] }}>
+			<Button
+				onPress={onComplete}
+				loading={submitting}
+				style={{ marginBottom: spacing[3] }}
+			>
 				Complete setup
 			</Button>
 
-			<Button variant="ghost" onPress={onSkip}>
+			<Button variant="ghost" onPress={onSkip} disabled={submitting}>
 				Skip verification — browse first
 			</Button>
 		</View>

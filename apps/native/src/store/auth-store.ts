@@ -1,7 +1,8 @@
+import type { Role } from "@nabhya/shared";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { storage } from "@/lib/storage";
-import type { User } from "@/lib/types";
+import type { OnboardingStatus, User } from "@/lib/types";
 
 export interface OrgProfile {
 	orgName: string;
@@ -31,12 +32,18 @@ const emptyProfile: OrgProfile = {
 	website: "",
 };
 
-export type UserRole = "ngo" | "volunteer";
+/**
+ * Canonical vocabulary — `organisation`, not `ngo`. The Expo route group is
+ * still called `(ngo)` for readability, but the role value matches the server
+ * and the `roles` table.
+ */
+export type UserRole = Role;
 
 export interface AuthState {
 	user: User | null;
 	email: string | null;
 	role: UserRole | null;
+	/** Draft state for the multi-step NGO onboarding wizard. */
 	orgProfile: OrgProfile;
 	isOnboarded: boolean;
 	isVerified: boolean;
@@ -49,7 +56,8 @@ export interface AuthState {
 	setOnboarded: () => void;
 	setVerified: () => void;
 	setSkipped: () => void;
-	setGuestMode: () => void;
+	/** Reconciles cached routing state with the server's answer. */
+	syncFromStatus: (status: OnboardingStatus) => void;
 	signOut: () => void;
 	hydrate: () => void;
 }
@@ -72,7 +80,7 @@ export const useAuthStore = create<AuthState>()(
 					orgProfile: { ...state.orgProfile, ...fields },
 				})),
 			setAuth: (email) => set({ email }),
-			setOnboarded: () => set({ isOnboarded: true }),
+			setOnboarded: () => set({ isOnboarded: true, isSkipped: false }),
 			setVerified: () => set({ isVerified: true, isSkipped: false }),
 			setSkipped: () =>
 				set({
@@ -80,15 +88,13 @@ export const useAuthStore = create<AuthState>()(
 					isOnboarded: true,
 					isVerified: false,
 				}),
-			setGuestMode: () =>
+			syncFromStatus: (status) =>
 				set({
-					email: "guest@nabhya.app",
-					user: null,
-					role: "volunteer",
-					orgProfile: { ...emptyProfile },
-					isOnboarded: true,
-					isVerified: false,
-					isSkipped: true,
+					role: status.role,
+					isOnboarded: status.isOnboarded,
+					isVerified:
+						status.organization?.verificationStatus === "VERIFIED" ||
+						status.verificationStatus === "VERIFIED",
 				}),
 			signOut: () => {
 				void storage.remove("accessToken");

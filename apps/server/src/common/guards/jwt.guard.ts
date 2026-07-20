@@ -1,5 +1,5 @@
 import type { db as dbType } from "@nabhya/db";
-import { roles, userRoles, users } from "@nabhya/db/schema";
+import { userRoles, users } from "@nabhya/db/schema";
 import { env } from "@nabhya/env/server";
 import {
 	type CanActivate,
@@ -13,8 +13,9 @@ import { Reflector } from "@nestjs/core";
 import { eq } from "drizzle-orm";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { DB_TOKEN } from "../database";
+import { IS_OPTIONAL_AUTH_KEY } from "../decorators/optional-auth.decorator";
 import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
-import type { NeonJwtPayload } from "../types";
+import type { AuthUser, NeonJwtPayload, UserRole } from "../types";
 
 @Injectable()
 export class JwtGuard implements CanActivate {
@@ -38,16 +39,23 @@ export class JwtGuard implements CanActivate {
 			return true;
 		}
 
+		const isOptional = this.reflector.getAllAndOverride<boolean>(
+			IS_OPTIONAL_AUTH_KEY,
+			[context.getHandler(), context.getClass()],
+		);
+
 		const request = context.switchToHttp().getRequest();
 		const authHeader = request.headers.authorization;
 
 		if (!authHeader) {
+			if (isOptional) return true;
 			throw new UnauthorizedException("Authorization header missing");
 		}
 
 		const [scheme, token] = authHeader.split(" ");
 
 		if (scheme !== "Bearer" || !token) {
+			if (isOptional) return true;
 			throw new UnauthorizedException("Token missing");
 		}
 
@@ -67,19 +75,24 @@ export class JwtGuard implements CanActivate {
 				with: { role: true },
 			});
 
-			const assignedRoles = roleRows.map((ur) => ur.role.name);
+			const assignedRoles = roleRows.map((ur) => ur.role.name) as UserRole[];
 
-			// Attach fully loaded user to request
+			// Attach fully loaded user to request. `roles` is empty until the user
+			// picks one on the role-select screen — routes that need a role are
+			// gated by @Roles() rather than by a server-side default.
 			request.user = {
 				id: dbUser.id,
 				email: dbUser.email,
-				role: assignedRoles[0] ?? "volunteer",
+				role: assignedRoles[0] ?? null,
 				roles: assignedRoles,
 				name: dbUser.fullName,
-			};
+			} satisfies AuthUser;
 
 			return true;
 		} catch (error) {
+			// On an optional-auth route a bad token simply means "anonymous" —
+			// a stale token in the app must not break the public feed.
+			if (isOptional) return true;
 			if (error instanceof UnauthorizedException) throw error;
 			this.logger.warn(
 				`Neon JWT verification failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -124,33 +137,18 @@ export class JwtGuard implements CanActivate {
 			}
 		}
 
-		if (!dbUser || dbUser.status !== "ACTIVE") {
-			throw new UnauthorizedException("User account is not active");
+		if (!dbUser) {
+			throw new UnauthorizedException("User account could not be resolved");
 		}
 
-		const currentRoles = await this.db.query.userRoles.findMany({
-			where: eq(userRoles.userId, dbUser.id),
-		});
-		if (currentRoles.length === 0) {
-			let volunteerRole = await this.db.query.roles.findFirst({
-				where: eq(roles.name, "volunteer"),
-			});
-			if (!volunteerRole) {
-				const [createdRole] = await this.db
-					.insert(roles)
-					.values({
-						name: "volunteer",
-						description: "Default application role",
-					})
-					.returning();
-				volunteerRole = createdRole;
-			}
-			if (volunteerRole) {
-				await this.db.insert(userRoles).values({
-					userId: dbUser.id,
-					roleId: volunteerRole.id,
-				});
-			}
+		if (dbUser.status === "SUSPENDED") {
+			throw new UnauthorizedException(
+				"Your account has been suspended. Contact support for help.",
+			);
+		}
+
+		if (dbUser.status !== "ACTIVE") {
+			throw new UnauthorizedException("User account is not active");
 		}
 
 		return dbUser;

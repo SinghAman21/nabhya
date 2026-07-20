@@ -9,7 +9,7 @@ export default function NgoLayout() {
 	const role = useAuthStore((s) => s.role);
 	const { colors } = useTheme();
 
-	if (role !== "ngo") return <Redirect href="/" />;
+	if (role !== "organisation") return <Redirect href="/" />;
 
 	return (
 		<View style={{ flex: 1 }}>

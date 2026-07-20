@@ -52,6 +52,9 @@ export default function RootLayout() {
 						<Stack.Screen name="(onboarding)" />
 						<Stack.Screen name="(ngo)" />
 						<Stack.Screen name="(volunteer)" />
+						<Stack.Screen name="(admin)" />
+						{/* Public — browsable without an account */}
+						<Stack.Screen name="events" />
 						<Stack.Screen name="success" />
 					</Stack>
 					<PortalHost />

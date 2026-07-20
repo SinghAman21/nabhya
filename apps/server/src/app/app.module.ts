@@ -1,14 +1,28 @@
 import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
+import { AuditModule } from "../common/audit";
 import { DatabaseModule } from "../common/database";
 import { JwtGuard, RolesGuard } from "../common/guards";
+import { AdminModule } from "../modules/admin/admin.module";
+import { CategoriesModule } from "../modules/categories/categories.module";
+import { EventsModule } from "../modules/events/events.module";
+import { NeedsModule } from "../modules/needs/needs.module";
+import { OnboardingModule } from "../modules/onboarding/onboarding.module";
+import { OrganizationsModule } from "../modules/organizations/organizations.module";
 import { UsersModule } from "../modules/users/users.module";
 import { AppController } from "./app.controller";
 
 @Module({
 	imports: [
 		DatabaseModule, // global — provides db to the whole app
+		AuditModule, // global — provides the activity trail writer
 		UsersModule,
+		OnboardingModule,
+		OrganizationsModule,
+		CategoriesModule,
+		EventsModule,
+		NeedsModule,
+		AdminModule,
 	],
 	providers: [
 		{

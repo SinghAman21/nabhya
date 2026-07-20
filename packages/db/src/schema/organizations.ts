@@ -2,13 +2,19 @@ import { relations } from "drizzle-orm";
 import {
 	boolean,
 	decimal,
+	index,
+	integer,
 	pgEnum,
 	pgTable,
 	text,
 	timestamp,
+	uniqueIndex,
 	uuid,
 	varchar,
 } from "drizzle-orm/pg-core";
+import { organizationCategories } from "./categories";
+import { events } from "./events";
+import { organizationNeeds } from "./needs";
 import { users } from "./users";
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
@@ -33,36 +39,61 @@ export const docVerificationStatusEnum = pgEnum("doc_verification_status", [
 	"VERIFIED",
 	"REJECTED",
 ]);
+export const orgTypeEnum = pgEnum("org_type", [
+	"TRUST",
+	"SOCIETY",
+	"SECTION_8",
+	"OTHERS",
+]);
 
 // ─── Organization Table ──────────────────────────────────────────────────────
-export const organizations = pgTable("organizations", {
-	id: uuid("id").primaryKey().defaultRandom(),
-	ownerUserId: uuid("owner_user_id")
-		.notNull()
-		.references(() => users.id, { onDelete: "restrict" }),
-	organizationName: varchar("organization_name").notNull(),
-	registrationNumber: varchar("registration_number"),
-	email: varchar("email"),
-	phone: varchar("phone"),
-	description: text("description"),
-	mission: text("mission"),
-	vision: text("vision"),
-	website: varchar("website"),
-	logo: text("logo"),
-	coverImage: text("cover_image"),
-	address: text("address"),
-	city: varchar("city"),
-	state: varchar("state"),
-	pincode: varchar("pincode"),
-	latitude: decimal("latitude"),
-	longitude: decimal("longitude"),
-	verificationStatus: orgVerificationStatusEnum("verification_status").default(
-		"PENDING",
-	),
-	status: orgStatusEnum("status").default("ACTIVE"),
-	createdAt: timestamp("created_at").defaultNow().notNull(),
-	updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export const organizations = pgTable(
+	"organizations",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		ownerUserId: uuid("owner_user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "restrict" }),
+		organizationName: varchar("organization_name").notNull(),
+		orgType: orgTypeEnum("org_type"),
+		registrationNumber: varchar("registration_number"),
+		email: varchar("email"),
+		phone: varchar("phone"),
+		description: text("description"),
+		mission: text("mission"),
+		vision: text("vision"),
+		website: varchar("website"),
+		logo: text("logo"),
+		coverImage: text("cover_image"),
+		address: text("address"),
+		city: varchar("city"),
+		state: varchar("state"),
+		pincode: varchar("pincode"),
+		latitude: decimal("latitude"),
+		longitude: decimal("longitude"),
+		teamSize: integer("team_size"),
+		foundingYear: integer("founding_year"),
+		verificationStatus: orgVerificationStatusEnum(
+			"verification_status",
+		).default("PENDING"),
+		rejectionReason: text("rejection_reason"),
+		reviewedBy: uuid("reviewed_by").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		reviewedAt: timestamp("reviewed_at"),
+		status: orgStatusEnum("status").default("ACTIVE"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(table) => [
+		// One organization per owner — enforced in the DB so a double-submitted
+		// onboarding form cannot create a duplicate NGO.
+		uniqueIndex("organizations_owner_unique").on(table.ownerUserId),
+		// Drives the superadmin verification queue.
+		index("organizations_verification_status_idx").on(table.verificationStatus),
+		index("organizations_city_idx").on(table.city),
+	],
+);
 
 // ─── OrganizationAdmin Table ─────────────────────────────────────────────────
 export const organizationAdmins = pgTable("organization_admins", {
@@ -105,6 +136,9 @@ export const organizationsRelations = relations(
 		}),
 		admins: many(organizationAdmins),
 		documents: many(organizationDocuments),
+		events: many(events),
+		needs: many(organizationNeeds),
+		organizationCategories: many(organizationCategories),
 	}),
 );
 
