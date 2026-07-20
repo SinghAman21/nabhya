@@ -49,6 +49,9 @@ scripts/         interactive Neon setup wizard (pnpm db:setup)
 
 Root scripts: `dev`, `build`, `check`, `db:setup|push|studio|generate|migrate`.
 
+Server scripts worth knowing: `pnpm --filter server test` (Vitest), `test:watch`,
+`test:coverage`, and `verify:di` — see trap 0.
+
 **There is no web app.** `notes.md` plans `apps/web` as Next.js — not scaffolded yet.
 The superadmin console likely belongs there, not in Expo.
 
@@ -169,20 +172,51 @@ notifications, announcements, financial reports, and file uploads (see traps).
   a transaction with `SELECT … FOR UPDATE` on the parent row.
 - Client data access is `lib/api/services.ts` (thin, typed) → `hooks/use-*.ts`
   (TanStack Query) → screens. Query keys are centralised in `lib/api/query-keys.ts`.
+- **Tests live in `apps/server/test/` (integration) and beside the source as
+  `*.spec.ts` (unit).** Integration specs run against a real Postgres compiled to
+  WASM via PGlite — no Docker, no external service — built from the committed
+  migrations, so a spec fails if migrations drift from the schema. `test/harness.ts`
+  creates the database; `test/factories.ts` builds rows. Mocking the database here
+  would defeat the point: the logic worth testing is unique indexes, `SELECT … FOR
+  UPDATE` and filtered aggregates.
 - Screens compose `components/screen-shell.tsx` (`ScreenHeader`, `Surface`,
   `EmptyState`, `LoadingState`, `ErrorState`, `FilterChips`) + `status-pill.tsx`.
+- **Files are uploaded straight to object storage, never through the API.** The
+  client asks `POST /api/uploads/intent` for a pre-signed ticket, PUTs the bytes
+  to it (plain `fetch`, not the axios instance — an Authorization header would
+  break the signature), then submits the returned **object key**. Keys, not URLs,
+  are what get stored: `document_key` holds `org-documents/{orgId}/{uuid}-name`.
+  The owning id is baked into the key, which is how download authorisation works
+  without trusting the client. Reads go through `POST /api/uploads/download-url`
+  for a short-lived signed URL. `UploadsService.assertUploaded` HEADs the object
+  before any key is persisted, since a signed PUT cannot cap body size.
 
 ## Known traps
 
 Verify these are still true before relying on them.
 
-1. **`drizzle-kit push` runs on every non-production boot** in
-   `apps/server/src/common/database/database.module.ts`, and `src/migrations/` doesn't
-   exist. Data-loss footgun once there are real records — move to generated migrations
-   before any real data lands.
-2. **Document URLs are plain text columns with no upload path.** Verification is the
-   spine of the product, but nothing writes these — the upload endpoints take a URL
-   string. Needs S3/R2 before verification works end to end.
+0. **Every constructor parameter needs an explicit `@Inject(Token)`.** `tsx` and
+   `tsdown` both use esbuild, which does not implement `emitDecoratorMetadata`
+   even though `tsconfig.json` enables it. So `design:paramtypes` is always
+   `undefined`, Nest thinks the class has no dependencies, constructs it with
+   zero arguments, and every service silently becomes `undefined` — it boots
+   fine and 500s on the first request. Typecheck cannot catch this.
+   Run `pnpm --filter server verify:di` after touching any constructor; it
+   resolves every controller and service and fails if a dependency is missing.
+   Beware the linter: with `verbatimModuleSyntax` on, a service used only as a
+   type gets rewritten to `import type`, which erases the class and breaks
+   injection. `@Inject(X)` keeps X a value, which prevents that.
+
+1. **`drizzle-kit push` still runs on every non-production boot** in
+   `apps/server/src/common/database/database.module.ts`. Generated migrations now
+   exist in `packages/db/src/migrations/` (run `pnpm --filter @nabhya/db db:generate`
+   after a schema change), but nothing applies them automatically yet — push is still
+   what mutates your dev database. Switch the boot path to `db:migrate` before real
+   data lands.
+2. **Without R2 credentials the server uses an in-memory storage stub.** Uploads
+   appear to succeed and are discarded; a restart loses them. Set `R2_ACCOUNT_ID`,
+   `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_BUCKET` in
+   `apps/server/.env.local` for real storage. The stub is refused in production.
 3. **No way to mint the first superadmin over HTTP.** `AdminService.grantSuperadmin`
    exists and is deliberately not routed; call it from a script or set `user_roles` by
    hand, otherwise `(admin)` is unreachable.
