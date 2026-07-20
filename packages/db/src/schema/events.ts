@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import {
+	decimal,
 	index,
 	integer,
 	pgEnum,
@@ -45,6 +46,11 @@ export const events = pgTable(
 		address: text("address"),
 		city: varchar("city"),
 		state: varchar("state"),
+		// Optional coordinates powering "events near me". Distance is computed
+		// with haversine in SQL rather than PostGIS — one dependency fewer, and
+		// accurate enough at city scale.
+		latitude: decimal("latitude"),
+		longitude: decimal("longitude"),
 
 		// When
 		startAt: timestamp("start_at").notNull(),
@@ -90,6 +96,11 @@ export const eventApplications = pgTable(
 			onDelete: "set null",
 		}),
 		reviewedAt: timestamp("reviewed_at"),
+		/**
+		 * Set when the organization confirms the volunteer turned up. Gates
+		 * certificate issuance — a certificate can never exist without it.
+		 */
+		attendedAt: timestamp("attended_at"),
 		appliedAt: timestamp("applied_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},

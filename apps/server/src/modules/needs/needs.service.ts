@@ -33,10 +33,11 @@ import {
 	type SQL,
 	sql,
 } from "drizzle-orm";
-import type { AuditService } from "../../common/audit";
+import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
-import type { OrganizationsService } from "../organizations/organizations.service";
+import { NotificationsService } from "../notifications/notifications.service";
+import { OrganizationsService } from "../organizations/organizations.service";
 
 const publicNeedColumns = {
 	id: organizationNeeds.id,
@@ -65,8 +66,11 @@ const publicNeedColumns = {
 export class NeedsService {
 	constructor(
 		@Inject(DB_TOKEN) private readonly db: typeof dbType,
-		private readonly audit: AuditService,
+		@Inject(AuditService) private readonly audit: AuditService,
+		@Inject(OrganizationsService)
 		private readonly organizationsService: OrganizationsService,
+		@Inject(NotificationsService)
+		private readonly notifications: NotificationsService,
 	) {}
 
 	// ─── Public feed ─────────────────────────────────────────────────────────
@@ -356,6 +360,8 @@ export class NeedsService {
 				status: organizationNeeds.status,
 				expiresAt: organizationNeeds.expiresAt,
 				organizationId: organizationNeeds.organizationId,
+				quantity: organizationNeeds.quantity,
+				unit: organizationNeeds.unit,
 			})
 			.from(organizationNeeds)
 			.innerJoin(
@@ -379,6 +385,15 @@ export class NeedsService {
 		}
 		if (need.expiresAt && need.expiresAt < new Date()) {
 			throw new BadRequestException("This post has expired.");
+		}
+
+		// A quantified need tracks progress through `fulfilledQuantity`, which
+		// advances by the pledged amount. A pledge without one would be accepted
+		// but count for nothing, so the need could never reach FULFILLED.
+		if (need.quantity !== null && !input.quantity) {
+			throw new BadRequestException(
+				`Tell us how many ${need.unit ?? "items"} you can provide.`,
+			);
 		}
 
 		const existing = await this.db.query.needPledges.findFirst({
@@ -558,7 +573,7 @@ export class NeedsService {
 				return pledge;
 			}
 
-			const [updated] = await tx
+			const updatedRows = await tx
 				.update(needPledges)
 				.set({
 					status: input.status,
@@ -596,7 +611,21 @@ export class NeedsService {
 					.where(eq(organizationNeeds.id, needId));
 			}
 
-			return updated;
+			return takeFirstOrThrow(updatedRows, "review need pledge");
+		});
+
+		void this.notifications.notify({
+			userId: result.userId,
+			type: input.status === "REJECTED" ? "PLEDGE_REJECTED" : "PLEDGE_ACCEPTED",
+			title:
+				input.status === "REJECTED"
+					? "Your offer wasn't accepted"
+					: input.status === "COMPLETED"
+						? "Your donation was received"
+						: "Your offer was accepted",
+			body: input.reviewNote ?? undefined,
+			entityName: "ORGANIZATION_NEED",
+			entityId: needId,
 		});
 
 		void this.audit.record({

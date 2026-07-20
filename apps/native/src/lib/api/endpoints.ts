@@ -74,3 +74,58 @@ export const ADMIN = {
 export const CATEGORIES = {
 	LIST: `${API_PREFIX}/categories`,
 } as const;
+
+export const UPLOADS = {
+	INTENT: `${API_PREFIX}/uploads/intent`,
+	DOWNLOAD_URL: `${API_PREFIX}/uploads/download-url`,
+} as const;
+
+export const NOTIFICATIONS = {
+	LIST: `${API_PREFIX}/notifications`,
+	UNREAD_COUNT: `${API_PREFIX}/notifications/unread-count`,
+	READ: `${API_PREFIX}/notifications/read`,
+	BROADCAST: `${API_PREFIX}/notifications/broadcast`,
+} as const;
+
+export const ENGAGEMENT = {
+	MY_BOOKMARKS: `${API_PREFIX}/me/bookmarks`,
+	ORG_REVIEWS: `${API_PREFIX}/org/reviews`,
+	bookmark: (id: string) => `${API_PREFIX}/organizations/${id}/bookmark`,
+	reviews: (id: string) => `${API_PREFIX}/organizations/${id}/reviews`,
+	myReview: (id: string) => `${API_PREFIX}/organizations/${id}/reviews/me`,
+	replyToReview: (reviewId: string) =>
+		`${API_PREFIX}/org/reviews/${reviewId}/reply`,
+} as const;
+
+export const CERTIFICATES = {
+	MINE: `${API_PREFIX}/me/certificates`,
+	pdf: (id: string) => `${API_PREFIX}/me/certificates/${id}/pdf`,
+	verify: (code: string) => `${API_PREFIX}/certificates/${code}/verify`,
+	attendance: (eventId: string, applicationId: string) =>
+		`${API_PREFIX}/org/events/${eventId}/applications/${applicationId}/attendance`,
+	issue: (eventId: string, applicationId: string) =>
+		`${API_PREFIX}/org/events/${eventId}/applications/${applicationId}/certificate`,
+	revoke: (id: string) => `${API_PREFIX}/org/certificates/${id}/revoke`,
+} as const;
+
+export const DONATIONS = {
+	CHECKOUT: `${API_PREFIX}/donations/checkout`,
+	MINE: `${API_PREFIX}/me/donations`,
+	ORG: `${API_PREFIX}/org/donations`,
+	receipt: (id: string) => `${API_PREFIX}/me/donations/${id}/receipt`,
+} as const;
+
+export const PUBLISHING = {
+	MY_ANNOUNCEMENTS: `${API_PREFIX}/org/announcements`,
+	MY_REPORTS: `${API_PREFIX}/org/reports`,
+	TEAM: `${API_PREFIX}/org/team`,
+	MY_IMPACT: `${API_PREFIX}/me/impact`,
+	NEARBY: `${API_PREFIX}/organizations/nearby`,
+	announcements: (orgId: string) =>
+		`${API_PREFIX}/organizations/${orgId}/announcements`,
+	reports: (orgId: string) => `${API_PREFIX}/organizations/${orgId}/reports`,
+	impact: (orgId: string) => `${API_PREFIX}/organizations/${orgId}/impact`,
+	announcement: (id: string) => `${API_PREFIX}/org/announcements/${id}`,
+	report: (id: string) => `${API_PREFIX}/org/reports/${id}`,
+	teamMember: (id: string) => `${API_PREFIX}/org/team/${id}`,
+} as const;

@@ -116,7 +116,7 @@ export const organizationDocuments = pgTable("organization_documents", {
 		.notNull()
 		.references(() => organizations.id, { onDelete: "cascade" }),
 	documentType: documentTypeEnum("document_type").notNull(),
-	documentUrl: text("document_url").notNull(),
+	documentKey: text("document_key").notNull(),
 	verificationStatus: docVerificationStatusEnum("verification_status").default(
 		"PENDING",
 	),

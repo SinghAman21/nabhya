@@ -17,6 +17,7 @@ import {
 	Controller,
 	Delete,
 	Get,
+	Inject,
 	Param,
 	ParseUUIDPipe,
 	Patch,
@@ -32,7 +33,7 @@ import {
 import { CurrentUser, Roles } from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthUser } from "../../common/types";
-import type { NeedsService } from "./needs.service";
+import { NeedsService } from "./needs.service";
 
 /**
  * "We need X" / "We're giving away Y" management for the caller's organization.
@@ -42,7 +43,9 @@ import type { NeedsService } from "./needs.service";
 @Roles("organisation")
 @ApiBearerAuth("access-token")
 export class OrgNeedsController {
-	constructor(private readonly needsService: NeedsService) {}
+	constructor(
+		@Inject(NeedsService) private readonly needsService: NeedsService,
+	) {}
 
 	@Get()
 	@ApiOperation({ summary: "List the organization's posts" })

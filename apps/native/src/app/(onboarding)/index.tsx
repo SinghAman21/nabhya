@@ -35,7 +35,6 @@ export default function OnboardingFlow() {
 	const router = useRouter();
 	const mergeProfile = useAuthStore((s) => s.mergeProfile);
 	const orgProfile = useAuthStore((s) => s.orgProfile);
-	const setSkipped = useAuthStore((s) => s.setSkipped);
 	const completeOnboarding = useCompleteOrgOnboarding();
 
 	const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -56,6 +55,7 @@ export default function OnboardingFlow() {
 					| "society"
 					| "section8"
 					| "others",
+				registrationNumber: orgProfile.registrationNumber,
 				address: orgProfile.address,
 				city: orgProfile.city,
 				state: orgProfile.state,
@@ -90,6 +90,7 @@ export default function OnboardingFlow() {
 						defaultValues={{
 							orgName: orgProfile.orgName,
 							phone: orgProfile.phone,
+							registrationNumber: orgProfile.registrationNumber,
 							orgType:
 								(orgProfile.orgType as Step1BasicInfo["orgType"] | "") ||
 								("" as never),
@@ -133,10 +134,11 @@ export default function OnboardingFlow() {
 					<StepReview
 						submitting={completeOnboarding.isPending}
 						onComplete={submit}
-						onSkip={() => {
-							setSkipped();
-							router.replace("/(volunteer)");
-						}}
+						// Skipping sends them to the public event feed, which needs no
+						// role. Routing into (volunteer) would bounce: the role is
+						// "organisation", so that layout redirects to "/", which sees no
+						// organization and sends them straight back here.
+						onSkip={() => router.replace("/events")}
 					/>
 				)}
 			</ScrollView>
@@ -165,7 +167,7 @@ export default function OnboardingFlow() {
 						color="secondary"
 						style={{ textAlign: "center", marginBottom: spacing[4] }}
 					>
-						You can add documents later from settings.
+						You'll upload these from your profile after setup.
 					</Body>
 					<View style={{ flexDirection: "row", gap: spacing[3] }}>
 						<View style={{ flex: 1 }}>
@@ -189,7 +191,12 @@ function StepBasicInfo({
 	defaultValues,
 	onSubmit,
 }: {
-	defaultValues: { orgName: string; phone: string; orgType: string };
+	defaultValues: {
+		orgName: string;
+		phone: string;
+		orgType: string;
+		registrationNumber: string;
+	};
 	onSubmit: (data: Step1BasicInfo) => void;
 }) {
 	const { colors, spacing } = useTheme();
@@ -199,6 +206,7 @@ function StepBasicInfo({
 		defaultValues: {
 			orgName: defaultValues.orgName,
 			phone: defaultValues.phone,
+			registrationNumber: defaultValues.registrationNumber,
 			orgType: defaultValues.orgType as Step1BasicInfo["orgType"],
 		},
 	});
@@ -255,6 +263,27 @@ function StepBasicInfo({
 					style={{ marginTop: spacing[1] }}
 				>
 					{form.formState.errors.phone.message}
+				</Caption>
+			)}
+
+			<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
+				Registration number
+			</Label>
+			<Input
+				placeholder="As printed on your registration certificate"
+				value={form.watch("registrationNumber")}
+				onChangeText={(v) =>
+					form.setValue("registrationNumber", v, { shouldValidate: true })
+				}
+				autoCapitalize="characters"
+				style={inputStyle}
+			/>
+			{form.formState.errors.registrationNumber?.message && (
+				<Caption
+					color={colors.error.main as string}
+					style={{ marginTop: spacing[1] }}
+				>
+					{form.formState.errors.registrationNumber.message}
 				</Caption>
 			)}
 
@@ -449,50 +478,56 @@ const DOCUMENTS = [
 		title: "PAN card",
 		hint: "Organization PAN card for financial verification",
 	},
-	{ title: "Logo / Brand asset", hint: "Your NGO logo (optional)" },
+	{
+		title: "80G / 12A certificate",
+		hint: "If you have them — they unlock tax-deductible donations",
+	},
 ];
 
+/**
+ * Preview of what verification will ask for.
+ *
+ * Uploads genuinely cannot happen here: documents are stored against the
+ * organization, and the organization row is only created when this wizard is
+ * submitted. The real upload UI lives on the Profile tab straight afterwards.
+ */
 function StepDocuments() {
 	const { colors, spacing, borderRadius } = useTheme();
 
 	return (
 		<View>
-			<H2 style={{ marginBottom: spacing[1] }}>Upload documents</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
-				These help us verify your organization. You can skip and do this later.
+			<H2 style={{ marginBottom: spacing[1] }}>Verification documents</H2>
+			<Body color="tertiary" style={{ marginBottom: spacing[6] }}>
+				Here's what we'll ask for. You'll upload these from your profile once
+				setup is finished.
 			</Body>
 
-			{DOCUMENTS.map((doc, i) => (
+			{DOCUMENTS.map((doc) => (
 				<View
 					key={doc.title}
 					style={{
-						borderWidth: 2,
-						borderColor: colors.border.medium,
-						borderStyle: "dashed",
-						borderRadius: borderRadius.lg,
-						padding: spacing[6],
+						flexDirection: "row",
 						alignItems: "center",
-						marginBottom: spacing[4],
+						gap: spacing[3],
+						borderWidth: 1,
+						borderColor: colors.border.light,
+						backgroundColor: colors.background.primary,
+						borderRadius: borderRadius.lg,
+						padding: spacing[4],
+						marginBottom: spacing[3],
 					}}
 				>
-					<Body weight="medium" style={{ marginBottom: spacing[1] }}>
-						{doc.title}
-					</Body>
-					<Caption color="tertiary" style={{ textAlign: "center" }}>
-						{doc.hint}
-					</Caption>
 					<View
 						style={{
-							marginTop: spacing[3],
-							paddingHorizontal: spacing[4],
-							paddingVertical: spacing[1.5],
-							borderRadius: borderRadius.sm,
-							backgroundColor: colors.background.tertiary,
+							width: 8,
+							height: 8,
+							borderRadius: 4,
+							backgroundColor: colors.border.dark,
 						}}
-					>
-						<Caption color="secondary" weight="medium">
-							Tap to upload
-						</Caption>
+					/>
+					<View style={{ flex: 1 }}>
+						<Body weight="medium">{doc.title}</Body>
+						<Caption color="tertiary">{doc.hint}</Caption>
 					</View>
 				</View>
 			))}
@@ -662,6 +697,7 @@ function StepReview({
 				{ key: "Name", val: profile.orgName },
 				{ key: "Phone", val: profile.phone },
 				{ key: "Type", val: profile.orgType },
+				{ key: "Registration no.", val: profile.registrationNumber },
 			],
 		},
 		{

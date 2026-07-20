@@ -14,7 +14,9 @@ import {
 	humanizeStatus,
 	StatusPill,
 } from "@/components/status-pill";
-import { Body, Caption, H2 } from "@/components/ui/typography";
+import { Input } from "@/components/ui/input";
+import { Body, Caption, H2, Label } from "@/components/ui/typography";
+import { useIssueCertificate, useMarkAttendance } from "@/hooks/use-engagement";
 import { useEventApplicants, useReviewApplication } from "@/hooks/use-events";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
@@ -44,6 +46,7 @@ export function ApplicantsSheet({
 }) {
 	const { colors, spacing } = useTheme();
 	const [filter, setFilter] = useState<StatusFilter>("PENDING");
+	const [note, setNote] = useState("");
 
 	const query = useEventApplicants(
 		eventId ?? undefined,
@@ -56,8 +59,12 @@ export function ApplicantsSheet({
 		status: "ACCEPTED" | "REJECTED",
 	) => {
 		review.mutate(
-			{ applicationId: applicant.id, input: { status } },
 			{
+				applicationId: applicant.id,
+				input: { status, reviewNote: note.trim() || undefined },
+			},
+			{
+				onSuccess: () => setNote(""),
 				onError: (error) =>
 					Alert.alert("Could not update", apiErrorMessage(error)),
 			},
@@ -114,6 +121,22 @@ export function ApplicantsSheet({
 
 				<View style={{ paddingHorizontal: spacing[6], paddingTop: spacing[4] }}>
 					<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
+
+					<Label style={{ marginBottom: spacing[1.5] }}>
+						Note to the volunteer <Caption color="tertiary">(optional)</Caption>
+					</Label>
+					<Input
+						placeholder="Where to meet, what to bring, why they weren't selected"
+						value={note}
+						onChangeText={setNote}
+						style={{
+							borderWidth: 0,
+							borderRadius: 12,
+							backgroundColor: colors.background.tertiary,
+							paddingVertical: spacing[3],
+							marginBottom: spacing[4],
+						}}
+					/>
 				</View>
 
 				{query.isLoading ? (
@@ -148,6 +171,7 @@ export function ApplicantsSheet({
 						renderItem={({ item }) => (
 							<ApplicantRow
 								applicant={item}
+								eventId={eventId ?? ""}
 								canAccept={remainingPlaces > 0}
 								busy={review.isPending}
 								onDecide={(status) => decide(item, status)}
@@ -162,11 +186,13 @@ export function ApplicantsSheet({
 
 function ApplicantRow({
 	applicant,
+	eventId,
 	canAccept,
 	busy,
 	onDecide,
 }: {
 	applicant: EventApplicant;
+	eventId: string;
 	canAccept: boolean;
 	busy: boolean;
 	onDecide: (status: "ACCEPTED" | "REJECTED") => void;
@@ -231,6 +257,10 @@ function ApplicantRow({
 				Applied {formatRelative(applicant.appliedAt)}
 			</Caption>
 
+			{applicant.status === "ACCEPTED" && (
+				<AttendanceControls applicant={applicant} eventId={eventId} />
+			)}
+
 			{isPending && (
 				<View
 					style={{
@@ -273,5 +303,121 @@ function ApplicantRow({
 				</View>
 			)}
 		</Surface>
+	);
+}
+
+/**
+ * Post-event controls for an accepted volunteer.
+ *
+ * Attendance is deliberately an explicit confirmation rather than something
+ * inferred from the event's end date, and the server refuses to issue a
+ * certificate without it.
+ */
+function AttendanceControls({
+	applicant,
+	eventId,
+}: {
+	applicant: EventApplicant;
+	eventId: string;
+}) {
+	const { colors, spacing } = useTheme();
+	const [note, setNote] = useState("");
+	const [showNote, setShowNote] = useState(false);
+
+	const attendance = useMarkAttendance(eventId);
+	const issue = useIssueCertificate(eventId);
+
+	const attended = !!applicant.attendedAt;
+	const busy = attendance.isPending || issue.isPending;
+
+	const toggleAttendance = () => {
+		attendance.mutate(
+			{ applicationId: applicant.id, attended: !attended },
+			{
+				onError: (error) =>
+					Alert.alert("Could not update", apiErrorMessage(error)),
+			},
+		);
+	};
+
+	const issueCertificate = () => {
+		issue.mutate(
+			{ applicationId: applicant.id, note: note.trim() || undefined },
+			{
+				onSuccess: () => {
+					setNote("");
+					setShowNote(false);
+					Alert.alert("Certificate issued", "The volunteer has been notified.");
+				},
+				onError: (error) =>
+					Alert.alert("Could not issue", apiErrorMessage(error)),
+			},
+		);
+	};
+
+	return (
+		<View
+			style={{
+				marginTop: spacing[3],
+				paddingTop: spacing[3],
+				borderTopWidth: 1,
+				borderTopColor: colors.border.light,
+			}}
+		>
+			<View
+				style={{ flexDirection: "row", alignItems: "center", gap: spacing[4] }}
+			>
+				<Pressable onPress={toggleAttendance} disabled={busy} hitSlop={8}>
+					<Caption
+						weight="medium"
+						color={
+							attended
+								? (colors.success.main as string)
+								: (colors.primary.main as string)
+						}
+					>
+						{attended ? "✓ Attended" : "Mark attended"}
+					</Caption>
+				</Pressable>
+
+				{attended && (
+					<Pressable
+						onPress={() => setShowNote((v) => !v)}
+						disabled={busy}
+						hitSlop={8}
+					>
+						<Caption weight="medium" color={colors.primary.main as string}>
+							Issue certificate
+						</Caption>
+					</Pressable>
+				)}
+			</View>
+
+			{showNote && (
+				<View style={{ marginTop: spacing[3] }}>
+					<Input
+						placeholder="Optional note — e.g. hours contributed"
+						value={note}
+						onChangeText={setNote}
+						style={{
+							borderWidth: 0,
+							borderRadius: 12,
+							backgroundColor: colors.background.tertiary,
+							paddingVertical: spacing[3],
+						}}
+					/>
+					<Pressable
+						onPress={issueCertificate}
+						disabled={busy}
+						hitSlop={8}
+						style={{ marginTop: spacing[2] }}
+					>
+						<Caption weight="bold" color={colors.primary.main as string}>
+							{issue.isPending ? "Issuing…" : "Confirm and issue"}
+						</Caption>
+					</Pressable>
+				</View>
+			)}
+		</View>
 	);
 }

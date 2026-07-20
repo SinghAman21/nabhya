@@ -57,6 +57,9 @@ export const updateOrganizationSchema = z.object({
 		.max(new Date().getFullYear())
 		.optional(),
 	categoryIds: z.array(z.uuid()).max(5).optional(),
+	// Set from the map picker; powers "NGOs near me".
+	latitude: z.coerce.number().min(-90).max(90).optional(),
+	longitude: z.coerce.number().min(-180).max(180).optional(),
 });
 
 export type UpdateOrganizationInput = z.infer<typeof updateOrganizationSchema>;
@@ -73,7 +76,7 @@ export const organizationDocumentTypeSchema = z.enum([
 
 export const uploadOrgDocumentSchema = z.object({
 	documentType: organizationDocumentTypeSchema,
-	documentUrl: z.string().trim().min(1, "Document URL is required").max(500),
+	documentKey: z.string().trim().min(1, "Upload a file first").max(500),
 });
 
 export type UploadOrgDocumentInput = z.infer<typeof uploadOrgDocumentSchema>;

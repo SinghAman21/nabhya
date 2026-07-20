@@ -1,7 +1,9 @@
 import type { NeedType } from "@nabhya/shared";
 import { HeartHandshake, Search } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, FlatList, RefreshControl, View } from "react-native";
+import { FlatList, RefreshControl, View } from "react-native";
+import { NotificationBell } from "@/components/notification-bell";
+import { PledgeSheet } from "@/components/pledge-sheet";
 import {
 	EmptyState,
 	ErrorState,
@@ -14,7 +16,7 @@ import { StatusPill, urgencyTone } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Body, Caption } from "@/components/ui/typography";
-import { useCreatePledge, usePublicNeeds } from "@/hooks/use-needs";
+import { usePublicNeeds } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatProgress, formatRelative } from "@/lib/format";
@@ -36,6 +38,7 @@ export default function Discover() {
 	const { colors, spacing } = useTheme();
 	const [filter, setFilter] = useState<Filter>("ALL");
 	const [search, setSearch] = useState("");
+	const [responding, setResponding] = useState<PublicNeed | null>(null);
 
 	const query = usePublicNeeds({
 		search: search.trim(),
@@ -54,6 +57,7 @@ export default function Discover() {
 			<ScreenHeader
 				title="Discover"
 				subtitle="What verified NGOs need right now — and what they're giving away."
+				action={<NotificationBell />}
 			/>
 
 			<View
@@ -117,33 +121,25 @@ export default function Discover() {
 							}
 						/>
 					}
-					renderItem={({ item }) => <NeedCard need={item} />}
+					renderItem={({ item }) => (
+						<NeedCard need={item} onRespond={() => setResponding(item)} />
+					)}
 				/>
 			)}
+
+			<PledgeSheet need={responding} onClose={() => setResponding(null)} />
 		</View>
 	);
 }
 
-function NeedCard({ need }: { need: PublicNeed }) {
+function NeedCard({
+	need,
+	onRespond,
+}: {
+	need: PublicNeed;
+	onRespond: () => void;
+}) {
 	const { spacing } = useTheme();
-	const pledge = useCreatePledge(need.id);
-
-	const onPledge = () => {
-		pledge.mutate(
-			{},
-			{
-				onSuccess: () =>
-					Alert.alert(
-						"Thanks!",
-						need.type === "WANT"
-							? "The NGO will review your offer and get in touch."
-							: "The NGO will confirm and arrange handover.",
-					),
-				onError: (error) =>
-					Alert.alert("Could not respond", apiErrorMessage(error)),
-			},
-		);
-	};
 
 	return (
 		<Surface>
@@ -190,12 +186,7 @@ function NeedCard({ need }: { need: PublicNeed }) {
 				</Caption>
 			</View>
 
-			<Button
-				size="sm"
-				onPress={onPledge}
-				loading={pledge.isPending}
-				style={{ marginTop: spacing[4] }}
-			>
+			<Button size="sm" onPress={onRespond} style={{ marginTop: spacing[4] }}>
 				{need.type === "WANT" ? "I can help with this" : "I'd like this"}
 			</Button>
 		</Surface>

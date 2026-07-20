@@ -7,7 +7,9 @@ import { GlobalExceptionFilter } from "./common/filters";
 import { ResponseTransformInterceptor } from "./common/interceptors";
 
 async function bootstrap() {
-	const app = await NestFactory.create(AppModule);
+	// rawBody is required by the payment webhook: its signature is computed over
+	// the exact bytes sent, so a re-serialised JSON body would never verify.
+	const app = await NestFactory.create(AppModule, { rawBody: true });
 
 	// Global prefix for all routes — e.g. /api/users/me
 	app.setGlobalPrefix("api");

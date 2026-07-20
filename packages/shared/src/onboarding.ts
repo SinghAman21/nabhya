@@ -12,6 +12,13 @@ export const step1BasicInfoSchema = z.object({
 	orgType: z.enum(["trust", "society", "section8", "others"] as const, {
 		message: "Select your organization type",
 	}),
+	// The single most important field for verifying an Indian NGO — a
+	// superadmin checks this against the uploaded registration certificate.
+	registrationNumber: z
+		.string()
+		.trim()
+		.min(3, "Enter your registration number")
+		.max(60, "That looks too long"),
 });
 
 export const step2AddressSchema = z.object({

@@ -41,7 +41,7 @@ import {
 	type SQL,
 	sql,
 } from "drizzle-orm";
-import type { AuditService } from "../../common/audit";
+import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import { paginate, toOffset } from "../../common/utils";
 
@@ -49,7 +49,7 @@ import { paginate, toOffset } from "../../common/utils";
 export class AdminService {
 	constructor(
 		@Inject(DB_TOKEN) private readonly db: typeof dbType,
-		private readonly audit: AuditService,
+		@Inject(AuditService) private readonly audit: AuditService,
 	) {}
 
 	// ─── Overview ────────────────────────────────────────────────────────────
@@ -654,7 +654,7 @@ export class AdminService {
 				.select({
 					id: organizationDocuments.id,
 					documentType: organizationDocuments.documentType,
-					documentUrl: organizationDocuments.documentUrl,
+					documentKey: organizationDocuments.documentKey,
 					verificationStatus: organizationDocuments.verificationStatus,
 					remarks: organizationDocuments.remarks,
 					uploadedAt: organizationDocuments.uploadedAt,
@@ -731,7 +731,7 @@ export class AdminService {
 				.select({
 					id: userDocuments.id,
 					documentType: userDocuments.documentType,
-					documentUrl: userDocuments.documentUrl,
+					documentKey: userDocuments.documentKey,
 					verificationStatus: userDocuments.verificationStatus,
 					remarks: userDocuments.remarks,
 					uploadedAt: userDocuments.uploadedAt,

@@ -1,6 +1,7 @@
 import type {
 	AdminOrgQuery,
 	AdminUserQuery,
+	ReviewDocumentInput,
 	ReviewOrganizationInput,
 	SetOrgStatusInput,
 	SetUserStatusInput,
@@ -70,6 +71,24 @@ export function useSetOrganizationStatus() {
 	return useMutation({
 		mutationFn: ({ id, input }: { id: string; input: SetOrgStatusInput }) =>
 			adminApi.setOrganizationStatus(id, input),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.admin });
+		},
+	});
+}
+
+/**
+ * Approving an identity document also promotes the user's own verification
+ * status server-side, so the whole admin scope is invalidated rather than just
+ * the document list.
+ */
+export function useReviewDocument(kind: "organization" | "user") {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({ id, input }: { id: string; input: ReviewDocumentInput }) =>
+			kind === "organization"
+				? adminApi.reviewOrgDocument(id, input)
+				: adminApi.reviewUserDocument(id, input),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.admin });
 		},

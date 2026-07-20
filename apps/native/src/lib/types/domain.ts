@@ -1,9 +1,11 @@
 import type {
 	ApplicationStatus,
+	DonationStatus,
 	EventStatus,
 	NeedStatus,
 	NeedType,
 	NeedUrgency,
+	NotificationType,
 	PledgeStatus,
 	Role,
 } from "@nabhya/shared";
@@ -140,6 +142,8 @@ export interface EventApplicant {
 	message: string | null;
 	reviewNote: string | null;
 	appliedAt: string;
+	/** Set once the organization confirms the volunteer turned up. */
+	attendedAt: string | null;
 	volunteer: VolunteerSummary;
 }
 
@@ -256,7 +260,7 @@ export interface AdminOrgListItem {
 export interface AdminOrgDocument {
 	id: string;
 	documentType: string;
-	documentUrl: string;
+	documentKey: string;
 	verificationStatus: DocVerificationStatus | null;
 	remarks: string | null;
 	uploadedAt: string;
@@ -370,4 +374,177 @@ export interface AdminUserDetail {
 		status: OrgStatus | null;
 	} | null;
 	stats: { applications: number; accepted: number; pledges: number };
+}
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+export interface NotificationItem {
+	id: string;
+	type: NotificationType;
+	title: string;
+	body: string | null;
+	entityName: string | null;
+	entityId: string | null;
+	readAt: string | null;
+	createdAt: string;
+}
+
+// ─── Engagement ──────────────────────────────────────────────────────────────
+
+export interface BookmarkListItem {
+	id: string;
+	createdAt: string;
+	organization: {
+		id: string;
+		organizationName: string;
+		logo: string | null;
+		city: string | null;
+		state: string | null;
+		description: string | null;
+	};
+}
+
+export interface ReviewItem {
+	id: string;
+	rating: number;
+	body: string | null;
+	reply: string | null;
+	repliedAt: string | null;
+	createdAt: string;
+	user: { id: string; fullName: string | null; profileImage: string | null };
+}
+
+// ─── Certificates ────────────────────────────────────────────────────────────
+
+export interface MyCertificate {
+	id: string;
+	code: string;
+	note: string | null;
+	pdfKey: string | null;
+	issuedAt: string;
+	revokedAt: string | null;
+	event: {
+		id: string;
+		title: string;
+		startAt: string;
+		city: string | null;
+	};
+	organization: {
+		id: string;
+		organizationName: string;
+		logo: string | null;
+	};
+}
+
+// ─── Donations ───────────────────────────────────────────────────────────────
+
+export interface MyDonation {
+	id: string;
+	amountMinor: number;
+	currency: string;
+	status: DonationStatus;
+	message: string | null;
+	isAnonymous: boolean;
+	receiptNumber: string | null;
+	completedAt: string | null;
+	createdAt: string;
+	organization: {
+		id: string;
+		organizationName: string;
+		logo: string | null;
+	};
+}
+
+export interface OrgDonation {
+	id: string;
+	amountMinor: number;
+	currency: string;
+	status: DonationStatus;
+	message: string | null;
+	isAnonymous: boolean;
+	receiptNumber: string | null;
+	completedAt: string | null;
+	createdAt: string;
+	/** Null when the donor chose to stay anonymous — enforced server-side. */
+	donorName: string | null;
+}
+
+// ─── Organization directory ──────────────────────────────────────────────────
+
+export interface PublicOrganization {
+	id: string;
+	organizationName: string;
+	orgType: string | null;
+	registrationNumber: string | null;
+	description: string | null;
+	mission: string | null;
+	vision: string | null;
+	website: string | null;
+	logo: string | null;
+	coverImage: string | null;
+	address: string | null;
+	city: string | null;
+	state: string | null;
+	pincode: string | null;
+	latitude: string | null;
+	longitude: string | null;
+	teamSize: number | null;
+	foundingYear: number | null;
+	verificationStatus: OrgVerificationStatus | null;
+	status: OrgStatus | null;
+	createdAt: string;
+	categories: Category[];
+	owner?: { id: string; fullName: string | null; email: string };
+}
+
+export interface NearbyOrganization {
+	id: string;
+	organizationName: string;
+	description: string | null;
+	logo: string | null;
+	city: string | null;
+	state: string | null;
+	latitude: string | null;
+	longitude: string | null;
+	/** Great-circle distance from the query point, in kilometres. */
+	distanceKm: number;
+}
+
+// ─── Publishing ──────────────────────────────────────────────────────────────
+
+export interface Announcement {
+	id: string;
+	organizationId: string;
+	title: string;
+	body: string;
+	coverImageKey: string | null;
+	status: "DRAFT" | "PUBLISHED";
+	isPinned: boolean;
+	publishedAt: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface FinancialReport {
+	id: string;
+	organizationId: string;
+	type: string;
+	title: string;
+	financialYear: number;
+	documentKey: string;
+	notes: string | null;
+	createdAt: string;
+}
+
+export interface OrgTeamMember {
+	id: string;
+	designation: string | null;
+	isOwner: boolean;
+	joinedAt: string;
+	user: {
+		id: string;
+		fullName: string | null;
+		email: string;
+		profileImage: string | null;
+	};
 }

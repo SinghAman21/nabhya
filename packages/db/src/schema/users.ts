@@ -82,7 +82,7 @@ export const userDocuments = pgTable("user_documents", {
 		.notNull()
 		.references(() => users.id, { onDelete: "cascade" }),
 	documentType: userDocumentTypeEnum("document_type").notNull(),
-	documentUrl: text("document_url").notNull(),
+	documentKey: text("document_key").notNull(),
 	verificationStatus: userDocVerificationStatusEnum(
 		"verification_status",
 	).default("PENDING"),

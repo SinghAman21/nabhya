@@ -30,10 +30,11 @@ import {
 	type SQL,
 	sql,
 } from "drizzle-orm";
-import type { AuditService } from "../../common/audit";
+import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
-import type { OrganizationsService } from "../organizations/organizations.service";
+import { NotificationsService } from "../notifications/notifications.service";
+import { OrganizationsService } from "../organizations/organizations.service";
 
 /** Columns exposed on the public feed — never the internal review fields. */
 const publicEventColumns = {
@@ -66,8 +67,11 @@ const publicEventColumns = {
 export class EventsService {
 	constructor(
 		@Inject(DB_TOKEN) private readonly db: typeof dbType,
-		private readonly audit: AuditService,
+		@Inject(AuditService) private readonly audit: AuditService,
+		@Inject(OrganizationsService)
 		private readonly organizationsService: OrganizationsService,
+		@Inject(NotificationsService)
+		private readonly notifications: NotificationsService,
 	) {}
 
 	// ─── Public feed ─────────────────────────────────────────────────────────
@@ -609,7 +613,7 @@ export class EventsService {
 				);
 			}
 
-			const [updated] = await tx
+			const updatedRows = await tx
 				.update(eventApplications)
 				.set({
 					status: input.status,
@@ -639,7 +643,22 @@ export class EventsService {
 					.where(eq(events.id, eventId));
 			}
 
-			return updated;
+			return takeFirstOrThrow(updatedRows, "review event application");
+		});
+
+		void this.notifications.notify({
+			userId: result.volunteerId,
+			type:
+				input.status === "ACCEPTED"
+					? "APPLICATION_ACCEPTED"
+					: "APPLICATION_REJECTED",
+			title:
+				input.status === "ACCEPTED"
+					? "You're confirmed for an event"
+					: "Your application wasn't accepted",
+			body: input.reviewNote ?? undefined,
+			entityName: "EVENT",
+			entityId: eventId,
 		});
 
 		void this.audit.record({

@@ -26,6 +26,8 @@ export const queryKeys = {
 
 	organization: (id: string) => ["organizations", id] as const,
 	myOrganization: ["organizations", "me"] as const,
+	myOrgDocuments: ["organizations", "me", "documents"] as const,
+	myUserDocuments: ["users", "me", "documents"] as const,
 
 	adminOverview: ["admin", "overview"] as const,
 	adminOrganizations: (params?: unknown) =>
@@ -39,6 +41,34 @@ export const queryKeys = {
 		["admin", "documents", "users", params] as const,
 	adminAuditLogs: (params?: unknown) =>
 		["admin", "audit-logs", params] as const,
+
+	notifications: (params?: unknown) => ["notifications", params] as const,
+	unreadCount: ["notifications", "unread-count"] as const,
+
+	bookmarks: (params?: unknown) => ["bookmarks", params] as const,
+	reviews: (id: string, params?: unknown) => ["reviews", id, params] as const,
+	orgReviews: (params?: unknown) => ["reviews", "org", params] as const,
+
+	certificates: (params?: unknown) => ["certificates", params] as const,
+	certificateVerification: (code: string) =>
+		["certificates", "verify", code] as const,
+
+	myDonations: (params?: unknown) => ["donations", "me", params] as const,
+	orgDonations: (params?: unknown) => ["donations", "org", params] as const,
+
+	organizations: (params?: unknown) =>
+		["organizations", "list", params] as const,
+	nearby: (params?: unknown) => ["organizations", "nearby", params] as const,
+
+	announcements: (id: string, params?: unknown) =>
+		["announcements", id, params] as const,
+	myAnnouncements: (params?: unknown) =>
+		["announcements", "me", params] as const,
+	reports: (id: string) => ["reports", id] as const,
+	team: ["org", "team"] as const,
+
+	myImpact: ["impact", "me"] as const,
+	orgImpact: (id: string) => ["impact", "org", id] as const,
 } as const;
 
 /** Broad prefixes for invalidation after a mutation. */
@@ -48,4 +78,13 @@ export const queryScopes = {
 	needs: ["needs"] as const,
 	orgNeeds: ["org", "needs"] as const,
 	admin: ["admin"] as const,
+	notifications: ["notifications"] as const,
+	bookmarks: ["bookmarks"] as const,
+	reviews: ["reviews"] as const,
+	certificates: ["certificates"] as const,
+	donations: ["donations"] as const,
+	organizations: ["organizations"] as const,
+	announcements: ["announcements"] as const,
+	reports: ["reports"] as const,
+	impact: ["impact"] as const,
 } as const;

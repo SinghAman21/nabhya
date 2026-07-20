@@ -12,6 +12,7 @@ import {
 	Body,
 	Controller,
 	Get,
+	Inject,
 	Param,
 	ParseUUIDPipe,
 	Post,
@@ -31,7 +32,7 @@ import {
 } from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthUser } from "../../common/types";
-import type { NeedsService } from "./needs.service";
+import { NeedsService } from "./needs.service";
 
 /**
  * Public feed of what NGOs need or are giving away, plus a volunteer's own
@@ -40,7 +41,9 @@ import type { NeedsService } from "./needs.service";
 @ApiTags("Needs")
 @Controller("needs")
 export class NeedsController {
-	constructor(private readonly needsService: NeedsService) {}
+	constructor(
+		@Inject(NeedsService) private readonly needsService: NeedsService,
+	) {}
 
 	@Public()
 	@Get()

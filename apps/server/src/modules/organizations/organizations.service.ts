@@ -5,6 +5,7 @@ import {
 	organizations,
 } from "@nabhya/db/schema";
 import type {
+	NearbyQuery,
 	PaginationQuery,
 	UpdateOrganizationInput,
 	UploadOrgDocumentInput,
@@ -15,16 +16,18 @@ import {
 	Injectable,
 	NotFoundException,
 } from "@nestjs/common";
-import { and, count, desc, eq, ilike, or } from "drizzle-orm";
-import type { AuditService } from "../../common/audit";
+import { and, count, desc, eq, ilike, isNotNull, or, sql } from "drizzle-orm";
+import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
+import { UploadsService } from "../uploads/uploads.service";
 
 @Injectable()
 export class OrganizationsService {
 	constructor(
 		@Inject(DB_TOKEN) private readonly db: typeof dbType,
-		private readonly audit: AuditService,
+		@Inject(AuditService) private readonly audit: AuditService,
+		@Inject(UploadsService) private readonly uploads: UploadsService,
 	) {}
 
 	/**
@@ -145,6 +148,76 @@ export class OrganizationsService {
 		return paginate(items, totals?.value ?? 0, query);
 	}
 
+	/**
+	 * "NGOs near me", ordered by distance.
+	 *
+	 * Haversine in SQL rather than PostGIS — one dependency fewer, and precise
+	 * enough at city scale. The bounding-box pre-filter lets Postgres use the
+	 * latitude index instead of computing a trig expression for every row.
+	 */
+	async listNearby(query: NearbyQuery) {
+		const { latitude, longitude, radiusKm } = query;
+		const { limit, offset } = toOffset(query);
+
+		// ~111 km per degree of latitude; longitude narrows with the cosine.
+		const latDelta = radiusKm / 111;
+		const lonDelta =
+			radiusKm / (111 * Math.cos((latitude * Math.PI) / 180) || 1);
+
+		const distance = sql<number>`(
+			6371 * acos(
+				least(1, greatest(-1,
+					cos(radians(${latitude}))
+					* cos(radians(${organizations.latitude}::float8))
+					* cos(radians(${organizations.longitude}::float8) - radians(${longitude}))
+					+ sin(radians(${latitude}))
+					* sin(radians(${organizations.latitude}::float8))
+				))
+			)
+		)`;
+
+		const where = and(
+			eq(organizations.verificationStatus, "VERIFIED"),
+			eq(organizations.status, "ACTIVE"),
+			isNotNull(organizations.latitude),
+			isNotNull(organizations.longitude),
+			sql`${organizations.latitude}::float8
+				between ${latitude - latDelta} and ${latitude + latDelta}`,
+			sql`${organizations.longitude}::float8
+				between ${longitude - lonDelta} and ${longitude + lonDelta}`,
+		);
+
+		const rows = await this.db
+			.select({
+				id: organizations.id,
+				organizationName: organizations.organizationName,
+				description: organizations.description,
+				logo: organizations.logo,
+				city: organizations.city,
+				state: organizations.state,
+				latitude: organizations.latitude,
+				longitude: organizations.longitude,
+				distanceKm: distance,
+			})
+			.from(organizations)
+			.where(where)
+			// The box is square; this trims the corners to a true radius.
+			.having(sql`${distance} <= ${radiusKm}`)
+			.groupBy(organizations.id)
+			.orderBy(distance)
+			.limit(limit)
+			.offset(offset);
+
+		return paginate(
+			rows.map((row) => ({
+				...row,
+				distanceKm: Math.round(Number(row.distanceKm) * 10) / 10,
+			})),
+			rows.length,
+			query,
+		);
+	}
+
 	async getPublicById(organizationId: string) {
 		const organization = await this.getById(organizationId);
 
@@ -218,13 +291,17 @@ export class OrganizationsService {
 	async uploadDocument(userId: string, input: UploadOrgDocumentInput) {
 		const organization = await this.requireOwnedOrganization(userId);
 
+		// Confirm the object landed in storage before recording its key — the
+		// client uploads directly, so this server never saw the bytes.
+		await this.uploads.assertUploaded(input.documentKey);
+
 		const document = takeFirstOrThrow(
 			await this.db
 				.insert(organizationDocuments)
 				.values({
 					organizationId: organization.id,
 					documentType: input.documentType,
-					documentUrl: input.documentUrl,
+					documentKey: input.documentKey,
 					verificationStatus: "PENDING",
 				})
 				.returning(),

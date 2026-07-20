@@ -8,6 +8,7 @@ export interface OrgProfile {
 	orgName: string;
 	phone: string;
 	orgType: string;
+	registrationNumber: string;
 	address: string;
 	city: string;
 	state: string;
@@ -22,6 +23,7 @@ const emptyProfile: OrgProfile = {
 	orgName: "",
 	phone: "",
 	orgType: "",
+	registrationNumber: "",
 	address: "",
 	city: "",
 	state: "",
@@ -47,7 +49,6 @@ export interface AuthState {
 	orgProfile: OrgProfile;
 	isOnboarded: boolean;
 	isVerified: boolean;
-	isSkipped: boolean;
 	isHydrated: boolean;
 	setUser: (user: User) => void;
 	setRole: (role: UserRole) => void;
@@ -55,7 +56,6 @@ export interface AuthState {
 	setAuth: (email: string) => void;
 	setOnboarded: () => void;
 	setVerified: () => void;
-	setSkipped: () => void;
 	/** Reconciles cached routing state with the server's answer. */
 	syncFromStatus: (status: OnboardingStatus) => void;
 	signOut: () => void;
@@ -71,7 +71,6 @@ export const useAuthStore = create<AuthState>()(
 			orgProfile: { ...emptyProfile },
 			isOnboarded: false,
 			isVerified: false,
-			isSkipped: false,
 			isHydrated: false,
 			setUser: (user) => set({ user, email: user.email }),
 			setRole: (role) => set({ role }),
@@ -80,14 +79,8 @@ export const useAuthStore = create<AuthState>()(
 					orgProfile: { ...state.orgProfile, ...fields },
 				})),
 			setAuth: (email) => set({ email }),
-			setOnboarded: () => set({ isOnboarded: true, isSkipped: false }),
-			setVerified: () => set({ isVerified: true, isSkipped: false }),
-			setSkipped: () =>
-				set({
-					isSkipped: true,
-					isOnboarded: true,
-					isVerified: false,
-				}),
+			setOnboarded: () => set({ isOnboarded: true }),
+			setVerified: () => set({ isVerified: true }),
 			syncFromStatus: (status) =>
 				set({
 					role: status.role,
@@ -105,7 +98,6 @@ export const useAuthStore = create<AuthState>()(
 					orgProfile: { ...emptyProfile },
 					isOnboarded: false,
 					isVerified: false,
-					isSkipped: false,
 				});
 			},
 			hydrate: () => set({ isHydrated: true }),
@@ -131,7 +123,6 @@ export const useAuthStore = create<AuthState>()(
 				orgProfile: state.orgProfile,
 				isOnboarded: state.isOnboarded,
 				isVerified: state.isVerified,
-				isSkipped: state.isSkipped,
 			}),
 			onRehydrateStorage: () => (state) => {
 				state?.hydrate();

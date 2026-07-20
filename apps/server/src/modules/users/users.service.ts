@@ -19,16 +19,18 @@ import {
 	NotFoundException,
 } from "@nestjs/common";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import type { AuditService } from "../../common/audit";
+import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import type { UserRole } from "../../common/types";
 import { takeFirstOrThrow } from "../../common/utils";
+import { UploadsService } from "../uploads/uploads.service";
 
 @Injectable()
 export class UsersService {
 	constructor(
 		@Inject(DB_TOKEN) private readonly db: typeof dbType,
-		private readonly audit: AuditService,
+		@Inject(AuditService) private readonly audit: AuditService,
+		@Inject(UploadsService) private readonly uploads: UploadsService,
 	) {}
 
 	/**
@@ -188,6 +190,10 @@ export class UsersService {
 	}
 
 	async uploadDocument(userId: string, input: UploadUserDocumentInput) {
+		// The client uploaded straight to object storage, so confirm the object
+		// really exists and is within limits before trusting the key.
+		await this.uploads.assertUploaded(input.documentKey);
+
 		// Re-uploading the same document type supersedes the previous attempt
 		// rather than stacking duplicates in the verification queue.
 		const document = takeFirstOrThrow(
@@ -196,7 +202,7 @@ export class UsersService {
 				.values({
 					userId,
 					documentType: input.documentType,
-					documentUrl: input.documentUrl,
+					documentKey: input.documentKey,
 					verificationStatus: "PENDING",
 				})
 				.returning(),

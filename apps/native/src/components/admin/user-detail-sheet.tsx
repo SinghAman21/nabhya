@@ -1,13 +1,8 @@
+import { USER_DOCUMENT_LABELS } from "@nabhya/shared";
 import { X } from "lucide-react-native";
 import { useState } from "react";
-import {
-	Alert,
-	Linking,
-	Modal,
-	Pressable,
-	ScrollView,
-	View,
-} from "react-native";
+import { Alert, Modal, Pressable, ScrollView, View } from "react-native";
+import { DocumentReviewRow } from "@/components/admin/document-review-row";
 import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
 import {
 	applicationTone,
@@ -20,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Body, Caption, H2, H3, Label } from "@/components/ui/typography";
 import { useAdminUser, useSetUserStatus } from "@/hooks/use-admin";
+import { useOpenDocument } from "@/hooks/use-documents";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
@@ -40,6 +36,7 @@ export function UserDetailSheet({
 
 	const query = useAdminUser(userId ?? undefined);
 	const setStatus = useSetUserStatus();
+	const _openDocument = useOpenDocument();
 
 	const user = query.data;
 
@@ -231,35 +228,15 @@ export function UserDetailSheet({
 								</Surface>
 							) : (
 								user.documents.map((document) => (
-									<Surface key={document.id}>
-										<View
-											style={{
-												flexDirection: "row",
-												alignItems: "center",
-												justifyContent: "space-between",
-												gap: spacing[2],
-											}}
-										>
-											<Body weight="medium" style={{ flex: 1 }}>
-												{humanizeStatus(document.documentType)}
-											</Body>
-											<StatusPill
-												label={humanizeStatus(document.verificationStatus)}
-												tone={verificationTone(document.verificationStatus)}
-											/>
-										</View>
-										<Pressable
-											onPress={() => Linking.openURL(document.documentUrl)}
-											style={{ marginTop: spacing[2] }}
-										>
-											<Caption
-												weight="medium"
-												color={colors.primary.main as string}
-											>
-												Open document
-											</Caption>
-										</Pressable>
-									</Surface>
+									<DocumentReviewRow
+										key={document.id}
+										document={document}
+										kind="user"
+										label={
+											USER_DOCUMENT_LABELS[document.documentType] ??
+											humanizeStatus(document.documentType)
+										}
+									/>
 								))
 							)}
 						</View>

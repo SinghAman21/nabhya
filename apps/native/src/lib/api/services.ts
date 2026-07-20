@@ -9,6 +9,7 @@ import type {
 	CreateEventInput,
 	CreateNeedInput,
 	CreatePledgeInput,
+	DownloadUrlResponse,
 	OrgEventQuery,
 	OrgNeedQuery,
 	PaginationQuery,
@@ -25,9 +26,14 @@ import type {
 	UpdateNeedInput,
 	UpdateOrganizationInput,
 	UpdateUserProfileInput,
+	UploadIntentInput,
+	UploadOrgDocumentInput,
+	UploadTicketResponse,
+	UploadUserDocumentInput,
 } from "@nabhya/shared";
 import type {
 	AdminOrgDetail,
+	AdminOrgDocument,
 	AdminOrgListItem,
 	AdminUserDetail,
 	AdminUserListItem,
@@ -53,6 +59,7 @@ import {
 	ORG_EVENTS,
 	ORG_NEEDS,
 	ORGANIZATIONS,
+	UPLOADS,
 	USERS,
 } from "./endpoints";
 import { http } from "./http";
@@ -63,6 +70,9 @@ export const usersApi = {
 		http.patch<MyProfile>(USERS.ME, input),
 	selectRole: (role: SelectableRole) =>
 		http.post<{ role: SelectableRole; roles: string[] }>(USERS.ROLE, { role }),
+	documents: () => http.get<AdminOrgDocument[]>(USERS.DOCUMENTS),
+	uploadDocument: (input: UploadUserDocumentInput) =>
+		http.post<AdminOrgDocument>(USERS.DOCUMENTS, input),
 };
 
 export const onboardingApi = {
@@ -81,6 +91,17 @@ export const organizationsApi = {
 	mine: () => http.get<AdminOrgDetail>(ORGANIZATIONS.ME),
 	update: (input: UpdateOrganizationInput) =>
 		http.patch<AdminOrgDetail>(ORGANIZATIONS.ME, input),
+	documents: () => http.get<AdminOrgDocument[]>(ORGANIZATIONS.MY_DOCUMENTS),
+	uploadDocument: (input: UploadOrgDocumentInput) =>
+		http.post<AdminOrgDocument>(ORGANIZATIONS.MY_DOCUMENTS, input),
+};
+
+export const uploadsApi = {
+	createIntent: (input: UploadIntentInput) =>
+		http.post<UploadTicketResponse>(UPLOADS.INTENT, input),
+	/** Signed, short-lived read URL. Document keys are never public. */
+	downloadUrl: (key: string) =>
+		http.post<DownloadUrlResponse>(UPLOADS.DOWNLOAD_URL, { key }),
 };
 
 export const eventsApi = {

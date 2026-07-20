@@ -50,7 +50,7 @@ export const userDocumentTypeSchema = z.enum(["AADHAR_CARD", "OTHER"]);
 
 export const uploadUserDocumentSchema = z.object({
 	documentType: userDocumentTypeSchema,
-	documentUrl: z.string().trim().min(1, "Document URL is required").max(500),
+	documentKey: z.string().trim().min(1, "Upload a file first").max(500),
 });
 
 export type UploadUserDocumentInput = z.infer<typeof uploadUserDocumentSchema>;

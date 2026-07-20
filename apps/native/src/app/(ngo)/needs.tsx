@@ -3,6 +3,7 @@ import { HeartHandshake, Plus } from "lucide-react-native";
 import { useState } from "react";
 import { Alert, FlatList, Pressable, RefreshControl, View } from "react-native";
 import { NeedFormSheet } from "@/components/need-form-sheet";
+import { PledgesSheet } from "@/components/pledges-sheet";
 import {
 	EmptyState,
 	ErrorState,
@@ -37,6 +38,7 @@ export default function NgoNeeds() {
 	const { colors, spacing } = useTheme();
 	const [filter, setFilter] = useState<TypeFilter>("ALL");
 	const [sheetOpen, setSheetOpen] = useState(false);
+	const [reviewing, setReviewing] = useState<OrgNeedListItem | null>(null);
 	const { data: me } = useMe();
 
 	const query = useOrgNeeds(filter === "ALL" ? {} : { type: filter });
@@ -154,10 +156,16 @@ export default function NgoNeeds() {
 						/>
 					}
 					renderItem={({ item }) => (
-						<NeedRow need={item} onDelete={() => confirmDelete(item)} />
+						<NeedRow
+							need={item}
+							onReview={() => setReviewing(item)}
+							onDelete={() => confirmDelete(item)}
+						/>
 					)}
 				/>
 			)}
+
+			<PledgesSheet need={reviewing} onClose={() => setReviewing(null)} />
 
 			<NeedFormSheet
 				visible={sheetOpen}
@@ -171,15 +179,17 @@ export default function NgoNeeds() {
 
 function NeedRow({
 	need,
+	onReview,
 	onDelete,
 }: {
 	need: OrgNeedListItem;
+	onReview: () => void;
 	onDelete: () => void;
 }) {
 	const { colors, spacing } = useTheme();
 
 	return (
-		<Surface>
+		<Surface onPress={onReview}>
 			<View
 				style={{
 					flexDirection: "row",
@@ -235,10 +245,17 @@ function NeedRow({
 					borderTopColor: colors.border.light,
 				}}
 			>
-				<Caption color={need.pendingPledges > 0 ? "primary" : "quaternary"}>
+				<Caption
+					weight={need.pendingPledges > 0 ? "medium" : "normal"}
+					color={
+						need.pendingPledges > 0
+							? (colors.primary.main as string)
+							: "quaternary"
+					}
+				>
 					{need.pendingPledges > 0
 						? `${need.pendingPledges} awaiting review`
-						: "No new responses"}
+						: "View responses"}
 				</Caption>
 				<Pressable onPress={onDelete} hitSlop={8}>
 					<Caption weight="medium" color={colors.error.main as string}>

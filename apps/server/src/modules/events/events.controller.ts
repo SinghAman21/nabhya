@@ -13,6 +13,7 @@ import {
 	Controller,
 	Delete,
 	Get,
+	Inject,
 	Param,
 	ParseUUIDPipe,
 	Post,
@@ -33,7 +34,7 @@ import {
 } from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthUser } from "../../common/types";
-import type { EventsService } from "./events.service";
+import { EventsService } from "./events.service";
 
 /**
  * The public event feed plus the volunteer's own application actions.
@@ -42,7 +43,9 @@ import type { EventsService } from "./events.service";
 @ApiTags("Events")
 @Controller("events")
 export class EventsController {
-	constructor(private readonly eventsService: EventsService) {}
+	constructor(
+		@Inject(EventsService) private readonly eventsService: EventsService,
+	) {}
 
 	@Public()
 	@Get()

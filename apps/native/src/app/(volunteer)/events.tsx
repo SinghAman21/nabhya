@@ -3,6 +3,7 @@ import { CalendarCheck } from "lucide-react-native";
 import { useState } from "react";
 import { FlatList, RefreshControl, View } from "react-native";
 import { EventFeed } from "@/components/event-feed";
+import { NotificationBell } from "@/components/notification-bell";
 import {
 	EmptyState,
 	ErrorState,
@@ -46,6 +47,7 @@ export default function VolunteerEvents() {
 			<ScreenHeader
 				title="Events"
 				subtitle="Find something to help with, and track what you've applied to."
+				action={<NotificationBell />}
 			/>
 
 			<FilterChips options={TABS} value={tab} onChange={setTab} />

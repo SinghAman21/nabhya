@@ -1,13 +1,8 @@
+import { ORG_DOCUMENT_LABELS } from "@nabhya/shared";
 import { X } from "lucide-react-native";
 import { useState } from "react";
-import {
-	Alert,
-	Linking,
-	Modal,
-	Pressable,
-	ScrollView,
-	View,
-} from "react-native";
+import { Alert, Modal, Pressable, ScrollView, View } from "react-native";
+import { DocumentReviewRow } from "@/components/admin/document-review-row";
 import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
 import {
 	humanizeStatus,
@@ -16,15 +11,16 @@ import {
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Body, Caption, H2, Label } from "@/components/ui/typography";
+import { Caption, H2, Label } from "@/components/ui/typography";
 import {
 	useAdminOrganization,
 	useReviewOrganization,
 	useSetOrganizationStatus,
 } from "@/hooks/use-admin";
+import { useOpenDocument } from "@/hooks/use-documents";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 
 /**
  * Full NGO dossier with the moderation actions attached — documents, activity
@@ -42,6 +38,7 @@ export function OrgDetailSheet({
 
 	const query = useAdminOrganization(organizationId ?? undefined);
 	const review = useReviewOrganization();
+	const _openDocument = useOpenDocument();
 	const setStatus = useSetOrganizationStatus();
 
 	const org = query.data;
@@ -253,38 +250,15 @@ export function OrgDetailSheet({
 								</Surface>
 							)}
 							{org.documents.map((document) => (
-								<Surface key={document.id}>
-									<View
-										style={{
-											flexDirection: "row",
-											alignItems: "center",
-											justifyContent: "space-between",
-											gap: spacing[2],
-										}}
-									>
-										<Body weight="medium" style={{ flex: 1 }} numberOfLines={1}>
-											{humanizeStatus(document.documentType)}
-										</Body>
-										<StatusPill
-											label={humanizeStatus(document.verificationStatus)}
-											tone={verificationTone(document.verificationStatus)}
-										/>
-									</View>
-									<Caption color="quaternary" style={{ marginTop: spacing[1] }}>
-										Uploaded {formatDateTime(document.uploadedAt)}
-									</Caption>
-									<Pressable
-										onPress={() => Linking.openURL(document.documentUrl)}
-										style={{ marginTop: spacing[2] }}
-									>
-										<Caption
-											weight="medium"
-											color={colors.primary.main as string}
-										>
-											Open document
-										</Caption>
-									</Pressable>
-								</Surface>
+								<DocumentReviewRow
+									key={document.id}
+									document={document}
+									kind="organization"
+									label={
+										ORG_DOCUMENT_LABELS[document.documentType] ??
+										humanizeStatus(document.documentType)
+									}
+								/>
 							))}
 						</View>
 

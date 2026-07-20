@@ -55,6 +55,11 @@ export default function RootLayout() {
 						<Stack.Screen name="(admin)" />
 						{/* Public — browsable without an account */}
 						<Stack.Screen name="events" />
+						<Stack.Screen name="certificates" />
+						<Stack.Screen name="notifications" />
+						<Stack.Screen name="bookmarks" />
+						<Stack.Screen name="ngos" />
+						<Stack.Screen name="impact" />
 						<Stack.Screen name="success" />
 					</Stack>
 					<PortalHost />
