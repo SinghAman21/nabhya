@@ -114,9 +114,19 @@ export default function EventDetail() {
 					}}
 					keyboardShouldPersistTaps="handled"
 				>
-					<Caption color="secondary" style={{ marginBottom: spacing[2] }}>
-						{event.organization.organizationName}
-					</Caption>
+					<Pressable
+						onPress={() =>
+							router.push(`/organizations/${event.organization.id}`)
+						}
+					>
+						<Caption
+							color={colors.primary.main as string}
+							weight="medium"
+							style={{ marginBottom: spacing[2] }}
+						>
+							{event.organization.organizationName}
+						</Caption>
+					</Pressable>
 					<H2 style={{ marginBottom: spacing[4] }}>{event.title}</H2>
 
 					<Surface style={{ marginBottom: spacing[5] }}>

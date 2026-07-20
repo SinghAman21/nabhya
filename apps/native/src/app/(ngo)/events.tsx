@@ -39,6 +39,7 @@ export default function NgoEvents() {
 	const { colors, spacing } = useTheme();
 	const [filter, setFilter] = useState<StatusFilter>("ALL");
 	const [formOpen, setFormOpen] = useState(false);
+	const [editing, setEditing] = useState<OrgEventListItem | null>(null);
 	const [reviewing, setReviewing] = useState<OrgEventListItem | null>(null);
 	const { data: me } = useMe();
 
@@ -154,6 +155,10 @@ export default function NgoEvents() {
 						<EventRow
 							event={item}
 							onReview={() => setReviewing(item)}
+							onEdit={() => {
+								setEditing(item);
+								setFormOpen(true);
+							}}
 							onDelete={() => confirmDelete(item)}
 						/>
 					)}
@@ -162,9 +167,13 @@ export default function NgoEvents() {
 
 			<EventFormSheet
 				visible={formOpen}
-				onClose={() => setFormOpen(false)}
+				onClose={() => {
+					setFormOpen(false);
+					setEditing(null);
+				}}
 				defaultCity={me?.organization?.city}
 				defaultState={me?.organization?.state}
+				event={editing}
 			/>
 
 			<ApplicantsSheet
@@ -182,10 +191,12 @@ export default function NgoEvents() {
 function EventRow({
 	event,
 	onReview,
+	onEdit,
 	onDelete,
 }: {
 	event: OrgEventListItem;
 	onReview: () => void;
+	onEdit: () => void;
 	onDelete: () => void;
 }) {
 	const { colors, spacing } = useTheme();
@@ -259,11 +270,20 @@ function EventRow({
 				<Caption weight="medium" color={colors.primary.main as string}>
 					View applicants
 				</Caption>
-				<Pressable onPress={onDelete} hitSlop={8}>
-					<Caption weight="medium" color={colors.error.main as string}>
-						Remove
-					</Caption>
-				</Pressable>
+				<View style={{ flexDirection: "row", gap: spacing[4] }}>
+					{(event.status === "DRAFT" || event.status === "PUBLISHED") && (
+						<Pressable onPress={onEdit} hitSlop={8}>
+							<Caption weight="medium" color="secondary">
+								Edit
+							</Caption>
+						</Pressable>
+					)}
+					<Pressable onPress={onDelete} hitSlop={8}>
+						<Caption weight="medium" color={colors.error.main as string}>
+							Remove
+						</Caption>
+					</Pressable>
+				</View>
 			</View>
 		</Surface>
 	);

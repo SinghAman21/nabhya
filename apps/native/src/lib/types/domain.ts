@@ -34,6 +34,17 @@ export interface OrganizationSummary {
 	verificationStatus?: OrgVerificationStatus | null;
 }
 
+/** A document as its owner sees it (identity or org verification doc). */
+export interface OwnedDocument {
+	id: string;
+	documentType: string;
+	documentUrl: string;
+	verificationStatus: DocVerificationStatus | null;
+	remarks: string | null;
+	uploadedAt: string;
+	verifiedAt: string | null;
+}
+
 export interface MyProfile {
 	id: string;
 	email: string;
@@ -76,6 +87,57 @@ export interface OnboardingStatus {
 	verificationStatus: string | null;
 }
 
+// ─── Organizations ───────────────────────────────────────────────────────────
+
+export interface PublicOrgListItem {
+	id: string;
+	organizationName: string;
+	description: string | null;
+	logo: string | null;
+	coverImage: string | null;
+	city: string | null;
+	state: string | null;
+	website: string | null;
+	verificationStatus: OrgVerificationStatus | null;
+}
+
+/**
+ * Shape of GET /organizations/:id and /organizations/me — the full org row
+ * plus owner and categories (no admin-only extras like documents or stats).
+ */
+export interface OrganizationDetail {
+	id: string;
+	organizationName: string;
+	orgType: string | null;
+	registrationNumber: string | null;
+	email: string | null;
+	phone: string | null;
+	description: string | null;
+	mission: string | null;
+	vision: string | null;
+	website: string | null;
+	logo: string | null;
+	coverImage: string | null;
+	address: string | null;
+	city: string | null;
+	state: string | null;
+	pincode: string | null;
+	teamSize: number | null;
+	foundingYear: number | null;
+	verificationStatus: OrgVerificationStatus | null;
+	rejectionReason: string | null;
+	status: OrgStatus | null;
+	createdAt: string;
+	updatedAt: string;
+	owner: {
+		id: string;
+		fullName: string | null;
+		email: string;
+		phone: string | null;
+	};
+	categories: Category[];
+}
+
 // ─── Events ──────────────────────────────────────────────────────────────────
 
 export interface PublicEvent {
@@ -112,10 +174,14 @@ export interface PublicEventDetail extends PublicEvent {
 export interface OrgEventListItem {
 	id: string;
 	title: string;
+	description: string;
+	venue: string | null;
+	address: string | null;
 	city: string | null;
 	state: string | null;
 	startAt: string;
 	endAt: string;
+	applicationDeadline: string | null;
 	status: EventStatus;
 	volunteersNeeded: number;
 	acceptedCount: number;
@@ -184,6 +250,16 @@ export interface PublicNeed {
 	organization: OrganizationSummary;
 }
 
+export interface PublicNeedDetail extends PublicNeed {
+	myPledge: {
+		id: string;
+		status: PledgeStatus;
+		quantity: number | null;
+		message: string | null;
+		createdAt: string;
+	} | null;
+}
+
 export interface OrgNeedListItem {
 	id: string;
 	type: NeedType;
@@ -195,6 +271,7 @@ export interface OrgNeedListItem {
 	urgency: NeedUrgency;
 	status: NeedStatus;
 	city: string | null;
+	state: string | null;
 	expiresAt: string | null;
 	createdAt: string;
 	pendingPledges: number;
@@ -305,6 +382,48 @@ export interface AdminOrgDetail {
 		volunteersNeeded: number;
 		acceptedCount: number;
 	}>;
+}
+
+/** Row in the admin org-document verification queue. */
+export interface AdminOrgDocQueueItem {
+	id: string;
+	documentType: string;
+	documentUrl: string;
+	verificationStatus: DocVerificationStatus | null;
+	remarks: string | null;
+	uploadedAt: string;
+	organization: {
+		id: string;
+		organizationName: string;
+		verificationStatus: OrgVerificationStatus | null;
+	};
+}
+
+/** Row in the admin identity-document verification queue. */
+export interface AdminUserDocQueueItem {
+	id: string;
+	documentType: string;
+	documentUrl: string;
+	verificationStatus: DocVerificationStatus | null;
+	remarks: string | null;
+	uploadedAt: string;
+	user: {
+		id: string;
+		fullName: string | null;
+		email: string;
+		verificationStatus: DocVerificationStatus | null;
+	};
+}
+
+export interface AuditLogItem {
+	id: string;
+	action: string;
+	entityName: string;
+	entityId: string | null;
+	oldValue: unknown;
+	newValue: unknown;
+	createdAt: string;
+	actor: { id: string; fullName: string | null; email: string } | null;
 }
 
 export interface AdminUserListItem {

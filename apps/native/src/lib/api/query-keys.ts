@@ -4,6 +4,7 @@
  */
 export const queryKeys = {
 	me: ["me"] as const,
+	myDocuments: ["me", "documents"] as const,
 	onboardingStatus: ["onboarding", "status"] as const,
 	categories: ["categories"] as const,
 
@@ -24,8 +25,11 @@ export const queryKeys = {
 	orgNeedPledges: (id: string, params?: unknown) =>
 		["org", "needs", id, "pledges", params] as const,
 
+	publicOrganizations: (params?: unknown) =>
+		["organizations", "public", params] as const,
 	organization: (id: string) => ["organizations", id] as const,
 	myOrganization: ["organizations", "me"] as const,
+	myOrgDocuments: ["organizations", "me", "documents"] as const,
 
 	adminOverview: ["admin", "overview"] as const,
 	adminOrganizations: (params?: unknown) =>
@@ -47,5 +51,6 @@ export const queryScopes = {
 	orgEvents: ["org", "events"] as const,
 	needs: ["needs"] as const,
 	orgNeeds: ["org", "needs"] as const,
+	organizations: ["organizations"] as const,
 	admin: ["admin"] as const,
 } as const;

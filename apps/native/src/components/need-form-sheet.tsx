@@ -6,14 +6,16 @@ import {
 	type NeedUrgency,
 } from "@nabhya/shared";
 import { X } from "lucide-react-native";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Alert, Modal, Pressable, ScrollView, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Body, Caption, H2, Label } from "@/components/ui/typography";
-import { useCreateNeed } from "@/hooks/use-needs";
+import { useCreateNeed, useUpdateNeed } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
+import type { OrgNeedListItem } from "@/lib/types";
 
 const TYPES: Array<{ value: NeedType; label: string; hint: string }> = [
 	{
@@ -35,22 +37,27 @@ const URGENCIES: Array<{ value: NeedUrgency; label: string }> = [
 ];
 
 /**
- * Create-a-post sheet for the NGO Needs tab. Validation comes straight from the
- * shared schema, so the inline errors match what the API would reject.
+ * Create/edit-a-post sheet for the NGO Needs tab — pass `need` to edit.
+ * Validation comes straight from the shared schema, so the inline errors match
+ * what the API would reject.
  */
 export function NeedFormSheet({
 	visible,
 	onClose,
 	defaultCity,
 	defaultState,
+	need,
 }: {
 	visible: boolean;
 	onClose: () => void;
 	defaultCity?: string | null;
 	defaultState?: string | null;
+	need?: OrgNeedListItem | null;
 }) {
 	const { colors, spacing } = useTheme();
 	const createNeed = useCreateNeed();
+	const updateNeed = useUpdateNeed();
+	const saving = createNeed.isPending || updateNeed.isPending;
 
 	const form = useForm<CreateNeedInput>({
 		// biome-ignore lint/suspicious/noExplicitAny: @hookform/resolvers v5 Zod v4 incompatibility
@@ -66,6 +73,34 @@ export function NeedFormSheet({
 		},
 	});
 
+	// Re-seed the form whenever the sheet opens on a different post (or none).
+	// biome-ignore lint/correctness/useExhaustiveDependencies: seed only on open/target change
+	useEffect(() => {
+		if (!visible) return;
+		form.reset(
+			need
+				? {
+						type: need.type,
+						title: need.title,
+						description: need.description,
+						quantity: need.quantity ?? undefined,
+						unit: need.unit ?? "",
+						urgency: need.urgency,
+						city: need.city ?? "",
+						state: need.state ?? "",
+					}
+				: {
+						type: "WANT",
+						title: "",
+						description: "",
+						unit: "",
+						urgency: "MEDIUM",
+						city: defaultCity ?? "",
+						state: defaultState ?? "",
+					},
+		);
+	}, [visible, need?.id]);
+
 	const inputStyle = {
 		borderWidth: 0,
 		borderRadius: 12,
@@ -79,10 +114,22 @@ export function NeedFormSheet({
 	};
 
 	const onSubmit = form.handleSubmit((data) => {
-		createNeed.mutate(data, {
-			onSuccess: close,
-			onError: (error) => Alert.alert("Could not post", apiErrorMessage(error)),
-		});
+		if (need) {
+			updateNeed.mutate(
+				{ id: need.id, input: data },
+				{
+					onSuccess: close,
+					onError: (error) =>
+						Alert.alert("Could not save changes", apiErrorMessage(error)),
+				},
+			);
+		} else {
+			createNeed.mutate(data, {
+				onSuccess: close,
+				onError: (error) =>
+					Alert.alert("Could not post", apiErrorMessage(error)),
+			});
+		}
 	});
 
 	const type = form.watch("type");
@@ -106,7 +153,7 @@ export function NeedFormSheet({
 						paddingBottom: spacing[2],
 					}}
 				>
-					<H2>New post</H2>
+					<H2>{need ? "Edit post" : "New post"}</H2>
 					<Pressable onPress={close} hitSlop={12}>
 						<X size={22} color={colors.text.tertiary as string} />
 					</Pressable>
@@ -302,8 +349,8 @@ export function NeedFormSheet({
 
 					<View style={{ height: spacing[8] }} />
 
-					<Button onPress={onSubmit} loading={createNeed.isPending}>
-						Publish post
+					<Button onPress={onSubmit} loading={saving}>
+						{need ? "Save changes" : "Publish post"}
 					</Button>
 				</ScrollView>
 			</View>

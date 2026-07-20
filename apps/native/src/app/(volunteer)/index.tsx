@@ -1,7 +1,8 @@
 import type { NeedType } from "@nabhya/shared";
-import { HeartHandshake, Search } from "lucide-react-native";
+import { useRouter } from "expo-router";
+import { Building2, HeartHandshake, Search } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, FlatList, RefreshControl, View } from "react-native";
+import { Alert, FlatList, Pressable, RefreshControl, View } from "react-native";
 import {
 	EmptyState,
 	ErrorState,
@@ -34,6 +35,7 @@ const FILTERS: Array<{ value: Filter; label: string }> = [
  */
 export default function Discover() {
 	const { colors, spacing } = useTheme();
+	const router = useRouter();
 	const [filter, setFilter] = useState<Filter>("ALL");
 	const [search, setSearch] = useState("");
 
@@ -54,6 +56,23 @@ export default function Discover() {
 			<ScreenHeader
 				title="Discover"
 				subtitle="What verified NGOs need right now — and what they're giving away."
+				action={
+					<Pressable
+						onPress={() => router.push("/organizations")}
+						style={{
+							width: 44,
+							height: 44,
+							borderRadius: 22,
+							alignItems: "center",
+							justifyContent: "center",
+							backgroundColor: colors.background.primary,
+							borderWidth: 1,
+							borderColor: colors.border.light,
+						}}
+					>
+						<Building2 size={20} color={colors.text.secondary as string} />
+					</Pressable>
+				}
 			/>
 
 			<View
@@ -126,6 +145,7 @@ export default function Discover() {
 
 function NeedCard({ need }: { need: PublicNeed }) {
 	const { spacing } = useTheme();
+	const router = useRouter();
 	const pledge = useCreatePledge(need.id);
 
 	const onPledge = () => {
@@ -146,7 +166,7 @@ function NeedCard({ need }: { need: PublicNeed }) {
 	};
 
 	return (
-		<Surface>
+		<Surface onPress={() => router.push(`/needs/${need.id}`)}>
 			<View
 				style={{
 					flexDirection: "row",

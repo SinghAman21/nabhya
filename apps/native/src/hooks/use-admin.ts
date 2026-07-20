@@ -1,12 +1,20 @@
 import type {
 	AdminOrgQuery,
 	AdminUserQuery,
+	AuditLogQuery,
+	PaginationQuery,
+	ReviewDocumentInput,
 	ReviewOrganizationInput,
 	SetOrgStatusInput,
 	SetUserStatusInput,
 } from "@nabhya/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminApi, queryKeys, queryScopes } from "@/lib/api";
+import type { DocVerificationStatus } from "@/lib/types";
+
+type DocQueueQuery = Partial<PaginationQuery> & {
+	status?: DocVerificationStatus;
+};
 
 export function useAdminOverview() {
 	return useQuery({
@@ -84,5 +92,50 @@ export function useSetUserStatus() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.admin });
 		},
+	});
+}
+
+// ─── Document verification queues ────────────────────────────────────────────
+
+export function useAdminOrgDocuments(query: DocQueueQuery = {}) {
+	return useQuery({
+		queryKey: queryKeys.adminOrgDocuments(query),
+		queryFn: () => adminApi.orgDocuments(query),
+	});
+}
+
+export function useAdminUserDocuments(query: DocQueueQuery = {}) {
+	return useQuery({
+		queryKey: queryKeys.adminUserDocuments(query),
+		queryFn: () => adminApi.userDocuments(query),
+	});
+}
+
+export function useReviewOrgDocument() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({ id, input }: { id: string; input: ReviewDocumentInput }) =>
+			adminApi.reviewOrgDocument(id, input),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.admin });
+		},
+	});
+}
+
+export function useReviewUserDocument() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({ id, input }: { id: string; input: ReviewDocumentInput }) =>
+			adminApi.reviewUserDocument(id, input),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.admin });
+		},
+	});
+}
+
+export function useAdminAuditLogs(query: Partial<AuditLogQuery> = {}) {
+	return useQuery({
+		queryKey: queryKeys.adminAuditLogs(query),
+		queryFn: () => adminApi.auditLogs(query),
 	});
 }

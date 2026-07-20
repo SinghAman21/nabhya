@@ -3,6 +3,7 @@ import type {
 	CompleteVolunteerOnboardingInput,
 	SelectableRole,
 	UpdateUserProfileInput,
+	UploadUserDocumentInput,
 } from "@nabhya/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { categoriesApi, onboardingApi, queryKeys, usersApi } from "@/lib/api";
@@ -40,6 +41,26 @@ export function useUpdateProfile() {
 		mutationFn: (input: UpdateUserProfileInput) =>
 			usersApi.updateProfile(input),
 		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryKeys.me });
+		},
+	});
+}
+
+export function useMyDocuments() {
+	return useQuery({
+		queryKey: queryKeys.myDocuments,
+		queryFn: usersApi.documents,
+	});
+}
+
+export function useUploadUserDocument() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (input: UploadUserDocumentInput) =>
+			usersApi.uploadDocument(input),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryKeys.myDocuments });
+			// A fresh upload flips the user back to PENDING verification.
 			queryClient.invalidateQueries({ queryKey: queryKeys.me });
 		},
 	});

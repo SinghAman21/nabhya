@@ -4,6 +4,7 @@ import type {
 	AdminUserQuery,
 	ApplicationQuery,
 	ApplyToEventInput,
+	AuditLogQuery,
 	CompleteOrgOnboardingInput,
 	CompleteVolunteerOnboardingInput,
 	CreateEventInput,
@@ -25,24 +26,34 @@ import type {
 	UpdateNeedInput,
 	UpdateOrganizationInput,
 	UpdateUserProfileInput,
+	UploadOrgDocumentInput,
+	UploadUserDocumentInput,
 } from "@nabhya/shared";
 import type {
 	AdminOrgDetail,
+	AdminOrgDocQueueItem,
 	AdminOrgListItem,
 	AdminUserDetail,
+	AdminUserDocQueueItem,
 	AdminUserListItem,
 	ApplicationListItem,
+	AuditLogItem,
 	Category,
+	DocVerificationStatus,
 	EventApplicant,
 	MyPledgeListItem,
 	MyProfile,
 	NeedPledge,
 	OnboardingStatus,
+	OrganizationDetail,
 	OrgEventListItem,
 	OrgNeedListItem,
+	OwnedDocument,
 	PublicEvent,
 	PublicEventDetail,
 	PublicNeed,
+	PublicNeedDetail,
+	PublicOrgListItem,
 } from "@/lib/types";
 import {
 	ADMIN,
@@ -63,6 +74,9 @@ export const usersApi = {
 		http.patch<MyProfile>(USERS.ME, input),
 	selectRole: (role: SelectableRole) =>
 		http.post<{ role: SelectableRole; roles: string[] }>(USERS.ROLE, { role }),
+	documents: () => http.get<OwnedDocument[]>(USERS.DOCUMENTS),
+	uploadDocument: (input: UploadUserDocumentInput) =>
+		http.post<OwnedDocument>(USERS.DOCUMENTS, input),
 };
 
 export const onboardingApi = {
@@ -78,9 +92,17 @@ export const categoriesApi = {
 };
 
 export const organizationsApi = {
-	mine: () => http.get<AdminOrgDetail>(ORGANIZATIONS.ME),
+	listPublic: (
+		query: Partial<PaginationQuery> & { search?: string; city?: string },
+	) => http.getPage<PublicOrgListItem>(ORGANIZATIONS.LIST, query),
+	publicDetail: (id: string) =>
+		http.get<OrganizationDetail>(ORGANIZATIONS.detail(id)),
+	mine: () => http.get<OrganizationDetail>(ORGANIZATIONS.ME),
 	update: (input: UpdateOrganizationInput) =>
-		http.patch<AdminOrgDetail>(ORGANIZATIONS.ME, input),
+		http.patch<OrganizationDetail>(ORGANIZATIONS.ME, input),
+	myDocuments: () => http.get<OwnedDocument[]>(ORGANIZATIONS.MY_DOCUMENTS),
+	uploadDocument: (input: UploadOrgDocumentInput) =>
+		http.post<OwnedDocument>(ORGANIZATIONS.MY_DOCUMENTS, input),
 };
 
 export const eventsApi = {
@@ -119,7 +141,7 @@ export const orgEventsApi = {
 export const needsApi = {
 	listPublic: (query: Partial<PublicNeedQuery>) =>
 		http.getPage<PublicNeed>(NEEDS.LIST, query),
-	detail: (id: string) => http.get<PublicNeed>(NEEDS.detail(id)),
+	detail: (id: string) => http.get<PublicNeedDetail>(NEEDS.detail(id)),
 	pledge: (id: string, input: CreatePledgeInput) =>
 		http.post<{ id: string }>(NEEDS.pledge(id), input),
 	myPledges: (query: Partial<PaginationQuery>) =>
@@ -156,8 +178,16 @@ export const adminApi = {
 	user: (id: string) => http.get<AdminUserDetail>(ADMIN.user(id)),
 	setUserStatus: (id: string, input: SetUserStatusInput) =>
 		http.patch<AdminUserListItem>(ADMIN.userStatus(id), input),
+	orgDocuments: (
+		query: Partial<PaginationQuery> & { status?: DocVerificationStatus },
+	) => http.getPage<AdminOrgDocQueueItem>(ADMIN.ORG_DOCUMENTS, query),
+	userDocuments: (
+		query: Partial<PaginationQuery> & { status?: DocVerificationStatus },
+	) => http.getPage<AdminUserDocQueueItem>(ADMIN.USER_DOCUMENTS, query),
 	reviewOrgDocument: (id: string, input: ReviewDocumentInput) =>
 		http.patch<{ id: string }>(ADMIN.orgDocument(id), input),
 	reviewUserDocument: (id: string, input: ReviewDocumentInput) =>
 		http.patch<{ id: string }>(ADMIN.userDocument(id), input),
+	auditLogs: (query: Partial<AuditLogQuery>) =>
+		http.getPage<AuditLogItem>(ADMIN.AUDIT_LOGS, query),
 };

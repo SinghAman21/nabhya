@@ -210,6 +210,7 @@ export class NeedsService {
 					urgency: organizationNeeds.urgency,
 					status: organizationNeeds.status,
 					city: organizationNeeds.city,
+					state: organizationNeeds.state,
 					expiresAt: organizationNeeds.expiresAt,
 					createdAt: organizationNeeds.createdAt,
 					pendingPledges: sql<number>`(

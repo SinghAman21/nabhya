@@ -1,14 +1,15 @@
 import { type CreateEventInput, createEventSchema } from "@nabhya/shared";
 import { X } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Modal, Pressable, ScrollView, View } from "react-native";
 import { DateTimeField } from "@/components/date-time-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Caption, H2, Label } from "@/components/ui/typography";
-import { useCreateEvent } from "@/hooks/use-events";
+import { useCreateEvent, useUpdateEvent } from "@/hooks/use-events";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
+import type { OrgEventListItem } from "@/lib/types";
 
 interface Draft {
 	title: string;
@@ -23,7 +24,7 @@ interface Draft {
 }
 
 /**
- * Create-an-event sheet.
+ * Create/edit-an-event sheet — pass `event` to edit an existing one.
  *
  * Dates come from DateTimeField rather than react-hook-form, so this validates
  * the assembled payload against the shared schema in one pass and maps Zod's
@@ -34,14 +35,18 @@ export function EventFormSheet({
 	onClose,
 	defaultCity,
 	defaultState,
+	event,
 }: {
 	visible: boolean;
 	onClose: () => void;
 	defaultCity?: string | null;
 	defaultState?: string | null;
+	event?: OrgEventListItem | null;
 }) {
 	const { colors, spacing } = useTheme();
 	const createEvent = useCreateEvent();
+	const updateEvent = useUpdateEvent();
+	const saving = createEvent.isPending || updateEvent.isPending;
 
 	const emptyDraft: Draft = {
 		title: "",
@@ -55,6 +60,28 @@ export function EventFormSheet({
 
 	const [draft, setDraft] = useState<Draft>(emptyDraft);
 	const [errors, setErrors] = useState<Record<string, string>>({});
+
+	// Re-seed the form whenever the sheet opens on a different event (or none).
+	// biome-ignore lint/correctness/useExhaustiveDependencies: seed only on open/target change
+	useEffect(() => {
+		if (!visible) return;
+		setErrors({});
+		setDraft(
+			event
+				? {
+						title: event.title,
+						description: event.description,
+						venue: event.venue ?? "",
+						address: event.address ?? "",
+						city: event.city ?? "",
+						state: event.state ?? "",
+						startAt: new Date(event.startAt),
+						endAt: new Date(event.endAt),
+						volunteersNeeded: String(event.volunteersNeeded),
+					}
+				: emptyDraft,
+		);
+	}, [visible, event?.id]);
 
 	const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
 		setDraft((d) => ({ ...d, [key]: value }));
@@ -102,12 +129,25 @@ export function EventFormSheet({
 		}
 
 		setErrors({});
-		createEvent.mutate(parsed.data as CreateEventInput, {
-			onSuccess: close,
-			onError: (error) =>
-				Alert.alert("Could not create event", apiErrorMessage(error)),
-		});
+		if (event) {
+			updateEvent.mutate(
+				{ id: event.id, input: parsed.data as CreateEventInput },
+				{
+					onSuccess: close,
+					onError: (error) =>
+						Alert.alert("Could not save changes", apiErrorMessage(error)),
+				},
+			);
+		} else {
+			createEvent.mutate(parsed.data as CreateEventInput, {
+				onSuccess: close,
+				onError: (error) =>
+					Alert.alert("Could not create event", apiErrorMessage(error)),
+			});
+		}
 	};
+
+	const editingPublished = event?.status === "PUBLISHED";
 
 	return (
 		<Modal
@@ -127,7 +167,7 @@ export function EventFormSheet({
 						paddingBottom: spacing[2],
 					}}
 				>
-					<H2>New event</H2>
+					<H2>{event ? "Edit event" : "New event"}</H2>
 					<Pressable onPress={close} hitSlop={12}>
 						<X size={22} color={colors.text.tertiary as string} />
 					</Pressable>
@@ -235,18 +275,20 @@ export function EventFormSheet({
 
 					<Button
 						onPress={() => submit("PUBLISHED")}
-						loading={createEvent.isPending}
+						loading={saving}
 						style={{ marginBottom: spacing[3] }}
 					>
-						Publish event
+						{editingPublished ? "Save changes" : "Publish event"}
 					</Button>
-					<Button
-						variant="outline"
-						onPress={() => submit("DRAFT")}
-						disabled={createEvent.isPending}
-					>
-						Save as draft
-					</Button>
+					{!editingPublished && (
+						<Button
+							variant="outline"
+							onPress={() => submit("DRAFT")}
+							disabled={saving}
+						>
+							Save as draft
+						</Button>
+					)}
 				</ScrollView>
 			</View>
 		</Modal>

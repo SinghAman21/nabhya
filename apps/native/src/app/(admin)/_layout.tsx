@@ -1,5 +1,11 @@
 import { Redirect, Tabs } from "expo-router";
-import { Building2, LayoutDashboard, Users } from "lucide-react-native";
+import {
+	Building2,
+	FileCheck,
+	LayoutDashboard,
+	ScrollText,
+	Users,
+} from "lucide-react-native";
 import { View } from "react-native";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useTheme } from "@/hooks/useTheme";
@@ -52,6 +58,24 @@ export default function AdminLayout() {
 						title: "Volunteers",
 						tabBarIcon: ({ color, size }) => (
 							<Users size={size} color={color} />
+						),
+					}}
+				/>
+				<Tabs.Screen
+					name="documents"
+					options={{
+						title: "Documents",
+						tabBarIcon: ({ color, size }) => (
+							<FileCheck size={size} color={color} />
+						),
+					}}
+				/>
+				<Tabs.Screen
+					name="audit"
+					options={{
+						title: "Activity",
+						tabBarIcon: ({ color, size }) => (
+							<ScrollText size={size} color={color} />
 						),
 					}}
 				/>

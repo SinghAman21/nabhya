@@ -193,10 +193,16 @@ export class EventsService {
 				.select({
 					id: events.id,
 					title: events.title,
+					// The owner's list doubles as the edit-form source, so it carries
+					// the full editable payload rather than just card fields.
+					description: events.description,
+					venue: events.venue,
+					address: events.address,
 					city: events.city,
 					state: events.state,
 					startAt: events.startAt,
 					endAt: events.endAt,
+					applicationDeadline: events.applicationDeadline,
 					status: events.status,
 					volunteersNeeded: events.volunteersNeeded,
 					acceptedCount: events.acceptedCount,

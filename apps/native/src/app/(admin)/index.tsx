@@ -72,12 +72,12 @@ export default function AdminOverviewScreen() {
 							{
 								label: "Organization documents to review",
 								count: overview.documents.pendingOrgDocuments,
-								onPress: () => router.push("/(admin)/organizations"),
+								onPress: () => router.push("/(admin)/documents"),
 							},
 							{
 								label: "Identity documents to review",
 								count: overview.documents.pendingUserDocuments,
-								onPress: () => router.push("/(admin)/volunteers"),
+								onPress: () => router.push("/(admin)/documents"),
 							},
 						]}
 					/>
