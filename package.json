@@ -1,5 +1,5 @@
 {
-	"name": "my-better-t-app",
+	"name": "nabhya",
 	"private": true,
 	"type": "module",
 	"scripts": {
@@ -8,15 +8,15 @@
 		"check-types": "turbo check-types",
 		"dev:server": "turbo -F server dev",
 		"db:setup": "tsx scripts/setup.ts",
-		"db:push": "turbo -F @my-better-t-app/db db:push",
-		"db:studio": "turbo -F @my-better-t-app/db db:studio",
-		"db:generate": "turbo -F @my-better-t-app/db db:generate",
-		"db:migrate": "turbo -F @my-better-t-app/db db:migrate",
+		"db:push": "turbo -F @nabhya/db db:push",
+		"db:studio": "turbo -F @nabhya/db db:studio",
+		"db:generate": "turbo -F @nabhya/db db:generate",
+		"db:migrate": "turbo -F @nabhya/db db:migrate",
 		"check": "biome check --write .",
 		"prepare": "husky"
 	},
 	"dependencies": {
-		"@my-better-t-app/env": "workspace:*",
+		"@nabhya/env": "workspace:*",
 		"dotenv": "catalog:",
 		"zod": "catalog:"
 	},
@@ -24,7 +24,7 @@
 		"@astrojs/cli-kit": "^0.4.1",
 		"@biomejs/biome": "^2.4.16",
 		"@clack/prompts": "^1.2.0",
-		"@my-better-t-app/config": "workspace:*",
+		"@nabhya/config": "workspace:*",
 		"@neondatabase/serverless": "^1.0.2",
 		"@types/node": "catalog:",
 		"husky": "^9.1.7",
@@ -43,6 +43,8 @@
 	"packageManager": "pnpm@10.10.0",
 	"pnpm": {
 		"onlyBuiltDependencies": [
+			"@scarf/scarf",
+			"core-js",
 			"esbuild",
 			"msgpackr-extract"
 		]

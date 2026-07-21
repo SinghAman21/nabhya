@@ -1,0 +1,198 @@
+volunteer features 
+
+Authentication
+--------------
+✔ Register
+✔ Login
+✔ Logout
+✔ Forgot Password
+✔ Email Verification
+
+Profile
+-------
+✔ Edit Profile
+✔ Upload Verification Document
+✔ View Verification Status
+
+Organizations
+-------------
+✔ Browse NGOs
+✔ Search NGOs
+✔ Filter NGOs
+✔ View NGO Details
+✔ Bookmark NGO
+
+Donations
+---------
+✔ Donate
+✔ View Donation History
+✔ Download Receipt
+
+Events
+------
+✔ View Events
+✔ Apply for Events
+✔ Track Application Status
+
+Certificates
+------------
+✔ View Certificates
+✔ Download Certificates
+
+Reviews
+-------
+✔ Give Rating
+✔ Write Review
+✔ Edit Own Review
+
+Notifications
+-------------
+✔ View Notifications
+✔ Mark as Read
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Super admin features 
+
+
+
+Dashboard
+---------
+✔ Platform Analytics
+✔ User Statistics
+✔ NGO Statistics
+✔ Donation Statistics
+
+User Management
+---------------
+✔ View Users
+✔ Suspend Users
+✔ Delete Users
+✔ Verify Identity Documents
+
+Organization Management
+-----------------------
+✔ View NGOs
+✔ Approve NGOs
+✔ Reject NGOs
+✔ Suspend NGOs
+✔ Delete NGOs
+
+Document Verification
+---------------------
+✔ Verify NGO Documents
+✔ Verify User Documents
+
+Categories
+----------
+✔ Add Categories
+✔ Edit Categories
+✔ Delete Categories
+
+Audit Logs
+----------
+✔ View All Logs
+✔ Search Logs
+
+Reports
+-------
+✔ View Donations
+✔ View Financial Reports
+✔ Export Reports
+
+Notifications
+-------------
+✔ Broadcast Notifications
+✔ Send Platform Announcements
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+organisation features 
+
+
+Authentication
+--------------
+✔ Register
+✔ Login
+✔ Logout
+
+Organization
+------------
+✔ Create NGO
+✔ Edit NGO Profile
+✔ Upload Documents
+✔ View Verification Status
+
+Organization Admins
+-------------------
+✔ Invite Admin
+✔ Remove Admin
+✔ Assign Roles
+
+Events
+------
+✔ Create Event
+✔ Edit Event
+✔ Delete Event
+✔ View Applicants
+✔ Accept Volunteers
+✔ Reject Volunteers
+✔ Generate Certificates
+
+Donations
+---------
+✔ View Donations
+✔ View Donor Messages
+✔ Download Reports
+
+Announcements
+-------------
+✔ Create Announcement
+✔ Edit Announcement
+✔ Delete Announcement
+
+Financial Reports
+-----------------
+✔ Upload Annual Reports
+✔ Manage Transparency Documents
+
+Reviews
+-------
+✔ View Reviews
+✔ Reply to Reviews
+
+Notifications
+-------------
+✔ View Notifications

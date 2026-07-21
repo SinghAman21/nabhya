@@ -48,8 +48,16 @@ export default function RootLayout() {
 					<Stack screenOptions={{ headerShown: false }}>
 						<Stack.Screen name="index" />
 						<Stack.Screen name="(auth)" />
+						<Stack.Screen name="role-select" />
 						<Stack.Screen name="(onboarding)" />
-						<Stack.Screen name="(app)" />
+						<Stack.Screen name="(ngo)" />
+						<Stack.Screen name="(volunteer)" />
+						<Stack.Screen name="(admin)" />
+						{/* Public — browsable without an account */}
+						<Stack.Screen name="events" />
+						<Stack.Screen name="needs" />
+						<Stack.Screen name="organizations" />
+						<Stack.Screen name="success" />
 					</Stack>
 					<PortalHost />
 				</View>

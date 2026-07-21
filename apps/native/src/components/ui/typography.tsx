@@ -14,7 +14,7 @@ interface TypographyProps extends TextProps {
 
 function useTextColor(color?: TextColor) {
 	const { colors } = useTheme();
-	if (!color) return undefined;
+	if (!color) return colors.text.primary;
 	if (color in colors.text)
 		return colors.text[color as keyof typeof colors.text];
 	return color;

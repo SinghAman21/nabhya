@@ -1,13 +1,38 @@
 import { Module } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
+import { AuditModule } from "../common/audit";
 import { DatabaseModule } from "../common/database";
-import { AuthModule } from "../modules/auth/auth.module";
+import { JwtGuard, RolesGuard } from "../common/guards";
+import { AdminModule } from "../modules/admin/admin.module";
+import { CategoriesModule } from "../modules/categories/categories.module";
+import { EventsModule } from "../modules/events/events.module";
+import { NeedsModule } from "../modules/needs/needs.module";
+import { OnboardingModule } from "../modules/onboarding/onboarding.module";
+import { OrganizationsModule } from "../modules/organizations/organizations.module";
+import { UsersModule } from "../modules/users/users.module";
 import { AppController } from "./app.controller";
 
 @Module({
 	imports: [
 		DatabaseModule, // global — provides db to the whole app
-		AuthModule,
-		// Add new feature modules here as you build them
+		AuditModule, // global — provides the activity trail writer
+		UsersModule,
+		OnboardingModule,
+		OrganizationsModule,
+		CategoriesModule,
+		EventsModule,
+		NeedsModule,
+		AdminModule,
+	],
+	providers: [
+		{
+			provide: APP_GUARD,
+			useClass: JwtGuard,
+		},
+		{
+			provide: APP_GUARD,
+			useClass: RolesGuard,
+		},
 	],
 	controllers: [AppController],
 })

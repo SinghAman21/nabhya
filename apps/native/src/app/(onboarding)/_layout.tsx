@@ -4,7 +4,7 @@ export default function OnboardingLayout() {
 	return (
 		<Stack screenOptions={{ headerShown: false }}>
 			<Stack.Screen name="index" />
-			<Stack.Screen name="step-2" />
+			<Stack.Screen name="volunteer" />
 		</Stack>
 	);
 }

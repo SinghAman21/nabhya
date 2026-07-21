@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { env } from "@my-better-t-app/env/server";
+import { env } from "@nabhya/env/server";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app/app.module";
@@ -9,7 +9,7 @@ import { ResponseTransformInterceptor } from "./common/interceptors";
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
 
-	// Global prefix for all routes — e.g. /api/auth/login
+	// Global prefix for all routes — e.g. /api/users/me
 	app.setGlobalPrefix("api");
 
 	app.enableCors({

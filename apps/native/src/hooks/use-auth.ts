@@ -1,47 +1,36 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-	type ApiResponse,
-	AUTH,
-	apiClient,
-	type LoginInput,
-	type LoginResponse,
-	type SignUpInput,
-} from "@/lib/api";
+import { authService } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/auth-store";
 
 export function useSignIn() {
-	const setAuth = useAuthStore((s) => s.setAuth);
+	const setUser = useAuthStore((s) => s.setUser);
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async (input: LoginInput) => {
-			const { data } = await apiClient.post<ApiResponse<LoginResponse>>(
-				AUTH.LOGIN,
-				input,
-			);
-			return data.data;
+		mutationFn: async (input: { email: string; password: string }) => {
+			return authService.login(input);
 		},
 		onSuccess: (data) => {
-			setAuth(data.user, data.tokens);
+			if (data?.user) setUser(data.user);
 			queryClient.invalidateQueries({ queryKey: ["me"] });
 		},
 	});
 }
 
 export function useSignUp() {
-	const setAuth = useAuthStore((s) => s.setAuth);
+	const setUser = useAuthStore((s) => s.setUser);
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async (input: SignUpInput) => {
-			const { data } = await apiClient.post<ApiResponse<LoginResponse>>(
-				AUTH.SIGNUP,
-				input,
-			);
-			return data.data;
+		mutationFn: async (input: {
+			email: string;
+			password: string;
+			name: string;
+		}) => {
+			return authService.signup(input);
 		},
 		onSuccess: (data) => {
-			setAuth(data.user, data.tokens);
+			if (data?.user) setUser(data.user);
 			queryClient.invalidateQueries({ queryKey: ["me"] });
 		},
 	});
@@ -53,15 +42,7 @@ export function useSignOut() {
 
 	return useMutation({
 		mutationFn: async () => {
-			try {
-				await apiClient.post(AUTH.LOGOUT);
-			} catch {
-				// Logout is best-effort on the client
-			}
-		},
-		onSuccess: () => {
-			queryClient.clear();
-			signOut();
+			await authService.logout();
 		},
 		onSettled: () => {
 			queryClient.clear();

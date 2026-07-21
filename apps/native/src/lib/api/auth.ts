@@ -1,0 +1,69 @@
+import { createInternalNeonAuth } from "@neondatabase/auth";
+import axios from "axios";
+import { API_URL, NEON_AUTH_URL } from "@/lib/env";
+import type { AuthResponse, LoginInput, SignUpInput } from "@/lib/types";
+import { storage } from "../storage";
+import { USERS } from "./endpoints";
+
+const neonAuth = createInternalNeonAuth(NEON_AUTH_URL);
+const neonAuthClient = neonAuth.adapter;
+
+export class AuthService {
+	async signup(input: SignUpInput): Promise<AuthResponse> {
+		const result = await neonAuthClient.signUp.email({
+			email: input.email,
+			password: input.password,
+			name: input.name,
+		});
+		this.throwIfNeonAuthError(result.error);
+		return this.getAuthenticatedUser();
+	}
+
+	async login(input: LoginInput): Promise<AuthResponse> {
+		const result = await neonAuthClient.signIn.email({
+			email: input.email,
+			password: input.password,
+		});
+		this.throwIfNeonAuthError(result.error);
+		return this.getAuthenticatedUser();
+	}
+
+	async logout(): Promise<void> {
+		try {
+			await neonAuthClient.signOut();
+		} finally {
+			await this.clearToken();
+		}
+	}
+
+	private async getAuthenticatedUser(): Promise<AuthResponse> {
+		const accessToken = await neonAuth.getJWTToken();
+		if (!accessToken) {
+			throw new Error("Neon Auth did not return an access token");
+		}
+
+		await storage.set("accessToken", accessToken);
+
+		const response = await axios.get(`${API_URL}${USERS.ME}`, {
+			headers: { Authorization: `Bearer ${accessToken}` },
+		});
+		return { accessToken, user: response.data.data };
+	}
+
+	private throwIfNeonAuthError(error: { message?: string } | null) {
+		if (error) throw new Error(error.message ?? "Neon Auth request failed");
+	}
+
+	private async clearToken(): Promise<void> {
+		await storage.remove("accessToken");
+	}
+
+	/**
+	 * Get stored access token
+	 */
+	async getAccessToken(): Promise<string | null> {
+		return storage.get("accessToken");
+	}
+}
+
+export const authService = new AuthService();
