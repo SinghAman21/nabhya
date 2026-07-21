@@ -2,6 +2,7 @@ import type {
 	AdminOrgQuery,
 	AdminUserQuery,
 	AuditLogQuery,
+	DocumentQueueQuery,
 	ReviewDocumentInput,
 	ReviewOrganizationInput,
 	SetOrgStatusInput,
@@ -11,7 +12,7 @@ import {
 	adminOrgQuerySchema,
 	adminUserQuerySchema,
 	auditLogQuerySchema,
-	paginationQuerySchema,
+	documentQueueQuerySchema,
 	reviewDocumentSchema,
 	reviewOrganizationSchema,
 	setOrgStatusSchema,
@@ -33,17 +34,10 @@ import {
 	ApiQuery,
 	ApiTags,
 } from "@nestjs/swagger";
-import { z } from "zod";
 import { CurrentUser, Roles } from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthUser } from "../../common/types";
 import { AdminService } from "./admin.service";
-
-const documentQueueQuerySchema = paginationQuerySchema.extend({
-	status: z.enum(["PENDING", "VERIFIED", "REJECTED"]).optional(),
-});
-
-type DocumentQueueQuery = z.infer<typeof documentQueueQuerySchema>;
 
 /**
  * Superadmin monitoring surface. The class-level @Roles guard means every route

@@ -4,7 +4,7 @@ import { Alert, Modal, Pressable, ScrollView, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Body, Caption, H2, Label } from "@/components/ui/typography";
-import { useCreatePledge } from "@/hooks/use-needs";
+import { useCreatePledge, usePublicNeed } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatProgress } from "@/lib/format";
@@ -19,7 +19,7 @@ import type { PublicNeed } from "@/lib/types";
  * mirrors the rule inline.
  */
 export function PledgeSheet({
-	need,
+	need: listItem,
 	onClose,
 }: {
 	need: PublicNeed | null;
@@ -30,16 +30,23 @@ export function PledgeSheet({
 	const [message, setMessage] = useState("");
 	const [error, setError] = useState<string | null>(null);
 
+	// The row that opened this sheet may have been loaded minutes ago, and
+	// `fulfilledQuantity` moves as other people pledge. Re-reading the need
+	// keeps "only N still needed" honest instead of validating against a stale
+	// number the server will then reject.
+	const fresh = usePublicNeed(listItem?.id);
+	const need = fresh.data ?? listItem;
+
 	const pledge = useCreatePledge(need?.id ?? "");
 
 	// Reset between different needs so one post's draft never leaks into another.
 	useEffect(() => {
-		if (need) {
+		if (listItem) {
 			setQuantity("");
 			setMessage("");
 			setError(null);
 		}
-	}, [need]);
+	}, [listItem]);
 
 	if (!need) return null;
 
@@ -86,9 +93,11 @@ export function PledgeSheet({
 		);
 	};
 
+	// Visibility tracks the caller's selection rather than `need`: a cached
+	// detail response must not keep the sheet open after it is dismissed.
 	return (
 		<Modal
-			visible={!!need}
+			visible={!!listItem}
 			animationType="slide"
 			presentationStyle="pageSheet"
 			onRequestClose={onClose}

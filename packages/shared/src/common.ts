@@ -35,12 +35,20 @@ export const uuidParamSchema = z.object({
  * output keeps the key required (typed `string | undefined`), which forces
  * every caller to pass it explicitly.
  */
+/**
+ * An optional free-text field.
+ *
+ * Empty becomes `null`, not `undefined`, so a partial update can tell "the
+ * caller left this alone" (`undefined`, key absent) from "the caller cleared
+ * it" (`null`). Collapsing both to `undefined` is why a bio could be set but
+ * never removed: every update path skips `undefined` keys.
+ */
 export const optionalText = (max: number) =>
 	z
 		.string()
 		.trim()
 		.max(max, `Must be under ${max} characters`)
-		.transform((v) => (v === "" ? undefined : v))
+		.transform((v) => (v === "" ? null : v))
 		.optional();
 
 export const sortOrderSchema = z.enum(["asc", "desc"]).default("desc");

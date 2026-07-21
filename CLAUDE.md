@@ -157,16 +157,30 @@ payments.
 
 ## Current state
 
-**Built:** auth end-to-end; the 14 tables above; ~50 REST endpoints across
-`users`, `onboarding`, `organizations`, `categories`, `events`, `needs` and `admin`;
-NGO + volunteer onboarding wired to the API; org events and needs management with
-applicant/pledge review; the public event feed and apply flow; the superadmin console.
+**Built:** auth end-to-end; ~89 REST endpoints across `users`, `onboarding`,
+`organizations`, `categories`, `events`, `needs`, `admin`, `uploads`,
+`engagement`, `publishing`, `certificates`, `donations` and `notifications`.
+NGO + volunteer onboarding; org events and needs management with
+applicant/pledge review; the public event feed and apply flow; the NGO
+directory; attendance and certificates (issue, revoke, public verification);
+bookmarks, reviews, announcements, financial reports, team management,
+in-app notifications and superadmin broadcast; R2 uploads; the superadmin
+console including the cross-org document verification queue and audit log.
+Monetary donations are wired through Dodo Payments but the feature is **on
+hold** at the user's request.
 
 Client route groups: `(auth)`, `(onboarding)` (`index` = NGO wizard, `volunteer` =
-volunteer wizard), `(ngo)`, `(volunteer)`, `(admin)`, and public `events/`.
+volunteer wizard), `(ngo)`, `(volunteer)`, `(admin)`, and public `events/`,
+`ngos/`, `certificates/`.
 
-**Not built:** monetary donations/payments, certificates, reviews, bookmarks,
-notifications, announcements, financial reports, and file uploads (see traps).
+Every endpoint is reachable from the app except two that are server-only by
+design: `POST /api/donations/webhook` (called by Dodo, signature-authenticated)
+and `POST /api/admin/events/close-finished` (a cron target — see Deploying).
+If you add an endpoint, wire it to a screen or explain here why it has none.
+
+**Not built:** `apps/web`, email/push delivery (notifications are in-app only),
+and pagination controls — every list endpoint returns a `Paginated<T>` envelope
+but the screens only ever render page 1.
 
 ### Conventions worth copying
 
@@ -196,6 +210,13 @@ notifications, announcements, financial reports, and file uploads (see traps).
   creates the database; `test/factories.ts` builds rows. Mocking the database here
   would defeat the point: the logic worth testing is unique indexes, `SELECT … FOR
   UPDATE` and filtered aggregates.
+- **Nothing that runs in CI may need a developer's `.env.local`.** Importing
+  almost anything from `common/` reaches `@nabhya/db`, which validates the
+  server env at module load — so the whole suite used to fail to import on a
+  machine without secrets. `test/setup-env.ts` supplies throwaway values and is
+  wired as vitest's `setupFiles`; `scripts/verify-di.ts` imports it dynamically
+  before `AppModule` for the same reason (static imports get hoisted and
+  reordered by the import sorter, which would put validation first).
 - Screens compose `components/screen-shell.tsx` (`ScreenHeader`, `Surface`,
   `EmptyState`, `LoadingState`, `ErrorState`, `FilterChips`) + `status-pill.tsx`.
 - **Files are uploaded straight to object storage, never through the API.** The
@@ -243,6 +264,15 @@ Verify these are still true before relying on them.
    dark mode. Use those primitives only if you first make the Tailwind theme dark-aware.
 5. **`expo-env.d.ts` is gitignored and generated.** A fresh clone fails `tsc` on the
    `global.css` import until `expo start` (or an equivalent) creates it.
+6. **Sign out through `useSignOut()`, never `useAuthStore().signOut` directly.**
+   The store action only drops the token and the Zustand slice — it does not
+   revoke the Neon Auth session or clear the TanStack Query cache, so on a
+   shared device the next person to sign in briefly sees the previous user's
+   cached data. The hook does both.
+7. **`optionalText` maps an empty string to `null`, not `undefined`.** Update
+   paths skip `undefined` keys to support partial updates, so collapsing both
+   cases would mean a field could be set but never cleared. `undefined` means
+   "not provided", `null` means "clear it".
 
 Recently fixed — don't reintroduce: the `ngo`/`organisation` role split (canonical
 vocabulary now lives in `@nabhya/shared`, `roles.ts`), the client's references to

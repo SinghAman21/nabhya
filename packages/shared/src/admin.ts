@@ -94,6 +94,13 @@ export const auditLogQuerySchema = paginationQuerySchema.extend({
 
 export type AuditLogQuery = z.infer<typeof auditLogQuerySchema>;
 
+/** Filter for the cross-organization document verification queues. */
+export const documentQueueQuerySchema = paginationQuerySchema.extend({
+	status: z.enum(["PENDING", "VERIFIED", "REJECTED"]).optional(),
+});
+
+export type DocumentQueueQuery = z.infer<typeof documentQueueQuerySchema>;
+
 // ─── Dashboard payload ───────────────────────────────────────────────────────
 
 export interface AdminOverview {

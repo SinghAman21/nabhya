@@ -16,7 +16,11 @@ import {
 } from "@/components/status-pill";
 import { Input } from "@/components/ui/input";
 import { Body, Caption, H2, Label } from "@/components/ui/typography";
-import { useIssueCertificate, useMarkAttendance } from "@/hooks/use-engagement";
+import {
+	useIssueCertificate,
+	useMarkAttendance,
+	useRevokeCertificate,
+} from "@/hooks/use-engagement";
 import { useEventApplicants, useReviewApplication } from "@/hooks/use-events";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
@@ -326,9 +330,36 @@ function AttendanceControls({
 
 	const attendance = useMarkAttendance(eventId);
 	const issue = useIssueCertificate(eventId);
+	const revoke = useRevokeCertificate();
 
 	const attended = !!applicant.attendedAt;
-	const busy = attendance.isPending || issue.isPending;
+	const certificate = applicant.certificate;
+	const busy = attendance.isPending || issue.isPending || revoke.isPending;
+
+	const confirmRevoke = () => {
+		if (!certificate) return;
+		// The record survives revocation, so a link already shared with an
+		// employer resolves to "revoked" rather than disappearing.
+		Alert.alert(
+			"Revoke certificate",
+			`${certificate.code} will show as revoked to anyone who verifies it. This cannot be undone.`,
+			[
+				{ text: "Cancel", style: "cancel" },
+				{
+					text: "Revoke",
+					style: "destructive",
+					onPress: () =>
+						revoke.mutate(
+							{ id: certificate.id, reason: "Revoked by the organization" },
+							{
+								onError: (error) =>
+									Alert.alert("Could not revoke", apiErrorMessage(error)),
+							},
+						),
+				},
+			],
+		);
+	};
 
 	const toggleAttendance = () => {
 		attendance.mutate(
@@ -380,7 +411,7 @@ function AttendanceControls({
 					</Caption>
 				</Pressable>
 
-				{attended && (
+				{attended && !certificate && (
 					<Pressable
 						onPress={() => setShowNote((v) => !v)}
 						disabled={busy}
@@ -390,6 +421,27 @@ function AttendanceControls({
 							Issue certificate
 						</Caption>
 					</Pressable>
+				)}
+
+				{certificate && (
+					<>
+						<Caption
+							color={
+								certificate.revokedAt
+									? (colors.error.main as string)
+									: (colors.success.main as string)
+							}
+						>
+							{certificate.revokedAt ? "Revoked" : `✓ ${certificate.code}`}
+						</Caption>
+						{!certificate.revokedAt && (
+							<Pressable onPress={confirmRevoke} disabled={busy} hitSlop={8}>
+								<Caption weight="medium" color={colors.error.main as string}>
+									{revoke.isPending ? "Revoking…" : "Revoke"}
+								</Caption>
+							</Pressable>
+						)}
+					</>
 				)}
 			</View>
 

@@ -3,7 +3,6 @@ import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { NestFactory } from "@nestjs/core";
-import { AppModule } from "../src/app/app.module";
 
 /**
  * Guards against silently broken dependency injection.
@@ -59,6 +58,15 @@ async function collectInjectables(): Promise<Ctor[]> {
 }
 
 async function main() {
+	// Both imports are dynamic and ordered deliberately: `@nabhya/db` validates
+	// the server env the moment it loads, so the placeholders have to be in
+	// place first. Static imports would be hoisted (and reordered by the import
+	// sorter), which would put validation before the defaults and make this
+	// script unrunnable without a developer's .env.local — the DI wiring it
+	// checks has nothing to do with real credentials.
+	await import("../test/setup-env");
+	const { AppModule } = await import("../src/app/app.module");
+
 	const app = await NestFactory.createApplicationContext(AppModule, {
 		logger: ["error"],
 	});

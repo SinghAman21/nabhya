@@ -6,6 +6,7 @@ import {
 	Bookmark,
 	Building2,
 	ChevronRight,
+	Pencil,
 	TrendingUp,
 } from "lucide-react-native";
 import { Alert, RefreshControl, ScrollView, View } from "react-native";
@@ -24,6 +25,7 @@ import {
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Body, Caption } from "@/components/ui/typography";
+import { useSignOut } from "@/hooks/use-auth";
 import {
 	useMyUserDocuments,
 	useUploadUserDocument,
@@ -31,7 +33,6 @@ import {
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
-import { useAuthStore } from "@/store/auth-store";
 
 const ID_DOCUMENTS: Array<{
 	type: UploadUserDocumentInput["documentType"];
@@ -44,7 +45,7 @@ const ID_DOCUMENTS: Array<{
 export default function VolunteerProfile() {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
-	const signOut = useAuthStore((s) => s.signOut);
+	const signOut = useSignOut();
 
 	const me = useMe();
 	const documents = useMyUserDocuments();
@@ -151,6 +152,25 @@ export default function VolunteerProfile() {
 							</View>
 						</Surface>
 
+						<Surface onPress={() => router.push("/edit-profile")}>
+							<View
+								style={{
+									flexDirection: "row",
+									alignItems: "center",
+									gap: spacing[3],
+								}}
+							>
+								<Pencil size={18} color={colors.text.secondary as string} />
+								<Body weight="medium" style={{ flex: 1 }}>
+									Edit profile
+								</Body>
+								<ChevronRight
+									size={18}
+									color={colors.text.quaternary as string}
+								/>
+							</View>
+						</Surface>
+
 						<Surface onPress={() => router.push("/impact")}>
 							<View
 								style={{
@@ -243,7 +263,8 @@ export default function VolunteerProfile() {
 
 					<Button
 						variant="outline"
-						onPress={signOut}
+						onPress={() => signOut.mutate()}
+						loading={signOut.isPending}
 						style={{ marginTop: spacing[6] }}
 					>
 						Sign out

@@ -5,6 +5,9 @@ export default defineConfig({
 		globals: true,
 		environment: "node",
 		include: ["src/**/*.spec.ts", "test/**/*.spec.ts"],
+		// Runs before each test file's own imports, which matters: `@nabhya/db`
+		// validates the server env the moment it is loaded.
+		setupFiles: ["./test/setup-env.ts"],
 		// Integration specs each build their own in-process Postgres, so running
 		// files in parallel would multiply memory for no wall-clock gain.
 		fileParallelism: false,

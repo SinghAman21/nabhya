@@ -145,6 +145,12 @@ export interface EventApplicant {
 	/** Set once the organization confirms the volunteer turned up. */
 	attendedAt: string | null;
 	volunteer: VolunteerSummary;
+	/** The certificate issued for this application, if any. */
+	certificate: {
+		id: string;
+		code: string;
+		revokedAt: string | null;
+	} | null;
 }
 
 export interface ApplicationListItem {
@@ -266,6 +272,30 @@ export interface AdminOrgDocument {
 	uploadedAt: string;
 }
 
+/**
+ * A row of the cross-organization verification queue.
+ *
+ * Same document shape as the dossier view, plus the owner it belongs to —
+ * the queue is sorted by upload time across every NGO, so each row has to
+ * name its own organization.
+ */
+export interface AdminOrgDocumentQueueItem extends AdminOrgDocument {
+	organization: {
+		id: string;
+		organizationName: string;
+		verificationStatus: OrgVerificationStatus | null;
+	};
+}
+
+export interface AdminUserDocumentQueueItem extends AdminOrgDocument {
+	user: {
+		id: string;
+		fullName: string | null;
+		email: string;
+		verificationStatus: DocVerificationStatus | null;
+	};
+}
+
 export interface AdminOrgDetail {
 	id: string;
 	organizationName: string;
@@ -274,6 +304,8 @@ export interface AdminOrgDetail {
 	email: string | null;
 	phone: string | null;
 	description: string | null;
+	mission: string | null;
+	vision: string | null;
 	website: string | null;
 	logo: string | null;
 	address: string | null;
@@ -455,6 +487,20 @@ export interface MyDonation {
 	};
 }
 
+/** The 80G-style receipt, available only once the payment has completed. */
+export interface DonationReceipt {
+	id: string;
+	receiptNumber: string | null;
+	amountMinor: number;
+	currency: string;
+	status: DonationStatus;
+	completedAt: string | null;
+	donorName: string | null;
+	donorEmail: string | null;
+	organizationName: string;
+	organizationCity: string | null;
+}
+
 export interface OrgDonation {
 	id: string;
 	amountMinor: number;
@@ -547,4 +593,16 @@ export interface OrgTeamMember {
 		email: string;
 		profileImage: string | null;
 	};
+}
+
+export interface AuditLogEntry {
+	id: string;
+	action: string;
+	entityName: string | null;
+	entityId: string | null;
+	oldValue: unknown;
+	newValue: unknown;
+	createdAt: string;
+	/** Null for system actions, or when the actor has since been deleted. */
+	actor: { id: string; fullName: string | null; email: string } | null;
 }

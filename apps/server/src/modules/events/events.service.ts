@@ -1,5 +1,10 @@
 import type { db as dbType } from "@nabhya/db";
-import { eventApplications, events, organizations } from "@nabhya/db/schema";
+import {
+	certificates,
+	eventApplications,
+	events,
+	organizations,
+} from "@nabhya/db/schema";
 import type {
 	ApplicationQuery,
 	ApplyToEventInput,
@@ -25,6 +30,7 @@ import {
 	eq,
 	gte,
 	ilike,
+	inArray,
 	lt,
 	or,
 	type SQL,
@@ -555,7 +561,39 @@ export class EventsService {
 			this.db.select({ value: count() }).from(eventApplications).where(where),
 		]);
 
-		return paginate(items, totals?.value ?? 0, query);
+		// Attached with a second bounded query rather than a correlated subquery:
+		// the relational builder aliases its FROM, so hand-written qualified SQL
+		// cannot reliably reference it. Without this the organization has no way
+		// to see — or revoke — a certificate it has already issued.
+		const issued = items.length
+			? await this.db
+					.select({
+						id: certificates.id,
+						code: certificates.code,
+						applicationId: certificates.applicationId,
+						revokedAt: certificates.revokedAt,
+					})
+					.from(certificates)
+					.where(
+						inArray(
+							certificates.applicationId,
+							items.map((item) => item.id),
+						),
+					)
+			: [];
+
+		const byApplication = new Map(
+			issued.map((row) => [row.applicationId, row]),
+		);
+
+		return paginate(
+			items.map((item) => ({
+				...item,
+				certificate: byApplication.get(item.id) ?? null,
+			})),
+			totals?.value ?? 0,
+			query,
+		);
 	}
 
 	/**

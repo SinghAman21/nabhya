@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { AuditService } from "../src/common/audit";
 import { StubStorageProvider } from "../src/common/storage";
 import { CertificatesService } from "../src/modules/certificates/certificates.service";
+import { EventsService } from "../src/modules/events/events.service";
 import { NotificationsService } from "../src/modules/notifications/notifications.service";
 import { OrganizationsService } from "../src/modules/organizations/organizations.service";
 import {
@@ -18,18 +19,31 @@ describe("CertificatesService", () => {
 	let db: TestDb;
 	let close: () => Promise<void>;
 	let service: CertificatesService;
+	let eventsService: EventsService;
 	let storage: StubStorageProvider;
 
 	beforeAll(async () => {
 		({ db, close } = await createTestDb());
 		const audit = new AuditService(db as never);
 		storage = new StubStorageProvider();
+		const notifications = new NotificationsService(db as never);
+		const organizations = new OrganizationsService(
+			db as never,
+			audit,
+			null as never,
+		);
 		service = new CertificatesService(
 			db as never,
 			audit,
 			storage,
-			new NotificationsService(db as never),
-			new OrganizationsService(db as never, audit, null as never),
+			notifications,
+			organizations,
+		);
+		eventsService = new EventsService(
+			db as never,
+			audit,
+			organizations,
+			notifications,
 		);
 	});
 
@@ -246,6 +260,92 @@ describe("CertificatesService", () => {
 
 			const result = await service.getPdfUrl(volunteer.id, certificate.id);
 			expect(result.url).toContain("stub-download");
+		});
+	});
+
+	/**
+	 * The applicant list is the only place an organization sees its issued
+	 * certificates, so revoking is unreachable from the app without this join.
+	 */
+	describe("certificates on the applicant list", () => {
+		it("reports null before anything is issued", async () => {
+			const { owner, event } = await scenario({ attended: true });
+
+			const page = await eventsService.listApplicants(owner.id, event.id, {
+				page: 1,
+				limit: 20,
+			});
+
+			expect(page.items).toHaveLength(1);
+			expect(page.items[0]?.certificate).toBeNull();
+		});
+
+		it("attaches the issued certificate to its own applicant", async () => {
+			const { owner, event, application } = await scenario({ attended: true });
+			const issued = await service.issue(
+				owner.id,
+				event.id,
+				application.id,
+				{},
+			);
+
+			const page = await eventsService.listApplicants(owner.id, event.id, {
+				page: 1,
+				limit: 20,
+			});
+
+			expect(page.items[0]?.certificate).toMatchObject({
+				id: issued.id,
+				code: issued.code,
+				revokedAt: null,
+			});
+		});
+
+		it("surfaces revocation, so the row stops offering to revoke again", async () => {
+			const { owner, event, application } = await scenario({ attended: true });
+			const issued = await service.issue(
+				owner.id,
+				event.id,
+				application.id,
+				{},
+			);
+			await service.revoke(owner.id, issued.id, { reason: "Issued in error" });
+
+			const page = await eventsService.listApplicants(owner.id, event.id, {
+				page: 1,
+				limit: 20,
+			});
+
+			expect(page.items[0]?.certificate?.revokedAt).not.toBeNull();
+		});
+
+		it("does not leak one volunteer's certificate onto another's row", async () => {
+			const { owner, org, event, application } = await scenario({
+				attended: true,
+			});
+			const other = await createUser(db, { role: "volunteer" });
+			await createApplication(db, event.id, other.id, {
+				status: "ACCEPTED",
+				attendedAt: new Date(),
+			});
+			expect(org.id).toBeTruthy();
+
+			const issued = await service.issue(
+				owner.id,
+				event.id,
+				application.id,
+				{},
+			);
+
+			const page = await eventsService.listApplicants(owner.id, event.id, {
+				page: 1,
+				limit: 20,
+			});
+
+			const withCertificate = page.items.filter((item) => item.certificate);
+			expect(withCertificate).toHaveLength(1);
+			expect(withCertificate[0]?.id).toBe(application.id);
+			expect(withCertificate[0]?.certificate?.id).toBe(issued.id);
 		});
 	});
 });

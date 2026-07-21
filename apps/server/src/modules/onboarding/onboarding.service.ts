@@ -170,9 +170,9 @@ export class OnboardingService {
 			})
 			.where(eq(users.id, user.id));
 
-		if (input.categoryIds) {
-			await this.usersService.setInterests(user.id, input.categoryIds);
-		}
+		// The wizard submits every step at once and the schema defaults this to
+		// [], so the selection is always authoritative — an empty one clears.
+		await this.usersService.setInterests(user.id, input.categoryIds);
 
 		void this.audit.record({
 			performedBy: user.id,

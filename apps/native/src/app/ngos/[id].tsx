@@ -31,7 +31,12 @@ import {
 	useOrganizationImpact,
 } from "@/hooks/use-directory";
 import { useOpenDocument } from "@/hooks/use-documents";
-import { useReviews, useToggleBookmark } from "@/hooks/use-engagement";
+import {
+	useDeleteMyReview,
+	useReviews,
+	useToggleBookmark,
+} from "@/hooks/use-engagement";
+import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate, formatRelative } from "@/lib/format";
@@ -281,7 +286,28 @@ function ReviewsTab({
 	onWrite: () => void;
 }) {
 	const { colors, spacing } = useTheme();
+	const email = useAuthStore((s) => s.email);
 	const query = useReviews(organizationId);
+	const me = useMe(!!email);
+	const remove = useDeleteMyReview(organizationId);
+
+	// One review per person, so "mine" is whichever row carries my user id.
+	const myUserId = me.data?.id;
+
+	const confirmDelete = () => {
+		Alert.alert("Delete review", "Your review will be removed for everyone.", [
+			{ text: "Cancel", style: "cancel" },
+			{
+				text: "Delete",
+				style: "destructive",
+				onPress: () =>
+					remove.mutate(undefined, {
+						onError: (error) =>
+							Alert.alert("Could not delete", apiErrorMessage(error)),
+					}),
+			},
+		]);
+	};
 
 	if (query.isLoading) return <LoadingState />;
 
@@ -351,6 +377,37 @@ function ReviewsTab({
 										Response from the NGO
 									</Caption>
 									<Caption color="secondary">{review.reply}</Caption>
+								</View>
+							)}
+
+							{review.user.id === myUserId && (
+								<View
+									style={{
+										flexDirection: "row",
+										gap: spacing[4],
+										marginTop: spacing[3],
+									}}
+								>
+									<Pressable onPress={onWrite} hitSlop={8}>
+										<Caption
+											weight="medium"
+											color={colors.primary.main as string}
+										>
+											Edit
+										</Caption>
+									</Pressable>
+									<Pressable
+										onPress={confirmDelete}
+										disabled={remove.isPending}
+										hitSlop={8}
+									>
+										<Caption
+											weight="medium"
+											color={colors.error.main as string}
+										>
+											{remove.isPending ? "Deleting…" : "Delete"}
+										</Caption>
+									</Pressable>
 								</View>
 							)}
 						</Surface>

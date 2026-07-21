@@ -60,6 +60,7 @@ export default function RootLayout() {
 						<Stack.Screen name="bookmarks" />
 						<Stack.Screen name="ngos" />
 						<Stack.Screen name="impact" />
+						<Stack.Screen name="edit-profile" />
 						<Stack.Screen name="success" />
 					</Stack>
 					<PortalHost />

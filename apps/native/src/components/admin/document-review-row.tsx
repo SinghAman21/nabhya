@@ -26,10 +26,14 @@ export function DocumentReviewRow({
 	document,
 	kind,
 	label,
+	subtitle,
 }: {
 	document: AdminOrgDocument;
 	kind: "organization" | "user";
 	label: string;
+	/** Who the document belongs to. Only the queue needs it — inside a dossier
+	 * the owner is already the subject of the screen. */
+	subtitle?: string;
 }) {
 	const { colors, spacing } = useTheme();
 	const [rejecting, setRejecting] = useState(false);
@@ -86,6 +90,12 @@ export function DocumentReviewRow({
 					tone={verificationTone(document.verificationStatus)}
 				/>
 			</View>
+
+			{subtitle && (
+				<Caption color="secondary" numberOfLines={1}>
+					{subtitle}
+				</Caption>
+			)}
 
 			<Caption color="quaternary" style={{ marginTop: spacing[1] }}>
 				Uploaded {formatDateTime(document.uploadedAt)}

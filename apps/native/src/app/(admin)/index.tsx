@@ -5,9 +5,12 @@ import {
 	CalendarDays,
 	FileCheck,
 	HeartHandshake,
+	Megaphone,
 	Users,
 } from "lucide-react-native";
+import { useState } from "react";
 import { Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { BroadcastSheet } from "@/components/admin/broadcast-sheet";
 import {
 	ErrorState,
 	LoadingState,
@@ -22,6 +25,7 @@ import { apiErrorMessage } from "@/lib/api";
 export default function AdminOverviewScreen() {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
+	const [broadcasting, setBroadcasting] = useState(false);
 	const query = useAdminOverview();
 
 	const overview = query.data;
@@ -38,6 +42,21 @@ export default function AdminOverviewScreen() {
 			<ScreenHeader
 				title="Overview"
 				subtitle="Everything happening across the platform."
+				action={
+					<Pressable
+						onPress={() => setBroadcasting(true)}
+						style={{
+							width: 44,
+							height: 44,
+							borderRadius: 22,
+							alignItems: "center",
+							justifyContent: "center",
+							backgroundColor: colors.primary.main,
+						}}
+					>
+						<Megaphone size={20} color={colors.primary.contrast as string} />
+					</Pressable>
+				}
 			/>
 
 			{query.isLoading ? (
@@ -178,6 +197,11 @@ export default function AdminOverviewScreen() {
 					</Section>
 				</ScrollView>
 			)}
+
+			<BroadcastSheet
+				visible={broadcasting}
+				onClose={() => setBroadcasting(false)}
+			/>
 		</View>
 	);
 }

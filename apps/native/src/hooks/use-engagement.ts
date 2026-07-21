@@ -101,6 +101,16 @@ export function useUpsertReview(organizationId: string) {
 	});
 }
 
+export function useDeleteMyReview(organizationId: string) {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: () => engagementApi.deleteMyReview(organizationId),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.reviews });
+		},
+	});
+}
+
 export function useMyOrgReviews(query: Partial<ReviewQuery> = {}) {
 	return useQuery({
 		queryKey: queryKeys.orgReviews(query),
@@ -180,6 +190,24 @@ export function useIssueCertificate(eventId: string) {
 	});
 }
 
+/**
+ * Withdraws a certificate that should not have been issued.
+ *
+ * The record is kept and flagged rather than deleted, so a verification link
+ * that has already been shared resolves to "revoked" instead of "not found".
+ */
+export function useRevokeCertificate() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+			certificatesApi.revoke(id, { reason }),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.orgEvents });
+			queryClient.invalidateQueries({ queryKey: queryScopes.certificates });
+		},
+	});
+}
+
 // ─── Donations ───────────────────────────────────────────────────────────────
 
 export function useCreateDonation() {
@@ -196,6 +224,18 @@ export function useMyDonations(query: Partial<DonationQuery> = {}) {
 	return useQuery({
 		queryKey: queryKeys.myDonations(query),
 		queryFn: () => donationsApi.listMine(query),
+	});
+}
+
+/**
+ * Fetched on demand rather than with the list: the server refuses a receipt
+ * for anything that has not completed, so asking for every row would 400.
+ */
+export function useDonationReceipt(id: string | undefined) {
+	return useQuery({
+		queryKey: queryKeys.donationReceipt(id ?? ""),
+		queryFn: () => donationsApi.receipt(id as string),
+		enabled: !!id,
 	});
 }
 

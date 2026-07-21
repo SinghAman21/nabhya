@@ -1,5 +1,15 @@
 import type { UploadOrgDocumentInput } from "@nabhya/shared";
 import { ORG_DOCUMENT_LABELS } from "@nabhya/shared";
+import { useRouter } from "expo-router";
+import {
+	ChevronRight,
+	FileText,
+	HandCoins,
+	Megaphone,
+	Pencil,
+	Star,
+	Users,
+} from "lucide-react-native";
 import { Alert, RefreshControl, ScrollView, View } from "react-native";
 import { DocumentUploadTile } from "@/components/document-upload-tile";
 import {
@@ -15,11 +25,21 @@ import {
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Body, Caption } from "@/components/ui/typography";
+import { useSignOut } from "@/hooks/use-auth";
 import { useMyOrgDocuments, useUploadOrgDocument } from "@/hooks/use-documents";
 import { useMyOrganization } from "@/hooks/use-organization";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
-import { useAuthStore } from "@/store/auth-store";
+
+/** Reached from here rather than the tab bar, which only has room for four. */
+const MANAGEMENT_LINKS = [
+	{ label: "Edit profile", href: "/(ngo)/edit", icon: Pencil },
+	{ label: "Updates", href: "/(ngo)/announcements", icon: Megaphone },
+	{ label: "Reviews", href: "/(ngo)/reviews", icon: Star },
+	{ label: "Team", href: "/(ngo)/team", icon: Users },
+	{ label: "Donations", href: "/(ngo)/donations", icon: HandCoins },
+	{ label: "Transparency", href: "/(ngo)/reports", icon: FileText },
+] as const;
 
 /** Document types the verification queue expects, in the order we ask for them. */
 const REQUIRED_DOCUMENTS: Array<{
@@ -37,7 +57,8 @@ const REQUIRED_DOCUMENTS: Array<{
 
 export default function NgoProfile() {
 	const { colors, spacing } = useTheme();
-	const signOut = useAuthStore((s) => s.signOut);
+	const router = useRouter();
+	const signOut = useSignOut();
 
 	const org = useMyOrganization();
 	const documents = useMyOrgDocuments();
@@ -97,6 +118,29 @@ export default function NgoProfile() {
 						/>
 					}
 				>
+					<View style={{ gap: spacing[2], marginBottom: spacing[5] }}>
+						{MANAGEMENT_LINKS.map(({ label, href, icon: Icon }) => (
+							<Surface key={href} onPress={() => router.push(href as never)}>
+								<View
+									style={{
+										flexDirection: "row",
+										alignItems: "center",
+										gap: spacing[3],
+									}}
+								>
+									<Icon size={18} color={colors.text.secondary as string} />
+									<Body weight="medium" style={{ flex: 1 }}>
+										{label}
+									</Body>
+									<ChevronRight
+										size={18}
+										color={colors.text.quaternary as string}
+									/>
+								</View>
+							</Surface>
+						))}
+					</View>
+
 					<Surface style={{ marginBottom: spacing[5] }}>
 						<View
 							style={{
@@ -168,7 +212,8 @@ export default function NgoProfile() {
 
 					<Button
 						variant="outline"
-						onPress={signOut}
+						onPress={() => signOut.mutate()}
+						loading={signOut.isPending}
 						style={{ marginTop: spacing[6] }}
 					>
 						Sign out

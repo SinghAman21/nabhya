@@ -51,6 +51,14 @@ export default function NgoLayout() {
 						),
 					}}
 				/>
+				{/* Reached from Profile, not the tab bar — href:null keeps them
+				    routable without crowding four tabs into seven. */}
+				<Tabs.Screen name="edit" options={{ href: null }} />
+				<Tabs.Screen name="announcements" options={{ href: null }} />
+				<Tabs.Screen name="reviews" options={{ href: null }} />
+				<Tabs.Screen name="team" options={{ href: null }} />
+				<Tabs.Screen name="reports" options={{ href: null }} />
+				<Tabs.Screen name="donations" options={{ href: null }} />
 				<Tabs.Screen
 					name="profile"
 					options={{

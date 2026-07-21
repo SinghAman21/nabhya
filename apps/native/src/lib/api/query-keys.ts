@@ -55,6 +55,7 @@ export const queryKeys = {
 
 	myDonations: (params?: unknown) => ["donations", "me", params] as const,
 	orgDonations: (params?: unknown) => ["donations", "org", params] as const,
+	donationReceipt: (id: string) => ["donations", "receipt", id] as const,
 
 	organizations: (params?: unknown) =>
 		["organizations", "list", params] as const,

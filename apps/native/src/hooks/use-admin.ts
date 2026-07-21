@@ -1,6 +1,8 @@
 import type {
 	AdminOrgQuery,
 	AdminUserQuery,
+	AuditLogQuery,
+	DocumentQueueQuery,
 	ReviewDocumentInput,
 	ReviewOrganizationInput,
 	SetOrgStatusInput,
@@ -28,6 +30,34 @@ export function useAdminOrganization(id: string | undefined) {
 		queryKey: queryKeys.adminOrganization(id ?? ""),
 		queryFn: () => adminApi.organization(id as string),
 		enabled: !!id,
+	});
+}
+
+export function useAuditLogs(query: Partial<AuditLogQuery> = {}) {
+	return useQuery({
+		queryKey: queryKeys.adminAuditLogs(query),
+		queryFn: () => adminApi.auditLogs(query),
+	});
+}
+
+/**
+ * The cross-organization verification queues.
+ *
+ * The dossier screens show one NGO's documents at a time; these answer the
+ * other question a reviewer has — "what is waiting on me right now?" — without
+ * opening every organization in turn.
+ */
+export function useOrgDocumentQueue(query: Partial<DocumentQueueQuery> = {}) {
+	return useQuery({
+		queryKey: queryKeys.adminOrgDocuments(query),
+		queryFn: () => adminApi.orgDocuments(query),
+	});
+}
+
+export function useUserDocumentQueue(query: Partial<DocumentQueueQuery> = {}) {
+	return useQuery({
+		queryKey: queryKeys.adminUserDocuments(query),
+		queryFn: () => adminApi.userDocuments(query),
 	});
 }
 

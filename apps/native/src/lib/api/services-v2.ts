@@ -19,6 +19,7 @@ import type {
 } from "@nabhya/shared";
 import type {
 	BookmarkListItem,
+	DonationReceipt,
 	MyCertificate,
 	MyDonation,
 	NotificationItem,
@@ -104,8 +105,7 @@ export const donationsApi = {
 		http.post<DonationCheckout>(DONATIONS.CHECKOUT, input),
 	listMine: (query: Partial<DonationQuery>) =>
 		http.getPage<MyDonation>(DONATIONS.MINE, query),
-	receipt: (id: string) =>
-		http.get<Record<string, unknown>>(DONATIONS.receipt(id)),
+	receipt: (id: string) => http.get<DonationReceipt>(DONATIONS.receipt(id)),
 	listForOrg: (query: Partial<DonationQuery>) =>
 		http.get<Paginated<OrgDonation> & { stats: DonationStats }>(
 			DONATIONS.ORG,

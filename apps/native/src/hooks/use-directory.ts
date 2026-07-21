@@ -3,6 +3,7 @@ import type {
 	InviteOrgAdminInput,
 	NearbyQuery,
 	PaginationQuery,
+	UpdateOrgAdminInput,
 	UpsertAnnouncementInput,
 } from "@nabhya/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -144,6 +145,17 @@ export function useInviteAdmin() {
 	return useMutation({
 		mutationFn: (input: InviteOrgAdminInput) =>
 			publishingApi.inviteAdmin(input),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryKeys.team });
+		},
+	});
+}
+
+export function useUpdateAdmin() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({ id, input }: { id: string; input: UpdateOrgAdminInput }) =>
+			publishingApi.updateAdmin(id, input),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryKeys.team });
 		},

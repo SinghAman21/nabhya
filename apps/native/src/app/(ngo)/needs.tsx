@@ -38,6 +38,7 @@ export default function NgoNeeds() {
 	const { colors, spacing } = useTheme();
 	const [filter, setFilter] = useState<TypeFilter>("ALL");
 	const [sheetOpen, setSheetOpen] = useState(false);
+	const [editing, setEditing] = useState<OrgNeedListItem | null>(null);
 	const [reviewing, setReviewing] = useState<OrgNeedListItem | null>(null);
 	const { data: me } = useMe();
 
@@ -159,6 +160,7 @@ export default function NgoNeeds() {
 						<NeedRow
 							need={item}
 							onReview={() => setReviewing(item)}
+							onEdit={() => setEditing(item)}
 							onDelete={() => confirmDelete(item)}
 						/>
 					)}
@@ -168,8 +170,12 @@ export default function NgoNeeds() {
 			<PledgesSheet need={reviewing} onClose={() => setReviewing(null)} />
 
 			<NeedFormSheet
-				visible={sheetOpen}
-				onClose={() => setSheetOpen(false)}
+				visible={sheetOpen || !!editing}
+				need={editing}
+				onClose={() => {
+					setSheetOpen(false);
+					setEditing(null);
+				}}
 				defaultCity={me?.organization?.city}
 				defaultState={me?.organization?.state}
 			/>
@@ -180,10 +186,12 @@ export default function NgoNeeds() {
 function NeedRow({
 	need,
 	onReview,
+	onEdit,
 	onDelete,
 }: {
 	need: OrgNeedListItem;
 	onReview: () => void;
+	onEdit: () => void;
 	onDelete: () => void;
 }) {
 	const { colors, spacing } = useTheme();
@@ -257,11 +265,18 @@ function NeedRow({
 						? `${need.pendingPledges} awaiting review`
 						: "View responses"}
 				</Caption>
-				<Pressable onPress={onDelete} hitSlop={8}>
-					<Caption weight="medium" color={colors.error.main as string}>
-						Remove
-					</Caption>
-				</Pressable>
+				<View style={{ flexDirection: "row", gap: spacing[4] }}>
+					<Pressable onPress={onEdit} hitSlop={8}>
+						<Caption weight="medium" color="secondary">
+							Edit
+						</Caption>
+					</Pressable>
+					<Pressable onPress={onDelete} hitSlop={8}>
+						<Caption weight="medium" color={colors.error.main as string}>
+							Remove
+						</Caption>
+					</Pressable>
+				</View>
 			</View>
 		</Surface>
 	);

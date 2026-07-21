@@ -6,14 +6,16 @@ import {
 	type NeedUrgency,
 } from "@nabhya/shared";
 import { X } from "lucide-react-native";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Alert, Modal, Pressable, ScrollView, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Body, Caption, H2, Label } from "@/components/ui/typography";
-import { useCreateNeed } from "@/hooks/use-needs";
+import { useCreateNeed, useUpdateNeed } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
+import type { OrgNeedListItem } from "@/lib/types";
 
 const TYPES: Array<{ value: NeedType; label: string; hint: string }> = [
 	{
@@ -43,14 +45,19 @@ export function NeedFormSheet({
 	onClose,
 	defaultCity,
 	defaultState,
+	need,
 }: {
 	visible: boolean;
 	onClose: () => void;
 	defaultCity?: string | null;
 	defaultState?: string | null;
+	/** Omit to create; supply to edit. */
+	need?: OrgNeedListItem | null;
 }) {
 	const { colors, spacing } = useTheme();
 	const createNeed = useCreateNeed();
+	const updateNeed = useUpdateNeed();
+	const isEditing = !!need;
 
 	const form = useForm<CreateNeedInput>({
 		// biome-ignore lint/suspicious/noExplicitAny: @hookform/resolvers v5 Zod v4 incompatibility
@@ -73,17 +80,47 @@ export function NeedFormSheet({
 		paddingVertical: spacing[3.5],
 	} as const;
 
+	// Load the post being edited; keyed on id so reopening for a different post
+	// replaces the form rather than keeping the previous one.
+	useEffect(() => {
+		if (!need) return;
+		form.reset({
+			type: need.type,
+			title: need.title,
+			description: need.description,
+			quantity: need.quantity ?? undefined,
+			unit: need.unit ?? "",
+			urgency: need.urgency,
+			city: need.city ?? "",
+			state: defaultState ?? "",
+		});
+	}, [need, form, defaultState]);
+
 	const close = () => {
 		form.reset();
 		onClose();
 	};
 
 	const onSubmit = form.handleSubmit((data) => {
+		if (isEditing && need) {
+			updateNeed.mutate(
+				{ id: need.id, input: data },
+				{
+					onSuccess: close,
+					onError: (error) =>
+						Alert.alert("Could not save changes", apiErrorMessage(error)),
+				},
+			);
+			return;
+		}
+
 		createNeed.mutate(data, {
 			onSuccess: close,
 			onError: (error) => Alert.alert("Could not post", apiErrorMessage(error)),
 		});
 	});
+
+	const saving = createNeed.isPending || updateNeed.isPending;
 
 	const type = form.watch("type");
 	const urgency = form.watch("urgency");
@@ -106,7 +143,7 @@ export function NeedFormSheet({
 						paddingBottom: spacing[2],
 					}}
 				>
-					<H2>New post</H2>
+					<H2>{isEditing ? "Edit post" : "New post"}</H2>
 					<Pressable onPress={close} hitSlop={12}>
 						<X size={22} color={colors.text.tertiary as string} />
 					</Pressable>
@@ -302,8 +339,8 @@ export function NeedFormSheet({
 
 					<View style={{ height: spacing[8] }} />
 
-					<Button onPress={onSubmit} loading={createNeed.isPending}>
-						Publish post
+					<Button onPress={onSubmit} loading={saving}>
+						{isEditing ? "Save changes" : "Publish post"}
 					</Button>
 				</ScrollView>
 			</View>

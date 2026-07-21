@@ -4,11 +4,13 @@ import type {
 	AdminUserQuery,
 	ApplicationQuery,
 	ApplyToEventInput,
+	AuditLogQuery,
 	CompleteOrgOnboardingInput,
 	CompleteVolunteerOnboardingInput,
 	CreateEventInput,
 	CreateNeedInput,
 	CreatePledgeInput,
+	DocumentQueueQuery,
 	DownloadUrlResponse,
 	OrgEventQuery,
 	OrgNeedQuery,
@@ -34,10 +36,13 @@ import type {
 import type {
 	AdminOrgDetail,
 	AdminOrgDocument,
+	AdminOrgDocumentQueueItem,
 	AdminOrgListItem,
 	AdminUserDetail,
+	AdminUserDocumentQueueItem,
 	AdminUserListItem,
 	ApplicationListItem,
+	AuditLogEntry,
 	Category,
 	EventApplicant,
 	MyPledgeListItem,
@@ -177,8 +182,14 @@ export const adminApi = {
 	user: (id: string) => http.get<AdminUserDetail>(ADMIN.user(id)),
 	setUserStatus: (id: string, input: SetUserStatusInput) =>
 		http.patch<AdminUserListItem>(ADMIN.userStatus(id), input),
+	orgDocuments: (query: Partial<DocumentQueueQuery>) =>
+		http.getPage<AdminOrgDocumentQueueItem>(ADMIN.ORG_DOCUMENTS, query),
+	userDocuments: (query: Partial<DocumentQueueQuery>) =>
+		http.getPage<AdminUserDocumentQueueItem>(ADMIN.USER_DOCUMENTS, query),
 	reviewOrgDocument: (id: string, input: ReviewDocumentInput) =>
 		http.patch<{ id: string }>(ADMIN.orgDocument(id), input),
 	reviewUserDocument: (id: string, input: ReviewDocumentInput) =>
 		http.patch<{ id: string }>(ADMIN.userDocument(id), input),
+	auditLogs: (query: Partial<AuditLogQuery>) =>
+		http.getPage<AuditLogEntry>(ADMIN.AUDIT_LOGS, query),
 };
