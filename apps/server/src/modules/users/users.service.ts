@@ -19,7 +19,7 @@ import {
 	NotFoundException,
 } from "@nestjs/common";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import type { AuditService } from "../../common/audit";
+import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import type { UserRole } from "../../common/types";
 import { takeFirstOrThrow } from "../../common/utils";
@@ -28,7 +28,7 @@ import { takeFirstOrThrow } from "../../common/utils";
 export class UsersService {
 	constructor(
 		@Inject(DB_TOKEN) private readonly db: typeof dbType,
-		private readonly audit: AuditService,
+		@Inject(AuditService) private readonly audit: AuditService,
 	) {}
 
 	/**

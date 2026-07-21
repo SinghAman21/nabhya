@@ -7,11 +7,11 @@ import {
 } from "@nabhya/shared";
 import { ConflictException, Inject, Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
-import type { AuditService } from "../../common/audit";
+import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import type { AuthUser } from "../../common/types";
 import { takeFirstOrThrow } from "../../common/utils";
-import type { UsersService } from "../users/users.service";
+import { UsersService } from "../users/users.service";
 
 export interface OnboardingStatus {
 	role: string | null;
@@ -31,8 +31,8 @@ export interface OnboardingStatus {
 export class OnboardingService {
 	constructor(
 		@Inject(DB_TOKEN) private readonly db: typeof dbType,
-		private readonly audit: AuditService,
-		private readonly usersService: UsersService,
+		@Inject(AuditService) private readonly audit: AuditService,
+		@Inject(UsersService) private readonly usersService: UsersService,
 	) {}
 
 	/**

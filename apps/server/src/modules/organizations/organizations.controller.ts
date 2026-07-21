@@ -12,6 +12,7 @@ import {
 	Body,
 	Controller,
 	Get,
+	Inject,
 	Param,
 	ParseUUIDPipe,
 	Patch,
@@ -28,7 +29,7 @@ import { z } from "zod";
 import { CurrentUser, Public, Roles } from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthUser } from "../../common/types";
-import type { OrganizationsService } from "./organizations.service";
+import { OrganizationsService } from "./organizations.service";
 
 const publicOrgQuerySchema = paginationQuerySchema.extend({
 	search: z.string().trim().max(120).optional(),
@@ -38,7 +39,10 @@ const publicOrgQuerySchema = paginationQuerySchema.extend({
 @ApiTags("Organizations")
 @Controller("organizations")
 export class OrganizationsController {
-	constructor(private readonly organizationsService: OrganizationsService) {}
+	constructor(
+		@Inject(OrganizationsService)
+		private readonly organizationsService: OrganizationsService,
+	) {}
 
 	// ─── Public directory ────────────────────────────────────────────────────
 

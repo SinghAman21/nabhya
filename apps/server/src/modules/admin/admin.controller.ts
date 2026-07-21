@@ -21,6 +21,7 @@ import {
 	Body,
 	Controller,
 	Get,
+	Inject,
 	Param,
 	ParseUUIDPipe,
 	Patch,
@@ -36,7 +37,7 @@ import { z } from "zod";
 import { CurrentUser, Roles } from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthUser } from "../../common/types";
-import type { AdminService } from "./admin.service";
+import { AdminService } from "./admin.service";
 
 const documentQueueQuerySchema = paginationQuerySchema.extend({
 	status: z.enum(["PENDING", "VERIFIED", "REJECTED"]).optional(),
@@ -53,7 +54,9 @@ type DocumentQueueQuery = z.infer<typeof documentQueueQuerySchema>;
 @Roles("superadmin")
 @ApiBearerAuth("access-token")
 export class AdminController {
-	constructor(private readonly adminService: AdminService) {}
+	constructor(
+		@Inject(AdminService) private readonly adminService: AdminService,
+	) {}
 
 	@Get("overview")
 	@ApiOperation({ summary: "Platform-wide counters for the admin dashboard" })

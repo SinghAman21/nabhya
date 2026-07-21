@@ -17,6 +17,7 @@ import {
 	Controller,
 	Delete,
 	Get,
+	Inject,
 	Param,
 	ParseUUIDPipe,
 	Patch,
@@ -32,7 +33,7 @@ import {
 import { CurrentUser, Roles } from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthUser } from "../../common/types";
-import type { EventsService } from "./events.service";
+import { EventsService } from "./events.service";
 
 /**
  * Event management for the organization the caller owns. Every route resolves
@@ -43,7 +44,9 @@ import type { EventsService } from "./events.service";
 @Roles("organisation")
 @ApiBearerAuth("access-token")
 export class OrgEventsController {
-	constructor(private readonly eventsService: EventsService) {}
+	constructor(
+		@Inject(EventsService) private readonly eventsService: EventsService,
+	) {}
 
 	@Get()
 	@ApiOperation({ summary: "List the organization's events" })

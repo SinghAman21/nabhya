@@ -6,7 +6,7 @@ import {
 	completeOrgOnboardingSchema,
 	completeVolunteerOnboardingSchema,
 } from "@nabhya/shared";
-import { Body, Controller, Get, Post } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Post } from "@nestjs/common";
 import {
 	ApiBearerAuth,
 	ApiOperation,
@@ -16,13 +16,16 @@ import {
 import { CurrentUser, Roles } from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthUser } from "../../common/types";
-import type { OnboardingService } from "./onboarding.service";
+import { OnboardingService } from "./onboarding.service";
 
 @ApiTags("Onboarding")
 @Controller("onboarding")
 @ApiBearerAuth("access-token")
 export class OnboardingController {
-	constructor(private readonly onboardingService: OnboardingService) {}
+	constructor(
+		@Inject(OnboardingService)
+		private readonly onboardingService: OnboardingService,
+	) {}
 
 	@Get("status")
 	@ApiOperation({

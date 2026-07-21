@@ -8,7 +8,7 @@ import {
 	updateUserProfileSchema,
 	uploadUserDocumentSchema,
 } from "@nabhya/shared";
-import { Body, Controller, Get, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Patch, Post } from "@nestjs/common";
 import {
 	ApiBearerAuth,
 	ApiOperation,
@@ -18,13 +18,15 @@ import {
 import { CurrentUser } from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthUser } from "../../common/types";
-import type { UsersService } from "./users.service";
+import { UsersService } from "./users.service";
 
 @ApiTags("Users")
 @Controller("users")
 @ApiBearerAuth("access-token")
 export class UsersController {
-	constructor(private readonly usersService: UsersService) {}
+	constructor(
+		@Inject(UsersService) private readonly usersService: UsersService,
+	) {}
 
 	@Get("me")
 	@ApiOperation({ summary: "Get the authenticated user's full profile" })

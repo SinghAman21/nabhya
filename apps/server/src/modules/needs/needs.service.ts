@@ -33,10 +33,10 @@ import {
 	type SQL,
 	sql,
 } from "drizzle-orm";
-import type { AuditService } from "../../common/audit";
+import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
-import type { OrganizationsService } from "../organizations/organizations.service";
+import { OrganizationsService } from "../organizations/organizations.service";
 
 const publicNeedColumns = {
 	id: organizationNeeds.id,
@@ -65,7 +65,8 @@ const publicNeedColumns = {
 export class NeedsService {
 	constructor(
 		@Inject(DB_TOKEN) private readonly db: typeof dbType,
-		private readonly audit: AuditService,
+		@Inject(AuditService) private readonly audit: AuditService,
+		@Inject(OrganizationsService)
 		private readonly organizationsService: OrganizationsService,
 	) {}
 
