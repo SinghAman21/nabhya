@@ -1,4 +1,8 @@
-import { announcements, organizationAdmins } from "@nabhya/db/schema";
+import {
+	announcements,
+	organizationAdmins,
+	organizations,
+} from "@nabhya/db/schema";
 import {
 	BadRequestException,
 	ConflictException,
@@ -114,6 +118,28 @@ describe("PublishingService", () => {
 				limit: 20,
 			});
 			expect(ownList.items).toHaveLength(2);
+		});
+
+		it("stops serving announcements once the NGO is suspended", async () => {
+			// Suspending a fraudulent NGO must pull its public content, not just its
+			// events and needs.
+			const { owner, org } = await verifiedOrg();
+			await service.createAnnouncement(owner.id, announcement);
+
+			const live = await service.listAnnouncements(org.id, {
+				page: 1,
+				limit: 20,
+			});
+			expect(live.items).toHaveLength(1);
+
+			await db
+				.update(organizations)
+				.set({ status: "SUSPENDED" })
+				.where(eq(organizations.id, org.id));
+
+			await expect(
+				service.listAnnouncements(org.id, { page: 1, limit: 20 }),
+			).rejects.toBeInstanceOf(NotFoundException);
 		});
 
 		it("refuses to edit another NGO's update", async () => {

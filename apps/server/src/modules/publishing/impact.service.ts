@@ -8,7 +8,7 @@ import {
 	organizations,
 } from "@nabhya/db/schema";
 import type { OrganizationImpact, VolunteerImpact } from "@nabhya/shared";
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { DB_TOKEN } from "../../common/database";
 
@@ -89,6 +89,26 @@ export class ImpactService {
 	async getOrganizationImpact(
 		organizationId: string,
 	): Promise<OrganizationImpact> {
+		// Public transparency figures are only served for a publicly-visible NGO;
+		// a suspended or unverified org must not keep exposing its stats.
+		const [org] = await this.db
+			.select({
+				createdAt: organizations.createdAt,
+				verificationStatus: organizations.verificationStatus,
+				status: organizations.status,
+			})
+			.from(organizations)
+			.where(eq(organizations.id, organizationId))
+			.limit(1);
+
+		if (
+			!org ||
+			org.verificationStatus !== "VERIFIED" ||
+			org.status !== "ACTIVE"
+		) {
+			throw new NotFoundException("Organization not found");
+		}
+
 		const [hosting] = await this.db
 			.select({
 				eventsHosted: sql<number>`count(distinct ${events.id}) filter (
@@ -117,11 +137,6 @@ export class ImpactService {
 			.select({ value: sql<number>`count(*)::int` })
 			.from(certificates)
 			.where(eq(certificates.organizationId, organizationId));
-
-		const [org] = await this.db
-			.select({ createdAt: organizations.createdAt })
-			.from(organizations)
-			.where(eq(organizations.id, organizationId));
 
 		return {
 			eventsHosted: hosting?.eventsHosted ?? 0,

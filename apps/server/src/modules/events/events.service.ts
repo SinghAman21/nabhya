@@ -269,6 +269,16 @@ export class EventsService {
 		return event;
 	}
 
+	/**
+	 * Full detail of one of the caller's own events. The list endpoint only
+	 * carries summary fields, so the edit form needs this to pre-fill
+	 * `description`, `venue` and `address` instead of blanking them.
+	 */
+	async getMyEvent(userId: string, eventId: string) {
+		const { event } = await this.requireOwnedEvent(userId, eventId);
+		return event;
+	}
+
 	async update(userId: string, eventId: string, input: UpdateEventInput) {
 		const { event } = await this.requireOwnedEvent(userId, eventId);
 

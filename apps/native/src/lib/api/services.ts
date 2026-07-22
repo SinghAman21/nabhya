@@ -49,6 +49,7 @@ import type {
 	MyProfile,
 	NeedPledge,
 	OnboardingStatus,
+	OrgEventDetail,
 	OrgEventListItem,
 	OrgNeedListItem,
 	PublicEvent,
@@ -123,6 +124,7 @@ export const eventsApi = {
 export const orgEventsApi = {
 	list: (query: Partial<OrgEventQuery>) =>
 		http.getPage<OrgEventListItem>(ORG_EVENTS.LIST, query),
+	detail: (id: string) => http.get<OrgEventDetail>(ORG_EVENTS.detail(id)),
 	create: (input: CreateEventInput) =>
 		http.post<OrgEventListItem>(ORG_EVENTS.CREATE, input),
 	update: (id: string, input: UpdateEventInput) =>

@@ -602,11 +602,20 @@ export class NeedsService {
 				const reachedTarget =
 					lockedNeed.quantity !== null && fulfilled >= lockedNeed.quantity;
 
+				// A manually CLOSED need stays closed — rejecting a pledge that drops
+				// the count below target must not resurrect it to OPEN. Only auto-flip
+				// between OPEN and FULFILLED.
+				const nextStatus = reachedTarget
+					? "FULFILLED"
+					: lockedNeed.status === "CLOSED"
+						? "CLOSED"
+						: "OPEN";
+
 				await tx
 					.update(organizationNeeds)
 					.set({
 						fulfilledQuantity: fulfilled,
-						status: reachedTarget ? "FULFILLED" : "OPEN",
+						status: nextStatus,
 						updatedAt: new Date(),
 					})
 					.where(eq(organizationNeeds.id, needId));

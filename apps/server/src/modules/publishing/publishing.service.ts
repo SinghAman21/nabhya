@@ -129,6 +129,9 @@ export class PublishingService {
 
 	/** Public feed for an organization's profile. Drafts never surface. */
 	async listAnnouncements(organizationId: string, query: PaginationQuery) {
+		// A suspended or unverified NGO's announcements must not stay readable.
+		await this.organizationsService.assertPubliclyVisible(organizationId);
+
 		const where = and(
 			eq(announcements.organizationId, organizationId),
 			eq(announcements.status, "PUBLISHED"),
@@ -217,6 +220,8 @@ export class PublishingService {
 	 * being able to see the organization at all.
 	 */
 	async listFinancialReports(organizationId: string) {
+		await this.organizationsService.assertPubliclyVisible(organizationId);
+
 		return this.db
 			.select()
 			.from(financialReports)

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "need_pledges_need_user_unique" ON "need_pledges" USING btree ("need_id","user_id");

@@ -13,6 +13,7 @@ export const queryKeys = {
 		["events", "me", "applications", params] as const,
 
 	orgEvents: (params?: unknown) => ["org", "events", params] as const,
+	orgEvent: (id: string) => ["org", "events", id, "detail"] as const,
 	orgEventApplicants: (id: string, params?: unknown) =>
 		["org", "events", id, "applications", params] as const,
 

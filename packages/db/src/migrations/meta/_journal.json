@@ -22,6 +22,13 @@
 			"when": 1784558551134,
 			"tag": "0002_lame_rage",
 			"breakpoints": true
+		},
+		{
+			"idx": 3,
+			"version": "7",
+			"when": 1784741286235,
+			"tag": "0003_breezy_justice",
+			"breakpoints": true
 		}
 	]
 }

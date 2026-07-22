@@ -57,6 +57,15 @@ export class OrgEventsController {
 		return this.eventsService.listForMyOrganization(user.id, query);
 	}
 
+	@Get(":id")
+	@ApiOperation({ summary: "Get one of the organization's events in full" })
+	detail(
+		@CurrentUser() user: AuthUser,
+		@Param("id", ParseUUIDPipe) id: string,
+	) {
+		return this.eventsService.getMyEvent(user.id, id);
+	}
+
 	@Post()
 	@ApiOperation({ summary: "Create an event" })
 	@ApiResponse({

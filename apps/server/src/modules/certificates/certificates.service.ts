@@ -218,6 +218,9 @@ export class CertificatesService {
 		if (certificate.organizationId !== organization.id) {
 			throw new ForbiddenException("That certificate belongs to another NGO.");
 		}
+		// Already revoked — don't rewrite the original timestamp/reason on a
+		// double-tap or retry.
+		if (certificate.revokedAt) return certificate;
 
 		const [updated] = await this.db
 			.update(certificates)
