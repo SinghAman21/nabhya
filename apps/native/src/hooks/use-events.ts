@@ -65,6 +65,15 @@ export function useOrgEvents(query: Partial<OrgEventQuery> = {}) {
 	});
 }
 
+/** Full detail of one owned event — used to pre-fill the edit form. */
+export function useOrgEvent(id: string | undefined) {
+	return useQuery({
+		queryKey: queryKeys.orgEvent(id ?? ""),
+		queryFn: () => orgEventsApi.detail(id as string),
+		enabled: !!id,
+	});
+}
+
 export function useCreateEvent() {
 	const queryClient = useQueryClient();
 	return useMutation({

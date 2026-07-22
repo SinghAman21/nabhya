@@ -215,6 +215,8 @@ export class EngagementService {
 	}
 
 	async listReviews(organizationId: string, query: ReviewQuery) {
+		await this.organizationsService.assertPubliclyVisible(organizationId);
+
 		const where = eq(reviews.organizationId, organizationId);
 		const { limit, offset } = toOffset(query);
 

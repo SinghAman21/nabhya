@@ -6,7 +6,11 @@ import { DateTimeField } from "@/components/date-time-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Caption, H2, Label } from "@/components/ui/typography";
-import { useCreateEvent, useUpdateEvent } from "@/hooks/use-events";
+import {
+	useCreateEvent,
+	useOrgEvent,
+	useUpdateEvent,
+} from "@/hooks/use-events";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
 import type { OrgEventListItem } from "@/lib/types";
@@ -51,6 +55,11 @@ export function EventFormSheet({
 	const createEvent = useCreateEvent();
 	const updateEvent = useUpdateEvent();
 	const isEditing = !!event;
+	// The list item lacks description/venue/address; fetch the full event so an
+	// edit doesn't wipe those fields.
+	const { data: detail, isLoading: loadingDetail } = useOrgEvent(
+		visible && event ? event.id : undefined,
+	);
 
 	const emptyDraft: Draft = {
 		title: "",
@@ -66,22 +75,27 @@ export function EventFormSheet({
 	const [errors, setErrors] = useState<Record<string, string>>({});
 
 	// Load the event being edited. Keyed on id so reopening the sheet for a
-	// different event replaces the form rather than keeping the last one.
+	// different event replaces the form rather than keeping the last one. Prefers
+	// the full detail (description/venue/address) once it loads, falling back to
+	// the summary list item so the form isn't empty while the request is in
+	// flight.
 	useEffect(() => {
 		if (!event) return;
 		setDraft({
-			title: event.title,
-			description: "",
-			venue: "",
-			address: "",
-			city: event.city ?? "",
-			state: event.state ?? "",
-			startAt: new Date(event.startAt),
-			endAt: new Date(event.endAt),
-			volunteersNeeded: String(event.volunteersNeeded),
+			title: detail?.title ?? event.title,
+			description: detail?.description ?? "",
+			venue: detail?.venue ?? "",
+			address: detail?.address ?? "",
+			city: detail?.city ?? event.city ?? "",
+			state: detail?.state ?? event.state ?? "",
+			startAt: new Date(detail?.startAt ?? event.startAt),
+			endAt: new Date(detail?.endAt ?? event.endAt),
+			volunteersNeeded: String(
+				detail?.volunteersNeeded ?? event.volunteersNeeded,
+			),
 		});
 		setErrors({});
-	}, [event]);
+	}, [event, detail]);
 
 	const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
 		setDraft((d) => ({ ...d, [key]: value }));
@@ -150,6 +164,9 @@ export function EventFormSheet({
 	};
 
 	const saving = createEvent.isPending || updateEvent.isPending;
+	// Block saving until the full event has loaded, so an edit can't submit the
+	// blank description the form starts with.
+	const blocked = saving || (isEditing && loadingDetail);
 
 	return (
 		<Modal
@@ -278,6 +295,7 @@ export function EventFormSheet({
 					<Button
 						onPress={() => submit("PUBLISHED")}
 						loading={saving}
+						disabled={blocked}
 						style={{ marginBottom: spacing[3] }}
 					>
 						{isEditing && event?.status === "DRAFT"
@@ -290,7 +308,7 @@ export function EventFormSheet({
 						<Button
 							variant="outline"
 							onPress={() => submit("DRAFT")}
-							disabled={saving}
+							disabled={blocked}
 						>
 							{isEditing ? "Keep as draft" : "Save as draft"}
 						</Button>

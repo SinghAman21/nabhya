@@ -126,6 +126,25 @@ export interface OrgEventListItem {
 	pendingApplications: number;
 }
 
+/**
+ * Full event as returned by `GET /api/org/events/:id`. The list item carries
+ * only summary fields, so the edit form needs this to pre-fill the description,
+ * venue and address rather than blanking them.
+ */
+export interface OrgEventDetail {
+	id: string;
+	title: string;
+	description: string;
+	venue: string | null;
+	address: string | null;
+	city: string | null;
+	state: string | null;
+	startAt: string;
+	endAt: string;
+	status: EventStatus;
+	volunteersNeeded: number;
+}
+
 export interface VolunteerSummary {
 	id: string;
 	fullName: string | null;

@@ -6,6 +6,7 @@ import {
 	pgTable,
 	text,
 	timestamp,
+	uniqueIndex,
 	uuid,
 	varchar,
 } from "drizzle-orm/pg-core";
@@ -110,6 +111,12 @@ export const needPledges = pgTable(
 	(table) => [
 		index("need_pledges_need_status_idx").on(table.needId, table.status),
 		index("need_pledges_user_idx").on(table.userId),
+		// One response per person per need — mirrors
+		// `event_applications_event_volunteer_unique`. The service reuses the
+		// existing row when re-pledging after cancelling, so this unique index is
+		// the backstop against a concurrent double-insert inflating
+		// `fulfilledQuantity`.
+		uniqueIndex("need_pledges_need_user_unique").on(table.needId, table.userId),
 	],
 );
 

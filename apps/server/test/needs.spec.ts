@@ -1,5 +1,9 @@
 import { organizationNeeds } from "@nabhya/db/schema";
-import { BadRequestException, ForbiddenException } from "@nestjs/common";
+import {
+	BadRequestException,
+	ConflictException,
+	ForbiddenException,
+} from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { AuditService } from "../src/common/audit";
@@ -81,6 +85,24 @@ describe("NeedsService", () => {
 			).rejects.toBeInstanceOf(BadRequestException);
 		});
 
+		it("refuses a second pledge from the same person", async () => {
+			// Backed by need_pledges_need_user_unique — without it a double-tap
+			// inserts two PENDING rows and both inflate fulfilledQuantity on accept.
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const need = await createNeed(db, org.id, { quantity: 100 });
+			const volunteer = await createUser(db, { role: "volunteer" });
+
+			await service.pledge(volunteer.id, need.id, { quantity: 10 });
+			await expect(
+				service.pledge(volunteer.id, need.id, { quantity: 10 }),
+			).rejects.toBeInstanceOf(ConflictException);
+
+			// The DB is truncated per test, so this is the one need's pledges.
+			const rows = await db.query.needPledges.findMany({});
+			expect(rows).toHaveLength(1);
+		});
+
 		it("hides needs from unverified organizations", async () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id, {
@@ -154,6 +176,36 @@ describe("NeedsService", () => {
 				where: eq(organizationNeeds.id, need.id),
 			});
 			expect(after?.fulfilledQuantity).toBe(0);
+		});
+
+		it("keeps a manually CLOSED need closed when a pledge is rejected", async () => {
+			// Rejecting a pledge drops fulfilledQuantity below target; that must not
+			// resurrect a need the organiser had deliberately closed back to OPEN.
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const need = await createNeed(db, org.id, { quantity: 100 });
+			const volunteer = await createUser(db, { role: "volunteer" });
+			const pledge = await createPledge(db, need.id, volunteer.id, {
+				quantity: 40,
+			});
+
+			await service.reviewPledge(owner.id, need.id, pledge.id, {
+				status: "ACCEPTED",
+			});
+			await db
+				.update(organizationNeeds)
+				.set({ status: "CLOSED" })
+				.where(eq(organizationNeeds.id, need.id));
+
+			await service.reviewPledge(owner.id, need.id, pledge.id, {
+				status: "REJECTED",
+			});
+
+			const after = await db.query.organizationNeeds.findFirst({
+				where: eq(organizationNeeds.id, need.id),
+			});
+			expect(after?.fulfilledQuantity).toBe(0);
+			expect(after?.status).toBe("CLOSED");
 		});
 
 		it("does not double-count when accepted then completed", async () => {

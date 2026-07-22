@@ -236,6 +236,32 @@ export class OrganizationsService {
 		return organization;
 	}
 
+	/**
+	 * Cheap gate for the `@Public()` profile sub-feeds (announcements, financial
+	 * reports, reviews, impact). Those take an org id straight from the URL, so
+	 * without this an unverified or superadmin-suspended NGO's content would stay
+	 * publicly readable even after its events/needs were pulled. Selects only the
+	 * status columns — the caller already has the id it needs.
+	 */
+	async assertPubliclyVisible(organizationId: string) {
+		const [organization] = await this.db
+			.select({
+				verificationStatus: organizations.verificationStatus,
+				status: organizations.status,
+			})
+			.from(organizations)
+			.where(eq(organizations.id, organizationId))
+			.limit(1);
+
+		if (
+			!organization ||
+			organization.verificationStatus !== "VERIFIED" ||
+			organization.status !== "ACTIVE"
+		) {
+			throw new NotFoundException("Organization not found");
+		}
+	}
+
 	async updateMyOrganization(userId: string, input: UpdateOrganizationInput) {
 		const organization = await this.requireOwnedOrganization(userId);
 		const { categoryIds, ...fields } = input;
