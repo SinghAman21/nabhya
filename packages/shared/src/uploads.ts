@@ -68,5 +68,10 @@ export const ORG_DOCUMENT_LABELS: Record<string, string> = {
 
 export const USER_DOCUMENT_LABELS: Record<string, string> = {
 	AADHAR_CARD: "Aadhaar card",
+	PAN_CARD: "PAN card",
+	DRIVING_LICENSE: "Driving licence",
+	VOTER_ID: "Voter ID",
+	PASSPORT: "Passport",
+	SELFIE: "Selfie (liveness)",
 	OTHER: "Other ID",
 };

@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 import {
 	boolean,
+	jsonb,
 	pgEnum,
 	pgTable,
 	text,
@@ -23,6 +24,11 @@ export const userStatusEnum = pgEnum("user_status", [
 ]);
 export const userDocumentTypeEnum = pgEnum("user_document_type", [
 	"AADHAR_CARD",
+	"PAN_CARD",
+	"DRIVING_LICENSE",
+	"VOTER_ID",
+	"PASSPORT",
+	"SELFIE",
 	"OTHER",
 ]);
 export const userDocVerificationStatusEnum = pgEnum(
@@ -87,6 +93,9 @@ export const userDocuments = pgTable("user_documents", {
 		"verification_status",
 	).default("PENDING"),
 	remarks: text("remarks"),
+	// Optional per-document extras. Only the liveness selfie populates this
+	// today: the issued challenge plus an optional second frame's storage key.
+	metadata: jsonb("metadata"),
 	uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
 	verifiedBy: uuid("verified_by").references(() => users.id),
 	verifiedAt: timestamp("verified_at"),

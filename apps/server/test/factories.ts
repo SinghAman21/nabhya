@@ -5,6 +5,7 @@ import {
 	organizationNeeds,
 	organizations,
 	roles,
+	userDocuments,
 	userRoles,
 	users,
 } from "@nabhya/db/schema";
@@ -69,6 +70,35 @@ export function authUserFor(
 		roles: roleNames,
 		name: user.fullName,
 	};
+}
+
+export async function createUserDocument(
+	db: TestDb,
+	userId: string,
+	options: {
+		documentType?:
+			| "AADHAR_CARD"
+			| "PAN_CARD"
+			| "DRIVING_LICENSE"
+			| "VOTER_ID"
+			| "PASSPORT"
+			| "SELFIE"
+			| "OTHER";
+		verificationStatus?: "PENDING" | "VERIFIED" | "REJECTED";
+	} = {},
+) {
+	const [document] = await db
+		.insert(userDocuments)
+		.values({
+			userId,
+			documentType: options.documentType ?? "AADHAR_CARD",
+			documentKey: `user-documents/${userId}/${unique()}-doc.jpg`,
+			verificationStatus: options.verificationStatus ?? "PENDING",
+		})
+		.returning();
+
+	if (!document) throw new Error("factory: user document insert failed");
+	return document;
 }
 
 export async function createOrganization(

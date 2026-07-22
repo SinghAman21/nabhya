@@ -71,6 +71,9 @@ export function DocumentReviewRow({
 	};
 
 	const isPending = document.verificationStatus === "PENDING";
+	const liveness = document.metadata?.liveness;
+	const livenessChallenge = liveness?.challenge;
+	const livenessFrameKey = liveness?.secondaryFrameKey;
 
 	return (
 		<Surface>
@@ -101,6 +104,12 @@ export function DocumentReviewRow({
 				Uploaded {formatDateTime(document.uploadedAt)}
 			</Caption>
 
+			{livenessChallenge && (
+				<Caption color="quaternary" style={{ marginTop: spacing[1] }}>
+					Liveness check: {livenessChallenge.replace(/_/g, " ").toLowerCase()}
+				</Caption>
+			)}
+
 			{document.remarks && (
 				<Caption color="secondary" style={{ marginTop: spacing[2] }}>
 					“{document.remarks}”
@@ -123,6 +132,19 @@ export function DocumentReviewRow({
 						{openDocument.isPending ? "Opening…" : "Open document"}
 					</Caption>
 				</Pressable>
+
+				{livenessFrameKey && (
+					<Pressable
+						onPress={() =>
+							livenessFrameKey && openDocument.mutate(livenessFrameKey)
+						}
+						hitSlop={8}
+					>
+						<Caption weight="medium" color={colors.primary.main as string}>
+							Liveness frame
+						</Caption>
+					</Pressable>
+				)}
 
 				{isPending && !rejecting && (
 					<>

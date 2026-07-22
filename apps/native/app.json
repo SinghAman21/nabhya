@@ -39,7 +39,21 @@
 				}
 			],
 			"expo-font",
-			"expo-image"
+			"expo-image",
+			[
+				"expo-camera",
+				{
+					"cameraPermission": "Nabhya uses the camera so you can capture your government ID and a verification selfie.",
+					"recordAudioAndroid": false
+				}
+			],
+			[
+				"expo-image-picker",
+				{
+					"photosPermission": "Nabhya needs access to your photos so you can upload your government ID.",
+					"cameraPermission": "Nabhya uses the camera so you can photograph your government ID."
+				}
+			]
 		],
 		"experiments": {
 			"typedRoutes": true,

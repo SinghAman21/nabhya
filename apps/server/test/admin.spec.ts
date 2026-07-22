@@ -11,6 +11,7 @@ import {
 	createNeed,
 	createOrganization,
 	createUser,
+	createUserDocument,
 	seedRoles,
 } from "./factories";
 import { createTestDb, type TestDb, truncateAll } from "./harness";
@@ -154,6 +155,106 @@ describe("AdminService", () => {
 				.then((rows) => rows.find((r) => r.id === user.id));
 			expect(stored?.status).toBe("ACTIVE");
 			expect(stored?.suspendedReason).toBeNull();
+		});
+	});
+
+	describe("identity verification", () => {
+		it("keeps the account PENDING until both a government ID and a selfie are approved", async () => {
+			const admin = await createUser(db, { role: "superadmin" });
+			const volunteer = await createUser(db, { role: "volunteer" });
+			const govId = await createUserDocument(db, volunteer.id, {
+				documentType: "AADHAR_CARD",
+			});
+			await createUserDocument(db, volunteer.id, { documentType: "SELFIE" });
+
+			// Approving only the ID must not promote the account on its own.
+			await service.reviewUserDocument(admin.id, govId.id, {
+				verificationStatus: "VERIFIED",
+			});
+
+			const user = await db.query.users.findFirst({
+				where: (u, { eq }) => eq(u.id, volunteer.id),
+			});
+			expect(user?.verificationStatus).toBe("PENDING");
+		});
+
+		it("verifies the account once both required documents are approved", async () => {
+			const admin = await createUser(db, { role: "superadmin" });
+			const volunteer = await createUser(db, { role: "volunteer" });
+			const govId = await createUserDocument(db, volunteer.id, {
+				documentType: "PAN_CARD",
+			});
+			const selfie = await createUserDocument(db, volunteer.id, {
+				documentType: "SELFIE",
+			});
+
+			await service.reviewUserDocument(admin.id, govId.id, {
+				verificationStatus: "VERIFIED",
+			});
+			await service.reviewUserDocument(admin.id, selfie.id, {
+				verificationStatus: "VERIFIED",
+			});
+
+			const user = await db.query.users.findFirst({
+				where: (u, { eq }) => eq(u.id, volunteer.id),
+			});
+			expect(user?.verificationStatus).toBe("VERIFIED");
+		});
+
+		it("rejecting a required document rejects the account", async () => {
+			const admin = await createUser(db, { role: "superadmin" });
+			const volunteer = await createUser(db, { role: "volunteer" });
+			const govId = await createUserDocument(db, volunteer.id, {
+				documentType: "AADHAR_CARD",
+			});
+			const selfie = await createUserDocument(db, volunteer.id, {
+				documentType: "SELFIE",
+			});
+
+			await service.reviewUserDocument(admin.id, govId.id, {
+				verificationStatus: "VERIFIED",
+			});
+			await service.reviewUserDocument(admin.id, selfie.id, {
+				verificationStatus: "REJECTED",
+				remarks: "Face not clearly visible",
+			});
+
+			const user = await db.query.users.findFirst({
+				where: (u, { eq }) => eq(u.id, volunteer.id),
+			});
+			expect(user?.verificationStatus).toBe("REJECTED");
+		});
+
+		it("stays VERIFIED when an unrelated extra document is later rejected", async () => {
+			// The approved ID + selfie still stand, so rejecting a spare document
+			// must not knock an already-verified volunteer back out.
+			const admin = await createUser(db, { role: "superadmin" });
+			const volunteer = await createUser(db, { role: "volunteer" });
+			const govId = await createUserDocument(db, volunteer.id, {
+				documentType: "AADHAR_CARD",
+			});
+			const selfie = await createUserDocument(db, volunteer.id, {
+				documentType: "SELFIE",
+			});
+			await service.reviewUserDocument(admin.id, govId.id, {
+				verificationStatus: "VERIFIED",
+			});
+			await service.reviewUserDocument(admin.id, selfie.id, {
+				verificationStatus: "VERIFIED",
+			});
+
+			const extra = await createUserDocument(db, volunteer.id, {
+				documentType: "OTHER",
+			});
+			await service.reviewUserDocument(admin.id, extra.id, {
+				verificationStatus: "REJECTED",
+				remarks: "Duplicate, not required",
+			});
+
+			const user = await db.query.users.findFirst({
+				where: (u, { eq }) => eq(u.id, volunteer.id),
+			});
+			expect(user?.verificationStatus).toBe("VERIFIED");
 		});
 	});
 

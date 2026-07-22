@@ -7,10 +7,11 @@ import {
 	userRoles,
 	users,
 } from "@nabhya/db/schema";
-import type {
-	SelectableRole,
-	UpdateUserProfileInput,
-	UploadUserDocumentInput,
+import {
+	computeUserVerificationStatus,
+	type SelectableRole,
+	type UpdateUserProfileInput,
+	type UploadUserDocumentInput,
 } from "@nabhya/shared";
 import {
 	ConflictException,
@@ -194,25 +195,60 @@ export class UsersService {
 		// really exists and is within limits before trusting the key.
 		await this.uploads.assertUploaded(input.documentKey);
 
-		// Re-uploading the same document type supersedes the previous attempt
-		// rather than stacking duplicates in the verification queue.
-		const document = takeFirstOrThrow(
-			await this.db
-				.insert(userDocuments)
-				.values({
-					userId,
-					documentType: input.documentType,
-					documentKey: input.documentKey,
-					verificationStatus: "PENDING",
-				})
-				.returning(),
-			"upload identity document",
-		);
+		// A liveness selfie can carry a second frame captured mid-challenge,
+		// uploaded the same way; its key has to be verified before we trust it.
+		const secondaryFrameKey = input.metadata?.liveness?.secondaryFrameKey;
+		if (secondaryFrameKey) {
+			await this.uploads.assertUploaded(secondaryFrameKey);
+		}
 
-		await this.db
-			.update(users)
-			.set({ verificationStatus: "PENDING", updatedAt: new Date() })
-			.where(eq(users.id, userId));
+		const document = await this.db.transaction(async (tx) => {
+			// Re-uploading a document type supersedes the previous attempt rather
+			// than stacking duplicates in the verification queue.
+			await tx
+				.delete(userDocuments)
+				.where(
+					and(
+						eq(userDocuments.userId, userId),
+						eq(userDocuments.documentType, input.documentType),
+					),
+				);
+
+			const row = takeFirstOrThrow(
+				await tx
+					.insert(userDocuments)
+					.values({
+						userId,
+						documentType: input.documentType,
+						documentKey: input.documentKey,
+						metadata: input.metadata ?? null,
+						verificationStatus: "PENDING",
+					})
+					.returning(),
+				"upload identity document",
+			);
+
+			// Verification needs a government ID *and* a selfie, both approved, so
+			// derive the account status from the whole set rather than blindly
+			// resetting it — a fresh upload can only move it off VERIFIED.
+			const currentDocs = await tx
+				.select({
+					documentType: userDocuments.documentType,
+					verificationStatus: userDocuments.verificationStatus,
+				})
+				.from(userDocuments)
+				.where(eq(userDocuments.userId, userId));
+
+			await tx
+				.update(users)
+				.set({
+					verificationStatus: computeUserVerificationStatus(currentDocs),
+					updatedAt: new Date(),
+				})
+				.where(eq(users.id, userId));
+
+			return row;
+		});
 
 		void this.audit.record({
 			performedBy: userId,

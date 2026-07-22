@@ -1,5 +1,4 @@
-import type { UploadUserDocumentInput } from "@nabhya/shared";
-import { USER_DOCUMENT_LABELS } from "@nabhya/shared";
+import { isSelfieDocument } from "@nabhya/shared";
 import { useRouter } from "expo-router";
 import {
 	Award,
@@ -9,8 +8,7 @@ import {
 	Pencil,
 	TrendingUp,
 } from "lucide-react-native";
-import { Alert, RefreshControl, ScrollView, View } from "react-native";
-import { DocumentUploadTile } from "@/components/document-upload-tile";
+import { RefreshControl, ScrollView, View } from "react-native";
 import { NotificationBell } from "@/components/notification-bell";
 import {
 	ErrorState,
@@ -26,21 +24,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Body, Caption } from "@/components/ui/typography";
 import { useSignOut } from "@/hooks/use-auth";
-import {
-	useMyUserDocuments,
-	useUploadUserDocument,
-} from "@/hooks/use-documents";
+import { useMyUserDocuments } from "@/hooks/use-documents";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
-
-const ID_DOCUMENTS: Array<{
-	type: UploadUserDocumentInput["documentType"];
-	hint: string;
-}> = [
-	{ type: "AADHAR_CARD", hint: "Front and back in a single PDF or image" },
-	{ type: "OTHER", hint: "Passport, driving licence or voter ID" },
-];
+import type { DocVerificationStatus } from "@/lib/types";
 
 export default function VolunteerProfile() {
 	const { colors, spacing } = useTheme();
@@ -49,24 +37,17 @@ export default function VolunteerProfile() {
 
 	const me = useMe();
 	const documents = useMyUserDocuments();
-	const upload = useUploadUserDocument();
 
-	const submit = (
-		documentType: UploadUserDocumentInput["documentType"],
-		documentKey: string,
-	) => {
-		upload.mutate(
-			{ documentType, documentKey },
-			{
-				onError: (error) =>
-					Alert.alert("Could not save document", apiErrorMessage(error)),
-			},
-		);
-	};
-
-	const byType = new Map(
-		(documents.data ?? []).map((doc) => [doc.documentType, doc]),
+	// Verification now needs two artifacts. Surface each one's own status; the
+	// account-level pill above reflects both (server-derived).
+	const govIdDoc = (documents.data ?? []).find(
+		(doc) => !isSelfieDocument(doc.documentType),
 	);
+	const selfieDoc = (documents.data ?? []).find((doc) =>
+		isSelfieDocument(doc.documentType),
+	);
+	const hasSubmitted = Boolean(govIdDoc || selfieDoc);
+	const reviewNote = govIdDoc?.remarks || selfieDoc?.remarks;
 
 	return (
 		<View
@@ -241,24 +222,32 @@ export default function VolunteerProfile() {
 						Identity verification
 					</Caption>
 					<Caption color="tertiary" style={{ marginBottom: spacing[4] }}>
-						A verified ID shows NGOs they can trust your application. One
-						document is enough — you don't need both.
+						Verify with a government ID and a quick selfie so NGOs know they can
+						trust your application. Both are needed to get verified.
 					</Caption>
 
 					{documents.isLoading ? (
 						<LoadingState />
 					) : (
-						ID_DOCUMENTS.map((doc) => (
-							<DocumentUploadTile
-								key={doc.type}
-								title={USER_DOCUMENT_LABELS[doc.type] ?? doc.type}
-								hint={doc.hint}
-								purpose="USER_DOCUMENT"
-								existing={byType.get(doc.type)}
-								saving={upload.isPending}
-								onUploaded={(key) => submit(doc.type, key)}
+						<Surface style={{ gap: spacing[3] }}>
+							<VerificationArtifact
+								label="Government ID"
+								status={govIdDoc?.verificationStatus}
 							/>
-						))
+							<VerificationArtifact
+								label="Verification selfie"
+								status={selfieDoc?.verificationStatus}
+							/>
+							{reviewNote && (
+								<Caption color="secondary">“{reviewNote}”</Caption>
+							)}
+							<Button
+								onPress={() => router.push("/verify-identity")}
+								style={{ marginTop: spacing[1] }}
+							>
+								{hasSubmitted ? "Update documents" : "Get verified"}
+							</Button>
+						</Surface>
 					)}
 
 					<Button
@@ -270,6 +259,38 @@ export default function VolunteerProfile() {
 						Sign out
 					</Button>
 				</ScrollView>
+			)}
+		</View>
+	);
+}
+
+function VerificationArtifact({
+	label,
+	status,
+}: {
+	label: string;
+	status?: DocVerificationStatus | null;
+}) {
+	const { spacing } = useTheme();
+	return (
+		<View
+			style={{
+				flexDirection: "row",
+				alignItems: "center",
+				justifyContent: "space-between",
+				gap: spacing[2],
+			}}
+		>
+			<Body weight="medium" style={{ flex: 1 }}>
+				{label}
+			</Body>
+			{status ? (
+				<StatusPill
+					label={humanizeStatus(status)}
+					tone={verificationTone(status)}
+				/>
+			) : (
+				<Caption color="quaternary">Not submitted</Caption>
 			)}
 		</View>
 	);

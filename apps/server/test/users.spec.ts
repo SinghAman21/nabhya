@@ -1,8 +1,14 @@
 import { categories, userCategories, users } from "@nabhya/db/schema";
-import { ConflictException, NotFoundException } from "@nestjs/common";
+import {
+	BadRequestException,
+	ConflictException,
+	NotFoundException,
+} from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { AuditService } from "../src/common/audit";
+import { StubStorageProvider } from "../src/common/storage";
+import { UploadsService } from "../src/modules/uploads/uploads.service";
 import { UsersService } from "../src/modules/users/users.service";
 import { createOrganization, createUser, seedRoles } from "./factories";
 import { createTestDb, type TestDb, truncateAll } from "./harness";
@@ -193,6 +199,102 @@ describe("UsersService", () => {
 				where: eq(userCategories.userId, first.id),
 			});
 			expect(rows).toHaveLength(1);
+		});
+	});
+
+	describe("uploadDocument", () => {
+		let storage: StubStorageProvider;
+		let docsService: UsersService;
+
+		beforeAll(() => {
+			storage = new StubStorageProvider();
+			docsService = new UsersService(
+				db as never,
+				new AuditService(db as never),
+				new UploadsService(db as never, storage),
+			);
+		});
+
+		/** Mimic a completed direct-to-storage upload so assertUploaded passes. */
+		async function stashUpload(userId: string, name: string) {
+			const key = `user-documents/${userId}/${name}`;
+			await storage.putObject({
+				key,
+				body: new Uint8Array(64),
+				contentType: "image/jpeg",
+			});
+			return key;
+		}
+
+		it("supersedes a prior upload of the same type instead of stacking", async () => {
+			const user = await createUser(db, { role: "volunteer" });
+			await docsService.uploadDocument(user.id, {
+				documentType: "AADHAR_CARD",
+				documentKey: await stashUpload(user.id, "aadhaar-1.jpg"),
+			});
+			const secondKey = await stashUpload(user.id, "aadhaar-2.jpg");
+			await docsService.uploadDocument(user.id, {
+				documentType: "AADHAR_CARD",
+				documentKey: secondKey,
+			});
+
+			const docs = await db.query.userDocuments.findMany({
+				where: (d, { eq: eqOp }) => eqOp(d.userId, user.id),
+			});
+			expect(docs).toHaveLength(1);
+			expect(docs[0]?.documentKey).toBe(secondKey);
+		});
+
+		it("does not verify the account on upload alone", async () => {
+			const user = await createUser(db, { role: "volunteer" });
+			await docsService.uploadDocument(user.id, {
+				documentType: "AADHAR_CARD",
+				documentKey: await stashUpload(user.id, "aadhaar.jpg"),
+			});
+
+			const stored = await db.query.users.findFirst({
+				where: eq(users.id, user.id),
+			});
+			expect(stored?.verificationStatus).toBe("PENDING");
+		});
+
+		it("stores liveness metadata and confirms the second frame exists", async () => {
+			const user = await createUser(db, { role: "volunteer" });
+			const documentKey = await stashUpload(user.id, "selfie.jpg");
+			const secondaryFrameKey = await stashUpload(user.id, "selfie-2.jpg");
+
+			await docsService.uploadDocument(user.id, {
+				documentType: "SELFIE",
+				documentKey,
+				metadata: { liveness: { challenge: "BLINK", secondaryFrameKey } },
+			});
+
+			const doc = await db.query.userDocuments.findFirst({
+				where: (d, { eq: eqOp }) => eqOp(d.userId, user.id),
+			});
+			const metadata = doc?.metadata as {
+				liveness?: { challenge?: string };
+			} | null;
+			expect(metadata?.liveness?.challenge).toBe("BLINK");
+		});
+
+		it("rejects a selfie whose second frame was never uploaded", async () => {
+			// A signed PUT can't guarantee the frame landed, so the key is HEAD-checked.
+			const user = await createUser(db, { role: "volunteer" });
+			const documentKey = await stashUpload(user.id, "selfie.jpg");
+
+			await expect(
+				docsService.uploadDocument(user.id, {
+					documentType: "SELFIE",
+					documentKey,
+					metadata: {
+						liveness: {
+							challenge: "BLINK",
+							secondaryFrameKey: `user-documents/${user.id}/missing.jpg`,
+						},
+					},
+				}),
+			).rejects.toBeInstanceOf(BadRequestException);
 		});
 	});
 });
