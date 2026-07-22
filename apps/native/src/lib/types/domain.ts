@@ -263,12 +263,27 @@ export interface AdminOrgListItem {
 	needCount: number;
 }
 
+/**
+ * Extra data on an identity document. Only the liveness selfie sets it — the
+ * challenge the volunteer was asked to perform and the storage key of the
+ * second frame captured mid-challenge, so a reviewer can see motion.
+ */
+export interface UserDocumentMetadata {
+	liveness?: {
+		challenge?: string;
+		capturedAt?: string;
+		secondaryFrameKey?: string;
+	};
+}
+
 export interface AdminOrgDocument {
 	id: string;
 	documentType: string;
 	documentKey: string;
 	verificationStatus: DocVerificationStatus | null;
 	remarks: string | null;
+	/** Present on identity selfies; absent on organization documents. */
+	metadata?: UserDocumentMetadata | null;
 	uploadedAt: string;
 }
 

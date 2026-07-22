@@ -1,16 +1,21 @@
-import type { UploadUserDocumentInput } from "@nabhya/shared";
-import { USER_DOCUMENT_LABELS } from "@nabhya/shared";
+import { isSelfieDocument } from "@nabhya/shared";
 import { useRouter } from "expo-router";
+import type { LucideIcon } from "lucide-react-native";
 import {
 	Award,
 	Bookmark,
 	Building2,
+	CalendarCheck,
+	Camera,
 	ChevronRight,
+	Clock,
+	IdCard,
+	MapPin,
 	Pencil,
+	ShieldCheck,
 	TrendingUp,
 } from "lucide-react-native";
-import { Alert, RefreshControl, ScrollView, View } from "react-native";
-import { DocumentUploadTile } from "@/components/document-upload-tile";
+import { Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { NotificationBell } from "@/components/notification-bell";
 import {
 	ErrorState,
@@ -24,49 +29,40 @@ import {
 	verificationTone,
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
-import { Body, Caption } from "@/components/ui/typography";
+import { Body, Caption, H4, H5 } from "@/components/ui/typography";
 import { useSignOut } from "@/hooks/use-auth";
-import {
-	useMyUserDocuments,
-	useUploadUserDocument,
-} from "@/hooks/use-documents";
+import { useMyImpact } from "@/hooks/use-directory";
+import { useMyUserDocuments } from "@/hooks/use-documents";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
-
-const ID_DOCUMENTS: Array<{
-	type: UploadUserDocumentInput["documentType"];
-	hint: string;
-}> = [
-	{ type: "AADHAR_CARD", hint: "Front and back in a single PDF or image" },
-	{ type: "OTHER", hint: "Passport, driving licence or voter ID" },
-];
+import type { DocVerificationStatus } from "@/lib/types";
 
 export default function VolunteerProfile() {
-	const { colors, spacing } = useTheme();
+	const { colors, spacing, withOpacity } = useTheme();
 	const router = useRouter();
 	const signOut = useSignOut();
 
 	const me = useMe();
 	const documents = useMyUserDocuments();
-	const upload = useUploadUserDocument();
+	const impact = useMyImpact();
 
-	const submit = (
-		documentType: UploadUserDocumentInput["documentType"],
-		documentKey: string,
-	) => {
-		upload.mutate(
-			{ documentType, documentKey },
-			{
-				onError: (error) =>
-					Alert.alert("Could not save document", apiErrorMessage(error)),
-			},
-		);
-	};
-
-	const byType = new Map(
-		(documents.data ?? []).map((doc) => [doc.documentType, doc]),
+	// Verification needs two artifacts. Surface each one's own status; the
+	// account-level pill reflects both (server-derived).
+	const govIdDoc = (documents.data ?? []).find(
+		(doc) => !isSelfieDocument(doc.documentType),
 	);
+	const selfieDoc = (documents.data ?? []).find((doc) =>
+		isSelfieDocument(doc.documentType),
+	);
+	const hasSubmitted = Boolean(govIdDoc || selfieDoc);
+	const reviewNote = govIdDoc?.remarks || selfieDoc?.remarks;
+	const isVerified = me.data?.verificationStatus === "VERIFIED";
+
+	const location = [me.data?.city, me.data?.state].filter(Boolean).join(", ");
+	const memberSince = me.data?.createdAt
+		? new Date(me.data.createdAt).getFullYear()
+		: null;
 
 	return (
 		<View
@@ -100,40 +96,108 @@ export default function VolunteerProfile() {
 							onRefresh={() => {
 								me.refetch();
 								documents.refetch();
+								impact.refetch();
 							}}
 							tintColor={colors.primary.main as string}
 						/>
 					}
 				>
-					<Surface style={{ marginBottom: spacing[5] }}>
+					{/* ── Identity card ─────────────────────────────────────── */}
+					<Surface style={{ marginBottom: spacing[3] }}>
+						<View
+							style={{
+								flexDirection: "row",
+								alignItems: "center",
+								gap: spacing[3.5],
+							}}
+						>
+							<InitialsAvatar name={me.data?.name} />
+							<View style={{ flex: 1 }}>
+								<H5 numberOfLines={1}>{me.data?.name ?? "Volunteer"}</H5>
+								<Caption color="tertiary" numberOfLines={1}>
+									{me.data?.email}
+								</Caption>
+								{location ? (
+									<View
+										style={{
+											flexDirection: "row",
+											alignItems: "center",
+											gap: spacing[1],
+											marginTop: spacing[0.5],
+										}}
+									>
+										<MapPin
+											size={11}
+											color={colors.text.quaternary as string}
+										/>
+										<Caption color="quaternary">{location}</Caption>
+									</View>
+								) : null}
+							</View>
+						</View>
+
+						{me.data?.bio ? (
+							<Caption color="secondary" style={{ marginTop: spacing[3] }}>
+								{me.data.bio}
+							</Caption>
+						) : null}
+
 						<View
 							style={{
 								flexDirection: "row",
 								alignItems: "center",
 								justifyContent: "space-between",
-								gap: spacing[3],
+								marginTop: spacing[3],
+								paddingTop: spacing[3],
+								borderTopWidth: 1,
+								borderTopColor: colors.border.light,
 							}}
 						>
-							<Body weight="bold" style={{ flex: 1 }} numberOfLines={1}>
-								{me.data?.name ?? "Volunteer"}
-							</Body>
 							<StatusPill
 								label={`ID ${humanizeStatus(me.data?.verificationStatus).toLowerCase()}`}
 								tone={verificationTone(me.data?.verificationStatus)}
 							/>
+							{memberSince && (
+								<Caption color="quaternary">Member since {memberSince}</Caption>
+							)}
 						</View>
-						<Caption color="tertiary" style={{ marginTop: spacing[1] }}>
-							{me.data?.email}
-						</Caption>
-						{(me.data?.city || me.data?.state) && (
-							<Caption color="tertiary">
-								{[me.data?.city, me.data?.state].filter(Boolean).join(", ")}
-							</Caption>
-						)}
 					</Surface>
 
-					<View style={{ gap: spacing[2], marginBottom: spacing[5] }}>
-						<Surface onPress={() => router.push("/certificates")}>
+					{/* ── Impact at a glance ────────────────────────────────── */}
+					{impact.data && (
+						<View
+							style={{
+								flexDirection: "row",
+								gap: spacing[2],
+								marginBottom: spacing[5],
+							}}
+						>
+							<StatTile
+								icon={Clock}
+								value={impact.data.hoursContributed}
+								label="hours given"
+								onPress={() => router.push("/impact")}
+							/>
+							<StatTile
+								icon={CalendarCheck}
+								value={impact.data.eventsAttended}
+								label="events"
+								onPress={() => router.push("/impact")}
+							/>
+							<StatTile
+								icon={Award}
+								value={impact.data.certificatesEarned}
+								label="certificates"
+								onPress={() => router.push("/certificates")}
+							/>
+						</View>
+					)}
+
+					{/* ── Identity verification ─────────────────────────────── */}
+					{documents.isLoading ? (
+						<LoadingState />
+					) : isVerified ? (
+						<Surface style={{ marginBottom: spacing[5] }}>
 							<View
 								style={{
 									flexDirection: "row",
@@ -141,94 +205,94 @@ export default function VolunteerProfile() {
 									gap: spacing[3],
 								}}
 							>
-								<Award size={18} color={colors.text.secondary as string} />
-								<Body weight="medium" style={{ flex: 1 }}>
-									My certificates
-								</Body>
-								<ChevronRight
-									size={18}
-									color={colors.text.quaternary as string}
+								<IconChip
+									icon={ShieldCheck}
+									color={colors.success.main as string}
 								/>
+								<View style={{ flex: 1 }}>
+									<Body weight="bold">Identity verified</Body>
+									<Caption color="tertiary">
+										NGOs can see you're a trusted volunteer.
+									</Caption>
+								</View>
 							</View>
 						</Surface>
-
-						<Surface onPress={() => router.push("/edit-profile")}>
+					) : (
+						<Surface style={{ marginBottom: spacing[5] }}>
 							<View
 								style={{
 									flexDirection: "row",
 									alignItems: "center",
 									gap: spacing[3],
+									marginBottom: spacing[2],
 								}}
 							>
-								<Pencil size={18} color={colors.text.secondary as string} />
-								<Body weight="medium" style={{ flex: 1 }}>
-									Edit profile
-								</Body>
-								<ChevronRight
-									size={18}
-									color={colors.text.quaternary as string}
+								<IconChip
+									icon={ShieldCheck}
+									color={colors.primary.main as string}
 								/>
+								<Body weight="bold" style={{ flex: 1 }}>
+									Get verified
+								</Body>
 							</View>
-						</Surface>
+							<Caption color="tertiary" style={{ marginBottom: spacing[3] }}>
+								Verify with a government ID and a quick selfie so NGOs know they
+								can trust your application. Both are needed.
+							</Caption>
 
-						<Surface onPress={() => router.push("/impact")}>
 							<View
 								style={{
 									flexDirection: "row",
-									alignItems: "center",
-									gap: spacing[3],
+									gap: spacing[1.5],
+									marginBottom: spacing[3],
 								}}
 							>
-								<TrendingUp size={18} color={colors.text.secondary as string} />
-								<Body weight="medium" style={{ flex: 1 }}>
-									My impact
-								</Body>
-								<ChevronRight
-									size={18}
-									color={colors.text.quaternary as string}
+								<ProgressSegment status={govIdDoc?.verificationStatus} />
+								<ProgressSegment status={selfieDoc?.verificationStatus} />
+							</View>
+
+							<View style={{ gap: spacing[2.5] }}>
+								<VerificationArtifact
+									icon={IdCard}
+									label="Government ID"
+									status={govIdDoc?.verificationStatus}
+								/>
+								<VerificationArtifact
+									icon={Camera}
+									label="Verification selfie"
+									status={selfieDoc?.verificationStatus}
 								/>
 							</View>
-						</Surface>
 
-						<Surface onPress={() => router.push("/ngos")}>
-							<View
-								style={{
-									flexDirection: "row",
-									alignItems: "center",
-									gap: spacing[3],
-								}}
+							{reviewNote && (
+								<View
+									style={{
+										marginTop: spacing[3],
+										padding: spacing[3],
+										borderRadius: 12,
+										backgroundColor: withOpacity(
+											colors.warning.main as string,
+											0.08,
+										),
+									}}
+								>
+									<Caption weight="medium" color="secondary">
+										Reviewer note
+									</Caption>
+									<Caption color="tertiary">“{reviewNote}”</Caption>
+								</View>
+							)}
+
+							<Button
+								onPress={() => router.push("/verify-identity")}
+								style={{ marginTop: spacing[4] }}
 							>
-								<Building2 size={18} color={colors.text.secondary as string} />
-								<Body weight="medium" style={{ flex: 1 }}>
-									Browse NGOs
-								</Body>
-								<ChevronRight
-									size={18}
-									color={colors.text.quaternary as string}
-								/>
-							</View>
+								{hasSubmitted ? "Update documents" : "Start verification"}
+							</Button>
 						</Surface>
+					)}
 
-						<Surface onPress={() => router.push("/bookmarks")}>
-							<View
-								style={{
-									flexDirection: "row",
-									alignItems: "center",
-									gap: spacing[3],
-								}}
-							>
-								<Bookmark size={18} color={colors.text.secondary as string} />
-								<Body weight="medium" style={{ flex: 1 }}>
-									Saved NGOs
-								</Body>
-								<ChevronRight
-									size={18}
-									color={colors.text.quaternary as string}
-								/>
-							</View>
-						</Surface>
-					</View>
-
+					{/* ── Account ───────────────────────────────────────────── */}
 					<Caption
 						weight="bold"
 						color="tertiary"
@@ -238,39 +302,255 @@ export default function VolunteerProfile() {
 							marginBottom: spacing[2],
 						}}
 					>
-						Identity verification
+						Account
 					</Caption>
-					<Caption color="tertiary" style={{ marginBottom: spacing[4] }}>
-						A verified ID shows NGOs they can trust your application. One
-						document is enough — you don't need both.
-					</Caption>
-
-					{documents.isLoading ? (
-						<LoadingState />
-					) : (
-						ID_DOCUMENTS.map((doc) => (
-							<DocumentUploadTile
-								key={doc.type}
-								title={USER_DOCUMENT_LABELS[doc.type] ?? doc.type}
-								hint={doc.hint}
-								purpose="USER_DOCUMENT"
-								existing={byType.get(doc.type)}
-								saving={upload.isPending}
-								onUploaded={(key) => submit(doc.type, key)}
-							/>
-						))
-					)}
+					<Surface padded={false} style={{ marginBottom: spacing[6] }}>
+						<MenuRow
+							icon={Pencil}
+							color={colors.info.main as string}
+							label="Edit profile"
+							sublabel="Name, bio, location and interests"
+							onPress={() => router.push("/edit-profile")}
+							first
+						/>
+						<MenuDivider />
+						<MenuRow
+							icon={Award}
+							color={colors.warning.main as string}
+							label="My certificates"
+							sublabel="Everything you've earned"
+							onPress={() => router.push("/certificates")}
+						/>
+						<MenuDivider />
+						<MenuRow
+							icon={TrendingUp}
+							color={colors.success.main as string}
+							label="My impact"
+							sublabel="Hours, events and donations"
+							onPress={() => router.push("/impact")}
+						/>
+						<MenuDivider />
+						<MenuRow
+							icon={Bookmark}
+							color={colors.primary.main as string}
+							label="Saved NGOs"
+							sublabel="Organisations you bookmarked"
+							onPress={() => router.push("/bookmarks")}
+						/>
+						<MenuDivider />
+						<MenuRow
+							icon={Building2}
+							color={colors.special.orange as string}
+							label="Browse NGOs"
+							sublabel="Discover verified organisations"
+							onPress={() => router.push("/ngos")}
+							last
+						/>
+					</Surface>
 
 					<Button
 						variant="outline"
 						onPress={() => signOut.mutate()}
 						loading={signOut.isPending}
-						style={{ marginTop: spacing[6] }}
 					>
 						Sign out
 					</Button>
 				</ScrollView>
 			)}
 		</View>
+	);
+}
+
+// ─── Pieces ──────────────────────────────────────────────────────────────────
+
+function InitialsAvatar({ name }: { name?: string | null }) {
+	const { colors, withOpacity } = useTheme();
+	const initials =
+		name
+			?.trim()
+			.split(/\s+/)
+			.slice(0, 2)
+			.map((word) => word[0])
+			.join("")
+			.toUpperCase() || "V";
+
+	return (
+		<View
+			style={{
+				width: 56,
+				height: 56,
+				borderRadius: 28,
+				alignItems: "center",
+				justifyContent: "center",
+				backgroundColor: withOpacity(colors.primary.main as string, 0.14),
+			}}
+		>
+			<H4 color={colors.primary.dark as string}>{initials}</H4>
+		</View>
+	);
+}
+
+function IconChip({ icon: Icon, color }: { icon: LucideIcon; color: string }) {
+	const { withOpacity } = useTheme();
+	return (
+		<View
+			style={{
+				width: 36,
+				height: 36,
+				borderRadius: 12,
+				alignItems: "center",
+				justifyContent: "center",
+				backgroundColor: withOpacity(color, 0.12),
+			}}
+		>
+			<Icon size={18} color={color} />
+		</View>
+	);
+}
+
+function StatTile({
+	icon: Icon,
+	value,
+	label,
+	onPress,
+}: {
+	icon: LucideIcon;
+	value: number;
+	label: string;
+	onPress: () => void;
+}) {
+	const { colors, spacing } = useTheme();
+	return (
+		<Surface onPress={onPress} style={{ flex: 1 }}>
+			<Icon size={16} color={colors.primary.main as string} />
+			<H5 style={{ marginTop: spacing[1] }}>{value}</H5>
+			<Caption color="tertiary" style={{ fontSize: 11 }}>
+				{label}
+			</Caption>
+		</Surface>
+	);
+}
+
+/** One of the two verification steps, colored by its document's review state. */
+function ProgressSegment({
+	status,
+}: {
+	status?: DocVerificationStatus | null;
+}) {
+	const { colors } = useTheme();
+	const color = !status
+		? colors.border.medium
+		: status === "VERIFIED"
+			? colors.success.main
+			: status === "REJECTED"
+				? colors.error.main
+				: colors.warning.main;
+
+	return (
+		<View
+			style={{
+				flex: 1,
+				height: 5,
+				borderRadius: 999,
+				backgroundColor: color as string,
+			}}
+		/>
+	);
+}
+
+function VerificationArtifact({
+	icon: Icon,
+	label,
+	status,
+}: {
+	icon: LucideIcon;
+	label: string;
+	status?: DocVerificationStatus | null;
+}) {
+	const { colors, spacing } = useTheme();
+	return (
+		<View
+			style={{
+				flexDirection: "row",
+				alignItems: "center",
+				gap: spacing[2.5],
+			}}
+		>
+			<Icon size={16} color={colors.text.tertiary as string} />
+			<Body weight="medium" style={{ flex: 1 }}>
+				{label}
+			</Body>
+			{status ? (
+				<StatusPill
+					label={humanizeStatus(status)}
+					tone={verificationTone(status)}
+				/>
+			) : (
+				<Caption color="quaternary">Not submitted</Caption>
+			)}
+		</View>
+	);
+}
+
+function MenuRow({
+	icon,
+	color,
+	label,
+	sublabel,
+	onPress,
+	first,
+	last,
+}: {
+	icon: LucideIcon;
+	color: string;
+	label: string;
+	sublabel?: string;
+	onPress: () => void;
+	first?: boolean;
+	last?: boolean;
+}) {
+	const { colors, spacing, borderRadius } = useTheme();
+	return (
+		<Pressable
+			onPress={onPress}
+			style={({ pressed }) => ({
+				flexDirection: "row",
+				alignItems: "center",
+				gap: spacing[3],
+				paddingHorizontal: spacing[4],
+				paddingVertical: spacing[3],
+				backgroundColor: pressed
+					? (colors.background.tertiary as string)
+					: "transparent",
+				borderTopLeftRadius: first ? borderRadius.lg : 0,
+				borderTopRightRadius: first ? borderRadius.lg : 0,
+				borderBottomLeftRadius: last ? borderRadius.lg : 0,
+				borderBottomRightRadius: last ? borderRadius.lg : 0,
+			})}
+		>
+			<IconChip icon={icon} color={color} />
+			<View style={{ flex: 1 }}>
+				<Body weight="medium">{label}</Body>
+				{sublabel && (
+					<Caption color="quaternary" numberOfLines={1}>
+						{sublabel}
+					</Caption>
+				)}
+			</View>
+			<ChevronRight size={18} color={colors.text.quaternary as string} />
+		</Pressable>
+	);
+}
+
+function MenuDivider() {
+	const { colors, spacing } = useTheme();
+	return (
+		<View
+			style={{
+				height: 1,
+				backgroundColor: colors.border.light,
+				marginLeft: spacing[4] + 36 + spacing[3],
+			}}
+		/>
 	);
 }

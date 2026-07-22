@@ -46,14 +46,116 @@ export type CompleteVolunteerOnboardingInput = z.infer<
 	typeof completeVolunteerOnboardingSchema
 >;
 
-export const userDocumentTypeSchema = z.enum(["AADHAR_CARD", "OTHER"]);
+export const userDocumentTypeSchema = z.enum([
+	"AADHAR_CARD",
+	"PAN_CARD",
+	"DRIVING_LICENSE",
+	"VOTER_ID",
+	"PASSPORT",
+	"SELFIE",
+	"OTHER",
+]);
+
+export type UserDocumentType = z.infer<typeof userDocumentTypeSchema>;
+
+/**
+ * The liveness selfie is the single document type that is not a government ID.
+ * Every other type identifies the person against an official record; the selfie
+ * is what a superadmin compares that record against.
+ */
+export const SELFIE_DOCUMENT_TYPE = "SELFIE" as const;
+
+export const isSelfieDocument = (type: string): boolean =>
+	type === SELFIE_DOCUMENT_TYPE;
+
+export const isGovernmentIdDocument = (type: string): boolean =>
+	type !== SELFIE_DOCUMENT_TYPE;
+
+/** Every user document type except the liveness selfie. */
+export const GOVERNMENT_ID_DOCUMENT_TYPES =
+	userDocumentTypeSchema.options.filter(isGovernmentIdDocument);
+
+/** Liveness prompts the client can issue while capturing a selfie. */
+export const livenessChallengeSchema = z.enum([
+	"BLINK",
+	"TURN_LEFT",
+	"TURN_RIGHT",
+	"SMILE",
+	"NOD",
+]);
+
+export type LivenessChallenge = z.infer<typeof livenessChallengeSchema>;
+
+/**
+ * Extra data attached to a user document. Only the liveness selfie uses it
+ * today: which challenge was issued and an optional second frame captured mid
+ * challenge, so a reviewer can see motion rather than a single still.
+ */
+export const userDocumentMetadataSchema = z.object({
+	liveness: z
+		.object({
+			challenge: livenessChallengeSchema,
+			capturedAt: z.string().max(40).optional(),
+			secondaryFrameKey: z.string().trim().min(1).max(500).optional(),
+		})
+		.optional(),
+});
+
+export type UserDocumentMetadata = z.infer<typeof userDocumentMetadataSchema>;
 
 export const uploadUserDocumentSchema = z.object({
 	documentType: userDocumentTypeSchema,
 	documentKey: z.string().trim().min(1, "Upload a file first").max(500),
+	metadata: userDocumentMetadataSchema.optional(),
 });
 
 export type UploadUserDocumentInput = z.infer<typeof uploadUserDocumentSchema>;
+
+/**
+ * A volunteer is only VERIFIED once BOTH a government ID and a liveness selfie
+ * have been approved. Verifying a single document must never flip the account,
+ * so the account status is always recomputed from the whole document set:
+ *
+ * - VERIFIED — a government ID *and* a selfie are both approved.
+ * - REJECTED — a still-unsatisfied required slot (gov ID or selfie) was rejected.
+ * - PENDING  — anything else (awaiting upload or review).
+ */
+export function computeUserVerificationStatus(
+	documents: ReadonlyArray<{
+		documentType: string;
+		verificationStatus: string | null;
+	}>,
+): "PENDING" | "VERIFIED" | "REJECTED" {
+	const hasVerifiedGovId = documents.some(
+		(d) =>
+			isGovernmentIdDocument(d.documentType) &&
+			d.verificationStatus === "VERIFIED",
+	);
+	const hasVerifiedSelfie = documents.some(
+		(d) =>
+			isSelfieDocument(d.documentType) && d.verificationStatus === "VERIFIED",
+	);
+
+	if (hasVerifiedGovId && hasVerifiedSelfie) return "VERIFIED";
+
+	const govIdRejected =
+		!hasVerifiedGovId &&
+		documents.some(
+			(d) =>
+				isGovernmentIdDocument(d.documentType) &&
+				d.verificationStatus === "REJECTED",
+		);
+	const selfieRejected =
+		!hasVerifiedSelfie &&
+		documents.some(
+			(d) =>
+				isSelfieDocument(d.documentType) && d.verificationStatus === "REJECTED",
+		);
+
+	if (govIdRejected || selfieRejected) return "REJECTED";
+
+	return "PENDING";
+}
 
 export const updateUserProfileSchema = z.object({
 	fullName: z.string().trim().min(2).max(100).optional(),

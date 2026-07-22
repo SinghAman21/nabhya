@@ -12,16 +12,17 @@ import {
 	userRoles,
 	users,
 } from "@nabhya/db/schema";
-import type {
-	AdminOrgQuery,
-	AdminOverview,
-	AdminUserQuery,
-	AuditLogQuery,
-	PaginationQuery,
-	ReviewDocumentInput,
-	ReviewOrganizationInput,
-	SetOrgStatusInput,
-	SetUserStatusInput,
+import {
+	type AdminOrgQuery,
+	type AdminOverview,
+	type AdminUserQuery,
+	type AuditLogQuery,
+	computeUserVerificationStatus,
+	type PaginationQuery,
+	type ReviewDocumentInput,
+	type ReviewOrganizationInput,
+	type SetOrgStatusInput,
+	type SetUserStatusInput,
 } from "@nabhya/shared";
 import {
 	BadRequestException,
@@ -739,6 +740,7 @@ export class AdminService {
 					documentKey: userDocuments.documentKey,
 					verificationStatus: userDocuments.verificationStatus,
 					remarks: userDocuments.remarks,
+					metadata: userDocuments.metadata,
 					uploadedAt: userDocuments.uploadedAt,
 					user: {
 						id: users.id,
@@ -760,8 +762,12 @@ export class AdminService {
 	}
 
 	/**
-	 * Verifying an identity document promotes the user's own verification
-	 * status, which is what gates trust badges elsewhere in the app.
+	 * Reviews one identity document and re-derives the volunteer's own
+	 * verification status from their whole document set. A volunteer is only
+	 * VERIFIED once a government ID *and* a liveness selfie have both been
+	 * approved — approving a single document must never promote the account on
+	 * its own, or a selfie-less ID (or an ID-less selfie) would count as
+	 * verified. The account status gates trust badges elsewhere in the app.
 	 */
 	async reviewUserDocument(
 		adminId: string,
@@ -788,10 +794,18 @@ export class AdminService {
 				.where(eq(userDocuments.id, documentId))
 				.returning();
 
+			const docs = await tx
+				.select({
+					documentType: userDocuments.documentType,
+					verificationStatus: userDocuments.verificationStatus,
+				})
+				.from(userDocuments)
+				.where(eq(userDocuments.userId, document.userId));
+
 			await tx
 				.update(users)
 				.set({
-					verificationStatus: input.verificationStatus,
+					verificationStatus: computeUserVerificationStatus(docs),
 					updatedAt: new Date(),
 				})
 				.where(eq(users.id, document.userId));

@@ -6,6 +6,7 @@ import type {
 } from "@nabhya/shared";
 import { MAX_UPLOAD_BYTES } from "@nabhya/shared";
 import * as DocumentPicker from "expo-document-picker";
+import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import { useState } from "react";
 import { uploadsApi } from "@/lib/api";
 
@@ -91,6 +92,95 @@ export function useFileUpload(purpose: UploadPurpose) {
 
 	return {
 		pickAndUpload,
+		isUploading,
+		error,
+		clearError: () => setError(null),
+	};
+}
+
+export interface ImageUploadOptions {
+	/** Stored file name; also the extension a reviewer sees. */
+	fileName: string;
+	/** Native width of the source, used to decide whether to downscale. */
+	sourceWidth?: number;
+	/** Longest edge to shrink to before upload. Defaults to 1600px. */
+	maxWidth?: number;
+}
+
+/**
+ * Normalise a captured or picked image and upload it straight to storage.
+ *
+ * Camera and library assets can be HEIC — which the storage content-type
+ * allowlist rejects — and several megabytes each, so every image is re-encoded
+ * to JPEG and downscaled first. Like the file path, the bytes go directly to
+ * the signed URL (never through our API) and the object key comes back for the
+ * caller to attach to a record.
+ */
+export function useImageUpload(purpose: UploadPurpose) {
+	const [isUploading, setUploading] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+
+	const uploadImage = async (
+		uri: string,
+		options: ImageUploadOptions,
+	): Promise<PickedUpload | null> => {
+		setError(null);
+		setUploading(true);
+		try {
+			const maxWidth = options.maxWidth ?? 1600;
+			const actions =
+				options.sourceWidth && options.sourceWidth > maxWidth
+					? [{ resize: { width: maxWidth } }]
+					: [];
+			const processed = await manipulateAsync(uri, actions, {
+				compress: 0.6,
+				format: SaveFormat.JPEG,
+			});
+
+			// One fetch yields both the byte length (needed up front for the
+			// intent) and the body to PUT.
+			const blob = await (await fetch(processed.uri)).blob();
+			if (blob.size > MAX_UPLOAD_BYTES) {
+				setError("That photo is too large even after compression.");
+				return null;
+			}
+
+			const ticket = await uploadsApi.createIntent({
+				purpose,
+				fileName: options.fileName,
+				contentType: "image/jpeg",
+				size: blob.size || 1,
+			});
+
+			const response = await fetch(ticket.url, {
+				method: "PUT",
+				headers: ticket.headers,
+				body: blob,
+			});
+			if (!response.ok) {
+				throw new Error(
+					`Storage rejected the upload (${response.status}). Please try again.`,
+				);
+			}
+
+			return {
+				key: ticket.key,
+				fileName: options.fileName,
+				size: blob.size,
+				contentType: "image/jpeg",
+			};
+		} catch (e) {
+			setError(
+				e instanceof Error ? e.message : "Upload failed. Please try again.",
+			);
+			return null;
+		} finally {
+			setUploading(false);
+		}
+	};
+
+	return {
+		uploadImage,
 		isUploading,
 		error,
 		clearError: () => setError(null),
