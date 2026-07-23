@@ -28,6 +28,19 @@ apiClient.interceptors.response.use(
 	(response) => response,
 	async (error: AxiosError) => {
 		if (error.response?.status === 401) {
+			const original = error.config as
+				| (InternalAxiosRequestConfig & { _retried?: boolean })
+				| undefined;
+			// Access tokens expire after ~15 min; mint a fresh one from the
+			// session and retry once before treating the 401 as a real sign-out.
+			if (original && !original._retried) {
+				const token = await authService.refreshAccessToken();
+				if (token) {
+					original._retried = true;
+					original.headers.Authorization = `Bearer ${token}`;
+					return apiClient(original);
+				}
+			}
 			await authService.logout();
 			useAuthStore.getState().signOut();
 		}

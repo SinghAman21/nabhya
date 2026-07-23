@@ -64,6 +64,22 @@ export class AuthService {
 	async getAccessToken(): Promise<string | null> {
 		return storage.get("accessToken");
 	}
+
+	/**
+	 * Mint a fresh JWT from the Better Auth session. The JWTs expire after
+	 * ~15 minutes while the session itself is long-lived, so a 401 usually
+	 * just means "stale token", not "signed out".
+	 */
+	async refreshAccessToken(): Promise<string | null> {
+		try {
+			const accessToken = await neonAuth.getJWTToken();
+			if (!accessToken) return null;
+			await storage.set("accessToken", accessToken);
+			return accessToken;
+		} catch {
+			return null;
+		}
+	}
 }
 
 export const authService = new AuthService();

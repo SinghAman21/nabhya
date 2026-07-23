@@ -5,6 +5,7 @@ import {
 	CalendarDays,
 	FileCheck,
 	HeartHandshake,
+	LogOut,
 	Megaphone,
 	Users,
 } from "lucide-react-native";
@@ -19,6 +20,7 @@ import {
 } from "@/components/screen-shell";
 import { Body, Caption, H3 } from "@/components/ui/typography";
 import { useAdminOverview } from "@/hooks/use-admin";
+import { useSignOut } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
 
@@ -27,6 +29,7 @@ export default function AdminOverviewScreen() {
 	const router = useRouter();
 	const [broadcasting, setBroadcasting] = useState(false);
 	const query = useAdminOverview();
+	const signOut = useSignOut();
 
 	const overview = query.data;
 
@@ -43,19 +46,42 @@ export default function AdminOverviewScreen() {
 				title="Overview"
 				subtitle="Everything happening across the platform."
 				action={
-					<Pressable
-						onPress={() => setBroadcasting(true)}
-						style={{
-							width: 44,
-							height: 44,
-							borderRadius: 22,
-							alignItems: "center",
-							justifyContent: "center",
-							backgroundColor: colors.primary.main,
-						}}
-					>
-						<Megaphone size={20} color={colors.primary.contrast as string} />
-					</Pressable>
+					<View style={{ flexDirection: "row", gap: spacing[2] }}>
+						<Pressable
+							disabled={signOut.isPending}
+							onPress={() =>
+								signOut.mutate(undefined, {
+									onSettled: () => router.replace("/(auth)/login"),
+								})
+							}
+							style={{
+								width: 44,
+								height: 44,
+								borderRadius: 22,
+								alignItems: "center",
+								justifyContent: "center",
+								backgroundColor: colors.background.primary,
+								borderWidth: 1,
+								borderColor: colors.border.light,
+								opacity: signOut.isPending ? 0.5 : 1,
+							}}
+						>
+							<LogOut size={18} color={colors.error.main as string} />
+						</Pressable>
+						<Pressable
+							onPress={() => setBroadcasting(true)}
+							style={{
+								width: 44,
+								height: 44,
+								borderRadius: 22,
+								alignItems: "center",
+								justifyContent: "center",
+								backgroundColor: colors.primary.main,
+							}}
+						>
+							<Megaphone size={20} color={colors.primary.contrast as string} />
+						</Pressable>
+					</View>
 				}
 			/>
 

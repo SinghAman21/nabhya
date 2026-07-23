@@ -4,14 +4,16 @@ import { env } from "@nabhya/env/server";
 import {
 	type CanActivate,
 	type ExecutionContext,
+	HttpException,
 	Inject,
 	Injectable,
 	Logger,
+	ServiceUnavailableException,
 	UnauthorizedException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { eq } from "drizzle-orm";
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createRemoteJWKSet, errors as joseErrors, jwtVerify } from "jose";
 import { DB_TOKEN } from "../database";
 import { IS_OPTIONAL_AUTH_KEY } from "../decorators/optional-auth.decorator";
 import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
@@ -75,7 +77,17 @@ export class JwtGuard implements CanActivate {
 				with: { role: true },
 			});
 
-			const assignedRoles = roleRows.map((ur) => ur.role.name) as UserRole[];
+			// Stable priority order — the join table returns rows in arbitrary
+			// order, and a flip-flopping `role` sends the app's routing gate and
+			// the role-guarded layouts into a redirect loop.
+			const ROLE_PRIORITY: UserRole[] = [
+				"superadmin",
+				"organisation",
+				"volunteer",
+			];
+			const assignedRoles = (
+				roleRows.map((ur) => ur.role.name) as UserRole[]
+			).sort((a, b) => ROLE_PRIORITY.indexOf(a) - ROLE_PRIORITY.indexOf(b));
 
 			// Attach fully loaded user to request. `roles` is empty until the user
 			// picks one on the role-select screen — routes that need a role are
@@ -93,11 +105,19 @@ export class JwtGuard implements CanActivate {
 			// On an optional-auth route a bad token simply means "anonymous" —
 			// a stale token in the app must not break the public feed.
 			if (isOptional) return true;
-			if (error instanceof UnauthorizedException) throw error;
-			this.logger.warn(
-				`Neon JWT verification failed: ${error instanceof Error ? error.message : String(error)}`,
+			if (error instanceof HttpException) throw error;
+			if (error instanceof joseErrors.JOSEError) {
+				this.logger.warn(`Neon JWT verification failed: ${error.message}`);
+				throw new UnauthorizedException("Token validation failed");
+			}
+			// Anything else (DB/network blip) is our failure, not the caller's.
+			// A 401 here would force-log-out the app on a transient error.
+			this.logger.error(
+				`Auth infrastructure error: ${error instanceof Error ? error.message : String(error)}`,
 			);
-			throw new UnauthorizedException("Token validation failed");
+			throw new ServiceUnavailableException(
+				"Authentication temporarily unavailable, please retry",
+			);
 		}
 	}
 

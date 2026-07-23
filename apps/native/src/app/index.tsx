@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { useOnboardingStatus } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/useTheme";
+import { authService } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
@@ -17,6 +18,12 @@ export default function Index() {
 	const router = useRouter();
 
 	const { data: status, isLoading, isError } = useOnboardingStatus(!!email);
+
+	// Access tokens expire after ~15 min but the Better Auth session cookie is
+	// long-lived — mint a fresh token on boot so a reload never starts stale.
+	useEffect(() => {
+		if (email) void authService.refreshAccessToken();
+	}, [email]);
 
 	useEffect(() => {
 		if (status) syncFromStatus(status);

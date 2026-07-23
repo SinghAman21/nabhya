@@ -56,7 +56,7 @@ export function AuthSplitLayout({
 					/>
 
 					<Caption color="#555555" style={{ marginTop: spacing[4] }}>
-						Built for NGOs • by NeGrOs
+						Built for NGOs
 					</Caption>
 				</View>
 
