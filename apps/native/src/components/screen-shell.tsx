@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react-native";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, View } from "react-native";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -219,6 +219,29 @@ export function FilterChips<T extends string>({
 					</Pressable>
 				);
 			})}
+		</View>
+	);
+}
+
+/**
+ * Constrains content width and centres it on desktop web. Passes through on
+ * mobile — no extra wrapper, no layout shift.
+ */
+export function WebContent({ children }: { children: React.ReactNode }) {
+	const { spacing } = useTheme();
+
+	if (Platform.OS !== "web") return <>{children}</>;
+
+	return (
+		<View
+			style={{
+				width: "100%",
+				maxWidth: 720,
+				alignSelf: "center",
+				paddingHorizontal: spacing[6],
+			}}
+		>
+			{children}
 		</View>
 	);
 }

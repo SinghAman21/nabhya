@@ -40,8 +40,8 @@ export default function VolunteerEvents() {
 			style={{
 				flex: 1,
 				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
 				paddingTop: spacing[8],
+				paddingHorizontal: spacing[6],
 			}}
 		>
 			<ScreenHeader
