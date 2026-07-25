@@ -1,7 +1,7 @@
 import { formatMinor } from "@nabhya/shared";
-import { useRouter } from "expo-router";
-import { ArrowLeft, HandCoins } from "lucide-react-native";
+import { HandCoins } from "lucide-react-native";
 import { FlatList, Pressable, RefreshControl, View } from "react-native";
+import { BackButton } from "@/components/back-button";
 import {
 	EmptyState,
 	ErrorState,
@@ -17,7 +17,6 @@ import { formatRelative } from "@/lib/format";
 
 export default function OrgDonations() {
 	const { colors, spacing } = useTheme();
-	const router = useRouter();
 	const query = useOrgDonations();
 
 	const stats = query.data?.stats;
@@ -31,13 +30,7 @@ export default function OrgDonations() {
 				paddingTop: spacing[8],
 			}}
 		>
-			<Pressable
-				onPress={() => router.back()}
-				hitSlop={12}
-				style={{ marginBottom: spacing[4] }}
-			>
-				<ArrowLeft size={22} color={colors.text.secondary as string} />
-			</Pressable>
+			<BackButton />
 
 			<ScreenHeader
 				title="Donations"

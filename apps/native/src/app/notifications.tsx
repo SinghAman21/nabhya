@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
-import { ArrowLeft, Bell } from "lucide-react-native";
+import { Bell } from "lucide-react-native";
 import { FlatList, Pressable, RefreshControl, View } from "react-native";
+import { BackButton } from "@/components/back-button";
 import {
 	EmptyState,
 	ErrorState,
@@ -56,13 +57,7 @@ export default function Notifications() {
 				paddingTop: spacing[8],
 			}}
 		>
-			<Pressable
-				onPress={() => router.back()}
-				hitSlop={12}
-				style={{ marginBottom: spacing[4] }}
-			>
-				<ArrowLeft size={22} color={colors.text.secondary as string} />
-			</Pressable>
+			<BackButton />
 
 			<View
 				style={{

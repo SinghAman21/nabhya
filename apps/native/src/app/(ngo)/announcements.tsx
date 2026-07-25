@@ -1,6 +1,5 @@
 import type { UpsertAnnouncementInput } from "@nabhya/shared";
-import { useRouter } from "expo-router";
-import { ArrowLeft, Megaphone, Pin, Plus, X } from "lucide-react-native";
+import { Megaphone, Pin, Plus, X } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
 	Alert,
@@ -10,6 +9,7 @@ import {
 	RefreshControl,
 	View,
 } from "react-native";
+import { BackButton } from "@/components/back-button";
 import {
 	EmptyState,
 	ErrorState,
@@ -34,7 +34,6 @@ import type { Announcement } from "@/lib/types";
 
 export default function OrgAnnouncements() {
 	const { colors, spacing } = useTheme();
-	const router = useRouter();
 	const [composing, setComposing] = useState(false);
 	const [editing, setEditing] = useState<Announcement | null>(null);
 
@@ -65,13 +64,7 @@ export default function OrgAnnouncements() {
 				paddingTop: spacing[8],
 			}}
 		>
-			<Pressable
-				onPress={() => router.back()}
-				hitSlop={12}
-				style={{ marginBottom: spacing[4] }}
-			>
-				<ArrowLeft size={22} color={colors.text.secondary as string} />
-			</Pressable>
+			<BackButton />
 
 			<ScreenHeader
 				title="Updates"

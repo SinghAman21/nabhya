@@ -1,7 +1,6 @@
 import type { CreateFinancialReportInput } from "@nabhya/shared";
 import { FINANCIAL_REPORT_LABELS, formatFinancialYear } from "@nabhya/shared";
-import { useRouter } from "expo-router";
-import { ArrowLeft, FileText, Plus, X } from "lucide-react-native";
+import { FileText, Plus, X } from "lucide-react-native";
 import { useState } from "react";
 import {
 	Alert,
@@ -11,6 +10,7 @@ import {
 	RefreshControl,
 	View,
 } from "react-native";
+import { BackButton } from "@/components/back-button";
 import {
 	EmptyState,
 	ErrorState,
@@ -50,7 +50,6 @@ const TYPES: CreateFinancialReportInput["type"][] = [
  */
 export default function OrgReports() {
 	const { colors, spacing } = useTheme();
-	const router = useRouter();
 	const [composing, setComposing] = useState(false);
 
 	const { data: me } = useMe();
@@ -86,13 +85,7 @@ export default function OrgReports() {
 				paddingTop: spacing[8],
 			}}
 		>
-			<Pressable
-				onPress={() => router.back()}
-				hitSlop={12}
-				style={{ marginBottom: spacing[4] }}
-			>
-				<ArrowLeft size={22} color={colors.text.secondary as string} />
-			</Pressable>
+			<BackButton />
 
 			<ScreenHeader
 				title="Transparency"

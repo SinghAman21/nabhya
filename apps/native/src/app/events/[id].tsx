@@ -1,7 +1,8 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, CalendarDays, MapPin, Users } from "lucide-react-native";
+import { CalendarDays, MapPin, Users } from "lucide-react-native";
 import { useState } from "react";
 import { Alert, Pressable, ScrollView, View } from "react-native";
+import { BackButton } from "@/components/back-button";
 import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
 import {
 	applicationTone,
@@ -91,9 +92,7 @@ export default function EventDetail() {
 					paddingBottom: spacing[2],
 				}}
 			>
-				<Pressable onPress={() => router.back()} hitSlop={12}>
-					<ArrowLeft size={22} color={colors.text.secondary as string} />
-				</Pressable>
+				<BackButton style={{ marginBottom: 0 }} />
 			</View>
 
 			{query.isLoading ? (

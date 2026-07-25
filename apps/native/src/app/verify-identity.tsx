@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
-import { ArrowLeft } from "lucide-react-native";
 import { useState } from "react";
 import { Alert, Pressable, ScrollView, View } from "react-native";
+import { BackButton } from "@/components/back-button";
 import { ScreenHeader } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
 import { Caption } from "@/components/ui/typography";
@@ -75,13 +75,11 @@ export default function VerifyIdentity() {
 				paddingTop: spacing[8],
 			}}
 		>
-			<Pressable
-				onPress={() => router.back()}
-				hitSlop={8}
+			<BackButton
+				size={24}
+				color={colors.text.primary as string}
 				style={{ marginBottom: spacing[2] }}
-			>
-				<ArrowLeft size={24} color={colors.text.primary as string} />
-			</Pressable>
+			/>
 
 			<ScreenHeader
 				title="Get verified"

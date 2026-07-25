@@ -1,15 +1,9 @@
 import { formatFinancialYear } from "@nabhya/shared";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import {
-	ArrowLeft,
-	Award,
-	Bookmark,
-	Clock,
-	FileText,
-	Users,
-} from "lucide-react-native";
+import { Award, Bookmark, Clock, FileText, Users } from "lucide-react-native";
 import { useState } from "react";
 import { Alert, Pressable, ScrollView, View } from "react-native";
+import { BackButton } from "@/components/back-button";
 import { ReviewSheet } from "@/components/review-sheet";
 import {
 	ErrorState,
@@ -85,9 +79,7 @@ export default function NgoProfilePage() {
 					paddingBottom: spacing[2],
 				}}
 			>
-				<Pressable onPress={() => router.back()} hitSlop={12}>
-					<ArrowLeft size={22} color={colors.text.secondary as string} />
-				</Pressable>
+				<BackButton style={{ marginBottom: 0 }} />
 				<Pressable onPress={onBookmark} hitSlop={12}>
 					<Bookmark size={22} color={colors.text.secondary as string} />
 				</Pressable>

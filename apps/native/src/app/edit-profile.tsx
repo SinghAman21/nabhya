@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
-import { ArrowLeft } from "lucide-react-native";
 import { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import { Alert, ScrollView, View } from "react-native";
+import { BackButton } from "@/components/back-button";
 import {
 	ErrorState,
 	LoadingState,
@@ -73,13 +73,7 @@ export default function EditProfile() {
 				paddingTop: spacing[8],
 			}}
 		>
-			<Pressable
-				onPress={() => router.back()}
-				hitSlop={12}
-				style={{ marginBottom: spacing[4] }}
-			>
-				<ArrowLeft size={22} color={colors.text.secondary as string} />
-			</Pressable>
+			<BackButton />
 
 			<ScreenHeader
 				title="Edit profile"

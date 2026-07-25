@@ -1,7 +1,5 @@
-import { useRouter } from "expo-router";
 import type { LucideIcon } from "lucide-react-native";
 import {
-	ArrowLeft,
 	Award,
 	Building2,
 	CalendarCheck,
@@ -9,6 +7,7 @@ import {
 	Package,
 } from "lucide-react-native";
 import { Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { BackButton } from "@/components/back-button";
 import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
 import { Body, Caption, H2, H3 } from "@/components/ui/typography";
 import { useMyImpact } from "@/hooks/use-directory";
@@ -26,7 +25,6 @@ import { formatDate } from "@/lib/format";
  */
 export default function Impact() {
 	const { colors, spacing } = useTheme();
-	const router = useRouter();
 	const query = useMyImpact();
 	const impact = query.data;
 
@@ -39,13 +37,7 @@ export default function Impact() {
 				paddingTop: spacing[8],
 			}}
 		>
-			<Pressable
-				onPress={() => router.back()}
-				hitSlop={12}
-				style={{ marginBottom: spacing[4] }}
-			>
-				<ArrowLeft size={22} color={colors.text.secondary as string} />
-			</Pressable>
+			<BackButton />
 
 			<H2 style={{ marginBottom: spacing[1] }}>Your impact</H2>
 			<Body color="tertiary" style={{ marginBottom: spacing[5] }}>

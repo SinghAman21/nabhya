@@ -1,15 +1,42 @@
-import { Redirect, Tabs } from "expo-router";
+import { Redirect, Slot, Tabs } from "expo-router";
 import { CalendarDays, Package, Search, User } from "lucide-react-native";
 import { View } from "react-native";
+import { type NavItem, Sidebar } from "@/components/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useMedia } from "@/hooks/useMedia";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuthStore } from "@/store/auth-store";
+
+const VOLUNTEER_NAV_ITEMS: NavItem[] = [
+	{ label: "Discover", href: "/(volunteer)", icon: Search },
+	{ label: "Donations", href: "/(volunteer)/donations", icon: Package },
+	{ label: "Events", href: "/(volunteer)/events", icon: CalendarDays },
+	{ label: "Profile", href: "/(volunteer)/profile", icon: User },
+];
 
 export default function VolunteerLayout() {
 	const role = useAuthStore((s) => s.role);
 	const { colors } = useTheme();
+	const { isDesktop } = useMedia();
 
 	if (role !== "volunteer") return <Redirect href="/" />;
+
+	if (isDesktop) {
+		return (
+			<View
+				style={{
+					flex: 1,
+					flexDirection: "row",
+					backgroundColor: colors.background.warm,
+				}}
+			>
+				<Sidebar navItems={VOLUNTEER_NAV_ITEMS} />
+				<View style={{ flex: 1 }}>
+					<Slot />
+				</View>
+			</View>
+		);
+	}
 
 	return (
 		<View style={{ flex: 1 }}>

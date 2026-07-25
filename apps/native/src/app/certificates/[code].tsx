@@ -1,6 +1,7 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, BadgeCheck, ShieldX } from "lucide-react-native";
-import { Pressable, ScrollView, View } from "react-native";
+import { useLocalSearchParams } from "expo-router";
+import { BadgeCheck, ShieldX } from "lucide-react-native";
+import { ScrollView, View } from "react-native";
+import { BackButton } from "@/components/back-button";
 import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useVerifyCertificate } from "@/hooks/use-engagement";
@@ -17,7 +18,6 @@ import { formatDate } from "@/lib/format";
 export default function VerifyCertificate() {
 	const { code } = useLocalSearchParams<{ code: string }>();
 	const { colors, spacing } = useTheme();
-	const router = useRouter();
 
 	const query = useVerifyCertificate(code);
 	const certificate = query.data;
@@ -31,13 +31,7 @@ export default function VerifyCertificate() {
 				paddingTop: spacing[8],
 			}}
 		>
-			<Pressable
-				onPress={() => router.back()}
-				hitSlop={12}
-				style={{ marginBottom: spacing[4] }}
-			>
-				<ArrowLeft size={22} color={colors.text.secondary as string} />
-			</Pressable>
+			<BackButton />
 
 			{query.isLoading ? (
 				<LoadingState label="Checking…" />

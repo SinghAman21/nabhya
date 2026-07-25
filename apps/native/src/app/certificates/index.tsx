@@ -1,5 +1,4 @@
-import { useRouter } from "expo-router";
-import { ArrowLeft, Award } from "lucide-react-native";
+import { Award } from "lucide-react-native";
 import {
 	Alert,
 	FlatList,
@@ -8,6 +7,7 @@ import {
 	RefreshControl,
 	View,
 } from "react-native";
+import { BackButton } from "@/components/back-button";
 import {
 	EmptyState,
 	ErrorState,
@@ -24,7 +24,6 @@ import type { MyCertificate } from "@/lib/types";
 
 export default function Certificates() {
 	const { colors, spacing } = useTheme();
-	const router = useRouter();
 
 	const query = useMyCertificates();
 	const pdf = useCertificatePdf();
@@ -50,13 +49,7 @@ export default function Certificates() {
 				paddingTop: spacing[8],
 			}}
 		>
-			<Pressable
-				onPress={() => router.back()}
-				hitSlop={12}
-				style={{ marginBottom: spacing[4] }}
-			>
-				<ArrowLeft size={22} color={colors.text.secondary as string} />
-			</Pressable>
+			<BackButton />
 
 			<H2 style={{ marginBottom: spacing[1] }}>Certificates</H2>
 			<Body color="tertiary" style={{ marginBottom: spacing[5] }}>

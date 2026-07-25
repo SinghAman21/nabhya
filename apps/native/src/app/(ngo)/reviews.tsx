@@ -1,7 +1,7 @@
-import { useRouter } from "expo-router";
-import { ArrowLeft, Star } from "lucide-react-native";
+import { Star } from "lucide-react-native";
 import { useState } from "react";
 import { Alert, FlatList, Pressable, RefreshControl, View } from "react-native";
+import { BackButton } from "@/components/back-button";
 import {
 	EmptyState,
 	ErrorState,
@@ -19,7 +19,6 @@ import type { ReviewItem } from "@/lib/types";
 
 export default function OrgReviews() {
 	const { colors, spacing } = useTheme();
-	const router = useRouter();
 	const query = useMyOrgReviews();
 
 	const summary = query.data?.summary;
@@ -33,13 +32,7 @@ export default function OrgReviews() {
 				paddingTop: spacing[8],
 			}}
 		>
-			<Pressable
-				onPress={() => router.back()}
-				hitSlop={12}
-				style={{ marginBottom: spacing[4] }}
-			>
-				<ArrowLeft size={22} color={colors.text.secondary as string} />
-			</Pressable>
+			<BackButton />
 
 			<ScreenHeader
 				title="Reviews"

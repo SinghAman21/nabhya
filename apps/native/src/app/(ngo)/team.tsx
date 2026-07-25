@@ -1,5 +1,4 @@
-import { useRouter } from "expo-router";
-import { ArrowLeft, UserPlus, Users, X } from "lucide-react-native";
+import { UserPlus, Users, X } from "lucide-react-native";
 import { useState } from "react";
 import {
 	Alert,
@@ -9,6 +8,7 @@ import {
 	RefreshControl,
 	View,
 } from "react-native";
+import { BackButton } from "@/components/back-button";
 import {
 	EmptyState,
 	ErrorState,
@@ -33,7 +33,6 @@ import type { OrgTeamMember } from "@/lib/types";
 
 export default function OrgTeam() {
 	const { colors, spacing } = useTheme();
-	const router = useRouter();
 	const [inviting, setInviting] = useState(false);
 
 	const query = useOrgTeam();
@@ -67,13 +66,7 @@ export default function OrgTeam() {
 				paddingTop: spacing[8],
 			}}
 		>
-			<Pressable
-				onPress={() => router.back()}
-				hitSlop={12}
-				style={{ marginBottom: spacing[4] }}
-			>
-				<ArrowLeft size={22} color={colors.text.secondary as string} />
-			</Pressable>
+			<BackButton />
 
 			<ScreenHeader
 				title="Team"

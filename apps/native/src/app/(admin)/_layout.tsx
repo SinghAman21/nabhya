@@ -1,4 +1,4 @@
-import { Redirect, Tabs } from "expo-router";
+import { Redirect, Slot, Tabs } from "expo-router";
 import {
 	Building2,
 	FileCheck2,
@@ -7,9 +7,19 @@ import {
 	Users,
 } from "lucide-react-native";
 import { View } from "react-native";
+import { type NavItem, Sidebar } from "@/components/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useMedia } from "@/hooks/useMedia";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuthStore } from "@/store/auth-store";
+
+const ADMIN_NAV_ITEMS: NavItem[] = [
+	{ label: "Overview", href: "/(admin)", icon: LayoutDashboard },
+	{ label: "NGOs", href: "/(admin)/organizations", icon: Building2 },
+	{ label: "Volunteers", href: "/(admin)/volunteers", icon: Users },
+	{ label: "Queue", href: "/(admin)/queue", icon: FileCheck2 },
+	{ label: "Activity", href: "/(admin)/audit", icon: ScrollText },
+];
 
 /**
  * Superadmin console. The client-side role check here is convenience only —
@@ -18,8 +28,26 @@ import { useAuthStore } from "@/store/auth-store";
 export default function AdminLayout() {
 	const role = useAuthStore((s) => s.role);
 	const { colors } = useTheme();
+	const { isDesktop } = useMedia();
 
 	if (role !== "superadmin") return <Redirect href="/" />;
+
+	if (isDesktop) {
+		return (
+			<View
+				style={{
+					flex: 1,
+					flexDirection: "row",
+					backgroundColor: colors.background.warm,
+				}}
+			>
+				<Sidebar navItems={ADMIN_NAV_ITEMS} />
+				<View style={{ flex: 1 }}>
+					<Slot />
+				</View>
+			</View>
+		);
+	}
 
 	return (
 		<View style={{ flex: 1 }}>

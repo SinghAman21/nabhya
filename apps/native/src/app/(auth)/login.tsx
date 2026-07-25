@@ -40,7 +40,7 @@ export default function Login() {
 			if (result?.user) {
 				setUser(result.user);
 			}
-			router.replace("/success" as any);
+			router.replace("/");
 		} catch {
 			Alert.alert("Error", "Sign in failed. Please try again.");
 		} finally {
