@@ -12,6 +12,7 @@ import {
 } from "lucide-react-native";
 import { View } from "react-native";
 import { type NavItem, Sidebar } from "@/components/sidebar";
+import { useTabBarOptions } from "@/components/tab-bar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useMyOrganization } from "@/hooks/use-organization";
 import { useMedia } from "@/hooks/useMedia";
@@ -20,20 +21,51 @@ import { useAuthStore } from "@/store/auth-store";
 
 const NGO_NAV_ITEMS: NavItem[] = [
 	{ label: "Dashboard", href: "/(ngo)", icon: House },
-	{ label: "Needs", href: "/(ngo)/needs", icon: HeartHandshake },
-	{ label: "Events", href: "/(ngo)/events", icon: CalendarDays },
-	{ label: "Updates", href: "/(ngo)/announcements", icon: Megaphone },
-	{ label: "Reviews", href: "/(ngo)/reviews", icon: Star },
-	{ label: "Team", href: "/(ngo)/team", icon: Users },
-	{ label: "Donations", href: "/(ngo)/donations", icon: HandCoins },
-	{ label: "Reports", href: "/(ngo)/reports", icon: FileText },
-	{ label: "Profile", href: "/(ngo)/profile", icon: User },
+	{
+		label: "Needs",
+		href: "/(ngo)/needs",
+		icon: HeartHandshake,
+		section: "Programmes",
+	},
+	{
+		label: "Events",
+		href: "/(ngo)/events",
+		icon: CalendarDays,
+		section: "Programmes",
+	},
+	{
+		label: "Updates",
+		href: "/(ngo)/announcements",
+		icon: Megaphone,
+		section: "Audience",
+	},
+	{ label: "Reviews", href: "/(ngo)/reviews", icon: Star, section: "Audience" },
+	{
+		label: "Donations",
+		href: "/(ngo)/donations",
+		icon: HandCoins,
+		section: "Money",
+	},
+	{
+		label: "Reports",
+		href: "/(ngo)/reports",
+		icon: FileText,
+		section: "Money",
+	},
+	{ label: "Team", href: "/(ngo)/team", icon: Users, section: "Organisation" },
+	{
+		label: "Profile",
+		href: "/(ngo)/profile",
+		icon: User,
+		section: "Organisation",
+	},
 ];
 
 export default function NgoLayout() {
 	const role = useAuthStore((s) => s.role);
 	const { colors } = useTheme();
 	const { isDesktop } = useMedia();
+	const tabBarOptions = useTabBarOptions();
 	const { data: org } = useMyOrganization(isDesktop);
 
 	if (role !== "organisation") return <Redirect href="/" />;
@@ -57,17 +89,7 @@ export default function NgoLayout() {
 
 	return (
 		<View style={{ flex: 1 }}>
-			<Tabs
-				screenOptions={{
-					headerShown: false,
-					tabBarActiveTintColor: colors.primary.main as string,
-					tabBarInactiveTintColor: colors.text.tertiary as string,
-					tabBarStyle: {
-						backgroundColor: colors.background.primary as string,
-						borderTopColor: colors.border.light as string,
-					},
-				}}
-			>
+			<Tabs screenOptions={tabBarOptions}>
 				<Tabs.Screen
 					name="index"
 					options={{

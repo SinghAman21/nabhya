@@ -9,6 +9,7 @@ import {
 	ErrorState,
 	FilterChips,
 	LoadingState,
+	Screen,
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
@@ -68,14 +69,7 @@ export default function NgoNeeds() {
 	};
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<ScreenHeader
 				title="Needs"
 				subtitle="Post what you need, or what you can give away."
@@ -179,7 +173,7 @@ export default function NgoNeeds() {
 				defaultCity={me?.organization?.city}
 				defaultState={me?.organization?.state}
 			/>
-		</View>
+		</Screen>
 	);
 }
 

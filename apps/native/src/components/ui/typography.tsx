@@ -25,6 +25,8 @@ function BaseText({
 	size,
 	weight = "normal",
 	color,
+	tracking = 0,
+	maxScale = 1.6,
 	className,
 	style,
 	children,
@@ -33,6 +35,11 @@ function BaseText({
 	family: "sans" | "mono" | "display";
 	size: number;
 	weight?: keyof typeof fontByWeight;
+	/** Optical tracking. Tightens as size grows — set by the ramp, not by callers. */
+	tracking?: number;
+	/** Dynamic Type ceiling. Body text is allowed to grow further than headings,
+	 *  which are already large and would break layout first. */
+	maxScale?: number;
 }) {
 	const fontFamily =
 		family === "display" ? displayByWeight[weight] : fontByWeight[weight];
@@ -43,12 +50,13 @@ function BaseText({
 				{
 					fontFamily,
 					fontSize: size,
+					letterSpacing: tracking,
 					color: useTextColor(color),
 				},
 				style,
 			]}
 			className={cn(className)}
-			maxFontSizeMultiplier={1.3}
+			maxFontSizeMultiplier={maxScale}
 			{...props}
 		>
 			{children}
@@ -60,8 +68,10 @@ export function H1({ className, ...props }: TypographyProps) {
 	return (
 		<BaseText
 			family="display"
-			size={42}
-			className={cn("tracking-tight", className)}
+			size={40}
+			tracking={-1}
+			maxScale={1.2}
+			className={className}
 			{...props}
 		/>
 	);
@@ -71,8 +81,10 @@ export function H2({ className, ...props }: TypographyProps) {
 	return (
 		<BaseText
 			family="display"
-			size={36}
-			className={cn("tracking-tight", className)}
+			size={28}
+			tracking={-0.6}
+			maxScale={1.3}
+			className={className}
 			{...props}
 		/>
 	);
@@ -82,9 +94,11 @@ export function H3({ className, ...props }: TypographyProps) {
 	return (
 		<BaseText
 			family="sans"
-			size={30}
+			size={22}
 			weight="bold"
-			className={cn("tracking-tight", className)}
+			tracking={-0.4}
+			maxScale={1.4}
+			className={className}
 			{...props}
 		/>
 	);
@@ -94,8 +108,10 @@ export function H4({ className, ...props }: TypographyProps) {
 	return (
 		<BaseText
 			family="sans"
-			size={26}
+			size={19}
 			weight="bold"
+			tracking={-0.2}
+			maxScale={1.4}
 			className={className}
 			{...props}
 		/>
@@ -106,7 +122,7 @@ export function H5({ className, ...props }: TypographyProps) {
 	return (
 		<BaseText
 			family="sans"
-			size={20}
+			size={17}
 			weight="bold"
 			className={className}
 			{...props}
@@ -115,22 +131,22 @@ export function H5({ className, ...props }: TypographyProps) {
 }
 
 export function Body({ className, ...props }: TypographyProps) {
-	return <BaseText family="sans" size={15} className={className} {...props} />;
+	return <BaseText family="sans" size={16} className={className} {...props} />;
 }
 
 export function BodySmall({ className, ...props }: TypographyProps) {
-	return <BaseText family="sans" size={14} className={className} {...props} />;
+	return <BaseText family="sans" size={15} className={className} {...props} />;
 }
 
 export function Caption({ className, ...props }: TypographyProps) {
-	return <BaseText family="sans" size={12} className={className} {...props} />;
+	return <BaseText family="sans" size={13} className={className} {...props} />;
 }
 
 export function Label({ className, ...props }: TypographyProps) {
 	return (
 		<BaseText
 			family="sans"
-			size={14}
+			size={15}
 			weight="medium"
 			className={className}
 			{...props}
@@ -139,7 +155,7 @@ export function Label({ className, ...props }: TypographyProps) {
 }
 
 export function Mono({ className, ...props }: TypographyProps) {
-	return <BaseText family="mono" size={14} className={className} {...props} />;
+	return <BaseText family="mono" size={15} className={className} {...props} />;
 }
 
 export const Typography = {

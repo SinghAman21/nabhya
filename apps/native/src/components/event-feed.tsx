@@ -20,7 +20,6 @@ import {
 	FilterChips,
 	LoadingState,
 } from "@/components/screen-shell";
-import { StatusPill } from "@/components/status-pill";
 import { Input } from "@/components/ui/input";
 import { Body, Caption } from "@/components/ui/typography";
 import { usePublicEvents } from "@/hooks/use-events";

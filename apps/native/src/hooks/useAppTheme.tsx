@@ -1,3 +1,4 @@
+import { colorScheme as nativewindColorScheme } from "nativewind";
 import {
 	createContext,
 	type ReactNode,
@@ -46,6 +47,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 				? true
 				: systemScheme === "dark";
 
+	/*
+	 * Tell NativeWind which scheme is active. The Tailwind config is
+	 * `darkMode: "class"`, which means the `dark:` variant is driven manually —
+	 * without this call it never activates on native, so every `components/ui/*`
+	 * primitive would render its light palette inside a dark screen.
+	 */
+	useEffect(() => {
+		if (!restored) return;
+		nativewindColorScheme.set(effectiveIsDark ? "dark" : "light");
+	}, [effectiveIsDark, restored]);
+
+	// Web also needs the class on <html> so the CSS variables in global.css swap.
 	useEffect(() => {
 		if (Platform.OS === "web" && restored) {
 			if (effectiveIsDark) {

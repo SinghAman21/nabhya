@@ -4,7 +4,12 @@ import { ShieldCheck } from "lucide-react-native";
 import { RefreshControl, ScrollView, View } from "react-native";
 import { BackButton } from "@/components/back-button";
 import { DocumentUploadTile } from "@/components/document-upload-tile";
-import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
+import {
+	ErrorState,
+	LoadingState,
+	Screen,
+	Surface,
+} from "@/components/screen-shell";
 import { Body, Caption } from "@/components/ui/typography";
 import { useMyOrgDocuments, useUploadOrgDocument } from "@/hooks/use-documents";
 import { useTheme } from "@/hooks/useTheme";
@@ -45,14 +50,7 @@ export default function NgoVerification() {
 	};
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<BackButton />
 			<Body weight="bold" style={{ fontSize: 22, marginBottom: spacing[1] }}>
 				Verification
@@ -141,6 +139,6 @@ export default function NgoVerification() {
 					))}
 				</ScrollView>
 			)}
-		</View>
+		</Screen>
 	);
 }

@@ -14,6 +14,7 @@ import {
 	EmptyState,
 	ErrorState,
 	LoadingState,
+	Screen,
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
@@ -56,14 +57,7 @@ export default function OrgAnnouncements() {
 	};
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<BackButton />
 
 			<ScreenHeader
@@ -192,7 +186,7 @@ export default function OrgAnnouncements() {
 					setEditing(null);
 				}}
 			/>
-		</View>
+		</Screen>
 	);
 }
 

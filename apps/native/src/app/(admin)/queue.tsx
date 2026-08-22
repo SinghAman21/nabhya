@@ -9,6 +9,7 @@ import {
 	ErrorState,
 	FilterChips,
 	LoadingState,
+	Screen,
 	ScreenHeader,
 } from "@/components/screen-shell";
 import { humanizeStatus } from "@/components/status-pill";
@@ -41,19 +42,11 @@ const STATUSES: Array<{ value: Status; label: string }> = [
  * review row rather than reimplementing approve/reject.
  */
 export default function AdminQueue() {
-	const { colors, spacing } = useTheme();
 	const [kind, setKind] = useState<Kind>("organization");
 	const [status, setStatus] = useState<Status>("PENDING");
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<ScreenHeader
 				title="Verification queue"
 				subtitle="Documents waiting on a decision, newest upload first."
@@ -67,7 +60,7 @@ export default function AdminQueue() {
 			) : (
 				<UserDocumentQueue status={status} />
 			)}
-		</View>
+		</Screen>
 	);
 }
 

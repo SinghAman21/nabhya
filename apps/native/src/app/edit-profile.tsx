@@ -5,6 +5,7 @@ import { BackButton } from "@/components/back-button";
 import {
 	ErrorState,
 	LoadingState,
+	Screen,
 	ScreenHeader,
 } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
@@ -65,14 +66,7 @@ export default function EditProfile() {
 	};
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<BackButton />
 
 			<ScreenHeader
@@ -157,6 +151,6 @@ export default function EditProfile() {
 					</Button>
 				</ScrollView>
 			)}
-		</View>
+		</Screen>
 	);
 }

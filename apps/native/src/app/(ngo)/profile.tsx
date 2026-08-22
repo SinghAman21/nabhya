@@ -1,5 +1,4 @@
 import type { UploadOrgDocumentInput } from "@nabhya/shared";
-import { ORG_DOCUMENT_LABELS } from "@nabhya/shared";
 import { useRouter } from "expo-router";
 import {
 	CalendarDays,
@@ -8,20 +7,14 @@ import {
 	HeartHandshake,
 	Mail,
 	MapPin,
-	Pencil,
 	Phone,
 	ShieldCheck,
 } from "lucide-react-native";
-import {
-	Alert,
-	Pressable,
-	RefreshControl,
-	ScrollView,
-	View,
-} from "react-native";
+import { Pressable, RefreshControl, ScrollView, View } from "react-native";
 import {
 	ErrorState,
 	LoadingState,
+	Screen,
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
@@ -98,14 +91,7 @@ export default function NgoProfile() {
 	const categories = org.data?.categories?.map((c) => c.name).join(", ");
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<ScreenHeader title="Profile" subtitle="Your organization at a glance." />
 
 			{org.isLoading ? (
@@ -433,7 +419,7 @@ export default function NgoProfile() {
 					</Button>
 				</ScrollView>
 			)}
-		</View>
+		</Screen>
 	);
 }
 

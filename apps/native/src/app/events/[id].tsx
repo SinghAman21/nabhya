@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { CalendarDays, MapPin, Users } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import { Alert, ScrollView, View } from "react-native";
 import { BackButton } from "@/components/back-button";
 import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
 import {

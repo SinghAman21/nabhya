@@ -12,6 +12,7 @@ import {
 	EmptyState,
 	ErrorState,
 	LoadingState,
+	Screen,
 	Surface,
 } from "@/components/screen-shell";
 import { StatusPill } from "@/components/status-pill";
@@ -41,14 +42,7 @@ export default function Certificates() {
 	};
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<BackButton />
 
 			<H2 style={{ marginBottom: spacing[1] }}>Certificates</H2>
@@ -146,6 +140,6 @@ export default function Certificates() {
 					)}
 				/>
 			)}
-		</View>
+		</Screen>
 	);
 }

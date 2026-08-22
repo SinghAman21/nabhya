@@ -2,7 +2,12 @@ import { useLocalSearchParams } from "expo-router";
 import { BadgeCheck, ShieldX } from "lucide-react-native";
 import { ScrollView, View } from "react-native";
 import { BackButton } from "@/components/back-button";
-import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
+import {
+	ErrorState,
+	LoadingState,
+	Screen,
+	Surface,
+} from "@/components/screen-shell";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useVerifyCertificate } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/useTheme";
@@ -23,14 +28,7 @@ export default function VerifyCertificate() {
 	const certificate = query.data;
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<BackButton />
 
 			{query.isLoading ? (
@@ -103,7 +101,7 @@ export default function VerifyCertificate() {
 					)}
 				</ScrollView>
 			)}
-		</View>
+		</Screen>
 	);
 }
 

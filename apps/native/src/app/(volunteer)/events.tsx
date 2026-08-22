@@ -9,6 +9,7 @@ import {
 	ErrorState,
 	FilterChips,
 	LoadingState,
+	Screen,
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
@@ -32,18 +33,10 @@ const TABS: Array<{ value: Tab; label: string }> = [
 ];
 
 export default function VolunteerEvents() {
-	const { colors, spacing } = useTheme();
 	const [tab, setTab] = useState<Tab>("browse");
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingTop: spacing[8],
-				paddingHorizontal: spacing[6],
-			}}
-		>
+		<Screen>
 			<ScreenHeader
 				title="Events"
 				subtitle="Find something to help with, and track what you've applied to."
@@ -53,7 +46,7 @@ export default function VolunteerEvents() {
 			<FilterChips options={TABS} value={tab} onChange={setTab} />
 
 			{tab === "browse" ? <EventFeed /> : <MyApplications />}
-		</View>
+		</Screen>
 	);
 }
 

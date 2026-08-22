@@ -27,6 +27,8 @@ export function BackButton({
 		<Pressable
 			onPress={() => router.back()}
 			hitSlop={hitSlop}
+			accessibilityRole="button"
+			accessibilityLabel="Go back"
 			style={{ marginBottom: spacing[4], ...style }}
 		>
 			<ArrowLeft

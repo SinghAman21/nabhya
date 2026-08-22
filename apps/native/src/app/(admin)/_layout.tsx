@@ -8,6 +8,7 @@ import {
 } from "lucide-react-native";
 import { View } from "react-native";
 import { type NavItem, Sidebar } from "@/components/sidebar";
+import { useTabBarOptions } from "@/components/tab-bar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useMedia } from "@/hooks/useMedia";
 import { useTheme } from "@/hooks/useTheme";
@@ -15,10 +16,30 @@ import { useAuthStore } from "@/store/auth-store";
 
 const ADMIN_NAV_ITEMS: NavItem[] = [
 	{ label: "Overview", href: "/(admin)", icon: LayoutDashboard },
-	{ label: "NGOs", href: "/(admin)/organizations", icon: Building2 },
-	{ label: "Volunteers", href: "/(admin)/volunteers", icon: Users },
-	{ label: "Queue", href: "/(admin)/queue", icon: FileCheck2 },
-	{ label: "Activity", href: "/(admin)/audit", icon: ScrollText },
+	{
+		label: "Queue",
+		href: "/(admin)/queue",
+		icon: FileCheck2,
+		section: "Review",
+	},
+	{
+		label: "NGOs",
+		href: "/(admin)/organizations",
+		icon: Building2,
+		section: "Directory",
+	},
+	{
+		label: "Volunteers",
+		href: "/(admin)/volunteers",
+		icon: Users,
+		section: "Directory",
+	},
+	{
+		label: "Activity",
+		href: "/(admin)/audit",
+		icon: ScrollText,
+		section: "Records",
+	},
 ];
 
 /**
@@ -29,6 +50,7 @@ export default function AdminLayout() {
 	const role = useAuthStore((s) => s.role);
 	const { colors } = useTheme();
 	const { isDesktop } = useMedia();
+	const tabBarOptions = useTabBarOptions();
 
 	if (role !== "superadmin") return <Redirect href="/" />;
 
@@ -51,17 +73,7 @@ export default function AdminLayout() {
 
 	return (
 		<View style={{ flex: 1 }}>
-			<Tabs
-				screenOptions={{
-					headerShown: false,
-					tabBarActiveTintColor: colors.primary.main as string,
-					tabBarInactiveTintColor: colors.text.tertiary as string,
-					tabBarStyle: {
-						backgroundColor: colors.background.primary as string,
-						borderTopColor: colors.border.light as string,
-					},
-				}}
-			>
+			<Tabs screenOptions={tabBarOptions}>
 				<Tabs.Screen
 					name="index"
 					options={{

@@ -8,6 +8,7 @@ import {
 	ErrorState,
 	FilterChips,
 	LoadingState,
+	Screen,
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
@@ -59,14 +60,7 @@ export default function AdminVolunteers() {
 	const query = useAdminUsers(toQuery(filter, search));
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<ScreenHeader
 				title="People"
 				subtitle="Track volunteers, their participation and account standing."
@@ -136,7 +130,7 @@ export default function AdminVolunteers() {
 			)}
 
 			<UserDetailSheet userId={selected} onClose={() => setSelected(null)} />
-		</View>
+		</Screen>
 	);
 }
 

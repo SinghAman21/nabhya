@@ -1,3 +1,4 @@
+import "@/lib/crypto-polyfill";
 import { createInternalNeonAuth } from "@neondatabase/auth";
 import axios from "axios";
 import { API_URL, NEON_AUTH_URL } from "@/lib/env";
@@ -37,7 +38,7 @@ export class AuthService {
 	}
 
 	private async getAuthenticatedUser(): Promise<AuthResponse> {
-		const accessToken = await neonAuth.getJWTToken();
+		const accessToken = await this.refreshAccessToken();
 		if (!accessToken) {
 			throw new Error("Neon Auth did not return an access token");
 		}
@@ -69,10 +70,21 @@ export class AuthService {
 	 * Mint a fresh JWT from the Better Auth session. The JWTs expire after
 	 * ~15 minutes while the session itself is long-lived, so a 401 usually
 	 * just means "stale token", not "signed out".
+	 *
+	 * NB: `neonAuth.getJWTToken()` is NOT usable here — it returns the
+	 * session token minted once at sign-in, whose `exp` then passes and
+	 * never recovers. The `/token` endpoint signs a fresh JWT per call.
 	 */
 	async refreshAccessToken(): Promise<string | null> {
 		try {
-			const accessToken = await neonAuth.getJWTToken();
+			const response = await fetch(`${NEON_AUTH_URL}/token`, {
+				method: "GET",
+				headers: { "Content-Type": "application/json" },
+				credentials: "include",
+			});
+			if (!response.ok) return null;
+			const data = (await response.json()) as { token?: string };
+			const accessToken = data?.token ?? null;
 			if (!accessToken) return null;
 			await storage.set("accessToken", accessToken);
 			return accessToken;

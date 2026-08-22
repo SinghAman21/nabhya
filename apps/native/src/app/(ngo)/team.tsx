@@ -13,6 +13,7 @@ import {
 	EmptyState,
 	ErrorState,
 	LoadingState,
+	Screen,
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
@@ -58,14 +59,7 @@ export default function OrgTeam() {
 	};
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<BackButton />
 
 			<ScreenHeader
@@ -123,7 +117,7 @@ export default function OrgTeam() {
 			)}
 
 			<InviteSheet visible={inviting} onClose={() => setInviting(false)} />
-		</View>
+		</Screen>
 	);
 }
 

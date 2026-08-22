@@ -1,9 +1,7 @@
 import { useRouter } from "expo-router";
-import { View } from "react-native";
 import { EventFeed } from "@/components/event-feed";
-import { ScreenHeader } from "@/components/screen-shell";
+import { Screen, ScreenHeader } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
-import { useTheme } from "@/hooks/useTheme";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
@@ -11,19 +9,11 @@ import { useAuthStore } from "@/store/auth-store";
  * account; applying prompts a sign-in.
  */
 export default function PublicEvents() {
-	const { colors, spacing } = useTheme();
 	const router = useRouter();
 	const email = useAuthStore((s) => s.email);
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<EventFeed
 				header={
 					<ScreenHeader
@@ -47,6 +37,6 @@ export default function PublicEvents() {
 					/>
 				}
 			/>
-		</View>
+		</Screen>
 	);
 }

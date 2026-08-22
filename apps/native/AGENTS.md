@@ -48,22 +48,48 @@ defines.
 
 Two systems coexist deliberately:
 
-1. NativeWind v4 + Tailwind 3.4 (brand primary `#FF7E40`) with shadcn-style
-   `@rn-primitives` components in `src/components/ui/`.
+1. NativeWind v4 + Tailwind 3.4 with shadcn-style `@rn-primitives` components in
+   `src/components/ui/`.
 2. A token system in `src/constants/design-system.ts` consumed via `useTheme()`.
+
+`design-system.ts` is the **source of truth**. `src/global.css` mirrors it as HSL
+CSS variables and `tailwind.config.js` reads those variables, so both systems now
+theme together — change a colour in the token file and update the matching
+variable in the same pass, or the two layers drift.
 
 Most screens use inline `style={{}}` from the tokens rather than Tailwind classes.
 **Match whatever the file you're editing already does.**
 
-The Tailwind config is **light-mode only** (hard-coded hex, no dark variants) while
-screens theme through `useTheme()` — that's why cards/pills are composed from `View`
-+ theme tokens instead of the shadcn `Card`/`Badge`, which would stay light-on-light
-in dark mode. Use those primitives only if you first make the Tailwind theme
-dark-aware.
+`darkMode` is `"class"`, which means the `dark:` variant is driven manually:
+`ThemeProvider` (`hooks/useAppTheme.tsx`) calls NativeWind's `colorScheme.set()`
+and, on web, toggles `.dark` on `<html>`. Both are required — without the first,
+`dark:` never fires on native; without the second, the CSS variables never swap.
 
 Screens compose `components/screen-shell.tsx` (`ScreenHeader`, `Surface`,
 `EmptyState`, `LoadingState`, `ErrorState`, `FilterChips`) + `status-pill.tsx` —
 reuse these rather than rebuilding layouts.
+
+### Colour rules
+
+`#FF7E40` is **a fill, not an ink** — it measures 2.53:1 on white, so it fails AA
+for any text, icon or 1px border. Use the tokens instead of reaching for `main`:
+
+- `primary.contrast` — label colour *on* a `primary.main` fill (7.44:1).
+- `primary.ink` — brand as text/icon on a light surface (7.31:1).
+- `<tone>.ink` — text grade on that tone's `bg` (6.8:1–10.4:1). `StatusPill` uses
+  these; a pill drawn in `<tone>.main` on its own tint is unreadable.
+- `text.quaternary` is the muted floor (4.61:1). Nothing lighter for real content.
+
+The type ramp lives in `components/ui/typography.tsx` and owns its own sizes,
+optical tracking and Dynamic Type ceilings. Don't override `fontSize` at call
+sites; add a ramp entry if a size is genuinely missing.
+
+Every interactive element needs `accessibilityRole`, a label if it has no visible
+text, and `accessibilityState` if it can be selected/checked/disabled. Icon-only
+controls (`BackButton`, `NotificationBell`, `ThemeToggle`, sidebar rows) are the
+worked examples. Focus rings matter on web: RNW renders none for `Pressable`, so
+read `focused` from the style callback and draw an `outline*` — `Button` and
+`Surface` show the pattern.
 
 ## Traps
 

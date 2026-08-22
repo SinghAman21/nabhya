@@ -1,6 +1,7 @@
 import { ActivityIndicator, Pressable, type ViewStyle } from "react-native";
 import { Body } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/useTheme";
+import { focusable } from "@/lib/focus";
 
 const variantStyles = {
 	default: {
@@ -29,7 +30,7 @@ const variantStyles = {
 	},
 	link: {
 		bg: "transparent" as string,
-		text: "primary.main" as string,
+		text: "primary.ink" as string,
 		bgActive: undefined as string | undefined,
 		border: undefined as string | undefined,
 	},
@@ -44,6 +45,13 @@ const sizeStyles = {
 
 type Variant = keyof typeof variantStyles;
 type Size = keyof typeof sizeStyles;
+
+/** `pressed` is RN; `focused`/`hovered` are react-native-web additions. */
+type PressableState = {
+	pressed: boolean;
+	focused?: boolean;
+	hovered?: boolean;
+};
 
 interface ButtonProps
 	extends Omit<React.ComponentProps<typeof Pressable>, "style"> {
@@ -91,7 +99,16 @@ export function Button({
 	return (
 		<Pressable
 			disabled={disabled || loading}
-			style={({ pressed }) => {
+			accessibilityRole="button"
+			accessibilityState={{
+				disabled: !!disabled || !!loading,
+				busy: !!loading,
+			}}
+			{...focusable}
+			style={(state) => {
+				// react-native-web also reports `focused` and `hovered` here; native
+				// only ever sets `pressed`.
+				const { pressed, hovered } = state as PressableState;
 				const isIcon = size === "icon";
 				const base: ViewStyle = {
 					backgroundColor:
@@ -106,7 +123,13 @@ export function Button({
 					flexDirection: "row",
 					gap: spacing[2],
 					opacity: disabled || loading ? 0.5 : 1,
+					// Respond on press-down, not on release. A scale this small reads as
+					// the surface taking the touch rather than as an animation.
+					transform: [{ scale: pressed ? 0.98 : 1 }],
 				};
+				if (hovered && !pressed && v.bgActive) {
+					base.backgroundColor = resolveColor(colors, v.bgActive);
+				}
 				if (isIcon) {
 					base.width = s.iconSize;
 					base.height = s.iconSize;

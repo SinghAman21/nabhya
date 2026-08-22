@@ -1,3 +1,4 @@
+import "@/lib/crypto-polyfill";
 import "../global.css";
 import { PortalHost } from "@rn-primitives/portal";
 import { QueryClientProvider } from "@tanstack/react-query";

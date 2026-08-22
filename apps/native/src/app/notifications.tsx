@@ -6,6 +6,7 @@ import {
 	EmptyState,
 	ErrorState,
 	LoadingState,
+	Screen,
 	Surface,
 } from "@/components/screen-shell";
 import { Body, Caption, H2 } from "@/components/ui/typography";
@@ -49,14 +50,7 @@ export default function Notifications() {
 	};
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<BackButton />
 
 			<View
@@ -153,6 +147,6 @@ export default function Notifications() {
 					)}
 				/>
 			)}
-		</View>
+		</Screen>
 	);
 }

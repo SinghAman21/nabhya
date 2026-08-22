@@ -6,6 +6,7 @@ import {
 	EmptyState,
 	ErrorState,
 	LoadingState,
+	Screen,
 	Surface,
 } from "@/components/screen-shell";
 import { Body, Caption, H2 } from "@/components/ui/typography";
@@ -15,20 +16,13 @@ import { apiErrorMessage } from "@/lib/api";
 
 export default function Bookmarks() {
 	const { colors, spacing } = useTheme();
-	const router = useRouter();
+	const _router = useRouter();
 
 	const query = useBookmarks();
 	const toggle = useToggleBookmark();
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<BackButton />
 
 			<H2 style={{ marginBottom: spacing[1] }}>Saved NGOs</H2>
@@ -121,6 +115,6 @@ export default function Bookmarks() {
 					)}
 				/>
 			)}
-		</View>
+		</Screen>
 	);
 }

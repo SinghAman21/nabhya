@@ -7,6 +7,7 @@ import {
 	ErrorState,
 	FilterChips,
 	LoadingState,
+	Screen,
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
@@ -46,14 +47,7 @@ export default function AdminAuditLog() {
 	});
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<ScreenHeader
 				title="Activity"
 				subtitle="Every moderation and lifecycle action, newest first."
@@ -152,6 +146,6 @@ export default function AdminAuditLog() {
 					)}
 				/>
 			)}
-		</View>
+		</Screen>
 	);
 }

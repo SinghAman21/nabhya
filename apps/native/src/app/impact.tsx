@@ -6,9 +6,14 @@ import {
 	Clock,
 	Package,
 } from "lucide-react-native";
-import { Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { RefreshControl, ScrollView, View } from "react-native";
 import { BackButton } from "@/components/back-button";
-import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
+import {
+	ErrorState,
+	LoadingState,
+	Screen,
+	Surface,
+} from "@/components/screen-shell";
 import { Body, Caption, H2, H3 } from "@/components/ui/typography";
 import { useMyImpact } from "@/hooks/use-directory";
 import { useTheme } from "@/hooks/useTheme";
@@ -29,14 +34,7 @@ export default function Impact() {
 	const impact = query.data;
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<BackButton />
 
 			<H2 style={{ marginBottom: spacing[1] }}>Your impact</H2>
@@ -139,7 +137,7 @@ export default function Impact() {
 					)}
 				</ScrollView>
 			)}
-		</View>
+		</Screen>
 	);
 }
 

@@ -7,6 +7,7 @@ import {
 	ErrorState,
 	FilterChips,
 	LoadingState,
+	Screen,
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
@@ -37,18 +38,10 @@ const TABS: Array<{ value: Tab; label: string }> = [
  * needs casts that hide real mistakes.
  */
 export default function Donations() {
-	const { colors, spacing } = useTheme();
 	const [tab, setTab] = useState<Tab>("items");
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingTop: spacing[8],
-				paddingHorizontal: spacing[6],
-			}}
-		>
+		<Screen>
 			<ScreenHeader
 				title="My donations"
 				subtitle="Items you've offered, and money you've given."
@@ -57,7 +50,7 @@ export default function Donations() {
 			<FilterChips options={TABS} value={tab} onChange={setTab} />
 
 			{tab === "items" ? <ItemPledges /> : <MoneyDonations />}
-		</View>
+		</Screen>
 	);
 }
 

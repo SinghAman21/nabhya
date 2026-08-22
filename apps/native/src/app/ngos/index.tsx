@@ -1,13 +1,14 @@
 import { useRouter } from "expo-router";
 import { Building2, MapPin, Search } from "lucide-react-native";
 import { useState } from "react";
-import { FlatList, Pressable, RefreshControl, View } from "react-native";
+import { FlatList, RefreshControl, View } from "react-native";
 import { BackButton } from "@/components/back-button";
 import {
 	EmptyState,
 	ErrorState,
 	FilterChips,
 	LoadingState,
+	Screen,
 	Surface,
 } from "@/components/screen-shell";
 import { Input } from "@/components/ui/input";
@@ -92,14 +93,7 @@ export default function NgoDirectory() {
 			}));
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<BackButton />
 
 			<H2 style={{ marginBottom: spacing[1] }}>Organizations</H2>
@@ -239,6 +233,6 @@ export default function NgoDirectory() {
 					)}
 				/>
 			)}
-		</View>
+		</Screen>
 	);
 }

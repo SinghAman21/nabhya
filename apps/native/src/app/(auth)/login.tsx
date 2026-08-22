@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SignInInput, signInSchema } from "@nabhya/shared";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -15,6 +16,7 @@ import { useAuthStore } from "@/store/auth-store";
 export default function Login() {
 	const { colors, spacing } = useTheme();
 	const setUser = useAuthStore((s) => s.setUser);
+	const queryClient = useQueryClient();
 	const router = useRouter();
 	const [loading, setLoading] = useState(false);
 	const form = useForm<SignInInput>({
@@ -39,6 +41,7 @@ export default function Login() {
 			});
 			if (result?.user) {
 				setUser(result.user);
+				queryClient.removeQueries();
 			}
 			router.replace("/");
 		} catch {

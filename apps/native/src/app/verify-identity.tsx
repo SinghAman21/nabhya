@@ -1,8 +1,8 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import { Alert, ScrollView, View } from "react-native";
 import { BackButton } from "@/components/back-button";
-import { ScreenHeader } from "@/components/screen-shell";
+import { Screen, ScreenHeader } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
 import { Caption } from "@/components/ui/typography";
 import {
@@ -67,14 +67,7 @@ export default function VerifyIdentity() {
 	};
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<BackButton
 				size={24}
 				color={colors.text.primary as string}
@@ -105,6 +98,6 @@ export default function VerifyIdentity() {
 					)}
 				</View>
 			</ScrollView>
-		</View>
+		</Screen>
 	);
 }

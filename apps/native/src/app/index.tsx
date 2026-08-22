@@ -44,6 +44,11 @@ export default function Index() {
 
 		if (!status) return;
 
+		// Reconcile the store BEFORE routing — the role-group layouts guard on
+		// the store role, so navigating first would bounce us back here and
+		// ping-pong forever.
+		syncFromStatus(status);
+
 		if (status.needsRoleSelection) {
 			router.replace("/role-select");
 		} else if (status.role === "superadmin") {

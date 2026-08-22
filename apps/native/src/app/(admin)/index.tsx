@@ -15,6 +15,7 @@ import { BroadcastSheet } from "@/components/admin/broadcast-sheet";
 import {
 	ErrorState,
 	LoadingState,
+	Screen,
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
@@ -34,14 +35,7 @@ export default function AdminOverviewScreen() {
 	const overview = query.data;
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<ScreenHeader
 				title="Overview"
 				subtitle="Everything happening across the platform."
@@ -228,7 +222,7 @@ export default function AdminOverviewScreen() {
 				visible={broadcasting}
 				onClose={() => setBroadcasting(false)}
 			/>
-		</View>
+		</Screen>
 	);
 }
 

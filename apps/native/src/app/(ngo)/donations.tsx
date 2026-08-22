@@ -1,11 +1,12 @@
 import { formatMinor } from "@nabhya/shared";
 import { HandCoins } from "lucide-react-native";
-import { FlatList, Pressable, RefreshControl, View } from "react-native";
+import { FlatList, RefreshControl, View } from "react-native";
 import { BackButton } from "@/components/back-button";
 import {
 	EmptyState,
 	ErrorState,
 	LoadingState,
+	Screen,
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
@@ -22,14 +23,7 @@ export default function OrgDonations() {
 	const stats = query.data?.stats;
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<BackButton />
 
 			<ScreenHeader
@@ -113,6 +107,6 @@ export default function OrgDonations() {
 					)}
 				/>
 			)}
-		</View>
+		</Screen>
 	);
 }

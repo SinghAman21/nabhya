@@ -1,15 +1,40 @@
 import { useRouter, useSegments } from "expo-router";
 import type { LucideIcon } from "lucide-react-native";
-import { LogOut, Menu, Moon, Sun, X } from "lucide-react-native";
+import {
+	LogOut,
+	Menu,
+	Moon,
+	PanelLeftClose,
+	PanelLeftOpen,
+	Sun,
+	X,
+} from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Body, Caption } from "@/components/ui/typography";
+import { Body, Caption, H5, Label } from "@/components/ui/typography";
 import { useSignOut } from "@/hooks/use-auth";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useMedia } from "@/hooks/useMedia";
 import { useTheme } from "@/hooks/useTheme";
+import { focusable } from "@/lib/focus";
+import { storage } from "@/lib/storage";
 import { useAuthStore } from "@/store/auth-store";
+
+/**
+ * Desktop rail / mobile drawer.
+ *
+ * Monochrome by design: the active row is an ink label on a subtle fill, not an
+ * orange-tinted pill with an orange icon. Navigation is not an action, and
+ * spending the brand colour on whichever row you happen to be looking at left
+ * the actual actions on the page with nothing louder to say.
+ *
+ * The rail collapses to icons. Collapsing animates **one** value — the width —
+ * and everything else derives from it by interpolation, so there is no second
+ * timeline to fall out of step with the first. The row tree is identical in both
+ * states: labels are clipped by the container rather than unmounted, which is
+ * what keeps the transition seamless instead of a layout swap mid-animation.
+ */
 
 export interface NavItem {
 	label: string;
@@ -20,9 +45,35 @@ export interface NavItem {
 }
 
 const EXPANDED_WIDTH = 264;
+/*
+ * Collapsed-rail geometry. These are one equation and change together:
+ *
+ *   ROW_MARGIN + ROW_INSET + ICON_SIZE/2  ==  COLLAPSED_WIDTH / 2   (icon centred)
+ *   ROW_INSET + ICON_SIZE + ICON_GAP      <=  COLLAPSED_WIDTH - 2*ROW_MARGIN
+ *
+ * The second line is the one that bites. The row is `icon, gap, label(flex:1)`
+ * and an icon does not shrink — RN defaults `flexShrink` to 0, unlike the web —
+ * so when inset + icon + gap + paddingRight came to 63px inside a 56px row, the
+ * row was over-constrained by 7px and Yoga resolved that overflow on every frame
+ * of the collapse.
+ *
+ * The fix is arithmetic, not a conditional: the row carries no `paddingRight`
+ * (the label does, so it can shrink to nothing), and the gap is small enough to
+ * fit. Do **not** make the gap depend on `collapsed` — the flag flips instantly
+ * while the width takes 260ms, so the row would jump halfway through.
+ */
+const COLLAPSED_WIDTH = 68;
+const ROW_MARGIN = 8;
+const ROW_INSET = 15;
+const ICON_SIZE = 22;
+const ICON_GAP = 10;
 const DRAWER_WIDTH = 288;
 
 const NO_SECTION = "__default__";
+const COLLAPSE_KEY = "nabhya-sidebar-collapsed";
+
+/** react-native-web reports `focused`/`hovered` here; native only sets `pressed`. */
+type PressState = { pressed: boolean; focused?: boolean; hovered?: boolean };
 
 function isActive(navHref: string, currentSegments: string[]): boolean {
 	const navSegments = navHref.split("/").filter(Boolean);
@@ -63,126 +114,186 @@ function NavItemRow({
 	item,
 	segments,
 	onPress,
+	labelOpacity,
+	collapsed,
 }: {
 	item: NavItem;
 	segments: string[];
 	onPress: () => void;
+	collapsed: boolean;
+	/** 1 when expanded, 0 when collapsed. Null in the drawer, which never collapses. */
+	labelOpacity?: Animated.AnimatedInterpolation<number>;
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
 	const Icon = item.icon;
 	const active = isActive(item.href, segments);
 
-	const press = useRef(new Animated.Value(1)).current;
-	const highlight = useRef(new Animated.Value(active ? 1 : 0)).current;
-
-	useEffect(() => {
-		Animated.timing(highlight, {
-			toValue: active ? 1 : 0,
-			duration: 240,
-			easing: Easing.out(Easing.cubic),
-			useNativeDriver: false,
-		}).start();
-	}, [active, highlight]);
-
-	const onPressIn = () =>
-		Animated.spring(press, {
-			toValue: 0.96,
-			useNativeDriver: true,
-			speed: 40,
-			bounciness: 0,
-		}).start();
-
-	const onPressOut = () =>
-		Animated.spring(press, {
-			toValue: 1,
-			useNativeDriver: true,
-			speed: 24,
-			bounciness: 6,
-		}).start();
-
-	const backgroundColor = highlight.interpolate({
-		inputRange: [0, 1],
-		outputRange: ["rgba(0,0,0,0)", `${colors.primary.main}12`],
-	});
-
 	return (
-		<Animated.View style={{ transform: [{ scale: press }] }}>
-			<Pressable
-				onPress={onPress}
-				onPressIn={onPressIn}
-				onPressOut={onPressOut}
-				style={{ marginHorizontal: spacing[2], marginVertical: 1 }}
+		<Pressable
+			onPress={onPress}
+			accessibilityRole="link"
+			accessibilityLabel={item.label}
+			accessibilityState={{ selected: active }}
+			{...focusable}
+			style={(state) => {
+				const { pressed, hovered } = state as PressState;
+				return {
+					flexDirection: "row",
+					alignItems: "center",
+					gap: collapsed ? 0 : ICON_GAP,
+					marginHorizontal: ROW_MARGIN,
+					marginVertical: 1,
+					paddingVertical: spacing[3],
+					paddingLeft: ROW_INSET,
+					borderRadius: borderRadius.md,
+					backgroundColor: active
+						? colors.background.subtle
+						: pressed || hovered
+							? colors.background.secondary
+							: "transparent",
+				};
+			}}
+		>
+			<Icon
+				size={ICON_SIZE}
+				strokeWidth={active ? 2.2 : 1.9}
+				color={
+					active
+						? (colors.text.primary as string)
+						: (colors.text.tertiary as string)
+				}
+			/>
+			<Animated.View
+				style={{
+					flex: 1,
+					// The row has no right padding: this carries it, so it can shrink
+					// to nothing instead of reserving space in a 68px rail.
+					paddingRight: spacing[3],
+					...(labelOpacity ? { opacity: labelOpacity } : null),
+				}}
 			>
-				<Animated.View
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						gap: spacing[3],
-						paddingVertical: spacing[2.5],
-						paddingHorizontal: spacing[3.5],
-						borderRadius: borderRadius.md,
-						backgroundColor,
-						overflow: "hidden",
-					}}
+				<Body
+					weight={active ? "semibold" : "normal"}
+					color={active ? "primary" : "secondary"}
+					numberOfLines={1}
 				>
-					<Icon
-						size={19}
-						strokeWidth={active ? 2.3 : 2}
-						color={
-							active
-								? (colors.primary.main as string)
-								: (colors.text.tertiary as string)
-						}
-					/>
-
-					<View style={{ flex: 1 }}>
-						<Body
-							weight={active ? "bold" : "medium"}
-							color={active ? "primary" : "secondary"}
-							numberOfLines={1}
-						>
-							{item.label}
-						</Body>
-					</View>
-				</Animated.View>
-			</Pressable>
-		</Animated.View>
+					{item.label}
+				</Body>
+			</Animated.View>
+		</Pressable>
 	);
 }
 
 /* -------------------------------------------------------------------------- */
-/* Section heading / divider                                                  */
+/* Section heading                                                            */
 /* -------------------------------------------------------------------------- */
 
-function SectionHeading({ label, first }: { label?: string; first: boolean }) {
+/**
+ * Expanded, a group is named. Collapsed, the name would be a truncated word, so
+ * it cross-fades into a hairline: the grouping survives the collapse, the label
+ * does not.
+ */
+function SectionHeading({
+	label,
+	first,
+	labelOpacity,
+	railOpacity,
+}: {
+	label?: string;
+	first: boolean;
+	labelOpacity?: Animated.AnimatedInterpolation<number>;
+	railOpacity?: Animated.AnimatedInterpolation<number>;
+}) {
 	const { colors, spacing } = useTheme();
 
 	if (!label) {
-		return <View style={{ height: first ? spacing[2] : spacing[3] }} />;
+		return <View style={{ height: first ? spacing[2] : spacing[4] }} />;
 	}
 
 	return (
 		<View
 			style={{
-				paddingHorizontal: spacing[4],
-				marginTop: first ? spacing[2] : spacing[5],
-				marginBottom: spacing[1.5],
+				height: 34,
+				justifyContent: "center",
+				marginTop: first ? spacing[2] : spacing[3],
 			}}
 		>
-			<Caption
-				weight="semibold"
-				color="tertiary"
+			<Animated.View
 				style={{
-					fontSize: 10.5,
-					letterSpacing: 0.8,
-					textTransform: "uppercase",
-					opacity: 0.7,
+					paddingHorizontal: ROW_MARGIN + ROW_INSET,
+					...(labelOpacity ? { opacity: labelOpacity } : null),
 				}}
-				numberOfLines={1}
 			>
-				{label}
-			</Caption>
+				<Caption color="quaternary" numberOfLines={1}>
+					{label}
+				</Caption>
+			</Animated.View>
+			{railOpacity && (
+				<Animated.View
+					pointerEvents="none"
+					style={{
+						position: "absolute",
+						left: spacing[5],
+						right: spacing[5],
+						height: 1,
+						backgroundColor: colors.border.hairline,
+						opacity: railOpacity,
+					}}
+				/>
+			)}
 		</View>
+	);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Icon button                                                                */
+/* -------------------------------------------------------------------------- */
+
+function IconButton({
+	icon: Icon,
+	label,
+	onPress,
+	role = "button",
+	checked,
+	expanded,
+}: {
+	icon: LucideIcon;
+	label: string;
+	onPress: () => void;
+	role?: "button" | "switch";
+	checked?: boolean;
+	expanded?: boolean;
+}) {
+	const { colors, borderRadius } = useTheme();
+
+	return (
+		<Pressable
+			onPress={onPress}
+			accessibilityRole={role}
+			accessibilityLabel={label}
+			{...(role === "switch" ? { accessibilityState: { checked } } : {})}
+			{...(expanded === undefined ? {} : { accessibilityState: { expanded } })}
+			hitSlop={6}
+			{...focusable}
+			style={(state) => {
+				const { pressed, hovered } = state as PressState;
+				return {
+					width: 40,
+					height: 40,
+					borderRadius: borderRadius.sm,
+					alignItems: "center",
+					justifyContent: "center",
+					backgroundColor:
+						pressed || hovered ? colors.background.subtle : "transparent",
+				};
+			}}
+		>
+			<Icon
+				size={16}
+				color={colors.text.tertiary as string}
+				strokeWidth={1.9}
+			/>
+		</Pressable>
 	);
 }
 
@@ -190,7 +301,13 @@ function SectionHeading({ label, first }: { label?: string; first: boolean }) {
 /* User / account section                                                     */
 /* -------------------------------------------------------------------------- */
 
-function UserSection() {
+function UserSection({
+	labelOpacity,
+	collapsed,
+}: {
+	labelOpacity?: Animated.AnimatedInterpolation<number>;
+	collapsed?: boolean;
+}) {
 	const { colors, spacing, borderRadius } = useTheme();
 	const { isDark, toggleTheme } = useAppTheme();
 	const user = useAuthStore((s) => s.user);
@@ -217,179 +334,170 @@ function UserSection() {
 	const avatar = (
 		<View
 			style={{
-				width: 36,
-				height: 36,
-				borderRadius: 12,
-				backgroundColor: colors.primary.main,
+				width: 34,
+				height: 34,
+				borderRadius: borderRadius.sm,
+				backgroundColor: colors.background.subtle,
 				alignItems: "center",
 				justifyContent: "center",
 			}}
 		>
-			<Caption weight="bold" color={colors.primary.contrast as string}>
-				{initials}
-			</Caption>
+			<Caption weight="bold">{initials}</Caption>
 		</View>
 	);
 
+	// Collapsed, the account block stacks: the row would only ever show its
+	// avatar with the two controls clipped off the edge.
+	if (collapsed) {
+		return (
+			<View
+				style={{
+					paddingVertical: spacing[3],
+					alignItems: "center",
+					gap: spacing[1],
+				}}
+			>
+				{avatar}
+				<IconButton
+					icon={isDark ? Sun : Moon}
+					label="Dark mode"
+					role="switch"
+					checked={isDark}
+					onPress={toggleTheme}
+				/>
+				<IconButton
+					icon={LogOut}
+					label="Sign out"
+					onPress={() => signOut.mutate()}
+				/>
+			</View>
+		);
+	}
+
 	return (
-		<View
-			style={{
-				borderTopWidth: 1,
-				borderTopColor: colors.border.light,
-				paddingVertical: spacing[3.5],
-				paddingHorizontal: spacing[3.5],
-				gap: spacing[3],
-			}}
-		>
+		<View style={{ padding: spacing[3] }}>
 			<View
 				style={{
 					flexDirection: "row",
 					alignItems: "center",
 					gap: spacing[3],
+					paddingLeft: spacing[1],
 				}}
 			>
 				{avatar}
-				<View style={{ flex: 1 }}>
+				<Animated.View
+					style={{
+						flex: 1,
+						...(labelOpacity ? { opacity: labelOpacity } : null),
+					}}
+				>
 					<Body weight="semibold" numberOfLines={1}>
 						{user?.name ?? "User"}
 					</Body>
-					<Caption color="tertiary" numberOfLines={1}>
-						{user?.email ?? ""}
-					</Caption>
-				</View>
-				<View
-					style={{
-						paddingHorizontal: spacing[1.5],
-						paddingVertical: spacing[0.5],
-						borderRadius: borderRadius.sm,
-						backgroundColor: `${colors.primary.main}15`,
-					}}
-				>
-					<Caption
-						weight="medium"
-						color={colors.primary.main as string}
-						style={{
-							fontSize: 10,
-							letterSpacing: 0.5,
-							textTransform: "uppercase",
-						}}
-					>
+					<Caption color="quaternary" numberOfLines={1}>
 						{roleLabel}
 					</Caption>
-				</View>
-			</View>
-
-			<View style={{ flexDirection: "row", gap: spacing[1.5] }}>
-				<Pressable
-					onPress={toggleTheme}
-					style={({ pressed }) => ({
-						flex: 1,
+				</Animated.View>
+				<Animated.View
+					style={{
 						flexDirection: "row",
-						alignItems: "center",
-						justifyContent: "center",
-						gap: spacing[1.5],
-						paddingVertical: spacing[2],
-						borderRadius: borderRadius.sm,
-						backgroundColor: pressed
-							? colors.background.tertiary
-							: colors.background.secondary,
-					})}
+						...(labelOpacity ? { opacity: labelOpacity } : null),
+					}}
 				>
-					{isDark ? (
-						<Sun size={14} color={colors.text.tertiary as string} />
-					) : (
-						<Moon size={14} color={colors.text.tertiary as string} />
-					)}
-					<Caption color="tertiary">{isDark ? "Light" : "Dark"}</Caption>
-				</Pressable>
-				<Pressable
-					onPress={() => signOut.mutate()}
-					style={({ pressed }) => ({
-						flex: 1,
-						flexDirection: "row",
-						alignItems: "center",
-						justifyContent: "center",
-						gap: spacing[1.5],
-						paddingVertical: spacing[2],
-						borderRadius: borderRadius.sm,
-						backgroundColor: pressed
-							? colors.background.tertiary
-							: colors.background.secondary,
-					})}
-				>
-					<LogOut size={14} color={colors.text.tertiary as string} />
-					<Caption color="tertiary">Sign out</Caption>
-				</Pressable>
+					<IconButton
+						icon={isDark ? Sun : Moon}
+						label="Dark mode"
+						role="switch"
+						checked={isDark}
+						onPress={toggleTheme}
+					/>
+					<IconButton
+						icon={LogOut}
+						label="Sign out"
+						onPress={() => signOut.mutate()}
+					/>
+				</Animated.View>
 			</View>
 		</View>
 	);
 }
 
 /* -------------------------------------------------------------------------- */
-/* Brand header — logo + org name                                             */
+/* Brand header                                                               */
 /* -------------------------------------------------------------------------- */
 
-function BrandHeader({ brandTitle }: { brandTitle?: string }) {
-	const { colors, spacing } = useTheme();
+/**
+ * Wordmark only. The logo tile — an orange rounded square holding one letter —
+ * was doing the same job as the word next to it.
+ */
+function BrandHeader({
+	brandTitle,
+	labelOpacity,
+	trailing,
+	collapsed,
+}: {
+	brandTitle?: string;
+	labelOpacity?: Animated.AnimatedInterpolation<number>;
+	trailing?: React.ReactNode;
+	collapsed?: boolean;
+}) {
+	const { spacing } = useTheme();
+
+	if (collapsed) {
+		return (
+			<View
+				style={{
+					paddingTop: spacing[4],
+					paddingBottom: spacing[2],
+					alignItems: "center",
+					gap: spacing[1],
+				}}
+			>
+				<Label weight="bold" style={{ fontSize: 18 }}>
+					n
+				</Label>
+				{trailing}
+			</View>
+		);
+	}
 
 	return (
 		<View
 			style={{
-				paddingVertical: spacing[3.5],
-				paddingHorizontal: spacing[3.5],
-				borderBottomWidth: 1,
-				borderBottomColor: colors.border.light,
+				flexDirection: "row",
+				alignItems: "center",
+				paddingTop: spacing[4],
+				paddingBottom: spacing[3],
+				paddingLeft: ROW_MARGIN + ROW_INSET,
+				paddingRight: spacing[2],
 			}}
 		>
-			<View
+			<Animated.View
 				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[2.5],
+					flex: 1,
+					...(labelOpacity ? { opacity: labelOpacity } : null),
 				}}
 			>
-				<View
-					style={{
-						width: 34,
-						height: 34,
-						borderRadius: 10,
-						backgroundColor: colors.primary.main,
-						alignItems: "center",
-						justifyContent: "center",
-					}}
-				>
-					<Caption
-						weight="bold"
-						color={colors.primary.contrast as string}
-						style={{ fontSize: 15 }}
-					>
-						{brandTitle ? brandTitle.charAt(0).toUpperCase() : "N"}
-					</Caption>
-				</View>
-				<View style={{ flex: 1 }}>
-					<Body weight="bold" numberOfLines={1} style={{ fontSize: 16.5 }}>
-						{brandTitle ?? "nabhya"}
-					</Body>
-					<Body
-						numberOfLines={1}
-						style={{
-							fontSize: 11,
-							marginTop: -1,
-							fontFamily: "NeutralFace-Bold",
-							color: colors.text.quaternary,
-							letterSpacing: -0.2,
-						}}
-					>
-						{brandTitle ? "nabhya" : ""}
-					</Body>
-				</View>
-			</View>
+				{brandTitle ? (
+					<>
+						<H5 numberOfLines={1}>{brandTitle}</H5>
+						<Caption color="quaternary" numberOfLines={1}>
+							nabhya
+						</Caption>
+					</>
+				) : (
+					<Label weight="bold" style={{ fontSize: 18 }}>
+						nabhya
+					</Label>
+				)}
+			</Animated.View>
+			{trailing}
 		</View>
 	);
 }
 
 /* -------------------------------------------------------------------------- */
-/* Sidebar                                                                     */
+/* Sidebar                                                                    */
 /* -------------------------------------------------------------------------- */
 
 export function Sidebar({
@@ -399,7 +507,7 @@ export function Sidebar({
 	navItems: NavItem[];
 	brandTitle?: string;
 }) {
-	const { colors, spacing } = useTheme();
+	const { colors, spacing, borderRadius, elevation, isDark } = useTheme();
 	const segments = useSegments();
 	const router = useRouter();
 	const { isDesktop } = useMedia();
@@ -407,7 +515,54 @@ export function Sidebar({
 
 	const sections = useMemo(() => groupBySection(navItems), [navItems]);
 
-	// Mobile drawer
+	/* ---- Collapse ---- */
+
+	const [collapsed, setCollapsed] = useState(false);
+	const [collapseRestored, setCollapseRestored] = useState(false);
+	// 1 = expanded, 0 = collapsed. Every other value derives from this one.
+	const openness = useRef(new Animated.Value(1)).current;
+
+	useEffect(() => {
+		storage.get(COLLAPSE_KEY).then((saved) => {
+			if (saved === "1") {
+				setCollapsed(true);
+				openness.setValue(0);
+			}
+			setCollapseRestored(true);
+		});
+	}, [openness]);
+
+	const toggleCollapsed = useCallback(() => {
+		const next = !collapsed;
+		setCollapsed(next);
+		storage.set(COLLAPSE_KEY, next ? "1" : "0");
+		Animated.timing(openness, {
+			toValue: next ? 0 : 1,
+			duration: 260,
+			// Decelerating: quick to commit, settling into place. No overshoot —
+			// a rail that bounces past its width reads as a glitch, not physics.
+			easing: Easing.bezier(0.22, 1, 0.36, 1),
+			useNativeDriver: false,
+		}).start();
+	}, [collapsed, openness]);
+
+	const railWidth = openness.interpolate({
+		inputRange: [0, 1],
+		outputRange: [COLLAPSED_WIDTH, EXPANDED_WIDTH],
+	});
+	// Labels finish fading before the width is done, so text never sits in a rail
+	// too narrow to hold it.
+	const labelOpacity = openness.interpolate({
+		inputRange: [0, 0.55, 1],
+		outputRange: [0, 0, 1],
+	});
+	const railOpacity = openness.interpolate({
+		inputRange: [0, 0.45, 1],
+		outputRange: [1, 0, 0],
+	});
+
+	/* ---- Mobile drawer ---- */
+
 	const [mobileOpen, setMobileOpen] = useState(false);
 	const [drawerMounted, setDrawerMounted] = useState(false);
 	const drawerAnim = useRef(new Animated.Value(0)).current;
@@ -451,17 +606,23 @@ export function Sidebar({
 		[router],
 	);
 
-	const renderNavList = () => (
+	const renderNavList = (animated: boolean) => (
 		<>
 			{sections.map((group, i) => (
 				<View key={group.section ?? `section-${i}`}>
-					<SectionHeading label={group.section} first={i === 0} />
+					<SectionHeading
+						label={group.section}
+						first={i === 0}
+						{...(animated ? { labelOpacity, railOpacity } : {})}
+					/>
 					{group.items.map((item) => (
 						<NavItemRow
 							key={item.href}
 							item={item}
 							segments={segments}
+							collapsed={animated ? collapsed : false}
 							onPress={() => handleNavigate(item.href)}
+							{...(animated ? { labelOpacity } : {})}
 						/>
 					))}
 				</View>
@@ -470,28 +631,54 @@ export function Sidebar({
 	);
 
 	if (isDesktop) {
+		// Nothing renders until the stored state is known: mounting expanded and
+		// snapping to collapsed a frame later is a visible flinch.
+		if (!collapseRestored) {
+			return (
+				<View
+					style={{
+						width: COLLAPSED_WIDTH,
+						backgroundColor: colors.background.card,
+						borderRightWidth: 1,
+						borderRightColor: colors.border.hairline,
+						height: "100%",
+					}}
+				/>
+			);
+		}
+
 		return (
-			<View
+			<Animated.View
 				style={{
-					width: EXPANDED_WIDTH,
-					backgroundColor: colors.background.primary,
+					width: railWidth,
+					backgroundColor: colors.background.card,
 					borderRightWidth: 1,
-					borderRightColor: colors.border.light,
+					borderRightColor: colors.border.hairline,
 					height: "100%",
+					overflow: "hidden",
 				}}
 			>
-				<BrandHeader brandTitle={brandTitle} />
+				<BrandHeader
+					brandTitle={brandTitle}
+					labelOpacity={labelOpacity}
+					collapsed={collapsed}
+					trailing={
+						<IconButton
+							icon={collapsed ? PanelLeftOpen : PanelLeftClose}
+							label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+							expanded={!collapsed}
+							onPress={toggleCollapsed}
+						/>
+					}
+				/>
 				<ScrollView
 					showsVerticalScrollIndicator={false}
-					contentContainerStyle={{
-						paddingVertical: spacing[2],
-						flexGrow: 1,
-					}}
+					contentContainerStyle={{ paddingBottom: spacing[2], flexGrow: 1 }}
 				>
-					{renderNavList()}
+					{renderNavList(true)}
 				</ScrollView>
-				<UserSection />
-			</View>
+				<UserSection labelOpacity={labelOpacity} collapsed={collapsed} />
+			</Animated.View>
 		);
 	}
 
@@ -507,22 +694,19 @@ export function Sidebar({
 			>
 				<Pressable
 					onPress={() => setMobileOpen(true)}
+					accessibilityRole="button"
+					accessibilityLabel="Open navigation menu"
+					hitSlop={6}
 					style={({ pressed }) => ({
-						width: 40,
-						height: 40,
-						borderRadius: 10,
+						width: 44,
+						height: 44,
+						borderRadius: borderRadius.md,
 						backgroundColor: pressed
-							? colors.background.tertiary
-							: colors.background.primary,
+							? colors.background.subtle
+							: colors.background.card,
 						alignItems: "center",
 						justifyContent: "center",
-						borderWidth: 1,
-						borderColor: colors.border.light,
-						shadowColor: "#000",
-						shadowOffset: { width: 0, height: 1 },
-						shadowOpacity: 0.08,
-						shadowRadius: 4,
-						elevation: 2,
+						...(isDark ? {} : elevation.card),
 					})}
 				>
 					<Menu size={20} color={colors.text.primary as string} />
@@ -535,12 +719,14 @@ export function Sidebar({
 						style={{
 							position: "absolute",
 							inset: 0,
-							backgroundColor: "rgba(0,0,0,0.3)",
+							backgroundColor: "rgba(0,0,0,0.32)",
 							opacity: backdropOpacity,
 						}}
 					>
 						<Pressable
 							onPress={() => setMobileOpen(false)}
+							accessibilityRole="button"
+							accessibilityLabel="Close navigation menu"
 							style={{ flex: 1 }}
 						/>
 					</Animated.View>
@@ -551,7 +737,7 @@ export function Sidebar({
 							left: 0,
 							bottom: 0,
 							width: DRAWER_WIDTH,
-							backgroundColor: colors.background.primary,
+							backgroundColor: colors.background.card,
 							transform: [{ translateX: drawerTranslateX }],
 							shadowColor: "#000",
 							shadowOffset: { width: 4, height: 0 },
@@ -560,39 +746,23 @@ export function Sidebar({
 							elevation: 16,
 						}}
 					>
-						<View
-							style={{
-								flexDirection: "row",
-								justifyContent: "flex-end",
-								paddingRight: spacing[2],
-								paddingTop: insets.top + spacing[2],
-							}}
-						>
-							<Pressable
-								onPress={() => setMobileOpen(false)}
-								style={({ pressed }) => ({
-									width: 36,
-									height: 36,
-									borderRadius: 10,
-									alignItems: "center",
-									justifyContent: "center",
-									backgroundColor: pressed
-										? colors.background.tertiary
-										: "transparent",
-								})}
-							>
-								<X size={20} color={colors.text.secondary as string} />
-							</Pressable>
+						<View style={{ paddingTop: insets.top }}>
+							<BrandHeader
+								brandTitle={brandTitle}
+								trailing={
+									<IconButton
+										icon={X}
+										label="Close navigation menu"
+										onPress={() => setMobileOpen(false)}
+									/>
+								}
+							/>
 						</View>
-						<BrandHeader brandTitle={brandTitle} />
 						<ScrollView
 							showsVerticalScrollIndicator={false}
-							contentContainerStyle={{
-								paddingVertical: spacing[2],
-								flexGrow: 1,
-							}}
+							contentContainerStyle={{ paddingBottom: spacing[2], flexGrow: 1 }}
 						>
-							{renderNavList()}
+							{renderNavList(false)}
 						</ScrollView>
 						<UserSection />
 					</Animated.View>

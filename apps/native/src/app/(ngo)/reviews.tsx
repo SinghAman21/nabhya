@@ -6,6 +6,7 @@ import {
 	EmptyState,
 	ErrorState,
 	LoadingState,
+	Screen,
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
@@ -24,14 +25,7 @@ export default function OrgReviews() {
 	const summary = query.data?.summary;
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<BackButton />
 
 			<ScreenHeader
@@ -129,7 +123,7 @@ export default function OrgReviews() {
 					renderItem={({ item }) => <ReviewRow review={item} />}
 				/>
 			)}
-		</View>
+		</Screen>
 	);
 }
 

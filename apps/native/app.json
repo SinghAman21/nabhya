@@ -53,7 +53,10 @@
 					"photosPermission": "Nabhya needs access to your photos so you can upload your government ID.",
 					"cameraPermission": "Nabhya uses the camera so you can photograph your government ID."
 				}
-			]
+			],
+			"expo-web-browser",
+			"expo-secure-store",
+			"expo-status-bar"
 		],
 		"experiments": {
 			"typedRoutes": true,

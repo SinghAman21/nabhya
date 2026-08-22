@@ -7,6 +7,7 @@ import {
 	ErrorState,
 	FilterChips,
 	LoadingState,
+	Screen,
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
@@ -45,14 +46,7 @@ export default function AdminOrganizations() {
 	});
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<ScreenHeader
 				title="Organizations"
 				subtitle="Verify NGOs and monitor what they publish."
@@ -129,7 +123,7 @@ export default function AdminOrganizations() {
 				organizationId={selected}
 				onClose={() => setSelected(null)}
 			/>
-		</View>
+		</Screen>
 	);
 }
 
