@@ -1,5 +1,11 @@
 import { Redirect, Tabs } from "expo-router";
-import { CalendarDays, Package, Search, User } from "lucide-react-native";
+import {
+	CalendarDays,
+	MessageCircle,
+	Package,
+	Search,
+	User,
+} from "lucide-react-native";
 import { View } from "react-native";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useTheme } from "@/hooks/useTheme";
@@ -39,6 +45,15 @@ export default function VolunteerLayout() {
 						title: "Donations",
 						tabBarIcon: ({ color, size }) => (
 							<Package size={size} color={color} />
+						),
+					}}
+				/>
+				<Tabs.Screen
+					name="feed"
+					options={{
+						title: "Feed",
+						tabBarIcon: ({ color, size }) => (
+							<MessageCircle size={size} color={color} />
 						),
 					}}
 				/>

@@ -16,17 +16,11 @@ export const env = createEnv({
 			.enum(["development", "production", "test"])
 			.default("development"),
 		SUPABASE_AUTH_JWKS_URL: z.string().url(),
-
-		// Cloudflare R2 (S3-compatible). All optional: when unset the server
-		// falls back to an in-memory stub so the app still boots and every
-		// upload path stays exercisable without credentials. The stub refuses
-		// to run in production — see StorageModule.
-		R2_ACCOUNT_ID: z.string().min(1).optional(),
-		R2_ACCESS_KEY_ID: z.string().min(1).optional(),
-		R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
-		R2_BUCKET: z.string().min(1).optional(),
-		/** Optional public base URL, for objects served without a signed link. */
-		R2_PUBLIC_BASE_URL: z.string().url().optional(),
+		/** Server-only credentials for minting Supabase Storage signed URLs. */
+		SUPABASE_URL: z.string().url().optional(),
+		SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+		/** Existing non-feed media (avatars, covers, certificates, etc.). */
+		SUPABASE_DEFAULT_STORAGE_BUCKET: z.string().min(1).default("user_avatars"),
 
 		// Dodo Payments. Optional for the same reason as R2: absent credentials
 		// fall back to a stub so the donation flow stays testable locally, and

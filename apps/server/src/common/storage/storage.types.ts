@@ -8,7 +8,9 @@ export type StoragePurpose =
 	| "ORG_COVER"
 	| "AVATAR"
 	| "EVENT_COVER"
-	| "CERTIFICATE";
+	| "FINANCIAL_REPORT"
+	| "CERTIFICATE"
+	| "FEED_MEDIA";
 
 /**
  * Content types we accept. Anything outside this list is rejected before a
@@ -20,6 +22,8 @@ export const ALLOWED_CONTENT_TYPES = [
 	"image/jpeg",
 	"image/png",
 	"image/webp",
+	"video/mp4",
+	"video/quicktime",
 ] as const;
 
 export type AllowedContentType = (typeof ALLOWED_CONTENT_TYPES)[number];
@@ -69,5 +73,5 @@ export interface StorageProvider {
 	}): Promise<void>;
 
 	/** Identifies the backing implementation, for health checks and logging. */
-	readonly name: "r2" | "stub";
+	readonly name: "supabase" | "stub";
 }

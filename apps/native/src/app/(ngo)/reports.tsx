@@ -227,7 +227,7 @@ function ReportSheet({
 		pickAndUpload,
 		isUploading,
 		error: uploadError,
-	} = useFileUpload("ORG_DOCUMENT");
+	} = useFileUpload("FINANCIAL_REPORT");
 
 	const attach = async () => {
 		const picked = await pickAndUpload();

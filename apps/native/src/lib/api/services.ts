@@ -8,10 +8,14 @@ import type {
 	CompleteOrgOnboardingInput,
 	CompleteVolunteerOnboardingInput,
 	CreateEventInput,
+	CreateFeedMediaIntentsInput,
+	CreateFeedPostInput,
 	CreateNeedInput,
 	CreatePledgeInput,
 	DocumentQueueQuery,
 	DownloadUrlResponse,
+	FeedMediaIntentsResponse,
+	FeedQuery,
 	OrgEventQuery,
 	OrgNeedQuery,
 	PaginationQuery,
@@ -60,6 +64,7 @@ import {
 	ADMIN,
 	CATEGORIES,
 	EVENTS,
+	FEED,
 	NEEDS,
 	ONBOARDING,
 	ORG_EVENTS,
@@ -100,6 +105,14 @@ export const organizationsApi = {
 	documents: () => http.get<AdminOrgDocument[]>(ORGANIZATIONS.MY_DOCUMENTS),
 	uploadDocument: (input: UploadOrgDocumentInput) =>
 		http.post<AdminOrgDocument>(ORGANIZATIONS.MY_DOCUMENTS, input),
+};
+
+export const feedApi = {
+	list: (query: Partial<FeedQuery>) => http.getPage<unknown>(FEED.LIST, query),
+	createMediaIntents: (input: CreateFeedMediaIntentsInput) =>
+		http.post<FeedMediaIntentsResponse>(FEED.UPLOAD_INTENTS, input),
+	create: (input: CreateFeedPostInput) => http.post<unknown>(FEED.LIST, input),
+	remove: (id: string) => http.delete<{ deleted: boolean }>(FEED.detail(id)),
 };
 
 export const uploadsApi = {

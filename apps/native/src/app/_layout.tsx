@@ -61,6 +61,7 @@ export default function RootLayout() {
 						<Stack.Screen name="ngos" />
 						<Stack.Screen name="impact" />
 						<Stack.Screen name="edit-profile" />
+						<Stack.Screen name="feed" />
 						<Stack.Screen name="verify-identity" />
 						<Stack.Screen name="success" />
 					</Stack>

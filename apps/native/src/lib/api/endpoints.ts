@@ -75,6 +75,12 @@ export const CATEGORIES = {
 	LIST: `${API_PREFIX}/categories`,
 } as const;
 
+export const FEED = {
+	LIST: `${API_PREFIX}/feed`,
+	UPLOAD_INTENTS: `${API_PREFIX}/feed/upload-intents`,
+	detail: (id: string) => `${API_PREFIX}/feed/${id}`,
+} as const;
+
 export const UPLOADS = {
 	INTENT: `${API_PREFIX}/uploads/intent`,
 	DOWNLOAD_URL: `${API_PREFIX}/uploads/download-url`,

@@ -69,6 +69,8 @@ export const queryKeys = {
 	reports: (id: string) => ["reports", id] as const,
 	team: ["org", "team"] as const,
 
+	feed: (params?: unknown) => ["feed", params] as const,
+
 	myImpact: ["impact", "me"] as const,
 	orgImpact: (id: string) => ["impact", "org", id] as const,
 } as const;
@@ -88,5 +90,6 @@ export const queryScopes = {
 	organizations: ["organizations"] as const,
 	announcements: ["announcements"] as const,
 	reports: ["reports"] as const,
+	feed: ["feed"] as const,
 	impact: ["impact"] as const,
 } as const;

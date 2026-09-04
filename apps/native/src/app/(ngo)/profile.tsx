@@ -203,6 +203,7 @@ export default function NgoProfile() {
 								title={ORG_DOCUMENT_LABELS[doc.type] ?? doc.type}
 								hint={doc.hint}
 								purpose="ORG_DOCUMENT"
+								organizationDocumentType={doc.type}
 								existing={byType.get(doc.type)}
 								saving={upload.isPending}
 								onUploaded={(key) => submit(doc.type, key)}

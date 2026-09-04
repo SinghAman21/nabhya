@@ -32,7 +32,10 @@ export interface PickedUpload {
  * caller can attach it to a record. The server re-verifies the object landed
  * before it trusts that key.
  */
-export function useFileUpload(purpose: UploadPurpose) {
+export function useFileUpload(
+	purpose: UploadPurpose,
+	organizationDocumentType?: string,
+) {
 	const [isUploading, setUploading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -69,6 +72,7 @@ export function useFileUpload(purpose: UploadPurpose) {
 		try {
 			const intent: UploadIntentInput = {
 				purpose,
+				organizationDocumentType,
 				fileName: asset.name,
 				contentType,
 				// A zero size means the picker couldn't determine it; send 1 so the
