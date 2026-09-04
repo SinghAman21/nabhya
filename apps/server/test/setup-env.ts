@@ -3,7 +3,7 @@
  *
  * Importing almost anything from `common/` reaches `@nabhya/db`, which
  * validates the server env at module load. Without this the whole suite fails
- * to import on a machine that has no `.env.local` — meaning the tests would
+ * to import on a machine that has no `.env` — meaning the tests would
  * only ever run for whoever happened to have secrets lying around.
  *
  * None of these values are used: integration specs talk to PGlite, and the R2

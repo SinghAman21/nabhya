@@ -53,10 +53,12 @@ You need one Supabase project providing both the Postgres database and auth:
 
 ## 3. Configure environment files
 
-Neither app reads a committed `.env` — you create `.env.local` files yourself, and
-both are gitignored.
+Neither app reads a committed env file — you create these yourself, and both are
+gitignored. **The server reads `.env`; the client reads `.env.local`** (Expo's own
+env loading prioritizes `.env.local` automatically, so no extra config is needed
+there) — don't mix these up.
 
-**`apps/server/.env.local`** (create this file):
+**`apps/server/.env`** (create this file):
 
 ```bash
 # Pooled connection (transaction-mode pgbouncer, port 6543) — used by the app.
@@ -102,7 +104,7 @@ pnpm --filter @nabhya/db db:seed   # seeds the 3 roles + 10 cause categories
 if it can't find your Supabase credentials, export them into your shell first:
 
 ```bash
-set -a; source apps/server/.env.local; set +a
+set -a; source apps/server/.env; set +a
 pnpm --filter @nabhya/db db:seed
 ```
 

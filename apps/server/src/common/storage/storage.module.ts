@@ -34,7 +34,7 @@ function createProvider(): StorageProvider {
 
 	logger.warn(
 		"Object storage: in-memory stub (no R2 credentials). Uploads are simulated " +
-			"and discarded — set the R2_* variables in .env.local for real storage.",
+			"and discarded — set the R2_* variables in .env for real storage.",
 	);
 	return new StubStorageProvider();
 }

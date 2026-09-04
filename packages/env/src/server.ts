@@ -1,7 +1,7 @@
 import { config } from "dotenv";
 
-// Load .env.local first (takes priority), then .env as fallback
-config({ path: ".env.local" });
+// The server reads env from .env (not .env.local) — apps/native is the one
+// that uses .env.local, since Expo's own env loading prioritizes that file.
 config({ path: ".env" });
 
 import { createEnv } from "@t3-oss/env-core";

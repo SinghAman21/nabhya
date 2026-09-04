@@ -62,7 +62,7 @@ async function main() {
 	// the server env the moment it loads, so the placeholders have to be in
 	// place first. Static imports would be hoisted (and reordered by the import
 	// sorter), which would put validation before the defaults and make this
-	// script unrunnable without a developer's .env.local — the DI wiring it
+	// script unrunnable without a developer's .env — the DI wiring it
 	// checks has nothing to do with real credentials.
 	await import("../test/setup-env");
 	const { AppModule } = await import("../src/app/app.module");

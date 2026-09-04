@@ -101,7 +101,7 @@ screen is the only thing that grants one.
 ### Database
 
 Drizzle ORM on Supabase Postgres. Schema in `packages/db/src/schema/`, config at
-`packages/db/drizzle.config.ts` (loads env from `apps/server/.env.local`, prefers
+`packages/db/drizzle.config.ts` (loads env from `apps/server/.env`, prefers
 `DIRECT_URL`). UUID primary keys throughout. Generated migrations live in
 `packages/db/src/migrations/` (`pnpm db:generate` after schema changes); the server
 test suite builds its database from them, so drift fails tests.
@@ -218,7 +218,7 @@ AGENTS.md files; these are the repo-wide ones.
    database. Switch the boot path to `db:migrate` before real data lands.
 2. **Without R2 credentials the server uses an in-memory storage stub.** Uploads
    appear to succeed and are discarded; a restart loses them. Set the `R2_*` vars in
-   `apps/server/.env.local` for real storage. The stub is refused in production.
+   `apps/server/.env` for real storage. The stub is refused in production.
    The bucket also needs a CORS policy allowing the client's direct upload: methods
    `PUT` and `GET`, the `content-type` request header, and your app origins. Native
    `fetch` isn't CORS-gated, but Expo Web and any browser client are.

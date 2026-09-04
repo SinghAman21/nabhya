@@ -2,8 +2,8 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-// Resolves to apps/server/.env.local from the monorepo root
-export const ENV_PATH = resolve(process.cwd(), "apps/server/.env.local");
+// Resolves to apps/server/.env from the monorepo root
+export const ENV_PATH = resolve(process.cwd(), "apps/server/.env");
 
 export interface EnvValues {
 	DATABASE_URL: string;

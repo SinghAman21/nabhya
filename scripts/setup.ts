@@ -85,7 +85,7 @@ async function decideOnExistingEnv(): Promise<"keep" | "overwrite"> {
 		.join("\n");
 
 	await maybeSay([
-		"I found an existing .env.local.",
+		"I found an existing .env.",
 		"I can keep it and just run migrations, or overwrite it from scratch.",
 	]);
 
@@ -97,7 +97,7 @@ async function decideOnExistingEnv(): Promise<"keep" | "overwrite"> {
 			options: [
 				{
 					value: "keep",
-					label: "Keep current .env.local",
+					label: "Keep current .env",
 					hint: "skip to schema push",
 				},
 				{
@@ -289,7 +289,7 @@ function getVersion(): string {
 }
 
 async function loadEnvForChildProcesses() {
-	// db:push reads from process.env, so load .env.local into it
+	// db:push reads from process.env, so load .env into it
 	const env = readEnv();
 	for (const [k, v] of Object.entries(env)) {
 		if (v && !process.env[k]) process.env[k] = v;

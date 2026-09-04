@@ -93,7 +93,7 @@ Guard order (all global `APP_GUARD`s in `app.module.ts`):
   mock the database: the logic worth testing is unique indexes, `SELECT … FOR
   UPDATE` accounting and filtered aggregates.
 - `test/harness.ts` creates the database; `test/factories.ts` builds rows.
-- **Nothing that runs in CI may need a developer's `.env.local`.** Importing almost
+- **Nothing that runs in CI may need a developer's `.env`.** Importing almost
   anything from `common/` reaches `@nabhya/db`, which validates the server env at
   module load. `test/setup-env.ts` supplies throwaway values (wired as vitest
   `setupFiles`); `scripts/verify-di.ts` imports it dynamically before `AppModule`
