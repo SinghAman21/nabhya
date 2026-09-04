@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { spinner } from "@clack/prompts";
-import { neon } from "@neondatabase/serverless";
+import { Client } from "pg";
 
 interface RunOptions {
 	label: string;
@@ -76,14 +76,15 @@ const NABHYA_SENTINEL_TABLES = new Set<string>([
 ]);
 
 export async function inspectDatabase(url: string): Promise<DbState> {
+	const client = new Client({ connectionString: url });
 	try {
-		const sql = neon(url);
-		const rows = (await sql`
+		await client.connect();
+		const { rows } = await client.query<{ table_name: string }>(`
       SELECT table_name
       FROM information_schema.tables
       WHERE table_schema = 'public'
         AND table_type = 'BASE TABLE'
-    `) as { table_name: string }[];
+    `);
 		const names = rows.map((r) => r.table_name);
 		if (names.length === 0) return { kind: "empty" };
 		// If any of the known nabhya tables are present, treat as nabhya schema
@@ -96,5 +97,7 @@ export async function inspectDatabase(url: string): Promise<DbState> {
 			kind: "unreachable",
 			error: err instanceof Error ? err.message : String(err),
 		};
+	} finally {
+		await client.end().catch(() => {});
 	}
 }

@@ -19,10 +19,14 @@ export interface AuthUser {
 	name: string | null;
 }
 
-export interface NeonJwtPayload {
+export interface SupabaseJwtPayload {
 	sub: string;
 	email: string;
-	name?: string;
+	/** Custom claims set at signup (`options.data`) land here, not top-level. */
+	user_metadata?: {
+		name?: string;
+		full_name?: string;
+	};
 	iat?: number;
 	exp?: number;
 }

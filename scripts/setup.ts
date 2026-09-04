@@ -27,11 +27,11 @@ import {
 import { banner, bannerAbort, nabhi } from "./lib/mascot";
 import {
 	consoleUrl,
-	NEON_REGIONS,
+	SUPABASE_REGIONS,
 	showConnectionStringGuide,
 	showOverview,
 	showRegionTip,
-} from "./lib/neon-guide";
+} from "./lib/supabase-guide";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 const CI_MODE =
@@ -114,18 +114,18 @@ async function decideOnExistingEnv(): Promise<"keep" | "overwrite"> {
 	return action;
 }
 
-async function collectNeonCredentials() {
+async function collectSupabaseCredentials() {
 	showOverview();
 
 	const region = ensure(
 		await select({
-			message: "Which region are you creating the Neon project in?",
-			options: NEON_REGIONS.map((r) => ({
+			message: "Which region are you creating the Supabase project in?",
+			options: SUPABASE_REGIONS.map((r) => ({
 				value: r.value,
 				label: r.label,
 				hint: r.hint,
 			})),
-			initialValue: "aws-ap-southeast-1",
+			initialValue: "ap-southeast-1",
 		}),
 	) as string;
 
@@ -148,18 +148,19 @@ async function collectNeonCredentials() {
 
 	const databaseUrl = ensure(
 		await text({
-			message: "Paste your POOLED connection string (DATABASE_URL):",
+			message:
+				"Paste your TRANSACTION POOLER connection string (DATABASE_URL):",
 			placeholder:
-				"postgresql://user:pass@ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require",
+				"postgresql://postgres.<project-ref>:pass@aws-0-region.pooler.supabase.com:6543/postgres",
 			validate: validatePooledUrl,
 		}),
 	) as string;
 
 	const directUrl = ensure(
 		await text({
-			message: "Paste your DIRECT (unpooled) connection string (DIRECT_URL):",
+			message: "Paste your DIRECT connection string (DIRECT_URL):",
 			placeholder:
-				"postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require",
+				"postgresql://postgres:pass@db.<project-ref>.supabase.co:5432/postgres",
 			validate: validateDirectUrl,
 		}),
 	) as string;
@@ -172,10 +173,26 @@ async function collectNeonCredentials() {
 		}),
 	) as string;
 
+	const projectUrl = ensure(
+		await text({
+			message: "Paste your Supabase project URL (Project Settings → API):",
+			placeholder: "https://your-project-ref.supabase.co",
+			validate: (value) =>
+				!value?.startsWith("https://")
+					? "Must be the https:// project URL"
+					: undefined,
+		}),
+	) as string;
+
+	// The JWKS endpoint is a fixed well-known path under the project URL —
+	// no need to prompt for it separately.
+	const supabaseAuthJwksUrl = `${projectUrl.replace(/\/+$/, "")}/auth/v1/.well-known/jwks.json`;
+
 	return {
 		DATABASE_URL: databaseUrl,
 		DIRECT_URL: directUrl,
 		CORS_ORIGIN: corsOrigin,
+		SUPABASE_AUTH_JWKS_URL: supabaseAuthJwksUrl,
 	};
 }
 
@@ -229,7 +246,7 @@ async function ensureDatabaseReady(directUrl: string | undefined) {
 	);
 	if (CI_MODE) {
 		process.stderr.write(
-			`  ${color.red("✗")} Refusing to continue in --ci mode. Use a fresh Neon project.\n\n`,
+			`  ${color.red("✗")} Refusing to continue in --ci mode. Use a fresh Supabase project.\n\n`,
 		);
 		process.exit(1);
 	}
@@ -284,7 +301,7 @@ async function main() {
 	banner();
 	await maybeSay([
 		`Welcome to nabhya v${getVersion()}.`,
-		"I'll wire up your Neon database and push the schema.",
+		"I'll wire up your Supabase database and push the schema.",
 		"Should take about two minutes.",
 	]);
 
@@ -293,13 +310,14 @@ async function main() {
 	const action = await decideOnExistingEnv();
 
 	if (action === "overwrite") {
-		const { DATABASE_URL, DIRECT_URL, CORS_ORIGIN } =
-			await collectNeonCredentials();
+		const { DATABASE_URL, DIRECT_URL, CORS_ORIGIN, SUPABASE_AUTH_JWKS_URL } =
+			await collectSupabaseCredentials();
 		writeEnv({
 			DATABASE_URL,
 			DIRECT_URL,
 			CORS_ORIGIN,
 			NODE_ENV: "development",
+			SUPABASE_AUTH_JWKS_URL,
 		});
 		process.stdout.write(
 			`\n  ${color.green("✓")} ${color.dim("wrote")} ${ENV_PATH}\n\n`,

@@ -6,13 +6,13 @@
 -- roughly once per environment. Run it against the database instead.
 --
 --   1. Sign up through the app first — this promotes an existing user, it does
---      not create one. Neon Auth owns account creation.
+--      not create one. Supabase Auth owns account creation.
 --   2. Set the email below.
 --   3. Run it:
 --        psql "$DIRECT_URL" -v email="you@example.com" \
 --          -f packages/db/sql/grant-superadmin.sql
 --
---      Or paste it into the Neon SQL editor after replacing :'email'.
+--      Or paste it into the Supabase SQL editor after replacing :'email'.
 --
 -- Safe to run more than once: it inserts the role only when absent.
 -- ─────────────────────────────────────────────────────────────────────────────

@@ -51,7 +51,7 @@ packages/db      Drizzle schema + pg client        (@nabhya/db)
 packages/env     t3-oss env validation              (@nabhya/env)
 packages/shared  Zod schemas shared client<->server (@nabhya/shared)
 packages/config  base biome/tsconfig                (@nabhya/config)
-scripts/         interactive Neon setup wizard (pnpm db:setup)
+scripts/         interactive Supabase setup wizard (pnpm db:setup)
 ```
 
 Root scripts: `dev`, `build`, `check`, `db:setup|push|studio|generate|migrate`.
@@ -89,24 +89,25 @@ guard model, module conventions and server traps: `apps/server/AGENTS.md`.
 
 ### Auth
 
-Neon Auth (Better Auth underneath) via `@neondatabase/auth`. Client signs in through
-the Better Auth adapter, calls `getJWTToken()`, stores it as `accessToken` in
-expo-secure-store (localStorage on web), and the axios interceptor attaches it as a
-Bearer token and force-logs-out on any 401. See `apps/native/src/lib/api/auth.ts` and
-`src/lib/api/client.ts`. Server side, `JwtGuard` verifies against a remote JWKS and
-JIT-syncs the user; it does **not** assign a default role — the role-select screen is
-the only thing that grants one.
+Supabase Auth via `@supabase/supabase-js`. Client signs in through the Supabase
+client (`signInWithPassword`/`signUp`), reads the access token off the returned
+session, stores it as `accessToken` in expo-secure-store (localStorage on web), and
+the axios interceptor attaches it as a Bearer token and force-logs-out on any 401.
+See `apps/native/src/lib/api/auth.ts` and `src/lib/api/client.ts`. Server side,
+`JwtGuard` verifies against a remote JWKS (Supabase's asymmetric JWT signing keys)
+and JIT-syncs the user; it does **not** assign a default role — the role-select
+screen is the only thing that grants one.
 
 ### Database
 
-Drizzle ORM on Neon Postgres. Schema in `packages/db/src/schema/`, config at
+Drizzle ORM on Supabase Postgres. Schema in `packages/db/src/schema/`, config at
 `packages/db/drizzle.config.ts` (loads env from `apps/server/.env.local`, prefers
 `DIRECT_URL`). UUID primary keys throughout. Generated migrations live in
 `packages/db/src/migrations/` (`pnpm db:generate` after schema changes); the server
 test suite builds its database from them, so drift fails tests.
 
 **22 tables across 10 schema files:**
-- `users.ts` — `users` (`neon_user_id`, `bio`, `city`, `state`, `onboarded_at`,
+- `users.ts` — `users` (`auth_user_id`, `bio`, `city`, `state`, `onboarded_at`,
   `suspended_reason`, verification + status), `roles`, `user_roles`, `user_documents`
 - `organizations.ts` — `organizations` (+ `org_type`, `team_size`, `founding_year`,
   `rejection_reason`, `reviewed_by/at`; unique index on `owner_user_id`),
@@ -135,17 +136,18 @@ disambiguate without `relationName`. Query those from the child side.
 
 ### Env
 
-No `.env*` is committed (all gitignored). Run `pnpm db:setup` for the interactive Neon
-wizard.
+No `.env*` is committed (all gitignored). Run `pnpm db:setup` for the interactive
+Supabase wizard.
 
 - Server (`packages/env/src/server.ts`, validated at boot): `DATABASE_URL`,
-  `DIRECT_URL`, `CORS_ORIGIN`, `NODE_ENV`, `NEON_AUTH_URL`, `NEON_AUTH_JWKS_URL`,
+  `DIRECT_URL`, `CORS_ORIGIN`, `NODE_ENV`, `SUPABASE_AUTH_JWKS_URL`,
   optional `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`
 - Client (`apps/native/src/lib/env.ts`): `EXPO_PUBLIC_API_URL` (dev fallback
-  `10.0.2.2:3000` on Android), `EXPO_PUBLIC_NEON_AUTH_URL` (throws at import if unset)
+  `10.0.2.2:3000` on Android), `EXPO_PUBLIC_SUPABASE_URL` and
+  `EXPO_PUBLIC_SUPABASE_ANON_KEY` (both throw at import if unset)
 
-Wired services: Neon + Neon Auth, Cloudflare R2 (optional, stubbed in dev), Dodo
-Payments (donations — on hold). No email provider.
+Wired services: Supabase (Postgres + Auth), Cloudflare R2 (optional, stubbed in dev),
+Dodo Payments (donations — on hold). No email provider.
 
 ## Current state
 
@@ -244,5 +246,5 @@ non-existent endpoints, `JwtGuard`'s hardcoded `volunteer` assignment, and the
 | `schema.md` | 19-entity target domain model + mermaid. Read the **Amendments** section: item donations (`OrganizationNeed` + `ItemDonation`) are the core differentiator, drop hand-rolled auth tables, store object-storage keys not URLs. |
 | `misc.md` | Table-by-table longform, v1 — pre-amendment. |
 | `org.md`, `volunteer.md`, `superadmin.md`, `PerRoleFeatures.txt` | Per-role flows/checklists. Current. |
-| `README.md` | **Stale boilerplate.** Says Hono and `bun install`. Ignore. |
+| `README.md` | Accurate setup/run instructions (install, Supabase env, db push/seed, dev commands). |
 | `bts.jsonc` | **Stale scaffold metadata.** Says `nestjs` but also `auth: none`, `dbSetup: supabase`. Ignore. |

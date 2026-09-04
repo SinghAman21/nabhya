@@ -15,8 +15,7 @@ const TEST_ENV: Record<string, string> = {
 	DATABASE_URL: "postgres://test:test@localhost:5432/test",
 	DIRECT_URL: "postgres://test:test@localhost:5432/test",
 	CORS_ORIGIN: "http://localhost:8081",
-	NEON_AUTH_URL: "https://auth.test.invalid",
-	NEON_AUTH_JWKS_URL: "https://auth.test.invalid/.well-known/jwks.json",
+	SUPABASE_AUTH_JWKS_URL: "https://auth.test.invalid/.well-known/jwks.json",
 };
 
 for (const [key, value] of Object.entries(TEST_ENV)) {
