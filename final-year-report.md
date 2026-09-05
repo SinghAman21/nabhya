@@ -28,6 +28,44 @@
 13. [Deployment & Operations](#13-deployment--operations)
 14. [Limitations & Future Work](#14-limitations--future-work)
 15. [Conclusion](#15-conclusion)
+16. [Feed-ranking implementation addendum](#feed-ranking-implementation-addendum-september-2026)
+
+---
+
+## Feed-ranking implementation addendum (September 2026)
+
+> This addendum supersedes the feed-related counts and descriptions in the July 2026
+> snapshot below. The historical narrative remains useful for the original project scope.
+
+Nabhya now exposes a **unified server-side recommendation feed** that combines generic
+feed posts, published events, open needs/offers, and published announcements. It has three
+separate views:
+
+- **For You** — deterministic ranking over location, cause-category affinity, follows,
+  recency, urgency and meaningful engagement. It uses Haversine distance when optional
+  viewer coordinates exist, otherwise city/state matching; recent impressions down-rank
+  rather than permanently hide candidates.
+- **Trending** — public, time-decayed ranking using likes, saves, shares, comments, event
+  applications and need pledges. An optional authenticated viewer adds location context.
+- **Following** — reverse-chronological content from explicitly followed verified NGOs;
+  it intentionally does not apply seen-content suppression.
+
+The ranking implementation follows a candidate-pipeline approach: fetch each content source,
+apply public-visibility/expiry/status filters, hydrate category, follow and engagement signals,
+score candidates, then select a diverse result. Selection avoids more than two consecutive
+items from one organisation and avoids extended runs of a single item type.
+
+The database now has **25 tables** and the API has **104 endpoints**. New persistence includes
+`organization_follows`, polymorphic `feed_interactions` (`LIKE`, `SAVE`, `SHARE`,
+`IMPRESSION`) and `feed_comments`; generic feed posts can belong to an NGO and carry location.
+Interactions target `POST`, `EVENT`, `NEED` or `ANNOUNCEMENT`, and the service validates each
+target is still publicly visible before accepting an action. Migration
+`0007_feed_ranking.sql` records these changes.
+
+The routes are `GET /api/feed/for-you`, `GET /api/feed/trending`, and
+`GET /api/feed/following`, with follow and interaction routes documented in the current README
+and Swagger. They are presently **server-only**: native feed tabs and interaction controls are
+future client work.
 
 ---
 
@@ -353,6 +391,10 @@ erDiagram
     USERS |o--o{ DONATIONS : "donates (nullable for guests)"
     USERS ||--o{ BOOKMARKS : "saves"
     ORGANIZATIONS ||--o{ BOOKMARKS : "saved by"
+    USERS ||--o{ ORGANIZATION_FOLLOWS : "follows"
+    ORGANIZATIONS ||--o{ ORGANIZATION_FOLLOWS : "followed by"
+    USERS ||--o{ FEED_INTERACTIONS : "records"
+    USERS ||--o{ FEED_COMMENTS : "writes"
     ORGANIZATIONS ||--o{ REVIEWS : "reviewed"
     USERS ||--o{ REVIEWS : "writes"
     USERS ||--o{ NOTIFICATIONS : "receives"
@@ -469,7 +511,7 @@ erDiagram
     }
 ```
 
-*(Join/support tables — `roles`, `user_roles`, `user_documents`, `organization_admins`, `organization_documents`, `categories`, `organization_categories`, `user_categories`, `bookmarks`, `reviews`, `notifications`, `announcements`, `financial_reports` — are shown as relationships above and detailed in the data dictionary below.)*
+*(Join/support tables — `roles`, `user_roles`, `user_documents`, `organization_admins`, `organization_documents`, `categories`, `organization_categories`, `user_categories`, `bookmarks`, `organization_follows`, `feed_interactions`, `feed_comments`, `reviews`, `notifications`, `announcements`, `financial_reports` — are shown as relationships above and detailed in the data dictionary below.)*
 
 ### 7.2 Data dictionary
 
@@ -477,7 +519,7 @@ erDiagram
 
 | Table | Columns (key ones) | Constraints & indexes |
 |---|---|---|
-| `users` | `id`, `neon_user_id`, `full_name`, `email`, `phone`, `profile_image`, `bio`, `city`, `state`, `email_verified`, `verification_status`, `status`, `suspended_reason`, `onboarded_at`, timestamps | `neon_user_id` unique, `email` unique. `onboarded_at` gates volunteer entry into the app (orgs are gated by the existence of their organisation row) |
+| `users` | `id`, `neon_user_id`, `full_name`, `email`, `phone`, `profile_image`, `bio`, `city`, `state`, optional `latitude`/`longitude`, `email_verified`, `verification_status`, `status`, `suspended_reason`, `onboarded_at`, timestamps | `neon_user_id` unique, `email` unique. Optional coordinates enable distance ranking; `onboarded_at` gates volunteer entry into the app (orgs are gated by the existence of their organisation row) |
 | `roles` | `id`, `name`, `description` | `name` unique. Seeded: `volunteer`, `organisation`, `superadmin` |
 | `user_roles` | `id`, `user_id`, `role_id`, `assigned_at` | FKs cascade on delete |
 | `user_documents` | `id`, `user_id`, `document_type` (AADHAR_CARD/OTHER), `document_key`, `verification_status`, `remarks`, `verified_by`, `verified_at` | `verified_by` → users (reviewer). Stores object-storage **keys**, not URLs |
@@ -497,6 +539,13 @@ erDiagram
 | `categories` | 10 seeded cause categories (`slug` unique, lucide `icon` name, `is_active`) |
 | `organization_categories` | M:N org ↔ category, unique per pair |
 | `user_categories` | M:N volunteer interest ↔ category, unique per pair |
+
+#### Generic feed posts (`feed.ts`)
+
+| Table | Columns (key ones) | Constraints & indexes |
+|---|---|---|
+| `feed_posts` | author, optional organisation, optional city/state/coordinates, text, media folder, created timestamp | Organization/time and city indexes support unified retrieval. NGO-authored posts inherit the owner's organization and location. |
+| `feed_post_media` | post, object key, image/video type, MIME type, sort order | Object keys are unique; `(post, sort_order)` preserves the submitted media sequence. |
 
 #### Events (`events.ts`)
 
@@ -530,6 +579,9 @@ erDiagram
 |---|---|---|
 | `bookmarks` | user, org, `created_at` | Unique `(user, org)` makes the bookmark toggle idempotent under double-taps |
 | `reviews` | org, user, `rating`, `body`, `reply` (org's public response), `replied_at` | Unique `(org, user)` — one review per person, editing updates in place |
+| `organization_follows` | user, org, `created_at` | Unique `(user, org)`; separate from a private bookmark and drives the Following feed |
+| `feed_interactions` | user, polymorphic `target_type` + `target_id`, `interaction_type`, `created_at` | Targets POST/EVENT/NEED/ANNOUNCEMENT. LIKE and SAVE are unique per user/target; SHARE and IMPRESSION are append-only analytics events |
+| `feed_comments` | user, polymorphic `target_type` + `target_id`, `body`, timestamps | Indexed by target chronology and author; the service validates target visibility before writes |
 | `notifications` | user, `type` (14-value enum: application/pledge outcomes, org/document verification, certificate, donation, review, broadcast), `title`, `body`, `entity_name` + `entity_id` (client deep-link), `read_at` | A broadcast fans out into one row per user, so read state and the unread badge stay a plain indexed query |
 
 #### Publishing (`publishing.ts`)
@@ -646,17 +698,35 @@ erDiagram
 | `GET /api/org/needs/:id/pledges` | organisation | List responses |
 | `PATCH /api/org/needs/:id/pledges/:pledgeId` | organisation | Accept / reject / complete a pledge (locked counter update) |
 
-#### Engagement (bookmarks & reviews)
+#### Engagement (bookmarks, follows & reviews)
 
 | Route | Gate | Purpose |
 |---|---|---|
 | `POST /api/organizations/:id/bookmark` | volunteer | Toggle bookmark |
 | `GET /api/me/bookmarks` | volunteer | Own bookmarked NGOs |
+| `POST /api/organizations/:id/follow` | authenticated | Follow a verified active NGO (idempotent) |
+| `DELETE /api/organizations/:id/follow` | authenticated | Unfollow an NGO |
 | `GET /api/organizations/:id/reviews` | Public | Reviews + rating summary |
 | `POST /api/organizations/:id/reviews` | volunteer *(strict throttle)* | Leave or edit review |
 | `DELETE /api/organizations/:id/reviews/me` | volunteer | Delete own review |
 | `GET /api/org/reviews` | organisation | Reviews of caller's org |
 | `PATCH /api/org/reviews/:reviewId/reply` | organisation | Public reply to a review |
+
+#### Unified feed and interactions
+
+| Route | Gate | Purpose |
+|---|---|---|
+| `GET /api/feed/for-you` | OptionalAuth | Unified personalized ranking; anonymous callers receive an unpersonalized fallback |
+| `GET /api/feed/trending` | Public / OptionalAuth | Unified recent-engagement ranking |
+| `GET /api/feed/following` | authenticated | Reverse-chronological content from followed NGOs |
+| `POST` / `DELETE /api/feed/:type/:id/like` | authenticated | Like or unlike a unified feed item |
+| `POST` / `DELETE /api/feed/:type/:id/save` | authenticated | Save or unsave a unified feed item |
+| `POST /api/feed/:type/:id/share` | authenticated | Record a share event |
+| `POST /api/feed/:type/:id/impression` | authenticated | Record an impression for For You novelty ranking |
+| `GET` / `POST /api/feed/:type/:id/comments` | Public / authenticated | List or add comments |
+| `DELETE /api/feed/comments/:commentId` | authenticated | Delete own comment; superadmin may moderate |
+
+`type` is `POST`, `EVENT`, `NEED` or `ANNOUNCEMENT`; all actions validate public visibility.
 
 #### Certificates & Attendance
 
