@@ -1,7 +1,13 @@
 import type { Role } from "@nabhya/shared";
-import { Search, Users } from "lucide-react-native";
+import { Users } from "lucide-react-native";
 import { useState } from "react";
 import { FlatList, RefreshControl, View } from "react-native";
+import {
+	AdminScreen,
+	ListFooter,
+	ResultCount,
+	SearchField,
+} from "@/components/admin/list-chrome";
 import { UserDetailSheet } from "@/components/admin/user-detail-sheet";
 import {
 	EmptyState,
@@ -16,10 +22,10 @@ import {
 	StatusPill,
 	verificationTone,
 } from "@/components/status-pill";
-import { Input } from "@/components/ui/input";
 import { Body, Caption } from "@/components/ui/typography";
-import { useAdminUsers } from "@/hooks/use-admin";
+import { useAdminUsersPaged } from "@/hooks/use-admin-lists";
 import { useTheme } from "@/hooks/use-theme";
+import { useDebounced } from "@/hooks/useDebounced";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type { AdminUserListItem } from "@/lib/types";
@@ -36,7 +42,7 @@ const FILTERS: Array<{ value: Filter; label: string }> = [
 
 /** Maps the single chip row onto the API's separate role/status filters. */
 function toQuery(filter: Filter, search: string) {
-	const base = { search: search.trim() };
+	const base = search ? { search } : {};
 	switch (filter) {
 		case "volunteer":
 		case "organisation":
@@ -56,49 +62,21 @@ export default function AdminVolunteers() {
 	const [search, setSearch] = useState("");
 	const [selected, setSelected] = useState<string | null>(null);
 
-	const query = useAdminUsers(toQuery(filter, search));
+	const debouncedSearch = useDebounced(search.trim());
+	const query = useAdminUsersPaged(toQuery(filter, debouncedSearch));
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<AdminScreen>
 			<ScreenHeader
 				title="People"
-				subtitle="Track volunteers, their participation and account standing."
+				subtitle="Volunteers and NGO accounts, their participation and standing"
 			/>
 
-			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[2],
-					backgroundColor: colors.background.tertiary,
-					borderRadius: 12,
-					paddingHorizontal: spacing[3.5],
-					marginBottom: spacing[4],
-				}}
-			>
-				<Search size={18} color={colors.text.quaternary as string} />
-				<Input
-					placeholder="Search by name, email or phone"
-					value={search}
-					onChangeText={setSearch}
-					autoCapitalize="none"
-					style={{
-						flex: 1,
-						backgroundColor: "transparent",
-						borderWidth: 0,
-						paddingHorizontal: 0,
-						paddingVertical: spacing[3.5],
-					}}
-				/>
-			</View>
-
+			<SearchField
+				value={search}
+				onChangeText={setSearch}
+				placeholder="Search by name, email or phone"
+			/>
 			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
 
 			{query.isLoading ? (
@@ -110,23 +88,43 @@ export default function AdminVolunteers() {
 				/>
 			) : (
 				<FlatList
-					data={query.data?.items ?? []}
+					data={query.items}
 					keyExtractor={(item) => item.id}
 					showsVerticalScrollIndicator={false}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
-					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
+					ItemSeparatorComponent={() => <View style={{ height: spacing[2] }} />}
+					onEndReached={() => {
+						if (query.hasNextPage && !query.isFetchingNextPage)
+							query.fetchNextPage();
+					}}
+					onEndReachedThreshold={0.6}
 					refreshControl={
 						<RefreshControl
-							refreshing={query.isRefetching}
+							refreshing={query.isRefetching && !query.isFetchingNextPage}
 							onRefresh={() => query.refetch()}
-							tintColor={colors.primary.main as string}
+							tintColor={colors.text.quaternary as string}
 						/>
+					}
+					ListHeaderComponent={
+						<ResultCount total={query.total} noun="account" />
 					}
 					ListEmptyComponent={
 						<EmptyState
 							icon={Users}
-							title="No one here"
-							description="No accounts match this filter."
+							title={debouncedSearch ? "No matching accounts" : "No one here"}
+							description={
+								debouncedSearch
+									? "Try part of the name, or the email address."
+									: "No accounts match this filter."
+							}
+						/>
+					}
+					ListFooterComponent={
+						<ListFooter
+							count={query.items.length}
+							hasMore={!!query.hasNextPage}
+							fetching={query.isFetchingNextPage}
+							onLoadMore={() => query.fetchNextPage()}
 						/>
 					}
 					renderItem={({ item }) => (
@@ -136,7 +134,7 @@ export default function AdminVolunteers() {
 			)}
 
 			<UserDetailSheet userId={selected} onClose={() => setSelected(null)} />
-		</View>
+		</AdminScreen>
 	);
 }
 
@@ -148,6 +146,7 @@ function UserRow({
 	onPress: () => void;
 }) {
 	const { colors, spacing } = useTheme();
+	const name = user.fullName ?? "Unnamed";
 
 	return (
 		<Surface onPress={onPress}>
@@ -155,22 +154,24 @@ function UserRow({
 				style={{ flexDirection: "row", alignItems: "center", gap: spacing[3] }}
 			>
 				<View
+					accessibilityElementsHidden
+					importantForAccessibility="no-hide-descendants"
 					style={{
 						width: 40,
 						height: 40,
 						borderRadius: 20,
-						backgroundColor: colors.background.tertiary,
+						backgroundColor: colors.background.subtle,
 						alignItems: "center",
 						justifyContent: "center",
 					}}
 				>
 					<Body weight="bold" color="secondary">
-						{(user.fullName ?? user.email)[0]?.toUpperCase()}
+						{(user.fullName ?? user.email).trim()[0]?.toUpperCase() ?? "?"}
 					</Body>
 				</View>
-				<View style={{ flex: 1 }}>
-					<Body weight="bold" numberOfLines={1}>
-						{user.fullName ?? "Unnamed"}
+				<View style={{ flex: 1, minWidth: 0 }}>
+					<Body weight="semibold" numberOfLines={1}>
+						{name}
 					</Body>
 					<Caption color="tertiary" numberOfLines={1}>
 						{user.email}
@@ -182,6 +183,7 @@ function UserRow({
 				style={{
 					flexDirection: "row",
 					flexWrap: "wrap",
+					alignItems: "center",
 					gap: spacing[2],
 					marginTop: spacing[3],
 				}}
@@ -196,24 +198,17 @@ function UserRow({
 				{!user.onboardedAt && (
 					<StatusPill label="Onboarding incomplete" tone="neutral" />
 				)}
+				<View style={{ flex: 1 }} />
+				<Caption color="quaternary">
+					Joined {formatDate(user.createdAt)}
+				</Caption>
 			</View>
 
-			<View
-				style={{
-					flexDirection: "row",
-					justifyContent: "space-between",
-					marginTop: spacing[3],
-					paddingTop: spacing[3],
-					borderTopWidth: 1,
-					borderTopColor: colors.border.light,
-				}}
-			>
-				<Caption color="quaternary">
-					{user.applicationCount} applications · {user.acceptedCount} accepted ·{" "}
-					{user.pledgeCount} pledges
-				</Caption>
-				<Caption color="quaternary">{formatDate(user.createdAt)}</Caption>
-			</View>
+			<Caption color="quaternary" style={{ marginTop: spacing[2] }}>
+				{user.applicationCount} application
+				{user.applicationCount === 1 ? "" : "s"} · {user.acceptedCount} accepted
+				· {user.pledgeCount} pledge{user.pledgeCount === 1 ? "" : "s"}
+			</Caption>
 		</Surface>
 	);
 }

@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
+import { Field, useFieldInputStyle } from "@/components/form-field";
 import { Input } from "@/components/ui/input";
-import { Caption, Label } from "@/components/ui/typography";
+import { Pressable } from "@/components/ui/pressable";
+import { Caption } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
+import { focusable } from "@/lib/focus";
 
 /**
  * Dependency-free date + time entry.
  *
  * The project has no date-picker package and shouldn't grow one for this, so
  * this composes two plain inputs (DD/MM/YYYY and 24-hour HH:MM) plus relative
- * shortcuts. It emits a Date only once both halves parse.
+ * shortcuts. It emits a Date only once both halves parse. Renders as a
+ * `Field`, so it spaces itself like every other field in the form.
  */
 export function DateTimeField({
 	label,
@@ -25,6 +29,7 @@ export function DateTimeField({
 	shortcuts?: boolean;
 }) {
 	const { colors, spacing } = useTheme();
+	const inputStyle = useFieldInputStyle();
 	const [dateText, setDateText] = useState(value ? toDateText(value) : "");
 	const [timeText, setTimeText] = useState(value ? toTimeText(value) : "");
 
@@ -34,13 +39,6 @@ export function DateTimeField({
 		setDateText(toDateText(value));
 		setTimeText(toTimeText(value));
 	}, [value]);
-
-	const inputStyle = {
-		borderWidth: 0,
-		borderRadius: 12,
-		backgroundColor: colors.background.tertiary,
-		paddingVertical: spacing[3.5],
-	} as const;
 
 	const emit = (nextDate: string, nextTime: string) => {
 		onChange(parseDateTime(nextDate, nextTime));
@@ -54,13 +52,12 @@ export function DateTimeField({
 	};
 
 	return (
-		<View>
-			<Label style={{ marginBottom: spacing[1.5] }}>{label}</Label>
-
+		<Field label={label} error={error} hint="24-hour time, e.g. 09:30">
 			<View style={{ flexDirection: "row", gap: spacing[3] }}>
 				<View style={{ flex: 1.4 }}>
 					<Input
 						placeholder="DD/MM/YYYY"
+						accessibilityLabel={`${label} date`}
 						value={dateText}
 						onChangeText={(text) => {
 							const masked = maskDate(text);
@@ -75,6 +72,7 @@ export function DateTimeField({
 				<View style={{ flex: 1 }}>
 					<Input
 						placeholder="HH:MM"
+						accessibilityLabel={`${label} time`}
 						value={timeText}
 						onChangeText={(text) => {
 							const masked = maskTime(text);
@@ -92,6 +90,7 @@ export function DateTimeField({
 				<View
 					style={{
 						flexDirection: "row",
+						flexWrap: "wrap",
 						gap: spacing[2],
 						marginTop: spacing[2],
 					}}
@@ -104,12 +103,21 @@ export function DateTimeField({
 						<Pressable
 							key={shortcut.label}
 							onPress={() => applyShortcut(shortcut.days)}
-							style={{
+							accessibilityRole="button"
+							accessibilityLabel={`${shortcut.label}, 10:00`}
+							hitSlop={6}
+							{...focusable}
+							style={({ pressed }) => ({
+								minHeight: 32,
+								justifyContent: "center",
 								paddingHorizontal: spacing[3],
-								paddingVertical: spacing[1.5],
 								borderRadius: 999,
-								backgroundColor: colors.background.tertiary,
-							}}
+								borderWidth: 1,
+								borderColor: colors.border.medium,
+								backgroundColor: pressed
+									? colors.background.subtle
+									: "transparent",
+							})}
 						>
 							<Caption color="secondary" weight="medium">
 								{shortcut.label}
@@ -118,16 +126,7 @@ export function DateTimeField({
 					))}
 				</View>
 			)}
-
-			{error && (
-				<Caption
-					color={colors.error.main as string}
-					style={{ marginTop: spacing[1] }}
-				>
-					{error}
-				</Caption>
-			)}
-		</View>
+		</Field>
 	);
 }
 

@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { useOnboardingStatus } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
+import { authService } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
@@ -17,6 +18,13 @@ export default function Index() {
 	const router = useRouter();
 
 	const { data: status, isLoading, isError } = useOnboardingStatus(!!email);
+
+	// Supabase access tokens are short-lived (an hour) while the refresh token
+	// in storage is long-lived — mint a fresh one on boot so a reload never
+	// starts with a token the API will reject.
+	useEffect(() => {
+		if (email) void authService.refreshAccessToken();
+	}, [email]);
 
 	useEffect(() => {
 		if (status) syncFromStatus(status);
@@ -36,6 +44,11 @@ export default function Index() {
 		}
 
 		if (!status) return;
+
+		// Reconcile the store BEFORE routing — the role-group layouts guard on
+		// the store role, so navigating first would bounce us back here and
+		// ping-pong forever.
+		syncFromStatus(status);
 
 		if (status.needsRoleSelection) {
 			router.replace("/role-select");

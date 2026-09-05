@@ -61,28 +61,6 @@ export class EngagementController {
 		return this.engagementService.listBookmarks(user.id, query);
 	}
 
-	// ─── Follows ─────────────────────────────────────────────────────────────
-
-	@Post("organizations/:id/follow")
-	@ApiBearerAuth("access-token")
-	@ApiOperation({ summary: "Follow a verified active NGO" })
-	follow(
-		@CurrentUser() user: AuthUser,
-		@Param("id", ParseUUIDPipe) id: string,
-	) {
-		return this.engagementService.followOrganization(user.id, id);
-	}
-
-	@Delete("organizations/:id/follow")
-	@ApiBearerAuth("access-token")
-	@ApiOperation({ summary: "Unfollow an NGO" })
-	unfollow(
-		@CurrentUser() user: AuthUser,
-		@Param("id", ParseUUIDPipe) id: string,
-	) {
-		return this.engagementService.unfollowOrganization(user.id, id);
-	}
-
 	// ─── Reviews ─────────────────────────────────────────────────────────────
 
 	@Public()

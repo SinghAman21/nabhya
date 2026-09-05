@@ -1,11 +1,11 @@
 import { type CreateEventInput, createEventSchema } from "@nabhya/shared";
-import { X } from "lucide-react-native";
 import { useEffect, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, View } from "react-native";
+import { View } from "react-native";
 import { DateTimeField } from "@/components/date-time-field";
+import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Caption, H2, Label } from "@/components/ui/typography";
+import { Sheet } from "@/components/ui/sheet";
 import {
 	useCreateEvent,
 	useOrgEvent,
@@ -51,7 +51,9 @@ export function EventFormSheet({
 	/** Omit to create; supply to edit. */
 	event?: OrgEventListItem | null;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
+	const inputStyle = useFieldInputStyle();
+	const textAreaStyle = useFieldInputStyle(120);
 	const createEvent = useCreateEvent();
 	const updateEvent = useUpdateEvent();
 	const isEditing = !!event;
@@ -100,13 +102,6 @@ export function EventFormSheet({
 	const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
 		setDraft((d) => ({ ...d, [key]: value }));
 
-	const inputStyle = {
-		borderWidth: 0,
-		borderRadius: 12,
-		backgroundColor: colors.background.tertiary,
-		paddingVertical: spacing[3.5],
-	} as const;
-
 	const close = () => {
 		setDraft(emptyDraft);
 		setErrors({});
@@ -143,23 +138,20 @@ export function EventFormSheet({
 		}
 
 		setErrors({});
+		const onError = (error: unknown) =>
+			setErrors({ form: apiErrorMessage(error) });
 
 		if (isEditing && event) {
 			updateEvent.mutate(
 				{ id: event.id, input: parsed.data as CreateEventInput },
-				{
-					onSuccess: close,
-					onError: (error) =>
-						Alert.alert("Could not save changes", apiErrorMessage(error)),
-				},
+				{ onSuccess: close, onError },
 			);
 			return;
 		}
 
 		createEvent.mutate(parsed.data as CreateEventInput, {
 			onSuccess: close,
-			onError: (error) =>
-				Alert.alert("Could not create event", apiErrorMessage(error)),
+			onError,
 		});
 	};
 
@@ -167,136 +159,25 @@ export function EventFormSheet({
 	// Block saving until the full event has loaded, so an edit can't submit the
 	// blank description the form starts with.
 	const blocked = saving || (isEditing && loadingDetail);
+	const isDraft = !isEditing || event?.status === "DRAFT";
 
 	return (
-		<Modal
+		<Sheet
 			visible={visible}
-			animationType="slide"
-			presentationStyle="pageSheet"
-			onRequestClose={close}
-		>
-			<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						justifyContent: "space-between",
-						paddingHorizontal: spacing[6],
-						paddingTop: spacing[6],
-						paddingBottom: spacing[2],
-					}}
-				>
-					<H2>{isEditing ? "Edit event" : "New event"}</H2>
-					<Pressable onPress={close} hitSlop={12}>
-						<X size={22} color={colors.text.tertiary as string} />
-					</Pressable>
-				</View>
-
-				<ScrollView
-					contentContainerStyle={{
-						padding: spacing[6],
-						paddingTop: spacing[4],
-					}}
-					keyboardShouldPersistTaps="handled"
-				>
-					<Label style={{ marginBottom: spacing[1.5] }}>Event title</Label>
-					<Input
-						placeholder="e.g. Beach cleanup drive"
-						value={draft.title}
-						onChangeText={(v) => set("title", v)}
-						style={inputStyle}
-					/>
-					<FieldError message={errors.title} />
-
-					<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-						What will volunteers do?
-					</Label>
-					<Input
-						placeholder="Describe the work, what to bring, and who to contact"
-						value={draft.description}
-						onChangeText={(v) => set("description", v)}
-						multiline
-						style={{ ...inputStyle, minHeight: 120, textAlignVertical: "top" }}
-					/>
-					<FieldError message={errors.description} />
-
-					<View style={{ marginTop: spacing[5] }}>
-						<DateTimeField
-							label="Starts"
-							value={draft.startAt}
-							onChange={(v) => set("startAt", v)}
-							error={errors.startAt}
-						/>
-					</View>
-
-					<View style={{ marginTop: spacing[5] }}>
-						<DateTimeField
-							label="Ends"
-							value={draft.endAt}
-							onChange={(v) => set("endAt", v)}
-							error={errors.endAt}
-							shortcuts={false}
-						/>
-					</View>
-
-					<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-						Volunteers needed
-					</Label>
-					<Input
-						placeholder="e.g. 25"
-						value={draft.volunteersNeeded}
-						onChangeText={(v) => set("volunteersNeeded", v.replace(/\D/g, ""))}
-						keyboardType="number-pad"
-						style={[inputStyle, { maxWidth: 160 }]}
-					/>
-					<FieldError message={errors.volunteersNeeded} />
-
-					<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-						Venue <Caption color="tertiary">(optional)</Caption>
-					</Label>
-					<Input
-						placeholder="e.g. Juhu Beach, Gate 3"
-						value={draft.venue}
-						onChangeText={(v) => set("venue", v)}
-						style={inputStyle}
-					/>
-
-					<View
-						style={{
-							flexDirection: "row",
-							gap: spacing[3],
-							marginTop: spacing[5],
-						}}
-					>
-						<View style={{ flex: 1 }}>
-							<Label style={{ marginBottom: spacing[1.5] }}>City</Label>
-							<Input
-								placeholder="Mumbai"
-								value={draft.city}
-								onChangeText={(v) => set("city", v)}
-								style={inputStyle}
-							/>
-							<FieldError message={errors.city} />
-						</View>
-						<View style={{ flex: 1 }}>
-							<Label style={{ marginBottom: spacing[1.5] }}>State</Label>
-							<Input
-								placeholder="Maharashtra"
-								value={draft.state}
-								onChangeText={(v) => set("state", v)}
-								style={inputStyle}
-							/>
-							<FieldError message={errors.state} />
-						</View>
-					</View>
-
-					<View style={{ height: spacing[8] }} />
-
+			onClose={close}
+			title={isEditing ? "Edit event" : "New event"}
+			subtitle={
+				isDraft
+					? "Drafts stay private until you publish."
+					: "Changes go live as soon as you save."
+			}
+			footer={
+				<View style={{ gap: spacing[2] }}>
+					<FieldError message={errors.form} />
 					<Button
 						onPress={() => submit("PUBLISHED")}
 						loading={saving}
 						disabled={blocked}
-						style={{ marginBottom: spacing[3] }}
 					>
 						{isEditing && event?.status === "DRAFT"
 							? "Publish this draft"
@@ -304,7 +185,7 @@ export function EventFormSheet({
 								? "Save changes"
 								: "Publish event"}
 					</Button>
-					{(!isEditing || event?.status === "DRAFT") && (
+					{isDraft && (
 						<Button
 							variant="outline"
 							onPress={() => submit("DRAFT")}
@@ -313,21 +194,85 @@ export function EventFormSheet({
 							{isEditing ? "Keep as draft" : "Save as draft"}
 						</Button>
 					)}
-				</ScrollView>
-			</View>
-		</Modal>
-	);
-}
-
-function FieldError({ message }: { message?: string }) {
-	const { colors, spacing } = useTheme();
-	if (!message) return null;
-	return (
-		<Caption
-			color={colors.error.main as string}
-			style={{ marginTop: spacing[1] }}
+				</View>
+			}
 		>
-			{message}
-		</Caption>
+			<View style={{ paddingTop: spacing[2] }}>
+				<Field label="Event title" error={errors.title}>
+					<Input
+						placeholder="e.g. Beach cleanup drive"
+						value={draft.title}
+						onChangeText={(v) => set("title", v)}
+						style={inputStyle}
+					/>
+				</Field>
+
+				<Field label="What will volunteers do?" error={errors.description}>
+					<Input
+						placeholder="Describe the work, what to bring, and who to contact"
+						value={draft.description}
+						onChangeText={(v) => set("description", v)}
+						multiline
+						style={textAreaStyle}
+					/>
+				</Field>
+
+				<DateTimeField
+					label="Starts"
+					value={draft.startAt}
+					onChange={(v) => set("startAt", v)}
+					error={errors.startAt}
+				/>
+				<DateTimeField
+					label="Ends"
+					value={draft.endAt}
+					onChange={(v) => set("endAt", v)}
+					error={errors.endAt}
+					shortcuts={false}
+				/>
+
+				<Field
+					label="Volunteers needed"
+					error={errors.volunteersNeeded}
+					hint="Applications close automatically once this many are accepted."
+				>
+					<Input
+						placeholder="e.g. 25"
+						value={draft.volunteersNeeded}
+						onChangeText={(v) => set("volunteersNeeded", v.replace(/\D/g, ""))}
+						keyboardType="number-pad"
+						style={[inputStyle, { maxWidth: 160 }]}
+					/>
+				</Field>
+
+				<Field label="Venue" optional error={errors.venue}>
+					<Input
+						placeholder="e.g. Juhu Beach, Gate 3"
+						value={draft.venue}
+						onChangeText={(v) => set("venue", v)}
+						style={inputStyle}
+					/>
+				</Field>
+
+				<View style={{ flexDirection: "row", gap: spacing[3] }}>
+					<Field label="City" error={errors.city} style={{ flex: 1 }}>
+						<Input
+							placeholder="Mumbai"
+							value={draft.city}
+							onChangeText={(v) => set("city", v)}
+							style={inputStyle}
+						/>
+					</Field>
+					<Field label="State" error={errors.state} style={{ flex: 1 }}>
+						<Input
+							placeholder="Maharashtra"
+							value={draft.state}
+							onChangeText={(v) => set("state", v)}
+							style={inputStyle}
+						/>
+					</Field>
+				</View>
+			</View>
+		</Sheet>
 	);
 }

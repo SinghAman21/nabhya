@@ -1,50 +1,67 @@
 import { describe, expect, it } from "vitest";
-import {
-	buildOrgVerificationKey,
-	buildStorageKey,
-	createFeedMediaFolder,
-	parseStorageKey,
-} from "./storage.keys";
+import { buildStorageKey, parseStorageKey } from "./storage.keys";
 
 describe("storage keys", () => {
-	it("scopes regular assets to the configured bucket and owner", () => {
+	it("puts each purpose under its own prefix, scoped to the owner", () => {
+		const key = buildStorageKey({
+			purpose: "ORG_DOCUMENT",
+			ownerId: "org-123",
+			fileName: "pan.pdf",
+		});
+
+		expect(key.startsWith("org-documents/org-123/")).toBe(true);
+		expect(key.endsWith("-pan.pdf")).toBe(true);
+	});
+
+	it("round-trips the owner, which is what authorises downloads", () => {
 		const key = buildStorageKey({
 			purpose: "USER_DOCUMENT",
 			ownerId: "user-9",
 			fileName: "aadhaar.jpg",
 		});
-		expect(key.startsWith("user_avatars/user-documents/user-9/")).toBe(true);
+
 		expect(parseStorageKey(key)).toEqual({
 			purpose: "USER_DOCUMENT",
 			ownerId: "user-9",
 		});
 	});
 
-	it("uses the requested private NGO verification folder and document name", () => {
-		const key = buildOrgVerificationKey({
-			organizationName: "Helping Hands India!",
-			documentType: "PAN_CARD",
-			fileName: "PAN Scan.PDF",
+	it("neutralises path traversal in the supplied file name", () => {
+		const key = buildStorageKey({
+			purpose: "ORG_DOCUMENT",
+			ownerId: "org-1",
+			fileName: "../../../etc/passwd",
 		});
-		expect(key).toMatch(
-			/^ngo_verification\/helping-hands-india-\d{6}\/pan-card-\d{6}\.pdf$/,
-		);
+
+		// What actually matters: the name cannot introduce a new path segment,
+		// so it can never escape the owner's prefix.
+		expect(key.startsWith("org-documents/org-1/")).toBe(true);
+		expect(key.split("/")).toHaveLength(3);
+		expect(key).not.toContain("..");
 	});
 
-	it("keeps the requested timestamp prefix while preventing folder collisions", () => {
-		const first = createFeedMediaFolder(new Date("2026-09-04T12:34:56"));
-		const second = createFeedMediaFolder(new Date("2026-09-04T12:34:56"));
-		expect(first).toMatch(/^040926123456-[a-z0-9]{6}$/);
-		expect(first).not.toBe(second);
+	it("never collides for identical file names", () => {
+		const input = {
+			purpose: "AVATAR",
+			ownerId: "user-1",
+			fileName: "photo.png",
+		} as const;
+
+		expect(buildStorageKey(input)).not.toBe(buildStorageKey(input));
 	});
 
-	it("neutralises path traversal in supplied file names", () => {
+	it("falls back to a safe name when the input sanitises to nothing", () => {
 		const key = buildStorageKey({
 			purpose: "AVATAR",
 			ownerId: "user-1",
-			fileName: "../../../etc/passwd",
+			fileName: "!!!",
 		});
-		expect(key.split("/")).toHaveLength(4);
-		expect(key).not.toContain("..");
+		expect(key.endsWith("-file")).toBe(true);
+	});
+
+	it("rejects malformed keys rather than guessing", () => {
+		expect(parseStorageKey("nonsense")).toBeNull();
+		expect(parseStorageKey("unknown-prefix/owner/file.pdf")).toBeNull();
+		expect(parseStorageKey("")).toBeNull();
 	});
 });

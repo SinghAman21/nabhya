@@ -83,7 +83,7 @@ client-side traps: `apps/native/AGENTS.md`.
 ### Server (`apps/server`)
 
 NestJS 11, global `/api` prefix, deny-by-default JWT guard + role guard, response
-envelope `{ success, data, timestamp }`, Swagger at `/api/docs`. 104 endpoints across
+envelope `{ success, data, timestamp }`, Swagger at `/api/docs`. 92 endpoints across
 14 feature modules (16 controllers), counting the two health probes. Architecture,
 guard model, module conventions and server traps: `apps/server/AGENTS.md`.
 
@@ -154,7 +154,7 @@ Razorpay (donations, native checkout SDK). No email provider.
 
 ## Current state
 
-**Built:** auth end-to-end; 104 REST endpoints across `users`, `onboarding`,
+**Built:** auth end-to-end; 92 REST endpoints across `users`, `onboarding`,
 `organizations`, `categories`, `events`, `needs`, `feed`, `admin`, `uploads`,
 `engagement`, `publishing`, `certificates`, `donations` and `notifications`.
 NGO + volunteer onboarding; org events and needs management with
@@ -179,6 +179,23 @@ client opens Razorpay's own in-app checkout, and only Razorpay's
 signature-verified webhook ever moves a donation to `COMPLETED` (never the
 client's own success callback). This requires a custom Expo dev client —
 Razorpay's native module does not run in Expo Go; see `apps/native/AGENTS.md`.
+
+The volunteer home is **one feed** (`modules/feed`): `GET /api/feed/for-you`,
+`/trending` and `/following` are ranked views over one candidate pool (recent
+posts, open needs, upcoming events, published announcements from verified NGOs),
+scored by `FeedRankingService` on location, cause match, follows, recency, urgency
+and engagement, then diversified. Every view accepts the shared `feedFilterSchema`
+(`kind`, `categoryId`, `city`, `search`, `urgent`) which cuts the pool before
+scoring, so page N of a filtered view is stable. Likes/saves/shares/impressions and
+comments live under `/api/feed/:type/:id/*`; "Follow" is `organization_follows`
+(`/api/engagement/organizations/:id/follow`), distinct from bookmarks. Posts with up
+to four media files are created via `/api/feed/upload-intents` + `POST /api/feed`.
+Client: `lib/feed-adapter.ts` maps the server row to the card's `FeedItem`
+(kinds `need`/`event`/`story`/`post`), `hooks/use-feed.ts` picks the view per lens
+(Urgent = For You + `urgent`), `components/feed/*` render it, `app/search.tsx`
+searches NGOs and posts with kind tabs, `app/feed.tsx` is the composer (linked from
+the NGO dashboard). All sheets go through `components/ui/sheet.tsx`
+(`@gorhom/bottom-sheet` in a Modal on native).
 
 Client route groups: `(auth)`, `(onboarding)` (`index` = NGO wizard, `volunteer` =
 volunteer wizard), `(ngo)`, `(volunteer)`, `(admin)`, and public `events/`,

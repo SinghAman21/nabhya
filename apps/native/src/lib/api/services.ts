@@ -16,6 +16,8 @@ import type {
 	DownloadUrlResponse,
 	FeedMediaIntentsResponse,
 	FeedQuery,
+	FollowingFeedQuery,
+	ForYouFeedQuery,
 	OrgEventQuery,
 	OrgNeedQuery,
 	PaginationQuery,
@@ -28,6 +30,7 @@ import type {
 	SelectableRole,
 	SetOrgStatusInput,
 	SetUserStatusInput,
+	TrendingFeedQuery,
 	UpdateEventInput,
 	UpdateNeedInput,
 	UpdateOrganizationInput,
@@ -37,6 +40,7 @@ import type {
 	UploadTicketResponse,
 	UploadUserDocumentInput,
 } from "@nabhya/shared";
+import { toFeedItem } from "@/lib/feed-adapter";
 import type {
 	AdminOrgDetail,
 	AdminOrgDocument,
@@ -49,6 +53,9 @@ import type {
 	AuditLogEntry,
 	Category,
 	EventApplicant,
+	FeedApiItem,
+	FeedApiItemType,
+	FeedPostRecord,
 	MyPledgeListItem,
 	MyProfile,
 	NeedPledge,
@@ -107,12 +114,35 @@ export const organizationsApi = {
 		http.post<AdminOrgDocument>(ORGANIZATIONS.MY_DOCUMENTS, input),
 };
 
+/** A ranked feed page, with every row mapped to the client's `FeedItem`. */
+async function feedPage(url: string, query: Record<string, unknown>) {
+	const page = await http.getPage<FeedApiItem>(url, query);
+	return { ...page, items: page.items.map(toFeedItem) };
+}
+
 export const feedApi = {
-	list: (query: Partial<FeedQuery>) => http.getPage<unknown>(FEED.LIST, query),
+	forYou: (query: Partial<ForYouFeedQuery>) => feedPage(FEED.FOR_YOU, query),
+	trending: (query: Partial<TrendingFeedQuery>) =>
+		feedPage(FEED.TRENDING, query),
+	following: (query: Partial<FollowingFeedQuery>) =>
+		feedPage(FEED.FOLLOWING, query),
+	/** Chronological posts only — the composer's own list. */
+	list: (query: Partial<FeedQuery>) =>
+		http.getPage<FeedPostRecord>(FEED.LIST, query),
 	createMediaIntents: (input: CreateFeedMediaIntentsInput) =>
 		http.post<FeedMediaIntentsResponse>(FEED.UPLOAD_INTENTS, input),
-	create: (input: CreateFeedPostInput) => http.post<unknown>(FEED.LIST, input),
+	create: (input: CreateFeedPostInput) =>
+		http.post<FeedPostRecord>(FEED.LIST, input),
 	remove: (id: string) => http.delete<{ deleted: boolean }>(FEED.detail(id)),
+	react: (
+		type: FeedApiItemType,
+		id: string,
+		action: "like" | "save",
+		on: boolean,
+	) =>
+		on
+			? http.post<unknown>(FEED.interaction(type, id, action))
+			: http.delete<unknown>(FEED.interaction(type, id, action)),
 };
 
 export const uploadsApi = {

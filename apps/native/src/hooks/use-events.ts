@@ -42,6 +42,7 @@ export function useApplyToEvent(eventId: string) {
 			// The detail view carries `myApplication`, and the list shows capacity —
 			// both change on apply.
 			queryClient.invalidateQueries({ queryKey: queryScopes.events });
+			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
 		},
 	});
 }

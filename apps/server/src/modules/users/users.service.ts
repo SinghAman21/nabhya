@@ -79,8 +79,6 @@ export class UsersService {
 			bio: user.bio,
 			city: user.city,
 			state: user.state,
-			latitude: user.latitude ? Number(user.latitude) : null,
-			longitude: user.longitude ? Number(user.longitude) : null,
 			emailVerified: user.emailVerified,
 			verificationStatus: user.verificationStatus,
 			status: user.status,
@@ -106,12 +104,6 @@ export class UsersService {
 				...(input.bio !== undefined && { bio: input.bio }),
 				...(input.city !== undefined && { city: input.city }),
 				...(input.state !== undefined && { state: input.state }),
-				...(input.latitude !== undefined && {
-					latitude: input.latitude.toString(),
-				}),
-				...(input.longitude !== undefined && {
-					longitude: input.longitude.toString(),
-				}),
 				updatedAt: new Date(),
 			})
 			.where(eq(users.id, userId))

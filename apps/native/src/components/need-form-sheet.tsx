@@ -5,13 +5,14 @@ import {
 	type NeedType,
 	type NeedUrgency,
 } from "@nabhya/shared";
-import { X } from "lucide-react-native";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Alert, Modal, Pressable, ScrollView, View } from "react-native";
+import { View } from "react-native";
+import { ChoiceChips } from "@/components/choice-chips";
+import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Body, Caption, H2, Label } from "@/components/ui/typography";
+import { Sheet } from "@/components/ui/sheet";
 import { useCreateNeed, useUpdateNeed } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
@@ -20,20 +21,24 @@ import type { OrgNeedListItem } from "@/lib/types";
 const TYPES: Array<{ value: NeedType; label: string; hint: string }> = [
 	{
 		value: "WANT",
-		label: "We need something",
-		hint: "Ask volunteers and donors to supply items or help",
+		label: "We need",
+		hint: "Ask volunteers and donors to supply items or help.",
 	},
 	{
 		value: "OFFER",
-		label: "We're giving something",
-		hint: "Offer surplus items to the people who need them",
+		label: "We're giving",
+		hint: "Offer surplus items to the people who need them.",
 	},
 ];
 
-const URGENCIES: Array<{ value: NeedUrgency; label: string }> = [
-	{ value: "LOW", label: "Low" },
-	{ value: "MEDIUM", label: "Medium" },
-	{ value: "HIGH", label: "Urgent" },
+const URGENCIES: Array<{ value: NeedUrgency; label: string; hint: string }> = [
+	{ value: "LOW", label: "Low", hint: "Whenever someone can help." },
+	{ value: "MEDIUM", label: "Medium", hint: "Needed in the coming weeks." },
+	{
+		value: "HIGH",
+		label: "Urgent",
+		hint: "Shown in the Urgent lens and ranked higher in every feed.",
+	},
 ];
 
 /**
@@ -54,9 +59,12 @@ export function NeedFormSheet({
 	/** Omit to create; supply to edit. */
 	need?: OrgNeedListItem | null;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
+	const inputStyle = useFieldInputStyle();
+	const textAreaStyle = useFieldInputStyle(110);
 	const createNeed = useCreateNeed();
 	const updateNeed = useUpdateNeed();
+	const [formError, setFormError] = useState<string | null>(null);
 	const isEditing = !!need;
 
 	const form = useForm<CreateNeedInput>({
@@ -73,13 +81,6 @@ export function NeedFormSheet({
 		},
 	});
 
-	const inputStyle = {
-		borderWidth: 0,
-		borderRadius: 12,
-		backgroundColor: colors.background.tertiary,
-		paddingVertical: spacing[3.5],
-	} as const;
-
 	// Load the post being edited; keyed on id so reopening for a different post
 	// replaces the form rather than keeping the previous one.
 	useEffect(() => {
@@ -94,112 +95,67 @@ export function NeedFormSheet({
 			city: need.city ?? "",
 			state: defaultState ?? "",
 		});
+		setFormError(null);
 	}, [need, form, defaultState]);
 
 	const close = () => {
 		form.reset();
+		setFormError(null);
 		onClose();
 	};
 
 	const onSubmit = form.handleSubmit((data) => {
+		setFormError(null);
+		const onError = (error: unknown) => setFormError(apiErrorMessage(error));
+
 		if (isEditing && need) {
 			updateNeed.mutate(
 				{ id: need.id, input: data },
-				{
-					onSuccess: close,
-					onError: (error) =>
-						Alert.alert("Could not save changes", apiErrorMessage(error)),
-				},
+				{ onSuccess: close, onError },
 			);
 			return;
 		}
-
-		createNeed.mutate(data, {
-			onSuccess: close,
-			onError: (error) => Alert.alert("Could not post", apiErrorMessage(error)),
-		});
+		createNeed.mutate(data, { onSuccess: close, onError });
 	});
 
 	const saving = createNeed.isPending || updateNeed.isPending;
-
+	const errors = form.formState.errors;
 	const type = form.watch("type");
 	const urgency = form.watch("urgency");
+	const quantity = form.watch("quantity");
 
 	return (
-		<Modal
+		<Sheet
 			visible={visible}
-			animationType="slide"
-			presentationStyle="pageSheet"
-			onRequestClose={close}
-		>
-			<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						justifyContent: "space-between",
-						paddingHorizontal: spacing[6],
-						paddingTop: spacing[6],
-						paddingBottom: spacing[2],
-					}}
-				>
-					<H2>{isEditing ? "Edit post" : "New post"}</H2>
-					<Pressable onPress={close} hitSlop={12}>
-						<X size={22} color={colors.text.tertiary as string} />
-					</Pressable>
+			onClose={close}
+			title={isEditing ? "Edit post" : "New post"}
+			subtitle={
+				isEditing
+					? "Changes go live as soon as you save."
+					: "Volunteers see this in their feed straight away."
+			}
+			footer={
+				<View style={{ gap: spacing[2] }}>
+					<FieldError message={formError} />
+					<Button onPress={onSubmit} loading={saving}>
+						{isEditing ? "Save changes" : "Publish post"}
+					</Button>
 				</View>
+			}
+		>
+			<View style={{ paddingTop: spacing[2] }}>
+				<Field label="This post is" error={errors.type?.message}>
+					<ChoiceChips
+						label="Post type"
+						options={TYPES}
+						value={type}
+						onChange={(value) =>
+							form.setValue("type", value, { shouldValidate: true })
+						}
+					/>
+				</Field>
 
-				<ScrollView
-					contentContainerStyle={{
-						padding: spacing[6],
-						paddingTop: spacing[4],
-					}}
-					keyboardShouldPersistTaps="handled"
-				>
-					<Label style={{ marginBottom: spacing[2] }}>Post type</Label>
-					{TYPES.map((option) => {
-						const active = type === option.value;
-						return (
-							<Pressable
-								key={option.value}
-								onPress={() =>
-									form.setValue("type", option.value, { shouldValidate: true })
-								}
-								style={{
-									backgroundColor: active
-										? colors.primary.main
-										: colors.background.primary,
-									borderWidth: 1,
-									borderColor: active
-										? colors.primary.main
-										: colors.border.light,
-									borderRadius: 14,
-									padding: spacing[4],
-									marginBottom: spacing[2],
-								}}
-							>
-								<Body
-									weight="bold"
-									color={
-										active ? (colors.primary.contrast as string) : "primary"
-									}
-								>
-									{option.label}
-								</Body>
-								<Caption
-									color={
-										active ? (colors.primary.contrast as string) : "tertiary"
-									}
-								>
-									{option.hint}
-								</Caption>
-							</Pressable>
-						);
-					})}
-
-					<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-						Title
-					</Label>
+				<Field label="Title" error={errors.title?.message}>
 					<Input
 						placeholder={
 							type === "WANT"
@@ -212,151 +168,93 @@ export function NeedFormSheet({
 						}
 						style={inputStyle}
 					/>
-					<FieldError message={form.formState.errors.title?.message} />
+				</Field>
 
-					<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-						Details
-					</Label>
+				<Field label="Details" error={errors.description?.message}>
 					<Input
-						placeholder="Describe condition, sizes, pickup or drop-off, anything useful"
+						placeholder="Condition, sizes, pickup or drop-off — anything a helper needs to know"
 						value={form.watch("description")}
 						onChangeText={(v) =>
 							form.setValue("description", v, { shouldValidate: true })
 						}
 						multiline
-						style={{ ...inputStyle, minHeight: 110, textAlignVertical: "top" }}
+						style={textAreaStyle}
 					/>
-					<FieldError message={form.formState.errors.description?.message} />
+				</Field>
 
-					<View
-						style={{
-							flexDirection: "row",
-							gap: spacing[3],
-							marginTop: spacing[5],
-						}}
+				<View style={{ flexDirection: "row", gap: spacing[3] }}>
+					<Field
+						label="Quantity"
+						optional
+						error={errors.quantity?.message}
+						style={{ flex: 1 }}
 					>
-						<View style={{ flex: 1 }}>
-							<Label style={{ marginBottom: spacing[1.5] }}>
-								Quantity <Caption color="tertiary">(optional)</Caption>
-							</Label>
-							<Input
-								placeholder="200"
-								value={
-									form.watch("quantity") ? String(form.watch("quantity")) : ""
-								}
-								onChangeText={(v) =>
-									form.setValue("quantity", v ? Number(v) : undefined, {
-										shouldValidate: true,
-									})
-								}
-								keyboardType="number-pad"
-								style={inputStyle}
-							/>
-							<FieldError message={form.formState.errors.quantity?.message} />
-						</View>
-						<View style={{ flex: 1 }}>
-							<Label style={{ marginBottom: spacing[1.5] }}>Unit</Label>
-							<Input
-								placeholder="blankets"
-								value={form.watch("unit") ?? ""}
-								onChangeText={(v) =>
-									form.setValue("unit", v, { shouldValidate: true })
-								}
-								style={inputStyle}
-							/>
-						</View>
-					</View>
+						<Input
+							placeholder="200"
+							value={quantity ? String(quantity) : ""}
+							onChangeText={(v) =>
+								form.setValue(
+									"quantity",
+									v.replace(/\D/g, "")
+										? Number(v.replace(/\D/g, ""))
+										: undefined,
+									{ shouldValidate: true },
+								)
+							}
+							keyboardType="number-pad"
+							style={inputStyle}
+						/>
+					</Field>
+					<Field label="Unit" error={errors.unit?.message} style={{ flex: 1 }}>
+						<Input
+							placeholder="blankets"
+							value={form.watch("unit") ?? ""}
+							onChangeText={(v) =>
+								form.setValue("unit", v, { shouldValidate: true })
+							}
+							style={inputStyle}
+						/>
+					</Field>
+				</View>
 
-					<Label style={{ marginTop: spacing[5], marginBottom: spacing[2] }}>
-						Urgency
-					</Label>
-					<View style={{ flexDirection: "row", gap: spacing[2] }}>
-						{URGENCIES.map((option) => {
-							const active = urgency === option.value;
-							return (
-								<Pressable
-									key={option.value}
-									onPress={() =>
-										form.setValue("urgency", option.value, {
-											shouldValidate: true,
-										})
-									}
-									style={{
-										flex: 1,
-										alignItems: "center",
-										paddingVertical: spacing[2.5],
-										borderRadius: 12,
-										backgroundColor: active
-											? colors.primary.main
-											: colors.background.tertiary,
-									}}
-								>
-									<Body
-										weight={active ? "bold" : "normal"}
-										color={
-											active ? (colors.primary.contrast as string) : "secondary"
-										}
-									>
-										{option.label}
-									</Body>
-								</Pressable>
-							);
-						})}
-					</View>
+				<Field label="Urgency" error={errors.urgency?.message}>
+					<ChoiceChips
+						label="Urgency"
+						options={URGENCIES}
+						value={urgency}
+						onChange={(value) =>
+							form.setValue("urgency", value, { shouldValidate: true })
+						}
+					/>
+				</Field>
 
-					<View
-						style={{
-							flexDirection: "row",
-							gap: spacing[3],
-							marginTop: spacing[5],
-						}}
+				<View style={{ flexDirection: "row", gap: spacing[3] }}>
+					<Field label="City" error={errors.city?.message} style={{ flex: 1 }}>
+						<Input
+							placeholder="Mumbai"
+							value={form.watch("city")}
+							onChangeText={(v) =>
+								form.setValue("city", v, { shouldValidate: true })
+							}
+							style={inputStyle}
+						/>
+					</Field>
+					<Field
+						label="State"
+						error={errors.state?.message}
+						style={{ flex: 1 }}
 					>
-						<View style={{ flex: 1 }}>
-							<Label style={{ marginBottom: spacing[1.5] }}>City</Label>
-							<Input
-								placeholder="Mumbai"
-								value={form.watch("city")}
-								onChangeText={(v) =>
-									form.setValue("city", v, { shouldValidate: true })
-								}
-								style={inputStyle}
-							/>
-							<FieldError message={form.formState.errors.city?.message} />
-						</View>
-						<View style={{ flex: 1 }}>
-							<Label style={{ marginBottom: spacing[1.5] }}>State</Label>
-							<Input
-								placeholder="Maharashtra"
-								value={form.watch("state")}
-								onChangeText={(v) =>
-									form.setValue("state", v, { shouldValidate: true })
-								}
-								style={inputStyle}
-							/>
-							<FieldError message={form.formState.errors.state?.message} />
-						</View>
-					</View>
-
-					<View style={{ height: spacing[8] }} />
-
-					<Button onPress={onSubmit} loading={saving}>
-						{isEditing ? "Save changes" : "Publish post"}
-					</Button>
-				</ScrollView>
+						<Input
+							placeholder="Maharashtra"
+							value={form.watch("state")}
+							onChangeText={(v) =>
+								form.setValue("state", v, { shouldValidate: true })
+							}
+							style={inputStyle}
+						/>
+					</Field>
+				</View>
 			</View>
-		</Modal>
-	);
-}
-
-function FieldError({ message }: { message?: string }) {
-	const { colors, spacing } = useTheme();
-	if (!message) return null;
-	return (
-		<Caption
-			color={colors.error.main as string}
-			style={{ marginTop: spacing[1] }}
-		>
-			{message}
-		</Caption>
+		</Sheet>
 	);
 }

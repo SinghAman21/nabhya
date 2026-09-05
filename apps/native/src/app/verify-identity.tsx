@@ -1,8 +1,14 @@
 import { useRouter } from "expo-router";
-import { ArrowLeft } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, View } from "react-native";
-import { ScreenHeader } from "@/components/screen-shell";
+import { ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+	Banner,
+	Screen,
+	ScreenHeader,
+	SectionTitle,
+	Surface,
+} from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
 import { Caption } from "@/components/ui/typography";
 import {
@@ -15,6 +21,7 @@ import {
 } from "@/components/verification/selfie-capture";
 import { useUploadUserDocument } from "@/hooks/use-documents";
 import { useTheme } from "@/hooks/use-theme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 
 /**
@@ -22,9 +29,14 @@ import { apiErrorMessage } from "@/lib/api";
  * selfie, upload both to storage, then submit them for a superadmin to review.
  * The account only becomes VERIFIED once both are approved (enforced server
  * side), so this screen requires both before it lets you submit.
+ *
+ * Two steps, each on its own card, and the submit pinned at the bottom so it is
+ * always reachable — the selfie step is tall, and burying the button under it
+ * made people think the page ended at the camera.
  */
 export default function VerifyIdentity() {
 	const { colors, spacing } = useTheme();
+	const insets = useSafeAreaInsets();
 	const router = useRouter();
 	const upload = useUploadUserDocument();
 
@@ -34,7 +46,8 @@ export default function VerifyIdentity() {
 	);
 	const [submitting, setSubmitting] = useState(false);
 
-	const canSubmit = !!idValue && !!selfieValue && !submitting;
+	const done = [idValue, selfieValue].filter(Boolean).length;
+	const canSubmit = done === 2 && !submitting;
 
 	const submit = async () => {
 		if (!idValue || !selfieValue) return;
@@ -56,7 +69,7 @@ export default function VerifyIdentity() {
 			});
 			Alert.alert(
 				"Submitted for review",
-				"Your ID and selfie are in. We'll update your verification status once a reviewer checks them.",
+				"Your ID and selfie are in. A reviewer usually gets to them within a day or two, and you'll see the result on your profile.",
 				[{ text: "Done", onPress: () => router.back() }],
 			);
 		} catch (e) {
@@ -67,46 +80,55 @@ export default function VerifyIdentity() {
 	};
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
-			<Pressable
-				onPress={() => router.back()}
-				hitSlop={8}
-				style={{ marginBottom: spacing[2] }}
-			>
-				<ArrowLeft size={24} color={colors.text.primary as string} />
-			</Pressable>
-
+		<Screen>
 			<ScreenHeader
+				back
 				title="Get verified"
-				subtitle="Upload a government ID and take a quick selfie so NGOs know they can trust your application."
+				subtitle="A government ID and a quick selfie"
 			/>
 
 			<ScrollView
 				showsVerticalScrollIndicator={false}
-				contentContainerStyle={{ paddingBottom: spacing[10], gap: spacing[8] }}
+				contentContainerStyle={{ paddingBottom: spacing[6] }}
 				keyboardShouldPersistTaps="handled"
 			>
-				<IdCapture onChange={setIdValue} disabled={submitting} />
-				<SelfieCapture onChange={setSelfieValue} disabled={submitting} />
-
-				<View style={{ gap: spacing[2] }}>
-					<Button onPress={submit} disabled={!canSubmit} loading={submitting}>
-						Submit for verification
-					</Button>
-					{(!idValue || !selfieValue) && (
-						<Caption color="quaternary" style={{ textAlign: "center" }}>
-							Add both your government ID and a selfie to submit.
-						</Caption>
-					)}
+				<View style={{ marginBottom: spacing[5] }}>
+					<Banner
+						tone="info"
+						title="Why verify?"
+						description="NGOs accept verified volunteers first. Your documents are seen only by Nabhya's reviewers, never by NGOs."
+					/>
 				</View>
+
+				<SectionTitle>Step 1 of 2</SectionTitle>
+				<Surface style={{ marginBottom: spacing[5] }}>
+					<IdCapture onChange={setIdValue} disabled={submitting} />
+				</Surface>
+
+				<SectionTitle>Step 2 of 2</SectionTitle>
+				<Surface>
+					<SelfieCapture onChange={setSelfieValue} disabled={submitting} />
+				</Surface>
 			</ScrollView>
-		</View>
+
+			<View
+				style={{
+					paddingTop: spacing[3],
+					paddingBottom: insets.bottom + spacing[3],
+					borderTopWidth: 1,
+					borderTopColor: colors.border.hairline,
+					gap: spacing[2],
+				}}
+			>
+				<Button onPress={submit} disabled={!canSubmit} loading={submitting}>
+					Submit for review
+				</Button>
+				<Caption color="quaternary" style={{ textAlign: "center" }}>
+					{done === 2
+						? "Both captured. Ready to submit."
+						: `${done} of 2 captured. Add ${idValue ? "your selfie" : selfieValue ? "your ID" : "both"} to continue.`}
+				</Caption>
+			</View>
+		</Screen>
 	);
 }

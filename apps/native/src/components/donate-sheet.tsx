@@ -1,33 +1,46 @@
 import { DONATION_PRESETS_MINOR, formatMinor } from "@nabhya/shared";
-import { useQueryClient } from "@tanstack/react-query";
-import { X } from "lucide-react-native";
+import { Check } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, View } from "react-native";
-import RazorpayCheckout from "react-native-razorpay";
+import { View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Body, Caption, H2, Label } from "@/components/ui/typography";
+import { Pressable } from "@/components/ui/pressable";
+import { Sheet } from "@/components/ui/sheet";
+import { Body, Caption, Label } from "@/components/ui/typography";
 import { useCreateDonation } from "@/hooks/use-engagement";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
-import { queryScopes } from "@/lib/api/query-keys";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
  * Donation entry point.
  *
  * The amount is captured in rupees but sent as paise — integers only, so no
- * float rounding ever reaches the ledger.
- *
- * Checkout happens in-app via Razorpay's native SDK: the server creates an
- * order and hands back its id plus the public key, and this sheet opens
- * Razorpay's own checkout UI directly — nothing here ever touches card
- * details. A successful checkout only tells the client the payment went
- * through; the donation row itself only ever flips to COMPLETED once the
- * server's webhook verifies it, so this sheet never assumes success beyond
- * showing a "confirming" message and letting the donor check their history.
+ * float rounding ever reaches the ledger. Dodo is product-based, so whole
+ * rupees are the finest granularity the gateway can represent.
  */
+interface RazorpayCheckout {
+	open: (options: Record<string, unknown>) => Promise<unknown>;
+}
+
+/**
+ * Razorpay ships a native module, so it exists only in a dev client or a store
+ * build. Loading it lazily keeps Expo Go and web booting; there the donor is
+ * told to use the app build instead.
+ */
+function loadRazorpay(): RazorpayCheckout | null {
+	try {
+		const mod = require("react-native-razorpay") as {
+			default?: RazorpayCheckout;
+		};
+		return mod.default ?? null;
+	} catch {
+		return null;
+	}
+}
+
 export function DonateSheet({
 	organizationId,
 	organizationName,
@@ -42,7 +55,6 @@ export function DonateSheet({
 	const { colors, spacing } = useTheme();
 	const email = useAuthStore((s) => s.email);
 	const { data: me } = useMe(!!email);
-	const queryClient = useQueryClient();
 
 	const [amountMinor, setAmountMinor] = useState<number>(
 		DONATION_PRESETS_MINOR[1] ?? 100_000,
@@ -88,11 +100,18 @@ export function DonateSheet({
 					razorpayKeyId,
 				}) => {
 					onClose();
+					const checkout = loadRazorpay();
+					if (!checkout) {
+						Alert.alert(
+							"Payments need the app build",
+							"Donations open Razorpay's secure checkout, which is not available in this preview.",
+						);
+						return;
+					}
 					try {
-						// Fields present because we always pass order_id: razorpay_payment_id,
-						// razorpay_order_id, razorpay_signature. This is fast client-side
-						// feedback only — never proof the donation is COMPLETED.
-						await RazorpayCheckout.open({
+						// Fast client-side feedback only — the donation is COMPLETED only
+						// once the server's webhook verifies Razorpay's signature.
+						await checkout.open({
 							key: razorpayKeyId,
 							order_id: orderId,
 							amount: orderAmount,
@@ -105,22 +124,18 @@ export function DonateSheet({
 							},
 							theme: { color: colors.primary.main as string },
 						});
-						queryClient.invalidateQueries({ queryKey: queryScopes.donations });
 						Alert.alert(
 							"Thank you!",
-							"We're confirming your donation now — check My Donations shortly.",
+							"We're confirming your donation now. Check Donations shortly.",
 						);
 					} catch (err: unknown) {
-						// User-cancelled checkouts land here too (react-native-razorpay
-						// rejects on dismiss, not just on failure) — there is no distinct
-						// "cancelled" code documented, so this message stays generic.
 						const description =
 							typeof err === "object" && err !== null && "description" in err
 								? String((err as { description?: unknown }).description)
 								: null;
 						Alert.alert(
 							"Payment not completed",
-							description || "You can try again from My Donations.",
+							description ?? "You can try again any time.",
 						);
 					}
 				},
@@ -130,202 +145,162 @@ export function DonateSheet({
 	};
 
 	return (
-		<Modal
+		<Sheet
 			visible={visible}
-			animationType="slide"
-			presentationStyle="pageSheet"
-			onRequestClose={onClose}
-		>
-			<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "flex-start",
-						justifyContent: "space-between",
-						gap: spacing[3],
-						paddingHorizontal: spacing[6],
-						paddingTop: spacing[6],
-						paddingBottom: spacing[2],
-					}}
-				>
-					<View style={{ flex: 1 }}>
-						<H2>Donate</H2>
-						<Caption color="tertiary" numberOfLines={1}>
-							{organizationName}
-						</Caption>
-					</View>
-					<Pressable onPress={onClose} hitSlop={12}>
-						<X size={22} color={colors.text.tertiary as string} />
-					</Pressable>
-				</View>
-
-				<ScrollView
-					contentContainerStyle={{
-						padding: spacing[6],
-						paddingTop: spacing[4],
-					}}
-					keyboardShouldPersistTaps="handled"
-				>
-					<Label style={{ marginBottom: spacing[2] }}>Amount</Label>
-					<View
-						style={{
-							flexDirection: "row",
-							flexWrap: "wrap",
-							gap: spacing[2],
-						}}
-					>
-						{DONATION_PRESETS_MINOR.map((preset) => {
-							const active = !custom && amountMinor === preset;
-							return (
-								<Pressable
-									key={preset}
-									onPress={() => {
-										setCustom("");
-										setAmountMinor(preset);
-									}}
-									style={{
-										paddingHorizontal: spacing[4],
-										paddingVertical: spacing[2.5],
-										borderRadius: 12,
-										backgroundColor: active
-											? colors.primary.main
-											: colors.background.tertiary,
-									}}
-								>
-									<Body
-										weight={active ? "bold" : "normal"}
-										color={
-											active ? (colors.primary.contrast as string) : "secondary"
-										}
-									>
-										{formatMinor(preset)}
-									</Body>
-								</Pressable>
-							);
-						})}
-					</View>
-
-					<Label style={{ marginTop: spacing[4], marginBottom: spacing[1.5] }}>
-						Or enter an amount (₹)
-					</Label>
-					<Input
-						placeholder="e.g. 750"
-						value={custom}
-						onChangeText={(v) => {
-							const digits = v.replace(/\D/g, "");
-							setCustom(digits);
-							if (digits) setAmountMinor(Number(digits) * 100);
-						}}
-						keyboardType="number-pad"
-						style={[inputStyle, { maxWidth: 180 }]}
-					/>
-
-					{!me && (
-						<>
-							<Label
-								style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}
-							>
-								Your name <Caption color="tertiary">(optional)</Caption>
-							</Label>
-							<Input
-								placeholder="Aditi Sharma"
-								value={guestName}
-								onChangeText={setGuestName}
-								style={inputStyle}
-							/>
-
-							<Label
-								style={{ marginTop: spacing[4], marginBottom: spacing[1.5] }}
-							>
-								Email for receipt
-							</Label>
-							<Input
-								placeholder="you@example.com"
-								value={guestEmail}
-								onChangeText={setGuestEmail}
-								keyboardType="email-address"
-								autoCapitalize="none"
-								style={inputStyle}
-							/>
-						</>
-					)}
-
-					<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-						Message <Caption color="tertiary">(optional)</Caption>
-					</Label>
-					<Input
-						placeholder="Anything you'd like the NGO to know"
-						value={message}
-						onChangeText={setMessage}
-						multiline
-						style={{ ...inputStyle, minHeight: 88, textAlignVertical: "top" }}
-					/>
-
-					<Pressable
-						onPress={() => setAnonymous((v) => !v)}
-						style={{
-							flexDirection: "row",
-							alignItems: "center",
-							gap: spacing[3],
-							marginTop: spacing[4],
-						}}
-					>
-						<View
-							style={{
-								width: 22,
-								height: 22,
-								borderRadius: 6,
-								borderWidth: 2,
-								borderColor: isAnonymous
-									? colors.primary.main
-									: colors.border.dark,
-								backgroundColor: isAnonymous
-									? colors.primary.main
-									: "transparent",
-								alignItems: "center",
-								justifyContent: "center",
-							}}
-						>
-							{isAnonymous && (
-								<Body
-									weight="bold"
-									color={colors.primary.contrast as string}
-									style={{ fontSize: 13, lineHeight: 16 }}
-								>
-									✓
-								</Body>
-							)}
-						</View>
-						<Caption color="secondary" style={{ flex: 1 }}>
-							Donate anonymously — your name is hidden from the NGO
-						</Caption>
-					</Pressable>
-
-					{error && (
-						<Caption
-							color={colors.error.main as string}
-							style={{ marginTop: spacing[3] }}
-						>
-							{error}
-						</Caption>
-					)}
-
-					<Button
-						onPress={submit}
-						loading={donate.isPending}
-						style={{ marginTop: spacing[6] }}
-					>
+			onClose={onClose}
+			title="Donate"
+			subtitle={organizationName}
+			footer={
+				<>
+					<Button onPress={submit} loading={donate.isPending}>
 						Donate {formatMinor(amountMinor)}
 					</Button>
-
 					<Caption
 						color="quaternary"
-						style={{ textAlign: "center", marginTop: spacing[3] }}
+						style={{ textAlign: "center", marginTop: spacing[2] }}
 					>
-						Payment is completed securely in this app.
+						You'll be taken to a secure payment page to finish.
 					</Caption>
-				</ScrollView>
+				</>
+			}
+		>
+			<Label style={{ marginBottom: spacing[2] }}>Amount</Label>
+			<View
+				style={{
+					flexDirection: "row",
+					flexWrap: "wrap",
+					gap: spacing[2],
+				}}
+			>
+				{DONATION_PRESETS_MINOR.map((preset) => {
+					const active = !custom && amountMinor === preset;
+					return (
+						<Pressable
+							key={preset}
+							onPress={() => {
+								setCustom("");
+								setAmountMinor(preset);
+							}}
+							accessibilityRole="radio"
+							accessibilityState={{ checked: active }}
+							style={{
+								paddingHorizontal: spacing[4],
+								paddingVertical: spacing[2.5],
+								borderRadius: 12,
+								backgroundColor: active
+									? colors.primary.main
+									: colors.background.tertiary,
+							}}
+						>
+							<Body
+								weight={active ? "bold" : "normal"}
+								color={
+									active ? (colors.primary.contrast as string) : "secondary"
+								}
+							>
+								{formatMinor(preset)}
+							</Body>
+						</Pressable>
+					);
+				})}
 			</View>
-		</Modal>
+
+			<Label style={{ marginTop: spacing[4], marginBottom: spacing[1.5] }}>
+				Or enter an amount (₹)
+			</Label>
+			<Input
+				placeholder="e.g. 750"
+				value={custom}
+				onChangeText={(v) => {
+					const digits = v.replace(/\D/g, "");
+					setCustom(digits);
+					if (digits) setAmountMinor(Number(digits) * 100);
+				}}
+				keyboardType="number-pad"
+				style={[inputStyle, { maxWidth: 180 }]}
+			/>
+
+			{!me && (
+				<>
+					<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
+						Your name <Caption color="tertiary">(optional)</Caption>
+					</Label>
+					<Input
+						placeholder="Aditi Sharma"
+						value={guestName}
+						onChangeText={setGuestName}
+						style={inputStyle}
+					/>
+
+					<Label style={{ marginTop: spacing[4], marginBottom: spacing[1.5] }}>
+						Email for receipt
+					</Label>
+					<Input
+						placeholder="you@example.com"
+						value={guestEmail}
+						onChangeText={setGuestEmail}
+						keyboardType="email-address"
+						autoCapitalize="none"
+						style={inputStyle}
+					/>
+				</>
+			)}
+
+			<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
+				Message <Caption color="tertiary">(optional)</Caption>
+			</Label>
+			<Input
+				placeholder="Anything you'd like the NGO to know"
+				value={message}
+				onChangeText={setMessage}
+				multiline
+				style={{ ...inputStyle, minHeight: 88, textAlignVertical: "top" }}
+			/>
+
+			<Pressable
+				onPress={() => setAnonymous((v) => !v)}
+				accessibilityRole="checkbox"
+				accessibilityState={{ checked: isAnonymous }}
+				style={{
+					flexDirection: "row",
+					alignItems: "center",
+					gap: spacing[3],
+					marginTop: spacing[4],
+				}}
+			>
+				<View
+					style={{
+						width: 22,
+						height: 22,
+						borderRadius: 6,
+						borderWidth: 2,
+						borderColor: isAnonymous ? colors.primary.main : colors.border.dark,
+						backgroundColor: isAnonymous ? colors.primary.main : "transparent",
+						alignItems: "center",
+						justifyContent: "center",
+					}}
+				>
+					{isAnonymous && (
+						<Check
+							size={14}
+							color={colors.primary.contrast as string}
+							strokeWidth={3}
+						/>
+					)}
+				</View>
+				<Caption color="secondary" style={{ flex: 1 }}>
+					Donate anonymously — your name is hidden from the NGO
+				</Caption>
+			</Pressable>
+
+			{error && (
+				<Caption
+					color={colors.error.ink as string}
+					style={{ marginTop: spacing[3] }}
+				>
+					{error}
+				</Caption>
+			)}
+		</Sheet>
 	);
 }

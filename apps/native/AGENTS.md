@@ -45,6 +45,9 @@ defines.
   Supabase Auth session or clear the TanStack Query cache, so on a shared device the
   next person to sign in briefly sees the previous user's cached data. The hook
   does both.
+- Feed rows arrive as one generic server shape; `lib/feed-adapter.ts` is the only
+  place that knows its `content` keys. Screens read `FeedItem` (`kind` union) and
+  call `useFeed` / `useFeedReaction` / `useToggleFollow` — never the raw endpoints.
 - Uploads: ask `POST /api/uploads/intent` for a pre-signed ticket, PUT the bytes
   with **plain `fetch`, not the axios instance** — an Authorization header would
   break the signature — then submit the returned object key. Reads go through
@@ -54,25 +57,75 @@ defines.
 
 Two systems coexist deliberately:
 
-1. NativeWind v4 + Tailwind 3.4 (brand primary `#FF7E40`) with shadcn-style
-   `@rn-primitives` components in `src/components/ui/`.
+1. NativeWind v4 + Tailwind 3.4 with shadcn-style `@rn-primitives` components in
+   `src/components/ui/`.
 2. A token system in `src/constants/design-system.ts` consumed via `useTheme()`.
+
+`design-system.ts` is the **source of truth**. `src/global.css` mirrors it as HSL
+CSS variables and `tailwind.config.js` reads those variables, so both systems now
+theme together — change a colour in the token file and update the matching
+variable in the same pass, or the two layers drift.
 
 Most screens use inline `style={{}}` from the tokens rather than Tailwind classes.
 **Match whatever the file you're editing already does.**
 
-The Tailwind config is **light-mode only** (hard-coded hex, no dark variants) while
-screens theme through `useTheme()` — that's why cards/pills are composed from `View`
-+ theme tokens instead of the shadcn `Card`/`Badge`, which would stay light-on-light
-in dark mode. Use those primitives only if you first make the Tailwind theme
-dark-aware.
+`darkMode` is `"class"`, which means the `dark:` variant is driven manually:
+`ThemeProvider` (`hooks/useAppTheme.tsx`) calls NativeWind's `colorScheme.set()`
+and, on web, toggles `.dark` on `<html>`. Both are required — without the first,
+`dark:` never fires on native; without the second, the CSS variables never swap.
 
 Screens compose `components/screen-shell.tsx` (`ScreenHeader`, `Surface`,
 `EmptyState`, `LoadingState`, `ErrorState`, `FilterChips`) + `status-pill.tsx` —
 reuse these rather than rebuilding layouts.
 
+- **Pushed pages** render `<ScreenHeader back title=… />`: a 40pt chevron on the
+  left and the title on the same row. Never place `<BackButton />` on its own
+  line above a heading. The two hero pages (`events/[id]`, `ngos/[id]`) draw their
+  own row and must use `useSafeAreaInsets().top`, not a guessed `paddingTop`.
+- **Every sheet is `components/ui/sheet.tsx`.** Native is `@gorhom/bottom-sheet`
+  (pan to dismiss, detents, keyboard-aware, pinned title and footer); web is a
+  `Modal` behind the same props. Never import `Modal` in a screen. Body content
+  goes in `children`, the primary action in `footer`; a list body sets
+  `scrollable={false}` + `detents` and renders `SheetFlatList`; a pick-one list
+  uses `SheetOption`. `Input` already switches to gorhom's text input inside a
+  sheet, so forms need nothing special.
+- The volunteer home header is two rows ("Home" with the city chip and search on
+  the right, then the lens chips with a filter button). Search is its own route,
+  `app/search.tsx`, with example searches before typing and All / NGOs / Needs /
+  Events / Updates result tabs (the feed API takes `kind`). The cause filter is a
+  sheet. Notifications live in Activity — no bell on Home. Appearance is a row in
+  the volunteer Profile (`useAppTheme().preference`), not a floating toggle.
+
+### Colour rules
+
+`#FF7E40` is **a fill, not an ink** — it measures 2.53:1 on white, so it fails AA
+for any text, icon or 1px border. Use the tokens instead of reaching for `main`:
+
+- `primary.contrast` — label colour *on* a `primary.main` fill (7.44:1).
+- `primary.ink` — brand as text/icon on a light surface (7.31:1).
+- `<tone>.ink` — text grade on that tone's `bg` (6.8:1–10.4:1). `StatusPill` uses
+  these; a pill drawn in `<tone>.main` on its own tint is unreadable.
+- `text.quaternary` is the muted floor (4.61:1). Nothing lighter for real content.
+
+The type ramp lives in `components/ui/typography.tsx` and owns its own sizes,
+optical tracking and Dynamic Type ceilings. Don't override `fontSize` at call
+sites; add a ramp entry if a size is genuinely missing.
+
+Every interactive element needs `accessibilityRole`, a label if it has no visible
+text, and `accessibilityState` if it can be selected/checked/disabled. Icon-only
+controls (`BackButton`, `NotificationBell`, `ThemeToggle`, sidebar rows) are the
+worked examples. Focus rings matter on web: RNW renders none for `Pressable`, so
+read `focused` from the style callback and draw an `outline*` — `Button` and
+`Surface` show the pattern.
+
 ## Traps
 
+- **Import `Pressable` from `@/components/ui/pressable`, never from `react-native`.**
+  NativeWind's native interop flattens `style` with an object spread, so a style
+  *function* (`style={({ pressed }) => …}`) becomes `{}` on iOS and Android while
+  web renders it fine. The wrapper passes `cssInterop={false}`. `Button`, `Surface`,
+  the chips and the tab bar are all built on it; `className` is not processed on it,
+  which nothing in the app needs.
 - `expo-env.d.ts` is gitignored and generated — a fresh clone fails `tsc` on the
   `global.css` import until `expo start` (or equivalent) creates it.
 - Env: `EXPO_PUBLIC_API_URL` falls back to `10.0.2.2:3000` on Android in dev;

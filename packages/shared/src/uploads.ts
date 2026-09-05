@@ -26,8 +26,6 @@ export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 export const uploadIntentSchema = z.object({
 	purpose: uploadPurposeSchema,
-	/** Required for NGO verification documents so their storage name is stable. */
-	organizationDocumentType: z.string().trim().min(1).max(80).optional(),
 	fileName: z.string().trim().min(1).max(200),
 	contentType: uploadContentTypeSchema,
 	/** Checked against the limit up front; re-verified after the upload lands. */

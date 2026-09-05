@@ -1,52 +1,41 @@
 import { useRouter } from "expo-router";
-import { View } from "react-native";
 import { EventFeed } from "@/components/event-feed";
-import { ScreenHeader } from "@/components/screen-shell";
+import { Screen, ScreenHeader } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
-import { useTheme } from "@/hooks/use-theme";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
  * Public directory of volunteering events. Anyone can browse this without an
- * account; applying prompts a sign-in.
+ * account; applying prompts a sign-in. Signed-in people get here from inside
+ * the app, so the header offers a way back instead of a "My account" button.
  */
 export default function PublicEvents() {
-	const { colors, spacing } = useTheme();
 	const router = useRouter();
 	const email = useAuthStore((s) => s.email);
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<EventFeed
 				header={
-					<ScreenHeader
-						title="Volunteer"
-						subtitle="Events from verified NGOs across India."
-						action={
-							email ? (
+					email ? (
+						<ScreenHeader back title="Events" />
+					) : (
+						<ScreenHeader
+							title="Events"
+							subtitle="From verified NGOs across India"
+							action={
 								<Button
 									size="sm"
-									variant="outline"
-									onPress={() => router.replace("/")}
+									onPress={() => router.push("/(auth)/login")}
+									accessibilityLabel="Sign in to apply to events"
 								>
-									My account
-								</Button>
-							) : (
-								<Button size="sm" onPress={() => router.push("/(auth)/login")}>
 									Sign in
 								</Button>
-							)
-						}
-					/>
+							}
+						/>
+					)
 				}
 			/>
-		</View>
+		</Screen>
 	);
 }

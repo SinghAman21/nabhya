@@ -1,28 +1,31 @@
-import type { NeedType } from "@nabhya/shared";
-import { HeartHandshake, Plus } from "lucide-react-native";
+import type { NeedType, OrgNeedQuery } from "@nabhya/shared";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import { HeartHandshake } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, FlatList, Pressable, RefreshControl, View } from "react-native";
+import { FlatList, RefreshControl, View } from "react-native";
+import { LoadMoreFooter } from "@/components/load-more-footer";
 import { NeedFormSheet } from "@/components/need-form-sheet";
 import { PledgesSheet } from "@/components/pledges-sheet";
 import {
+	Banner,
 	EmptyState,
 	ErrorState,
 	FilterChips,
 	LoadingState,
+	Screen,
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
-import {
-	humanizeStatus,
-	StatusPill,
-	urgencyTone,
-} from "@/components/status-pill";
+import { humanizeStatus, StatusPill } from "@/components/status-pill";
+import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
-import { Body, Caption } from "@/components/ui/typography";
-import { useDeleteNeed, useOrgNeeds } from "@/hooks/use-needs";
+import { Body, Caption, Label } from "@/components/ui/typography";
+import { useDeleteNeed } from "@/hooks/use-needs";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
-import { apiErrorMessage } from "@/lib/api";
+import { Alert } from "@/lib/alert";
+import { apiErrorMessage, orgNeedsApi, queryKeys } from "@/lib/api";
 import { formatProgress, formatRelative } from "@/lib/format";
 import type { OrgNeedListItem } from "@/lib/types";
 
@@ -34,19 +37,43 @@ const FILTERS: Array<{ value: TypeFilter; label: string }> = [
 	{ value: "OFFER", label: "We're giving" },
 ];
 
+const PAGE_SIZE = 20;
+
+/**
+ * The org's needs, page by page. Shares the `["org","needs"]` prefix with
+ * `useOrgNeeds` so every needs mutation invalidates it too; the `paged` marker
+ * keeps its cache shape apart from the page-1 query the dashboard reads.
+ */
+function useOrgNeedPages(filters: Partial<OrgNeedQuery>) {
+	return useInfiniteQuery({
+		queryKey: queryKeys.orgNeeds({ ...filters, paged: true }),
+		queryFn: ({ pageParam }) =>
+			orgNeedsApi.list({ ...filters, page: pageParam, limit: PAGE_SIZE }),
+		initialPageParam: 1,
+		getNextPageParam: (last) =>
+			last.meta.hasMore ? last.meta.page + 1 : undefined,
+	});
+}
+
 export default function NgoNeeds() {
 	const { colors, spacing } = useTheme();
+	const router = useRouter();
 	const [filter, setFilter] = useState<TypeFilter>("ALL");
 	const [sheetOpen, setSheetOpen] = useState(false);
 	const [editing, setEditing] = useState<OrgNeedListItem | null>(null);
 	const [reviewing, setReviewing] = useState<OrgNeedListItem | null>(null);
 	const { data: me } = useMe();
 
-	const query = useOrgNeeds(filter === "ALL" ? {} : { type: filter });
+	const query = useOrgNeedPages(filter === "ALL" ? {} : { type: filter });
 	const deleteNeed = useDeleteNeed();
 
 	const isVerified = me?.organization?.verificationStatus === "VERIFIED";
-	const items = query.data?.items ?? [];
+	const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+	const total = query.data?.pages[0]?.meta.total ?? items.length;
+
+	const loadMore = () => {
+		if (query.hasNextPage && !query.isFetchingNextPage) query.fetchNextPage();
+	};
 
 	const confirmDelete = (need: OrgNeedListItem) => {
 		Alert.alert(
@@ -67,58 +94,39 @@ export default function NgoNeeds() {
 		);
 	};
 
+	const openCreate = () => setSheetOpen(true);
+
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<ScreenHeader
 				title="Needs"
-				subtitle="Post what you need, or what you can give away."
+				subtitle={
+					total > 0 ? `${total} post${total === 1 ? "" : "s"}` : undefined
+				}
 				action={
 					isVerified ? (
-						<Pressable
-							onPress={() => setSheetOpen(true)}
-							style={{
-								width: 44,
-								height: 44,
-								borderRadius: 22,
-								alignItems: "center",
-								justifyContent: "center",
-								backgroundColor: colors.primary.main,
-							}}
-						>
-							<Plus size={22} color={colors.primary.contrast as string} />
-						</Pressable>
+						<Button size="sm" onPress={openCreate}>
+							New post
+						</Button>
 					) : undefined
 				}
 			/>
 
 			{!isVerified && (
-				<Surface
-					style={{
-						marginBottom: spacing[4],
-						backgroundColor: colors.warning.bg,
-						borderColor: colors.warning.main,
-					}}
-				>
-					<Body weight="bold" color={colors.warning.dark as string}>
-						Verification pending
-					</Body>
-					<Caption color="secondary">
-						Your organization needs to be verified before you can publish posts.
-					</Caption>
-				</Surface>
+				<View style={{ marginBottom: spacing[4] }}>
+					<Banner
+						tone="warning"
+						title="Verification needed to post"
+						description="Needs and offers go into every volunteer's feed, so they unlock once your documents are approved."
+						onPress={() => router.push("/(ngo)/verification")}
+					/>
+				</View>
 			)}
 
 			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
 
 			{query.isLoading ? (
-				<LoadingState label="Loading your posts…" />
+				<LoadingState label="Loading your posts" />
 			) : query.isError ? (
 				<ErrorState
 					message={apiErrorMessage(query.error)}
@@ -131,29 +139,46 @@ export default function NgoNeeds() {
 					showsVerticalScrollIndicator={false}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
 					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
+					onEndReached={loadMore}
+					onEndReachedThreshold={0.5}
 					refreshControl={
 						<RefreshControl
-							refreshing={query.isRefetching}
+							refreshing={query.isRefetching && !query.isFetchingNextPage}
 							onRefresh={() => query.refetch()}
-							tintColor={colors.primary.main as string}
+							tintColor={colors.text.quaternary as string}
 						/>
 					}
 					ListEmptyComponent={
 						<EmptyState
 							icon={HeartHandshake}
-							title="Nothing posted yet"
+							title={
+								filter === "ALL"
+									? "Nothing posted yet"
+									: filter === "WANT"
+										? "No requests yet"
+										: "No offers yet"
+							}
 							description={
 								isVerified
-									? "Tell volunteers what your organization needs, or list surplus you can pass on."
+									? "Ask for what your programme needs, or list surplus you can pass on. Each post shows here with its pledges."
 									: "Once you're verified you'll be able to post here."
 							}
 							action={
 								isVerified ? (
-									<Button onPress={() => setSheetOpen(true)}>
-										Create your first post
+									<Button onPress={openCreate}>
+										{filter === "OFFER" ? "Offer something" : "Post a need"}
 									</Button>
 								) : undefined
 							}
+						/>
+					}
+					ListFooterComponent={
+						<LoadMoreFooter
+							hasMore={!!query.hasNextPage}
+							loading={query.isFetchingNextPage}
+							onLoadMore={loadMore}
+							count={items.length}
+							noun="posts"
 						/>
 					}
 					renderItem={({ item }) => (
@@ -179,10 +204,14 @@ export default function NgoNeeds() {
 				defaultCity={me?.organization?.city}
 				defaultState={me?.organization?.state}
 			/>
-		</View>
+		</Screen>
 	);
 }
 
+/**
+ * One post. Tapping the card opens its responses — that is the decision this
+ * screen exists for. Edit and Remove sit quietly in the footer.
+ */
 function NeedRow({
 	need,
 	onReview,
@@ -195,6 +224,7 @@ function NeedRow({
 	onDelete: () => void;
 }) {
 	const { colors, spacing } = useTheme();
+	const pending = need.pendingPledges ?? 0;
 
 	return (
 		<Surface onPress={onReview}>
@@ -203,28 +233,29 @@ function NeedRow({
 					flexDirection: "row",
 					alignItems: "center",
 					gap: spacing[2],
-					marginBottom: spacing[2],
+					marginBottom: spacing[2.5],
 				}}
 			>
 				<StatusPill
 					label={need.type === "WANT" ? "We need" : "We're giving"}
 					tone={need.type === "WANT" ? "info" : "success"}
 				/>
-				<StatusPill
-					label={
-						need.urgency === "HIGH" ? "Urgent" : humanizeStatus(need.urgency)
-					}
-					tone={urgencyTone(need.urgency)}
-				/>
+				{need.urgency === "HIGH" && <StatusPill label="Urgent" tone="error" />}
 				{need.status !== "OPEN" && (
 					<StatusPill label={humanizeStatus(need.status)} tone="neutral" />
 				)}
+				<View style={{ flex: 1 }} />
+				<Caption color="quaternary">{formatRelative(need.createdAt)}</Caption>
 			</View>
 
 			<Body weight="bold" numberOfLines={1}>
 				{need.title}
 			</Body>
-			<Caption color="tertiary" numberOfLines={2} style={{ marginTop: 2 }}>
+			<Caption
+				color="tertiary"
+				numberOfLines={2}
+				style={{ marginTop: spacing[0.5] }}
+			>
 				{need.description}
 			</Caption>
 
@@ -233,49 +264,39 @@ function NeedRow({
 					flexDirection: "row",
 					alignItems: "center",
 					justifyContent: "space-between",
-					marginTop: spacing[3],
-				}}
-			>
-				<Caption color="secondary">
-					{formatProgress(need.fulfilledQuantity, need.quantity, need.unit)}
-				</Caption>
-				<Caption color="quaternary">{formatRelative(need.createdAt)}</Caption>
-			</View>
-
-			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					justifyContent: "space-between",
+					gap: spacing[3],
 					marginTop: spacing[3],
 					paddingTop: spacing[3],
 					borderTopWidth: 1,
-					borderTopColor: colors.border.light,
+					borderTopColor: colors.border.hairline,
 				}}
 			>
-				<Caption
-					weight={need.pendingPledges > 0 ? "medium" : "normal"}
-					color={
-						need.pendingPledges > 0
-							? (colors.primary.main as string)
-							: "quaternary"
-					}
-				>
-					{need.pendingPledges > 0
-						? `${need.pendingPledges} awaiting review`
-						: "View responses"}
-				</Caption>
-				<View style={{ flexDirection: "row", gap: spacing[4] }}>
-					<Pressable onPress={onEdit} hitSlop={8}>
-						<Caption weight="medium" color="secondary">
-							Edit
-						</Caption>
-					</Pressable>
-					<Pressable onPress={onDelete} hitSlop={8}>
-						<Caption weight="medium" color={colors.error.main as string}>
-							Remove
-						</Caption>
-					</Pressable>
+				<View style={{ flex: 1, minWidth: 0 }}>
+					<Label numberOfLines={1}>
+						{formatProgress(need.fulfilledQuantity, need.quantity, need.unit)}
+					</Label>
+					<Caption
+						weight={pending > 0 ? "medium" : "normal"}
+						color={pending > 0 ? (colors.warning.ink as string) : "quaternary"}
+						numberOfLines={1}
+					>
+						{pending > 0
+							? `${pending} pledge${pending === 1 ? "" : "s"} to review`
+							: "Tap to see responses"}
+					</Caption>
+				</View>
+				<View style={{ flexDirection: "row", gap: spacing[3] }}>
+					<TextAction
+						label="Edit"
+						onPress={onEdit}
+						accessibilityLabel={`Edit ${need.title}`}
+					/>
+					<TextAction
+						label="Remove"
+						tone="danger"
+						onPress={onDelete}
+						accessibilityLabel={`Remove ${need.title}`}
+					/>
 				</View>
 			</View>
 		</Surface>

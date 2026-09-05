@@ -10,10 +10,18 @@ import {
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+	ListGroup,
+	ListRow,
+	LoadingState,
+	Screen,
+} from "@/components/screen-shell";
 import { StepIndicator } from "@/components/step-indicator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H2, Label } from "@/components/ui/typography";
 import {
 	useCategories,
@@ -21,9 +29,13 @@ import {
 	useMe,
 } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
+import { useMedia } from "@/hooks/useMedia";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
+import { focusable } from "@/lib/focus";
 
 const STEPS = ["You", "Location", "Causes", "Done"];
+const MAX_CAUSES = 5;
 
 interface VolunteerDraft {
 	fullName: string;
@@ -45,10 +57,13 @@ const emptyDraft: VolunteerDraft = {
 
 /**
  * Volunteer counterpart to the NGO wizard — same step-indicator shell, same
- * per-step validation, one submit at the end.
+ * per-step validation, one submit at the end. Back lives in the header beside
+ * the steps; each step ends in one full-width Continue.
  */
 export default function VolunteerOnboarding() {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
+	const { isDesktop } = useMedia();
+	const insets = useSafeAreaInsets();
 	const router = useRouter();
 	const [step, setStep] = useState(0);
 	const [draft, setDraft] = useState<VolunteerDraft>(emptyDraft);
@@ -75,72 +90,131 @@ export default function VolunteerOnboarding() {
 				onSuccess: () => router.replace("/(volunteer)"),
 				onError: (error) =>
 					Alert.alert(
-						"Could not finish setup",
-						apiErrorMessage(error, "Please check your details and try again."),
+						"Couldn't finish setup",
+						apiErrorMessage(error, "Check your details and try again."),
 					),
 			},
 		);
 	};
 
 	return (
-		<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
-			<StepIndicator steps={STEPS} currentStep={step} />
-
-			<ScrollView
-				style={{ flex: 1 }}
-				contentContainerStyle={{ padding: spacing[6], paddingTop: spacing[2] }}
-				keyboardShouldPersistTaps="handled"
+		<Screen style={{ paddingTop: 0, paddingHorizontal: 0 }}>
+			<View
+				style={
+					isDesktop
+						? { flex: 1, width: "100%", maxWidth: 560, alignSelf: "center" }
+						: { flex: 1 }
+				}
 			>
-				{step === 0 && (
-					<StepAbout
-						defaultValues={{
-							fullName: draft.fullName || (me?.name ?? ""),
-							phone: draft.phone || (me?.phone ?? ""),
-						}}
-						onSubmit={(data) => {
-							merge(data);
-							next();
-						}}
-					/>
-				)}
-				{step === 1 && (
-					<StepLocation
-						defaultValues={{ city: draft.city, state: draft.state }}
-						onSubmit={(data) => {
-							merge(data);
-							next();
-						}}
-					/>
-				)}
-				{step === 2 && (
-					<StepCauses
-						defaultValues={{ bio: draft.bio, categoryIds: draft.categoryIds }}
-						onSubmit={(data) => {
-							merge({
-								bio: data.bio ?? "",
-								categoryIds: data.categoryIds ?? [],
-							});
-							next();
-						}}
-					/>
-				)}
-				{step === 3 && (
-					<StepReview
-						draft={draft}
-						submitting={complete.isPending}
-						onComplete={submit}
-					/>
-				)}
-			</ScrollView>
+				<StepIndicator
+					steps={STEPS}
+					currentStep={step}
+					{...(step > 0 ? { onBack: back } : {})}
+				/>
 
-			{step > 0 && step !== 3 && (
-				<View
-					style={{ paddingHorizontal: spacing[6], paddingBottom: spacing[8] }}
+				<KeyboardAvoidingView
+					style={{ flex: 1 }}
+					behavior={Platform.OS === "ios" ? "padding" : undefined}
 				>
-					<Button variant="ghost" onPress={back}>
-						Back
-					</Button>
-				</View>
+					<ScrollView
+						style={{ flex: 1 }}
+						contentContainerStyle={{
+							paddingHorizontal: spacing[5],
+							paddingTop: spacing[2],
+							paddingBottom: insets.bottom + spacing[8],
+						}}
+						keyboardShouldPersistTaps="handled"
+						automaticallyAdjustKeyboardInsets
+						showsVerticalScrollIndicator={false}
+					>
+						{step === 0 && (
+							<StepAbout
+								defaultValues={{
+									fullName: draft.fullName || (me?.name ?? ""),
+									phone: draft.phone || (me?.phone ?? ""),
+								}}
+								onSubmit={(data) => {
+									merge(data);
+									next();
+								}}
+							/>
+						)}
+						{step === 1 && (
+							<StepLocation
+								defaultValues={{ city: draft.city, state: draft.state }}
+								onSubmit={(data) => {
+									merge(data);
+									next();
+								}}
+							/>
+						)}
+						{step === 2 && (
+							<StepCauses
+								defaultValues={{
+									bio: draft.bio,
+									categoryIds: draft.categoryIds,
+								}}
+								onSubmit={(data) => {
+									merge({
+										bio: data.bio ?? "",
+										categoryIds: data.categoryIds ?? [],
+									});
+									next();
+								}}
+							/>
+						)}
+						{step === 3 && (
+							<StepReview
+								draft={draft}
+								submitting={complete.isPending}
+								onComplete={submit}
+								onEdit={setStep}
+							/>
+						)}
+					</ScrollView>
+				</KeyboardAvoidingView>
+			</View>
+		</Screen>
+	);
+}
+
+// ─── Shared bits ─────────────────────────────────────────────────────────────
+
+function StepHeading({ title, lede }: { title: string; lede: string }) {
+	const { spacing } = useTheme();
+	return (
+		<View style={{ marginBottom: spacing[6] }}>
+			<H2 accessibilityRole="header">{title}</H2>
+			<Body color="tertiary" style={{ marginTop: spacing[1] }}>
+				{lede}
+			</Body>
+		</View>
+	);
+}
+
+function Field({
+	label,
+	optional,
+	error,
+	children,
+}: {
+	label: string;
+	optional?: boolean;
+	error?: string;
+	children: React.ReactNode;
+}) {
+	const { colors, spacing } = useTheme();
+	return (
+		<View style={{ marginBottom: spacing[4] }}>
+			<Label style={{ marginBottom: spacing[1.5] }}>
+				{label}
+				{optional && <Caption color="tertiary"> (optional)</Caption>}
+			</Label>
+			{children}
+			{error && (
+				<Caption color={colors.error.ink} style={{ marginTop: spacing[1] }}>
+					{error}
+				</Caption>
 			)}
 		</View>
 	);
@@ -155,55 +229,57 @@ function StepAbout({
 	defaultValues: VolunteerProfileStep;
 	onSubmit: (data: VolunteerProfileStep) => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const form = useForm<VolunteerProfileStep>({
 		// biome-ignore lint/suspicious/noExplicitAny: @hookform/resolvers v5 Zod v4 incompatibility
 		resolver: zodResolver(volunteerProfileStepSchema as any),
 		defaultValues,
 	});
 
-	const inputStyle = {
-		borderWidth: 0,
-		borderRadius: 12,
-		backgroundColor: colors.background.tertiary,
-		paddingVertical: spacing[3.5],
-	} as const;
-
 	return (
 		<View>
-			<H2 style={{ marginBottom: spacing[1] }}>About you</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
-				NGOs see this when you apply to their events.
-			</Body>
-
-			<Label style={{ marginBottom: spacing[1.5] }}>Full name</Label>
-			<Input
-				placeholder="e.g. Aditi Sharma"
-				value={form.watch("fullName")}
-				onChangeText={(v) =>
-					form.setValue("fullName", v, { shouldValidate: true })
-				}
-				autoCapitalize="words"
-				style={inputStyle}
+			<StepHeading
+				title="About you"
+				lede="NGOs see this when you apply to their events."
 			/>
-			<FieldError message={form.formState.errors.fullName?.message} />
 
-			<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-				Phone number
-			</Label>
-			<Input
-				placeholder="e.g. +91 98765 43210"
-				value={form.watch("phone")}
-				onChangeText={(v) =>
-					form.setValue("phone", v, { shouldValidate: true })
-				}
-				keyboardType="phone-pad"
-				style={inputStyle}
-			/>
-			<FieldError message={form.formState.errors.phone?.message} />
+			<Field label="Full name" error={form.formState.errors.fullName?.message}>
+				<Input
+					placeholder="e.g. Aditi Sharma"
+					value={form.watch("fullName")}
+					onChangeText={(v) =>
+						form.setValue("fullName", v, { shouldValidate: true })
+					}
+					autoCapitalize="words"
+					autoComplete="name"
+					textContentType="name"
+					returnKeyType="next"
+					accessibilityLabel="Full name"
+				/>
+			</Field>
 
-			<View style={{ height: spacing[8] }} />
-			<Button onPress={form.handleSubmit(onSubmit)}>Continue</Button>
+			<Field label="Phone number" error={form.formState.errors.phone?.message}>
+				<Input
+					placeholder="e.g. +91 98765 43210"
+					value={form.watch("phone")}
+					onChangeText={(v) =>
+						form.setValue("phone", v, { shouldValidate: true })
+					}
+					keyboardType="phone-pad"
+					autoComplete="tel"
+					textContentType="telephoneNumber"
+					returnKeyType="done"
+					accessibilityLabel="Phone number"
+				/>
+			</Field>
+
+			<Button
+				onPress={form.handleSubmit(onSubmit)}
+				size="lg"
+				style={{ marginTop: spacing[4] }}
+			>
+				Continue
+			</Button>
 		</View>
 	);
 }
@@ -217,56 +293,58 @@ function StepLocation({
 	defaultValues: VolunteerLocationStep;
 	onSubmit: (data: VolunteerLocationStep) => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const form = useForm<VolunteerLocationStep>({
 		// biome-ignore lint/suspicious/noExplicitAny: @hookform/resolvers v5 Zod v4 incompatibility
 		resolver: zodResolver(volunteerLocationStepSchema as any),
 		defaultValues,
 	});
 
-	const inputStyle = {
-		borderWidth: 0,
-		borderRadius: 12,
-		backgroundColor: colors.background.tertiary,
-		paddingVertical: spacing[3.5],
-	} as const;
-
 	return (
 		<View>
-			<H2 style={{ marginBottom: spacing[1] }}>Where are you?</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
-				We use this to show events and needs near you.
-			</Body>
+			<StepHeading
+				title="Where are you?"
+				lede="So we can show events and needs near you first."
+			/>
 
 			<View style={{ flexDirection: "row", gap: spacing[3] }}>
 				<View style={{ flex: 1 }}>
-					<Label style={{ marginBottom: spacing[1.5] }}>City</Label>
-					<Input
-						placeholder="Mumbai"
-						value={form.watch("city")}
-						onChangeText={(v) =>
-							form.setValue("city", v, { shouldValidate: true })
-						}
-						style={inputStyle}
-					/>
-					<FieldError message={form.formState.errors.city?.message} />
+					<Field label="City" error={form.formState.errors.city?.message}>
+						<Input
+							placeholder="Mumbai"
+							value={form.watch("city")}
+							onChangeText={(v) =>
+								form.setValue("city", v, { shouldValidate: true })
+							}
+							autoCapitalize="words"
+							returnKeyType="next"
+							accessibilityLabel="City"
+						/>
+					</Field>
 				</View>
 				<View style={{ flex: 1 }}>
-					<Label style={{ marginBottom: spacing[1.5] }}>State</Label>
-					<Input
-						placeholder="Maharashtra"
-						value={form.watch("state")}
-						onChangeText={(v) =>
-							form.setValue("state", v, { shouldValidate: true })
-						}
-						style={inputStyle}
-					/>
-					<FieldError message={form.formState.errors.state?.message} />
+					<Field label="State" error={form.formState.errors.state?.message}>
+						<Input
+							placeholder="Maharashtra"
+							value={form.watch("state")}
+							onChangeText={(v) =>
+								form.setValue("state", v, { shouldValidate: true })
+							}
+							autoCapitalize="words"
+							returnKeyType="done"
+							accessibilityLabel="State"
+						/>
+					</Field>
 				</View>
 			</View>
 
-			<View style={{ height: spacing[8] }} />
-			<Button onPress={form.handleSubmit(onSubmit)}>Continue</Button>
+			<Button
+				onPress={form.handleSubmit(onSubmit)}
+				size="lg"
+				style={{ marginTop: spacing[4] }}
+			>
+				Continue
+			</Button>
 		</View>
 	);
 }
@@ -292,17 +370,12 @@ function StepCauses({
 		},
 	});
 
-	const inputStyle = {
-		borderWidth: 0,
-		borderRadius: 12,
-		backgroundColor: colors.background.tertiary,
-		paddingVertical: spacing[3.5],
-	} as const;
+	const atLimit = selected.length >= MAX_CAUSES;
 
 	const toggle = (id: string) => {
 		const nextSelected = selected.includes(id)
 			? selected.filter((c) => c !== id)
-			: selected.length >= 5
+			: atLimit
 				? selected
 				: [...selected, id];
 		setSelected(nextSelected);
@@ -311,60 +384,93 @@ function StepCauses({
 
 	return (
 		<View>
-			<H2 style={{ marginBottom: spacing[1] }}>What do you care about?</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
-				Pick up to 5 causes. You can change these later.
-			</Body>
+			<StepHeading
+				title="What do you care about?"
+				lede={`Pick up to ${MAX_CAUSES} causes. You can change these later.`}
+			/>
 
 			{isLoading ? (
-				<Caption color="tertiary">Loading causes…</Caption>
+				<LoadingState label="Loading causes" />
 			) : (
 				<View
 					style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[2] }}
 				>
 					{(categories ?? []).map((category) => {
 						const active = selected.includes(category.id);
+						const blocked = !active && atLimit;
 						return (
 							<Pressable
 								key={category.id}
 								onPress={() => toggle(category.id)}
-								style={{
+								disabled={blocked}
+								hitSlop={4}
+								accessibilityRole="checkbox"
+								accessibilityLabel={category.name}
+								accessibilityState={{ checked: active, disabled: blocked }}
+								{...focusable}
+								style={({ pressed }) => ({
+									minHeight: 40,
+									justifyContent: "center",
 									paddingHorizontal: spacing[4],
-									paddingVertical: spacing[2.5],
-									borderRadius: 12,
+									borderRadius: 999,
 									backgroundColor: active
-										? colors.primary.main
-										: colors.background.tertiary,
-								}}
+										? (colors.text.primary as string)
+										: pressed
+											? colors.background.subtle
+											: "transparent",
+									borderWidth: active ? 0 : 1,
+									borderColor: colors.border.medium,
+									opacity: blocked ? 0.45 : 1,
+								})}
 							>
-								<Body
-									weight={active ? "bold" : "normal"}
-									color={
-										active ? (colors.primary.contrast as string) : "secondary"
-									}
+								<Label
+									weight={active ? "semibold" : "normal"}
+									color={active ? (colors.text.inverse as string) : "secondary"}
 								>
 									{category.name}
-								</Body>
+								</Label>
 							</Pressable>
 						);
 					})}
 				</View>
 			)}
+			<Caption color="quaternary" style={{ marginTop: spacing[2] }}>
+				{selected.length === 0
+					? "Pick at least one to get a feed that fits you."
+					: `${selected.length} of ${MAX_CAUSES} chosen`}
+			</Caption>
+			{form.formState.errors.categoryIds?.message && (
+				<Caption color={colors.error.ink} style={{ marginTop: spacing[1] }}>
+					{form.formState.errors.categoryIds.message}
+				</Caption>
+			)}
 
-			<Label style={{ marginTop: spacing[6], marginBottom: spacing[1.5] }}>
-				About you <Caption color="tertiary">(optional)</Caption>
-			</Label>
-			<Input
-				placeholder="Skills, availability, anything NGOs should know"
-				value={form.watch("bio") ?? ""}
-				onChangeText={(v) => form.setValue("bio", v, { shouldValidate: true })}
-				multiline
-				style={{ ...inputStyle, minHeight: 96, textAlignVertical: "top" }}
-			/>
-			<FieldError message={form.formState.errors.bio?.message} />
+			<View style={{ marginTop: spacing[6] }}>
+				<Field
+					label="About you"
+					optional
+					error={form.formState.errors.bio?.message}
+				>
+					<Input
+						placeholder="Skills, availability, anything NGOs should know"
+						value={form.watch("bio") ?? ""}
+						onChangeText={(v) =>
+							form.setValue("bio", v, { shouldValidate: true })
+						}
+						multiline
+						accessibilityLabel="About you"
+						style={{ minHeight: 96, textAlignVertical: "top" }}
+					/>
+				</Field>
+			</View>
 
-			<View style={{ height: spacing[8] }} />
-			<Button onPress={form.handleSubmit(onSubmit)}>Continue</Button>
+			<Button
+				onPress={form.handleSubmit(onSubmit)}
+				size="lg"
+				style={{ marginTop: spacing[2] }}
+			>
+				Continue
+			</Button>
 		</View>
 	);
 }
@@ -375,12 +481,14 @@ function StepReview({
 	draft,
 	submitting,
 	onComplete,
+	onEdit,
 }: {
 	draft: VolunteerDraft;
 	submitting: boolean;
 	onComplete: () => void;
+	onEdit: (step: number) => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const { data: categories } = useCategories();
 
 	const selectedNames = (categories ?? [])
@@ -388,82 +496,48 @@ function StepReview({
 		.map((c) => c.name)
 		.join(", ");
 
-	const rows = [
-		{ key: "Name", val: draft.fullName },
-		{ key: "Phone", val: draft.phone },
-		{ key: "City", val: draft.city },
-		{ key: "State", val: draft.state },
-		{ key: "Causes", val: selectedNames || "—" },
+	const rows: Array<{ label: string; value: string; step: number }> = [
+		{ label: "Name", value: draft.fullName, step: 0 },
+		{ label: "Phone", value: draft.phone, step: 0 },
+		{
+			label: "Location",
+			value: [draft.city, draft.state].filter(Boolean).join(", "),
+			step: 1,
+		},
+		{ label: "Causes", value: selectedNames, step: 2 },
 	];
 
 	return (
 		<View>
-			<H2 style={{ marginBottom: spacing[1] }}>Review & finish</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
-				Check your details before we set up your account.
-			</Body>
+			<StepHeading title="Check and finish" lede="Tap any line to change it." />
 
-			<View
-				style={{
-					backgroundColor: colors.background.primary,
-					borderRadius: 16,
-					borderWidth: 1,
-					borderColor: colors.border.light,
-					padding: spacing[5],
-					marginBottom: spacing[8],
-				}}
-			>
+			<ListGroup>
 				{rows.map((row) => (
-					<View
-						key={row.key}
-						style={{
-							flexDirection: "row",
-							justifyContent: "space-between",
-							paddingVertical: spacing[1.5],
-						}}
-					>
-						<Caption color="tertiary">{row.key}</Caption>
-						<Caption
-							weight="medium"
-							color={row.val && row.val !== "—" ? "primary" : "tertiary"}
-							style={{ flex: 1, textAlign: "right", marginLeft: spacing[4] }}
-							numberOfLines={1}
-						>
-							{row.val || "—"}
-						</Caption>
-					</View>
+					<ListRow
+						key={row.label}
+						label={row.label}
+						hint={row.value || "Not set"}
+						onPress={() => onEdit(row.step)}
+					/>
 				))}
-			</View>
+			</ListGroup>
 
-			<Body
-				color="secondary"
-				style={{ textAlign: "center", marginBottom: spacing[4] }}
+			<Caption
+				color="tertiary"
+				style={{ textAlign: "center", marginTop: spacing[5] }}
 			>
-				You can{" "}
-				<Body weight="bold" color="secondary">
-					edit everything later
-				</Body>{" "}
-				from your profile. Upload an ID whenever you're ready to get verified.
-			</Body>
+				You can edit all of this later from your profile, and verify your
+				identity whenever you're ready.
+			</Caption>
 
-			<Button onPress={onComplete} loading={submitting}>
-				Complete setup
+			<Button
+				onPress={onComplete}
+				loading={submitting}
+				size="lg"
+				style={{ marginTop: spacing[5] }}
+			>
+				Finish setup
 			</Button>
 		</View>
-	);
-}
-
-// ─── Shared ──────────────────────────────────────────────────────────────────
-
-function FieldError({ message }: { message?: string }) {
-	const { colors, spacing } = useTheme();
-	if (!message) return null;
-	return (
-		<Caption
-			color={colors.error.main as string}
-			style={{ marginTop: spacing[1] }}
-		>
-			{message}
-		</Caption>
 	);
 }

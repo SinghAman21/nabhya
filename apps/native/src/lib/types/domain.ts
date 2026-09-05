@@ -640,3 +640,135 @@ export interface AuditLogEntry {
 	/** Null for system actions, or when the actor has since been deleted. */
 	actor: { id: string; fullName: string | null; email: string } | null;
 }
+
+// ─── Feed ────────────────────────────────────────────────────────────────────
+
+/** Item type vocabulary the server uses for feed rows and interactions. */
+export type FeedApiItemType =
+	| "POST"
+	| "URGENT"
+	| "EVENT"
+	| "NEED"
+	| "ANNOUNCEMENT";
+
+/** One row exactly as `GET /api/feed/{for-you,trending,following}` returns it. */
+export interface FeedApiItem {
+	id: string;
+	type: FeedApiItemType;
+	organizationId: string | null;
+	organization: { id: string; name: string; logo: string | null } | null;
+	author: {
+		id: string;
+		fullName: string | null;
+		profileImage: string | null;
+	} | null;
+	createdAt: string;
+	city: string | null;
+	state: string | null;
+	latitude: number | null;
+	longitude: number | null;
+	urgency: NeedUrgency | null;
+	/** Type-specific facts; see `lib/feed-adapter.ts` for the keys per type. */
+	content: Record<string, unknown>;
+	engagement: FeedEngagement;
+	viewer: {
+		followsOrganization: boolean;
+		liked: boolean;
+		saved: boolean;
+	} | null;
+}
+
+export interface FeedEngagement {
+	likes: number;
+	saves: number;
+	shares: number;
+	comments: number;
+	applications: number;
+	pledges: number;
+}
+
+export interface FeedMedia {
+	id: string;
+	type: "IMAGE" | "VIDEO";
+	url: string;
+	sortOrder: number;
+}
+
+/** A row of `GET /api/feed` (chronological posts) and of `POST /api/feed`. */
+export interface FeedPostRecord {
+	id: string;
+	text: string;
+	createdAt: string;
+	author: { id: string; fullName: string | null };
+	media: Array<{ id: string; type: "IMAGE" | "VIDEO"; url: string }>;
+}
+
+/** The client's view of a feed row: what the card reads. */
+export type FeedKind = "need" | "event" | "story" | "post";
+
+interface FeedItemBase {
+	kind: FeedKind;
+	id: string;
+	title: string;
+	description: string;
+	city: string | null;
+	state: string | null;
+	postedAt: string;
+	isUrgent: boolean;
+	/** Whether the caller follows the posting NGO. */
+	isFollowing: boolean;
+	/** Null only for a post by a volunteer with no organisation. */
+	organization: OrganizationSummary | null;
+	author: { id: string; fullName: string | null } | null;
+	engagement: FeedEngagement;
+	viewer: { liked: boolean; saved: boolean } | null;
+}
+
+export interface FeedNeedItem extends FeedItemBase {
+	kind: "need";
+	need: {
+		type: NeedType;
+		quantity: number | null;
+		unit: string | null;
+		fulfilledQuantity: number;
+		urgency: NeedUrgency;
+		status: NeedStatus;
+		expiresAt: string | null;
+	};
+}
+
+export interface FeedEventItem extends FeedItemBase {
+	kind: "event";
+	event: {
+		coverImage: string | null;
+		venue: string | null;
+		startAt: string;
+		endAt: string;
+		applicationDeadline: string | null;
+		volunteersNeeded: number;
+		acceptedCount: number;
+		status: EventStatus;
+	};
+}
+
+export interface FeedStoryItem extends FeedItemBase {
+	kind: "story";
+	story: {
+		coverImageKey: string | null;
+		isPinned: boolean;
+	};
+}
+
+export interface FeedPostItem extends FeedItemBase {
+	kind: "post";
+	post: {
+		text: string;
+		media: FeedMedia[];
+	};
+}
+
+export type FeedItem =
+	| FeedNeedItem
+	| FeedEventItem
+	| FeedStoryItem
+	| FeedPostItem;

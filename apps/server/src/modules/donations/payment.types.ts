@@ -8,15 +8,16 @@ export interface CheckoutRequest {
 	organizationName: string;
 	donorName?: string | null;
 	donorEmail?: string | null;
+	returnUrl: string;
 }
 
 export interface CheckoutResult {
-	/** Provider's handle for the session (order id), stored for reconciliation. */
+	/** Provider's handle for the session, stored for reconciliation. */
 	providerCheckoutId: string;
-	amountMinor: number;
-	currency: string;
-	/** Public key the client needs to open the native checkout. Not a secret. */
-	publicKeyId: string;
+	checkoutUrl?: string;
+	amountMinor?: number;
+	currency?: string;
+	publicKeyId?: string;
 }
 
 export type PaymentEventKind = "SUCCEEDED" | "FAILED" | "REFUNDED" | "IGNORED";

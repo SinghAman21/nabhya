@@ -164,8 +164,6 @@ export const updateUserProfileSchema = z.object({
 	bio: optionalText(500),
 	city: z.string().trim().min(2).max(80).optional(),
 	state: z.string().trim().min(2).max(80).optional(),
-	latitude: z.coerce.number().min(-90).max(90).optional(),
-	longitude: z.coerce.number().min(-180).max(180).optional(),
 });
 
 export type UpdateUserProfileInput = z.infer<typeof updateUserProfileSchema>;

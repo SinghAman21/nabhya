@@ -1,11 +1,12 @@
-import { X } from "lucide-react-native";
 import { useEffect, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, View } from "react-native";
+import { View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Body, Caption, H2, Label } from "@/components/ui/typography";
+import { Sheet } from "@/components/ui/sheet";
+import { Body, Caption, Label } from "@/components/ui/typography";
 import { useCreatePledge, usePublicNeed } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/use-theme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatProgress } from "@/lib/format";
 import type { PublicNeed } from "@/lib/types";
@@ -25,7 +26,7 @@ export function PledgeSheet({
 	need: PublicNeed | null;
 	onClose: () => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { colors, spacing, borderRadius } = useTheme();
 	const [quantity, setQuantity] = useState("");
 	const [message, setMessage] = useState("");
 	const [error, setError] = useState<string | null>(null);
@@ -34,8 +35,14 @@ export function PledgeSheet({
 	// `fulfilledQuantity` moves as other people pledge. Re-reading the need
 	// keeps "only N still needed" honest instead of validating against a stale
 	// number the server will then reject.
-	const fresh = usePublicNeed(listItem?.id);
-	const need = fresh.data ?? listItem;
+	// Remember the last need so the sheet can animate closed after the caller
+	// clears it; `visible` follows the caller, the content follows this.
+	const [shown, setShown] = useState<PublicNeed | null>(listItem);
+	useEffect(() => {
+		if (listItem) setShown(listItem);
+	}, [listItem]);
+	const fresh = usePublicNeed(shown?.id);
+	const need = fresh.data ?? shown;
 
 	const pledge = useCreatePledge(need?.id ?? "");
 
@@ -58,8 +65,8 @@ export function PledgeSheet({
 
 	const inputStyle = {
 		borderWidth: 0,
-		borderRadius: 12,
-		backgroundColor: colors.background.tertiary,
+		borderRadius: borderRadius.md,
+		backgroundColor: colors.background.subtle,
 		paddingVertical: spacing[3.5],
 	} as const;
 
@@ -96,103 +103,77 @@ export function PledgeSheet({
 	// Visibility tracks the caller's selection rather than `need`: a cached
 	// detail response must not keep the sheet open after it is dismissed.
 	return (
-		<Modal
+		<Sheet
 			visible={!!listItem}
-			animationType="slide"
-			presentationStyle="pageSheet"
-			onRequestClose={onClose}
+			onClose={onClose}
+			title={isWant ? "Offer to help" : "Claim this"}
+			subtitle={need.organization.organizationName}
+			footer={
+				<Button onPress={submit} loading={pledge.isPending}>
+					{isWant ? "Send offer" : "Request this"}
+				</Button>
+			}
 		>
-			<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "flex-start",
-						justifyContent: "space-between",
-						gap: spacing[3],
-						paddingHorizontal: spacing[6],
-						paddingTop: spacing[6],
-						paddingBottom: spacing[2],
-					}}
-				>
-					<View style={{ flex: 1 }}>
-						<H2 numberOfLines={2}>{isWant ? "Offer to help" : "Claim this"}</H2>
-						<Caption color="tertiary" numberOfLines={1}>
-							{need.organization.organizationName}
-						</Caption>
-					</View>
-					<Pressable onPress={onClose} hitSlop={12}>
-						<X size={22} color={colors.text.tertiary as string} />
-					</Pressable>
-				</View>
+			<View
+				style={{
+					padding: spacing[3.5],
+					borderRadius: borderRadius.md,
+					backgroundColor: colors.background.warm,
+					marginBottom: spacing[5],
+				}}
+			>
+				<Body weight="bold" numberOfLines={2}>
+					{need.title}
+				</Body>
+				<Caption color="tertiary" style={{ marginTop: spacing[0.5] }}>
+					{formatProgress(need.fulfilledQuantity, need.quantity, need.unit)}
+					{remaining !== null ? ` · ${remaining} still needed` : ""}
+				</Caption>
+			</View>
 
-				<ScrollView
-					contentContainerStyle={{
-						padding: spacing[6],
-						paddingTop: spacing[4],
-					}}
-					keyboardShouldPersistTaps="handled"
-				>
-					<Body weight="bold" style={{ marginBottom: spacing[1] }}>
-						{need.title}
-					</Body>
-					<Caption color="tertiary" style={{ marginBottom: spacing[5] }}>
-						{formatProgress(need.fulfilledQuantity, need.quantity, need.unit)}
-						{remaining !== null ? ` · ${remaining} still needed` : ""}
-					</Caption>
-
-					{need.quantity !== null && (
-						<>
-							<Label style={{ marginBottom: spacing[1.5] }}>
-								How many {need.unit ?? "items"}?
-							</Label>
-							<Input
-								placeholder={remaining ? String(remaining) : "e.g. 10"}
-								value={quantity}
-								onChangeText={(v) => setQuantity(v.replace(/\D/g, ""))}
-								keyboardType="number-pad"
-								style={[inputStyle, { maxWidth: 160 }]}
-							/>
-						</>
-					)}
-
-					<Label
-						style={{
-							marginTop: need.quantity !== null ? spacing[5] : 0,
-							marginBottom: spacing[1.5],
-						}}
-					>
-						Message <Caption color="tertiary">(optional)</Caption>
+			{need.quantity !== null && (
+				<>
+					<Label style={{ marginBottom: spacing[1.5] }}>
+						How many {need.unit ?? "items"}?
 					</Label>
 					<Input
-						placeholder={
-							isWant
-								? "Condition of the items, when you can drop them off…"
-								: "How you'll use these, when you can collect…"
-						}
-						value={message}
-						onChangeText={setMessage}
-						multiline
-						style={{ ...inputStyle, minHeight: 96, textAlignVertical: "top" }}
+						placeholder={remaining ? String(remaining) : "e.g. 10"}
+						value={quantity}
+						onChangeText={(v) => setQuantity(v.replace(/\D/g, ""))}
+						keyboardType="number-pad"
+						style={[inputStyle, { maxWidth: 160 }]}
 					/>
+				</>
+			)}
 
-					{error && (
-						<Caption
-							color={colors.error.main as string}
-							style={{ marginTop: spacing[3] }}
-						>
-							{error}
-						</Caption>
-					)}
+			<Label
+				style={{
+					marginTop: need.quantity !== null ? spacing[5] : 0,
+					marginBottom: spacing[1.5],
+				}}
+			>
+				Message <Caption color="tertiary">(optional)</Caption>
+			</Label>
+			<Input
+				placeholder={
+					isWant
+						? "Condition of the items, when you can drop them off…"
+						: "How you'll use these, when you can collect…"
+				}
+				value={message}
+				onChangeText={setMessage}
+				multiline
+				style={{ ...inputStyle, minHeight: 96, textAlignVertical: "top" }}
+			/>
 
-					<Button
-						onPress={submit}
-						loading={pledge.isPending}
-						style={{ marginTop: spacing[6] }}
-					>
-						{isWant ? "Send offer" : "Request this"}
-					</Button>
-				</ScrollView>
-			</View>
-		</Modal>
+			{error && (
+				<Caption
+					color={colors.error.ink as string}
+					style={{ marginTop: spacing[3] }}
+				>
+					{error}
+				</Caption>
+			)}
+		</Sheet>
 	);
 }

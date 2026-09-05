@@ -1,10 +1,10 @@
+import { randomUUID } from "node:crypto";
 import type { db as dbType } from "@nabhya/db";
-import { organizationDocuments, organizations } from "@nabhya/db/schema";
+import { organizations } from "@nabhya/db/schema";
 import type {
 	CreateFeedMediaIntentsInput,
 	UploadIntentInput,
 } from "@nabhya/shared";
-import { MAX_FEED_MEDIA_BYTES, MAX_UPLOAD_BYTES } from "@nabhya/shared";
 import {
 	BadRequestException,
 	ForbiddenException,
@@ -12,14 +12,11 @@ import {
 	Injectable,
 	NotFoundException,
 } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { DB_TOKEN } from "../../common/database";
 import {
-	type AllowedContentType,
-	buildFeedMediaKey,
-	buildOrgVerificationKey,
 	buildStorageKey,
-	createFeedMediaFolder,
+	MAX_UPLOAD_BYTES,
 	parseStorageKey,
 	STORAGE_TOKEN,
 	type StorageProvider,
@@ -27,6 +24,7 @@ import {
 } from "../../common/storage";
 import type { AuthUser } from "../../common/types";
 
+/** Purposes whose objects are scoped to an organization rather than a user. */
 const ORG_SCOPED: StoragePurpose[] = [
 	"ORG_DOCUMENT",
 	"ORG_LOGO",
@@ -42,64 +40,74 @@ export class UploadsService {
 		@Inject(STORAGE_TOKEN) private readonly storage: StorageProvider,
 	) {}
 
+	/**
+	 * Issues a pre-signed upload URL.
+	 *
+	 * The key is derived server-side from the caller's identity — the client
+	 * never proposes one — so a volunteer cannot obtain a ticket that writes
+	 * into another organization's prefix.
+	 */
 	async createIntent(user: AuthUser, input: UploadIntentInput) {
-		const purpose = input.purpose as Exclude<StoragePurpose, "FEED_MEDIA">;
-		if (purpose === "ORG_DOCUMENT") {
-			if (!input.organizationDocumentType) {
-				throw new BadRequestException(
-					"Choose the verification document type before uploading.",
-				);
-			}
-			const organization = await this.requireOwnedOrganization(user.id);
-			return this.storage.createUploadTicket({
-				key: buildOrgVerificationKey({
-					organizationName: organization.organizationName,
-					documentType: input.organizationDocumentType,
-					fileName: input.fileName,
-				}),
-				contentType: input.contentType as AllowedContentType,
-			});
-		}
-
+		const purpose = input.purpose as StoragePurpose;
 		const ownerId = await this.resolveOwnerId(user, purpose);
+
+		const key = buildStorageKey({
+			purpose,
+			ownerId,
+			fileName: input.fileName,
+		});
+
 		return this.storage.createUploadTicket({
-			key: buildStorageKey({ purpose, ownerId, fileName: input.fileName }),
-			contentType: input.contentType as AllowedContentType,
+			key,
+			contentType: input.contentType,
 		});
 	}
 
-	/** Allocates one timestamp folder for all media attached to a single post. */
-	createEmptyFeedMediaFolder() {
-		return createFeedMediaFolder();
+	/**
+	 * Confirms an upload actually landed and is within limits.
+	 *
+	 * A signed PUT cannot cap body size, so this is where an oversized object is
+	 * caught. Callers run it before persisting a key against a document row.
+	 */
+	async assertUploaded(key: string): Promise<void> {
+		const object = await this.storage.head(key);
+
+		if (!object) {
+			throw new BadRequestException(
+				"That file was not uploaded. Please try again.",
+			);
+		}
+		if (object.size > MAX_UPLOAD_BYTES) {
+			await this.storage.delete(key);
+			throw new BadRequestException("Files must be under 10 MB.");
+		}
+	}
+
+	createEmptyFeedMediaFolder(): string {
+		const timestamp = Date.now().toString().padStart(12, "0").slice(-12);
+		return `${timestamp}-${randomUUID().replace(/-/g, "").slice(0, 6)}`;
 	}
 
 	async createFeedMediaIntents(
 		user: AuthUser,
 		files: CreateFeedMediaIntentsInput["files"],
 	) {
-		const mediaFolder = createFeedMediaFolder();
+		const mediaFolder = this.createEmptyFeedMediaFolder();
 		const tickets = await Promise.all(
-			files.map((file, index) =>
-				this.storage.createUploadTicket({
-					key: buildFeedMediaKey({
-						folder: mediaFolder,
-						ownerId: user.id,
-						index,
-						fileName: file.fileName,
-					}),
+			files.map(async (file) => {
+				const safeName =
+					file.fileName
+						.toLowerCase()
+						.replace(/[^a-z0-9._-]+/g, "-")
+						.slice(-80) || "file";
+				const key = `feed-media/${user.id}/${mediaFolder}/${randomUUID()}-${safeName}`;
+				return this.storage.createUploadTicket({
+					key,
 					contentType: file.contentType,
-				}),
-			),
+				});
+			}),
 		);
 		return { mediaFolder, tickets };
-	}
-
-	async assertUploaded(key: string): Promise<void> {
-		await this.assertObject(
-			key,
-			MAX_UPLOAD_BYTES,
-			"Files must be under 10 MB.",
-		);
 	}
 
 	async assertFeedMediaKeys(
@@ -107,67 +115,48 @@ export class UploadsService {
 		mediaFolder: string,
 		keys: string[],
 	): Promise<void> {
-		if (new Set(keys).size !== keys.length)
-			throw new BadRequestException("Each feed media item must be unique.");
-		const expectedPrefix = `feed_media/${mediaFolder}/${user.id}-`;
-		for (const key of keys) {
-			if (!key.startsWith(expectedPrefix)) {
-				throw new ForbiddenException(
-					"Feed media must be uploaded using your post upload ticket.",
-				);
-			}
-			const object = await this.assertObject(
-				key,
-				MAX_FEED_MEDIA_BYTES,
-				"Feed media must be under 25 MB.",
-			);
-			if (
-				!object.contentType ||
-				![
-					"image/jpeg",
-					"image/png",
-					"image/webp",
-					"video/mp4",
-					"video/quicktime",
-				].includes(object.contentType)
-			) {
-				await this.storage.delete(key);
-				throw new BadRequestException(
-					"Feed posts accept JPEG, PNG, WebP, MP4, and MOV media only.",
-				);
-			}
-		}
+		if (!/^\d{12}-[a-z0-9]{6}$/.test(mediaFolder))
+			throw new BadRequestException("Malformed feed media folder");
+		const prefix = `feed-media/${user.id}/${mediaFolder}/`;
+		if (keys.some((key) => !key.startsWith(prefix)))
+			throw new ForbiddenException("You cannot use these media files.");
+		await Promise.all(
+			keys.map(async (key) => {
+				const object = await this.storage.head(key);
+				if (!object)
+					throw new BadRequestException("That feed media was not uploaded.");
+				if (object.size > 25 * 1024 * 1024) {
+					await this.storage.delete(key);
+					throw new BadRequestException("Feed media must be under 25 MB.");
+				}
+			}),
+		);
 	}
 
+	/**
+	 * Signed read URL, gated on the caller owning the object or being a
+	 * superadmin. Ownership is read from the key itself, which always encodes
+	 * the owning user or organization.
+	 */
 	async createDownloadUrl(user: AuthUser, key: string) {
 		const parsed = parseStorageKey(key);
-		if (!parsed || parsed.purpose === "FEED_MEDIA")
+		if (!parsed) {
 			throw new BadRequestException("Malformed file reference");
-		if (!user.roles.includes("superadmin")) {
-			if (parsed.purpose === "ORG_DOCUMENT") {
-				const organization = await this.db.query.organizations.findFirst({
-					where: eq(organizations.ownerUserId, user.id),
-					columns: { id: true },
-				});
-				if (
-					!organization ||
-					!(await this.db.query.organizationDocuments.findFirst({
-						where: and(
-							eq(organizationDocuments.organizationId, organization.id),
-							eq(organizationDocuments.documentKey, key),
-						),
-						columns: { id: true },
-					}))
-				)
-					throw new ForbiddenException("You cannot access this file.");
-			} else if (
-				parsed.ownerId !== (await this.resolveOwnerId(user, parsed.purpose))
-			) {
+		}
+
+		const isSuperadmin = user.roles.includes("superadmin");
+		if (!isSuperadmin) {
+			const ownerId = await this.resolveOwnerId(user, parsed.purpose);
+			if (ownerId !== parsed.ownerId) {
 				throw new ForbiddenException("You cannot access this file.");
 			}
 		}
+
 		const object = await this.storage.head(key);
-		if (!object) throw new NotFoundException("File not found");
+		if (!object) {
+			throw new NotFoundException("File not found");
+		}
+
 		const expiresInSeconds = 10 * 60;
 		return {
 			url: await this.storage.createDownloadUrl(key, expiresInSeconds),
@@ -175,40 +164,24 @@ export class UploadsService {
 		};
 	}
 
-	private async assertObject(
-		key: string,
-		maxSize: number,
-		tooLargeMessage: string,
-	) {
-		const object = await this.storage.head(key);
-		if (!object)
-			throw new BadRequestException(
-				"That file was not uploaded. Please try again.",
-			);
-		if (object.size > maxSize) {
-			await this.storage.delete(key);
-			throw new BadRequestException(tooLargeMessage);
-		}
-		return object;
-	}
-
+	/** Org-scoped objects belong to the caller's organization, others to them. */
 	private async resolveOwnerId(
 		user: AuthUser,
-		purpose: Exclude<StoragePurpose, "FEED_MEDIA">,
+		purpose: StoragePurpose,
 	): Promise<string> {
 		if (!ORG_SCOPED.includes(purpose)) return user.id;
-		return (await this.requireOwnedOrganization(user.id)).id;
-	}
 
-	private async requireOwnedOrganization(userId: string) {
 		const organization = await this.db.query.organizations.findFirst({
-			where: eq(organizations.ownerUserId, userId),
-			columns: { id: true, organizationName: true },
+			where: eq(organizations.ownerUserId, user.id),
+			columns: { id: true },
 		});
-		if (!organization)
+
+		if (!organization) {
 			throw new ForbiddenException(
 				"Complete organization onboarding before uploading these files.",
 			);
-		return organization;
+		}
+
+		return organization.id;
 	}
 }

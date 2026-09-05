@@ -16,6 +16,7 @@ import {
 	users,
 } from "@nabhya/db/schema";
 import type {
+	FeedFilterQuery,
 	FollowingFeedQuery,
 	ForYouFeedQuery,
 	PostTag,
@@ -73,7 +74,7 @@ export class FeedRankingService {
 	) {}
 
 	async forYou(user: AuthUser | undefined, query: ForYouFeedQuery) {
-		const candidates = await this.candidates(user);
+		const candidates = applyFilters(await this.candidates(user), query);
 		const context = await this.viewerContext(user?.id);
 		for (const candidate of candidates)
 			candidate.score = this.forYouScore(candidate, context);
@@ -86,7 +87,7 @@ export class FeedRankingService {
 	}
 
 	async trending(user: AuthUser | undefined, query: TrendingFeedQuery) {
-		const candidates = await this.candidates(user);
+		const candidates = applyFilters(await this.candidates(user), query);
 		const context = await this.viewerContext(user?.id);
 		for (const candidate of candidates)
 			candidate.score = this.trendingScore(candidate, context);
@@ -99,7 +100,7 @@ export class FeedRankingService {
 	}
 
 	async following(user: AuthUser, query: FollowingFeedQuery) {
-		const candidates = await this.candidates(user);
+		const candidates = applyFilters(await this.candidates(user), query);
 		const following = new Set(
 			(
 				await this.db
@@ -605,6 +606,65 @@ export class FeedRankingService {
 			.map(({ score: _score, ...item }) => item);
 		return paginate(page, total, query);
 	}
+}
+
+const URGENT_WINDOW_MS = 3 * 86_400_000;
+
+/**
+ * Cuts the candidate pool to what the caller asked for, before scoring and
+ * before pagination, so `total` reflects the filtered pool and page N is
+ * stable. Substring matching is case-insensitive; `city` falls back to the
+ * NGO's city because posts and announcements rarely carry their own.
+ */
+function applyFilters(candidates: Candidate[], query: FeedFilterQuery) {
+	const search = query.search?.toLowerCase();
+	const city = query.city?.toLowerCase();
+	const now = Date.now();
+	return candidates.filter((candidate) => {
+		if (query.kind) {
+			// Urgent posts are still posts to a reader asking for posts.
+			const type = candidate.type === "URGENT" ? "POST" : candidate.type;
+			if (type !== query.kind && candidate.type !== query.kind) return false;
+		}
+		if (query.categoryId && !candidate.categoryIds.includes(query.categoryId))
+			return false;
+		if (city && !(candidate.city ?? "").toLowerCase().includes(city))
+			return false;
+		if (query.urgent && !isUrgent(candidate, now)) return false;
+		if (search) {
+			const haystack = [
+				candidate.content.title,
+				candidate.content.text,
+				candidate.content.description,
+				candidate.content.body,
+				candidate.organization?.name,
+			]
+				.filter((value): value is string => typeof value === "string")
+				.join(" ")
+				.toLowerCase();
+			if (!haystack.includes(search)) return false;
+		}
+		return true;
+	});
+}
+
+/** HIGH-urgency needs, urgent posts, and events that start within three days. */
+function isUrgent(candidate: Candidate, now: number) {
+	if (candidate.type === "URGENT") return true;
+	if (candidate.type === "NEED") return candidate.urgency === "HIGH";
+	if (candidate.type === "EVENT") {
+		const startAt = candidate.content.startAt;
+		const start =
+			startAt instanceof Date
+				? startAt.getTime()
+				: typeof startAt === "string"
+					? Date.parse(startAt)
+					: Number.NaN;
+		return (
+			Number.isFinite(start) && start >= now && start - now <= URGENT_WINDOW_MS
+		);
+	}
+	return false;
 }
 
 function emptyEngagement() {

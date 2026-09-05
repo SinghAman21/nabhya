@@ -3,7 +3,14 @@ export const lightColors = {
 		main: "#FF7E40",
 		light: "#FFA366",
 		dark: "#E05A1A",
-		contrast: "#FFFFFF",
+		/** Label colour on a `primary.main` fill. Warm near-black: 7.44:1.
+		 *  White here was 2.53:1 — the old default failed WCAG AA on every button. */
+		contrast: "#1A0F0A",
+		/** Brand as *text* on a light surface. #FF7E40 is 2.53:1 and unusable
+		 *  for type or icons; this is 7.31:1 on white, 6.71:1 on `primary.tint`. */
+		ink: "#9A3412",
+		/** Faint brand wash for selected rows and brand-toned pills. */
+		tint: "#FFF3EC",
 	},
 	neutral: {
 		50: "#FAFAFA",
@@ -25,6 +32,8 @@ export const lightColors = {
 		dark: "#16A34A",
 		bg: "#F0FDF4",
 		border: "#22C55E",
+		/** Text/icon grade on this tone's `bg` (6.81:1). `main` is a fill colour. */
+		ink: "#166534",
 	},
 	error: {
 		main: "#EF4444",
@@ -32,6 +41,8 @@ export const lightColors = {
 		dark: "#DC2626",
 		bg: "#FEF2F2",
 		border: "#EF4444",
+		/** Text/icon grade on this tone's `bg` (7.60:1). `main` is a fill colour. */
+		ink: "#991B1B",
 	},
 	warning: {
 		main: "#F59E0B",
@@ -39,6 +50,8 @@ export const lightColors = {
 		dark: "#D97706",
 		bg: "#FFFBEB",
 		border: "#F59E0B",
+		/** Text/icon grade on this tone's `bg` (6.84:1). `main` is a fill colour. */
+		ink: "#92400E",
 	},
 	info: {
 		main: "#3B82F6",
@@ -46,6 +59,8 @@ export const lightColors = {
 		dark: "#2563EB",
 		bg: "#EFF6FF",
 		border: "#3B82F6",
+		/** Text/icon grade on this tone's `bg` (8.01:1). `main` is a fill colour. */
+		ink: "#1E40AF",
 	},
 	background: {
 		warm: "#FBFBF9",
@@ -53,19 +68,25 @@ export const lightColors = {
 		secondary: "#FAFAFA",
 		tertiary: "#F5F5F5",
 		overlay: "#E5E5E5",
+		/** Raised surface: cards, grouped lists, sheets. */
+		card: "#FFFFFF",
+		/** Inset surface: chips, icon wells, quiet fills inside a card. */
+		subtle: "#F4F4F2",
 	},
 	text: {
 		primary: "#111111",
 		secondary: "#404040",
 		tertiary: "#666666",
-		quaternary: "#999999",
-		disabled: "#CCCCCC",
+		quaternary: "#757575",
+		disabled: "#8E8E8E",
 		inverse: "#FFFFFF",
 	},
 	border: {
 		light: "#F3F4F6",
 		medium: "#E5E7EB",
 		dark: "#D1D5DB",
+		/** Divider inside a grouped list. Visible, but only just. */
+		hairline: "#ECECE8",
 	},
 	special: {
 		premium: "#FBBF24",
@@ -82,7 +103,10 @@ export const darkColors = {
 		main: "#FF7E40",
 		light: "#FFA366",
 		dark: "#E05A1A",
-		contrast: "#111111",
+		contrast: "#1A0F0A",
+		/** 9.49:1 on the dark background — the light-mode ink would vanish here. */
+		ink: "#FF9A66",
+		tint: "#3A1608",
 	},
 	neutral: {
 		50: "#171717",
@@ -104,6 +128,8 @@ export const darkColors = {
 		dark: "#16A34A",
 		bg: "#052E16",
 		border: "#22C55E",
+		/** Text/icon grade on this tone's dark `bg` (9.65:1). */
+		ink: "#6EE7A0",
 	},
 	error: {
 		main: "#EF4444",
@@ -111,6 +137,8 @@ export const darkColors = {
 		dark: "#DC2626",
 		bg: "#450A0A",
 		border: "#EF4444",
+		/** Text/icon grade on this tone's dark `bg` (8.51:1). */
+		ink: "#FCA5A5",
 	},
 	warning: {
 		main: "#F59E0B",
@@ -118,6 +146,8 @@ export const darkColors = {
 		dark: "#D97706",
 		bg: "#451A03",
 		border: "#F59E0B",
+		/** Text/icon grade on this tone's dark `bg` (10.39:1). */
+		ink: "#FCD34D",
 	},
 	info: {
 		main: "#3B82F6",
@@ -125,26 +155,32 @@ export const darkColors = {
 		dark: "#2563EB",
 		bg: "#0C1F3F",
 		border: "#3B82F6",
+		/** Text/icon grade on this tone's dark `bg` (9.07:1). */
+		ink: "#93C5FD",
 	},
 	background: {
-		warm: "#111111",
+		warm: "#0E0E0E",
 		primary: "#0A0A0A",
 		secondary: "#171717",
 		tertiary: "#262626",
 		overlay: "#333333",
+		/** Lifted off the page rather than cut into it — dark mode has no shadows. */
+		card: "#191919",
+		subtle: "#232323",
 	},
 	text: {
 		primary: "#F5F5F5",
 		secondary: "#D4D4D4",
 		tertiary: "#A3A3A3",
-		quaternary: "#737373",
-		disabled: "#525252",
+		quaternary: "#8F8F8F",
+		disabled: "#6E6E6E",
 		inverse: "#0A0A0A",
 	},
 	border: {
 		light: "#262626",
 		medium: "#333333",
 		dark: "#404040",
+		hairline: "#242424",
 	},
 	special: {
 		premium: "#FBBF24",
@@ -159,6 +195,7 @@ export const darkColors = {
 export const typography = {
 	fontFamily: {
 		display: "NeutralFace-Bold",
+		displayRegular: "NeutralFace",
 		sans: "MonaSans",
 		sansBold: "MonaSans-Bold",
 		sansMedium: "MonaSans-Medium",
@@ -281,6 +318,28 @@ export const shadows = {
 		shadowOpacity: 0.15,
 		shadowRadius: 24,
 		elevation: 12,
+	},
+} as const;
+
+/**
+ * Card elevation. Deliberately shallow — the surface should separate from the
+ * page without announcing itself. Dark mode leans on `background.card` instead,
+ * since a shadow on near-black is invisible.
+ */
+export const elevation = {
+	card: {
+		shadowColor: "#0B0B0F",
+		shadowOffset: { width: 0, height: 1 },
+		shadowOpacity: 0.05,
+		shadowRadius: 3,
+		elevation: 1,
+	},
+	raised: {
+		shadowColor: "#0B0B0F",
+		shadowOffset: { width: 0, height: 6 },
+		shadowOpacity: 0.08,
+		shadowRadius: 16,
+		elevation: 6,
 	},
 } as const;
 

@@ -29,6 +29,10 @@ export class DatabaseModule implements OnModuleInit {
 
 	async onModuleInit() {
 		if (process.env.NODE_ENV === "production") return;
+		// Tests run against an in-process PGlite database. Pushing here would
+		// spawn drizzle-kit and rewrite whatever DIRECT_URL happens to point at —
+		// a developer's real database — just for running `pnpm test`.
+		if (process.env.NODE_ENV === "test") return;
 
 		this.logger.log("Auto-syncing schema (drizzle-kit push)…");
 		await this.runPush();

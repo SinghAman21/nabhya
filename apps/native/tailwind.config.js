@@ -7,39 +7,42 @@ module.exports = {
 	presets: [require("nativewind/preset")],
 	theme: {
 		extend: {
+			// Driven by the CSS variables in src/global.css so every `components/ui/*`
+			// primitive follows the theme. HSL channels + `<alpha-value>` keep the
+			// opacity modifiers in use (`bg-input/30`, `ring-ring/50`) working.
 			colors: {
-				border: "#E5E7EB",
-				input: "#E5E7EB",
-				ring: "#FF7E40",
-				background: "#FBFBF9",
-				foreground: "#111111",
+				border: "hsl(var(--border) / <alpha-value>)",
+				input: "hsl(var(--input) / <alpha-value>)",
+				ring: "hsl(var(--ring) / <alpha-value>)",
+				background: "hsl(var(--background) / <alpha-value>)",
+				foreground: "hsl(var(--foreground) / <alpha-value>)",
 				primary: {
-					DEFAULT: "#FF7E40",
-					foreground: "#FFFFFF",
+					DEFAULT: "hsl(var(--primary) / <alpha-value>)",
+					foreground: "hsl(var(--primary-foreground) / <alpha-value>)",
 				},
 				secondary: {
-					DEFAULT: "#FAFAFA",
-					foreground: "#404040",
+					DEFAULT: "hsl(var(--secondary) / <alpha-value>)",
+					foreground: "hsl(var(--secondary-foreground) / <alpha-value>)",
 				},
 				destructive: {
-					DEFAULT: "#EF4444",
-					foreground: "#FFFFFF",
+					DEFAULT: "hsl(var(--destructive) / <alpha-value>)",
+					foreground: "hsl(var(--destructive-foreground) / <alpha-value>)",
 				},
 				muted: {
-					DEFAULT: "#F5F5F5",
-					foreground: "#666666",
+					DEFAULT: "hsl(var(--muted) / <alpha-value>)",
+					foreground: "hsl(var(--muted-foreground) / <alpha-value>)",
 				},
 				accent: {
-					DEFAULT: "#FAFAFA",
-					foreground: "#111111",
+					DEFAULT: "hsl(var(--accent) / <alpha-value>)",
+					foreground: "hsl(var(--accent-foreground) / <alpha-value>)",
 				},
 				popover: {
-					DEFAULT: "#FFFFFF",
-					foreground: "#111111",
+					DEFAULT: "hsl(var(--popover) / <alpha-value>)",
+					foreground: "hsl(var(--popover-foreground) / <alpha-value>)",
 				},
 				card: {
-					DEFAULT: "#FFFFFF",
-					foreground: "#111111",
+					DEFAULT: "hsl(var(--card) / <alpha-value>)",
+					foreground: "hsl(var(--card-foreground) / <alpha-value>)",
 				},
 			},
 			borderRadius: {

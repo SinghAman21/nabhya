@@ -80,6 +80,7 @@ export const queryScopes = {
 	events: ["events"] as const,
 	orgEvents: ["org", "events"] as const,
 	needs: ["needs"] as const,
+	feed: ["feed"] as const,
 	orgNeeds: ["org", "needs"] as const,
 	admin: ["admin"] as const,
 	notifications: ["notifications"] as const,
@@ -90,6 +91,5 @@ export const queryScopes = {
 	organizations: ["organizations"] as const,
 	announcements: ["announcements"] as const,
 	reports: ["reports"] as const,
-	feed: ["feed"] as const,
 	impact: ["impact"] as const,
 } as const;

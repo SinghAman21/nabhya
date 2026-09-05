@@ -1,10 +1,11 @@
 import { useRouter } from "expo-router";
-import { ArrowLeft } from "lucide-react-native";
 import { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import {
+	Banner,
 	ErrorState,
 	LoadingState,
+	Screen,
 	ScreenHeader,
 } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
@@ -14,8 +15,13 @@ import { useMe, useUpdateProfile } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 
+/**
+ * The volunteer's own details. Saves straight back to the profile and returns;
+ * a success alert on top of a screen that has already changed is one tap too
+ * many, so there isn't one.
+ */
 export default function EditProfile() {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const router = useRouter();
 
 	const me = useMe();
@@ -37,13 +43,6 @@ export default function EditProfile() {
 		setState(me.data.state ?? "");
 	}, [me.data]);
 
-	const inputStyle = {
-		borderWidth: 0,
-		borderRadius: 12,
-		backgroundColor: colors.background.tertiary,
-		paddingVertical: spacing[3.5],
-	} as const;
-
 	const save = () => {
 		setError(null);
 		update.mutate(
@@ -55,35 +54,18 @@ export default function EditProfile() {
 				state: state.trim() || undefined,
 			},
 			{
-				onSuccess: () => {
-					Alert.alert("Saved", "Your profile has been updated.");
-					router.back();
-				},
+				onSuccess: () => router.back(),
 				onError: (e) => setError(apiErrorMessage(e)),
 			},
 		);
 	};
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
-			<Pressable
-				onPress={() => router.back()}
-				hitSlop={12}
-				style={{ marginBottom: spacing[4] }}
-			>
-				<ArrowLeft size={22} color={colors.text.secondary as string} />
-			</Pressable>
-
+		<Screen>
 			<ScreenHeader
+				back
 				title="Edit profile"
-				subtitle="NGOs see this when you apply to their events."
+				subtitle="NGOs see this when you apply."
 			/>
 
 			{me.isLoading ? (
@@ -94,75 +76,113 @@ export default function EditProfile() {
 					onRetry={() => me.refetch()}
 				/>
 			) : (
-				<ScrollView
-					showsVerticalScrollIndicator={false}
-					contentContainerStyle={{ paddingBottom: spacing[12] }}
-					keyboardShouldPersistTaps="handled"
+				<KeyboardAvoidingView
+					style={{ flex: 1 }}
+					behavior={Platform.OS === "ios" ? "padding" : undefined}
 				>
-					<Label style={{ marginBottom: spacing[1.5] }}>Full name</Label>
-					<Input
-						value={fullName}
-						onChangeText={setFullName}
-						autoCapitalize="words"
-						style={inputStyle}
-					/>
-
-					<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-						Phone
-					</Label>
-					<Input
-						value={phone}
-						onChangeText={setPhone}
-						keyboardType="phone-pad"
-						style={inputStyle}
-					/>
-
-					<View
-						style={{
-							flexDirection: "row",
-							gap: spacing[3],
-							marginTop: spacing[5],
-						}}
+					<ScrollView
+						showsVerticalScrollIndicator={false}
+						contentContainerStyle={{ paddingBottom: spacing[12] }}
+						keyboardShouldPersistTaps="handled"
+						automaticallyAdjustKeyboardInsets
 					>
-						<View style={{ flex: 1 }}>
-							<Label style={{ marginBottom: spacing[1.5] }}>City</Label>
-							<Input value={city} onChangeText={setCity} style={inputStyle} />
-						</View>
-						<View style={{ flex: 1 }}>
-							<Label style={{ marginBottom: spacing[1.5] }}>State</Label>
-							<Input value={state} onChangeText={setState} style={inputStyle} />
-						</View>
-					</View>
+						<Field label="Full name">
+							<Input
+								value={fullName}
+								onChangeText={setFullName}
+								autoCapitalize="words"
+								autoComplete="name"
+								textContentType="name"
+								accessibilityLabel="Full name"
+							/>
+						</Field>
 
-					<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-						About you <Caption color="tertiary">(optional)</Caption>
-					</Label>
-					<Input
-						value={bio}
-						onChangeText={setBio}
-						multiline
-						placeholder="Skills, availability, anything NGOs should know"
-						style={{ ...inputStyle, minHeight: 110, textAlignVertical: "top" }}
-					/>
+						<Field label="Phone">
+							<Input
+								value={phone}
+								onChangeText={setPhone}
+								keyboardType="phone-pad"
+								autoComplete="tel"
+								textContentType="telephoneNumber"
+								accessibilityLabel="Phone"
+							/>
+						</Field>
 
-					{error && (
-						<Caption
-							color={colors.error.main as string}
-							style={{ marginTop: spacing[3] }}
+						<View style={{ flexDirection: "row", gap: spacing[3] }}>
+							<View style={{ flex: 1 }}>
+								<Field label="City">
+									<Input
+										value={city}
+										onChangeText={setCity}
+										autoCapitalize="words"
+										accessibilityLabel="City"
+									/>
+								</Field>
+							</View>
+							<View style={{ flex: 1 }}>
+								<Field label="State">
+									<Input
+										value={state}
+										onChangeText={setState}
+										autoCapitalize="words"
+										accessibilityLabel="State"
+									/>
+								</Field>
+							</View>
+						</View>
+
+						<Field label="About you" optional>
+							<Input
+								value={bio}
+								onChangeText={setBio}
+								multiline
+								placeholder="Skills, availability, anything NGOs should know"
+								accessibilityLabel="About you"
+								style={{ minHeight: 110, textAlignVertical: "top" }}
+							/>
+						</Field>
+
+						{error && (
+							<View style={{ marginBottom: spacing[4] }}>
+								<Banner
+									tone="error"
+									title="Couldn't save"
+									description={error}
+								/>
+							</View>
+						)}
+
+						<Button
+							onPress={save}
+							loading={update.isPending}
+							style={{ marginTop: spacing[2] }}
 						>
-							{error}
-						</Caption>
-					)}
-
-					<Button
-						onPress={save}
-						loading={update.isPending}
-						style={{ marginTop: spacing[6] }}
-					>
-						Save changes
-					</Button>
-				</ScrollView>
+							Save changes
+						</Button>
+					</ScrollView>
+				</KeyboardAvoidingView>
 			)}
+		</Screen>
+	);
+}
+
+function Field({
+	label,
+	optional,
+	children,
+}: {
+	label: string;
+	optional?: boolean;
+	children: React.ReactNode;
+}) {
+	const { spacing } = useTheme();
+	return (
+		<View style={{ marginBottom: spacing[5] }}>
+			<Label style={{ marginBottom: spacing[1.5] }}>
+				{label}
+				{optional && <Caption color="tertiary"> (optional)</Caption>}
+			</Label>
+			{children}
 		</View>
 	);
 }

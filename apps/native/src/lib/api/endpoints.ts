@@ -77,8 +77,13 @@ export const CATEGORIES = {
 
 export const FEED = {
 	LIST: `${API_PREFIX}/feed`,
+	FOR_YOU: `${API_PREFIX}/feed/for-you`,
+	TRENDING: `${API_PREFIX}/feed/trending`,
+	FOLLOWING: `${API_PREFIX}/feed/following`,
 	UPLOAD_INTENTS: `${API_PREFIX}/feed/upload-intents`,
 	detail: (id: string) => `${API_PREFIX}/feed/${id}`,
+	interaction: (type: string, id: string, action: "like" | "save" | "share") =>
+		`${API_PREFIX}/feed/${type}/${id}/${action}`,
 } as const;
 
 export const UPLOADS = {
@@ -97,6 +102,7 @@ export const ENGAGEMENT = {
 	MY_BOOKMARKS: `${API_PREFIX}/me/bookmarks`,
 	ORG_REVIEWS: `${API_PREFIX}/org/reviews`,
 	bookmark: (id: string) => `${API_PREFIX}/organizations/${id}/bookmark`,
+	follow: (id: string) => `${API_PREFIX}/organizations/${id}/follow`,
 	reviews: (id: string) => `${API_PREFIX}/organizations/${id}/reviews`,
 	myReview: (id: string) => `${API_PREFIX}/organizations/${id}/reviews/me`,
 	replyToReview: (reviewId: string) =>

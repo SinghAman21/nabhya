@@ -9,8 +9,7 @@ export type StoragePurpose =
 	| "AVATAR"
 	| "EVENT_COVER"
 	| "FINANCIAL_REPORT"
-	| "CERTIFICATE"
-	| "FEED_MEDIA";
+	| "CERTIFICATE";
 
 /**
  * Content types we accept. Anything outside this list is rejected before a
@@ -73,5 +72,5 @@ export interface StorageProvider {
 	}): Promise<void>;
 
 	/** Identifies the backing implementation, for health checks and logging. */
-	readonly name: "supabase" | "stub";
+	readonly name: "r2" | "stub" | "supabase";
 }

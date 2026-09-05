@@ -1,14 +1,13 @@
 import { useRouter } from "expo-router";
 import { CalendarCheck } from "lucide-react-native";
 import { useState } from "react";
-import { FlatList, RefreshControl, View } from "react-native";
+import { View } from "react-native";
 import { EventFeed } from "@/components/event-feed";
-import { NotificationBell } from "@/components/notification-bell";
+import { PAGE_SIZE, PagedList, usePagedQuery } from "@/components/paged-list";
 import {
 	EmptyState,
-	ErrorState,
 	FilterChips,
-	LoadingState,
+	Screen,
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
@@ -17,10 +16,10 @@ import {
 	humanizeStatus,
 	StatusPill,
 } from "@/components/status-pill";
-import { Body, Caption } from "@/components/ui/typography";
-import { useMyApplications } from "@/hooks/use-events";
+import { Button } from "@/components/ui/button";
+import { Caption, H5 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
-import { apiErrorMessage } from "@/lib/api";
+import { eventsApi, queryKeys } from "@/lib/api";
 import { formatDateRange } from "@/lib/format";
 import type { ApplicationListItem } from "@/lib/types";
 
@@ -31,70 +30,58 @@ const TABS: Array<{ value: Tab; label: string }> = [
 	{ value: "applications", label: "My applications" },
 ];
 
+/**
+ * Events for a volunteer: the public list to browse, and the ones they have
+ * applied to. Not on the tab bar — reached from Activity and Profile — so the
+ * header carries a back button.
+ */
 export default function VolunteerEvents() {
-	const { colors, spacing } = useTheme();
 	const [tab, setTab] = useState<Tab>("browse");
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
-			<ScreenHeader
-				title="Events"
-				subtitle="Find something to help with, and track what you've applied to."
-				action={<NotificationBell />}
-			/>
+		<Screen>
+			<ScreenHeader back title="Events" />
 
 			<FilterChips options={TABS} value={tab} onChange={setTab} />
 
-			{tab === "browse" ? <EventFeed /> : <MyApplications />}
-		</View>
+			{tab === "browse" ? (
+				<EventFeed />
+			) : (
+				<MyApplications onBrowse={() => setTab("browse")} />
+			)}
+		</Screen>
 	);
 }
 
-function MyApplications() {
-	const { colors, spacing } = useTheme();
+function MyApplications({ onBrowse }: { onBrowse: () => void }) {
 	const router = useRouter();
-	const query = useMyApplications();
 
-	if (query.isLoading) return <LoadingState label="Loading applications…" />;
-	if (query.isError) {
-		return (
-			<ErrorState
-				message={apiErrorMessage(query.error)}
-				onRetry={() => query.refetch()}
-			/>
-		);
-	}
+	const { query, items, loadMore } = usePagedQuery({
+		queryKey: queryKeys.myApplications({ limit: PAGE_SIZE }),
+		fetchPage: (page) => eventsApi.myApplications({ page, limit: PAGE_SIZE }),
+	});
 
 	return (
-		<FlatList
-			data={query.data?.items ?? []}
+		<PagedList
+			query={query}
+			items={items}
+			loadMore={loadMore}
+			loadingLabel="Loading your applications"
 			keyExtractor={(item) => item.id}
-			showsVerticalScrollIndicator={false}
-			contentContainerStyle={{ paddingBottom: spacing[10] }}
-			ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
-			refreshControl={
-				<RefreshControl
-					refreshing={query.isRefetching}
-					onRefresh={() => query.refetch()}
-					tintColor={colors.primary.main as string}
-				/>
-			}
-			ListEmptyComponent={
+			empty={
 				<EmptyState
 					icon={CalendarCheck}
 					title="No applications yet"
-					description="Events you apply to will appear here so you can track their status."
+					description="Apply to an event and you can follow its status here — pending, accepted, or not this time."
+					action={
+						<Button size="sm" variant="outline" onPress={onBrowse}>
+							Browse events
+						</Button>
+					}
 				/>
 			}
-			renderItem={({ item }) => (
-				<ApplicationRow
+			renderItem={(item) => (
+				<ApplicationCard
 					application={item}
 					onPress={() => router.push(`/events/${item.event.id}`)}
 				/>
@@ -103,14 +90,21 @@ function MyApplications() {
 	);
 }
 
-function ApplicationRow({
+function ApplicationCard({
 	application,
 	onPress,
 }: {
 	application: ApplicationListItem;
 	onPress: () => void;
 }) {
-	const { spacing } = useTheme();
+	const { colors, spacing } = useTheme();
+
+	const next =
+		application.status === "PENDING"
+			? "Waiting for the NGO to review"
+			: application.status === "ACCEPTED"
+				? "You're in — turn up and get marked present"
+				: null;
 
 	return (
 		<Surface onPress={onPress}>
@@ -120,10 +114,10 @@ function ApplicationRow({
 					alignItems: "center",
 					justifyContent: "space-between",
 					gap: spacing[3],
-					marginBottom: spacing[2],
+					marginBottom: spacing[1],
 				}}
 			>
-				<Caption color="secondary" numberOfLines={1} style={{ flex: 1 }}>
+				<Caption color="tertiary" numberOfLines={1} style={{ flex: 1 }}>
 					{application.organization.organizationName}
 				</Caption>
 				<StatusPill
@@ -132,13 +126,17 @@ function ApplicationRow({
 				/>
 			</View>
 
-			<Body weight="bold" numberOfLines={2}>
-				{application.event.title}
-			</Body>
-			<Caption color="tertiary" style={{ marginTop: 4 }}>
+			<H5 numberOfLines={2}>{application.event.title}</H5>
+			<Caption color="tertiary" style={{ marginTop: spacing[0.5] }}>
 				{formatDateRange(application.event.startAt, application.event.endAt)}
 				{application.event.city ? ` · ${application.event.city}` : ""}
 			</Caption>
+
+			{next && (
+				<Caption color={colors.warning.ink} style={{ marginTop: spacing[2] }}>
+					{next}
+				</Caption>
+			)}
 
 			{application.reviewNote && (
 				<Caption color="secondary" style={{ marginTop: spacing[2] }}>

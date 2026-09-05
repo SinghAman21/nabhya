@@ -1,39 +1,47 @@
 import type { CreateFeedPostInput } from "@nabhya/shared";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { ImagePlus } from "lucide-react-native";
+import { useRouter } from "expo-router";
+import { ImagePlus, X } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, FlatList, Pressable, TextInput, View } from "react-native";
-import {
-	EmptyState,
-	LoadingState,
-	ScreenHeader,
-	Surface,
-} from "@/components/screen-shell";
+import { ScrollView, View } from "react-native";
+import { Screen, ScreenHeader, Surface } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
-import { Body, Caption } from "@/components/ui/typography";
+import { Input } from "@/components/ui/input";
+import { Pressable } from "@/components/ui/pressable";
+import { Caption, Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
-import { apiErrorMessage, feedApi, queryKeys } from "@/lib/api";
+import { Alert } from "@/lib/alert";
+import { apiErrorMessage, feedApi, queryScopes } from "@/lib/api";
 
-interface FeedPost {
-	id: string;
-	text: string;
-	createdAt: string;
-	author: { id: string; fullName: string | null };
-	media: Array<{ id: string; type: "IMAGE" | "VIDEO"; url: string }>;
-}
+const MAX_MEDIA = 4;
+const MAX_TEXT = 5000;
 
-export default function FeedScreen() {
+/**
+ * Compose a post for the feed.
+ *
+ * Text first, photos second: a field big enough to think in, then a strip of
+ * thumbnails with a remove target on each. Media goes straight to storage
+ * with the signed tickets the server hands out (plain `fetch`, never the axios
+ * instance — an Authorization header would break the signature), and only the
+ * returned keys are submitted. On success the screen closes and every feed
+ * query refreshes, so the post is the first thing the author sees.
+ */
+export default function ComposePost() {
 	const { colors, spacing, borderRadius } = useTheme();
+	const router = useRouter();
+	const queryClient = useQueryClient();
 	const [text, setText] = useState("");
 	const [media, setMedia] = useState<ImagePicker.ImagePickerAsset[]>([]);
-	const feed = useQuery({
-		queryKey: queryKeys.feed(),
-		queryFn: () => feedApi.list({}) as Promise<{ items: FeedPost[] }>,
-	});
+
 	const publish = useMutation({
 		mutationFn: async () => {
-			const input: CreateFeedPostInput = { text: text.trim(), mediaKeys: [] };
+			const input: CreateFeedPostInput = {
+				text: text.trim(),
+				tag: "POST",
+				mediaKeys: [],
+			};
 			if (media.length > 0) {
 				const uploads = await feedApi.createMediaIntents({
 					files: media.map((asset) => ({
@@ -51,7 +59,7 @@ export default function FeedScreen() {
 							body,
 						});
 						if (!response.ok)
-							throw new Error("Media upload failed. Please try again.");
+							throw new Error("A photo failed to upload. Please try again.");
 					}),
 				);
 				input.mediaFolder = uploads.mediaFolder;
@@ -60,9 +68,9 @@ export default function FeedScreen() {
 			return feedApi.create(input);
 		},
 		onSuccess: () => {
-			setText("");
-			setMedia([]);
-			feed.refetch();
+			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
+			if (router.canGoBack()) router.back();
+			else router.replace("/");
 		},
 		onError: (error) =>
 			Alert.alert("Could not publish", apiErrorMessage(error)),
@@ -72,94 +80,147 @@ export default function FeedScreen() {
 		const result = await ImagePicker.launchImageLibraryAsync({
 			mediaTypes: ["images", "videos"],
 			allowsMultipleSelection: true,
-			selectionLimit: 4,
+			selectionLimit: MAX_MEDIA - media.length,
 			orderedSelection: true,
+			quality: 0.85,
 		});
-		if (!result.canceled) setMedia(result.assets.slice(0, 4));
+		if (!result.canceled)
+			setMedia((current) => [...current, ...result.assets].slice(0, MAX_MEDIA));
 	};
 
+	const remaining = MAX_TEXT - text.length;
+	const canPost = text.trim().length > 0 && remaining >= 0;
+
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
+		<Screen>
 			<ScreenHeader
-				title="Community feed"
-				subtitle="Updates from volunteers and NGOs across Nabhya."
+				back
+				title="Share an update"
+				action={
+					<Button
+						size="sm"
+						onPress={() => publish.mutate()}
+						disabled={!canPost}
+						loading={publish.isPending}
+					>
+						Post
+					</Button>
+				}
 			/>
-			<Surface style={{ marginBottom: spacing[4], gap: spacing[3] }}>
-				<TextInput
-					value={text}
-					onChangeText={setText}
-					placeholder="Share an update…"
-					placeholderTextColor={colors.text.tertiary as string}
-					multiline
-					style={{
-						minHeight: 90,
-						color: colors.text.primary as string,
-						textAlignVertical: "top",
-					}}
-				/>
-				<Pressable
-					onPress={selectMedia}
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						gap: spacing[2],
-					}}
-				>
-					<ImagePlus size={18} color={colors.primary.main as string} />
-					<Caption color="secondary">
-						{media.length
-							? `${media.length} of 4 media selected`
-							: "Add up to 4 photos or videos"}
-					</Caption>
-				</Pressable>
-				<Button
-					disabled={!text.trim()}
-					loading={publish.isPending}
-					onPress={() => publish.mutate()}
-				>
-					Post update
-				</Button>
-			</Surface>
-			{feed.isLoading ? (
-				<LoadingState />
-			) : (
-				<FlatList
-					data={feed.data?.items ?? []}
-					keyExtractor={(item) => item.id}
-					renderItem={({ item }) => (
-						<Surface
-							style={{
-								marginBottom: spacing[3],
-								borderRadius: borderRadius.lg,
-							}}
+			<ScrollView
+				keyboardShouldPersistTaps="handled"
+				automaticallyAdjustKeyboardInsets
+				showsVerticalScrollIndicator={false}
+				contentContainerStyle={{ paddingBottom: spacing[12], gap: spacing[4] }}
+			>
+				<Surface>
+					<Input
+						value={text}
+						onChangeText={setText}
+						placeholder="What happened, who it helped, what's next…"
+						multiline
+						autoFocus
+						maxLength={MAX_TEXT + 200}
+						accessibilityLabel="Post text"
+						style={{
+							borderWidth: 0,
+							padding: 0,
+							backgroundColor: "transparent",
+							minHeight: 160,
+							textAlignVertical: "top",
+							fontSize: 17,
+							lineHeight: 24,
+						}}
+					/>
+					<View
+						style={{
+							flexDirection: "row",
+							alignItems: "center",
+							justifyContent: "space-between",
+							marginTop: spacing[3],
+							paddingTop: spacing[3],
+							borderTopWidth: 1,
+							borderTopColor: colors.border.hairline,
+						}}
+					>
+						<Pressable
+							onPress={selectMedia}
+							disabled={media.length >= MAX_MEDIA}
+							accessibilityRole="button"
+							accessibilityLabel="Add photos"
+							hitSlop={6}
+							style={({ pressed }) => ({
+								flexDirection: "row",
+								alignItems: "center",
+								gap: spacing[2],
+								opacity: media.length >= MAX_MEDIA ? 0.4 : pressed ? 0.6 : 1,
+							})}
 						>
-							<Body weight="bold">
-								{item.author.fullName ?? "Nabhya member"}
-							</Body>
-							<Body style={{ marginTop: spacing[2] }}>{item.text}</Body>
-							<Caption color="tertiary" style={{ marginTop: spacing[2] }}>
-								{item.media.length
-									? `${item.media.length} media item(s)`
-									: "Text update"}
-							</Caption>
-						</Surface>
-					)}
-					ListEmptyComponent={
-						<EmptyState
-							title="No posts yet"
-							description="Be the first to share an update."
-						/>
-					}
-				/>
-			)}
-		</View>
+							<ImagePlus size={18} color={colors.primary.ink as string} />
+							<Label weight="medium" color={colors.primary.ink}>
+								{media.length
+									? `${media.length} of ${MAX_MEDIA} added`
+									: "Add photos"}
+							</Label>
+						</Pressable>
+						<Caption color={remaining < 0 ? colors.error.ink : "quaternary"}>
+							{remaining < 200 ? remaining : ""}
+						</Caption>
+					</View>
+				</Surface>
+
+				{media.length > 0 && (
+					<View
+						style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[2] }}
+					>
+						{media.map((asset, index) => (
+							<View
+								key={asset.assetId ?? asset.uri}
+								style={{ position: "relative" }}
+							>
+								<Image
+									source={{ uri: asset.uri }}
+									contentFit="cover"
+									accessibilityIgnoresInvertColors
+									style={{
+										width: 96,
+										height: 96,
+										borderRadius: borderRadius.md,
+										backgroundColor: colors.background.subtle,
+									}}
+								/>
+								<Pressable
+									onPress={() =>
+										setMedia((current) => current.filter((_, i) => i !== index))
+									}
+									accessibilityRole="button"
+									accessibilityLabel="Remove photo"
+									hitSlop={6}
+									style={{
+										position: "absolute",
+										top: 4,
+										right: 4,
+										width: 24,
+										height: 24,
+										borderRadius: 12,
+										alignItems: "center",
+										justifyContent: "center",
+										backgroundColor: "rgba(17,17,17,0.7)",
+									}}
+								>
+									<X size={13} color="#FFFFFF" strokeWidth={2.5} />
+								</Pressable>
+							</View>
+						))}
+					</View>
+				)}
+
+				<Caption color="quaternary">
+					Posts appear in every volunteer's feed with your NGO's name. Keep it
+					concrete: numbers, places, people.
+				</Caption>
+			</ScrollView>
+		</Screen>
 	);
 }
 
