@@ -40,6 +40,7 @@ export function useCreatePledge(needId: string) {
 		mutationFn: (input: CreatePledgeInput) => needsApi.pledge(needId, input),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.needs });
+			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
 		},
 	});
 }

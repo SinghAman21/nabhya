@@ -3,13 +3,15 @@ import { type SignUpInput, signUpSchema } from "@nabhya/shared";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Alert, Pressable } from "react-native";
 import { AuthSplitLayout } from "@/components/auth-split-layout";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { authService } from "@/lib/api/auth";
+import { apiErrorMessage } from "@/lib/api/http";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function SignUp() {
@@ -42,8 +44,11 @@ export default function SignUp() {
 				setUser(result.user);
 			}
 			router.replace("/");
-		} catch {
-			Alert.alert("Error", "Sign up failed. Please try again.");
+		} catch (error) {
+			Alert.alert(
+				"Sign up failed",
+				apiErrorMessage(error, "Please try again."),
+			);
 		} finally {
 			setLoading(false);
 		}
@@ -73,6 +78,8 @@ export default function SignUp() {
 				label="Full name"
 				placeholder="Your full name"
 				autoCapitalize="words"
+				autoComplete="name"
+				textContentType="name"
 				style={inputStyle}
 			/>
 
@@ -83,6 +90,9 @@ export default function SignUp() {
 				placeholder="org@example.org"
 				keyboardType="email-address"
 				autoCapitalize="none"
+				autoComplete="email"
+				textContentType="emailAddress"
+				autoCorrect={false}
 				style={inputStyle}
 			/>
 
@@ -92,6 +102,8 @@ export default function SignUp() {
 				label="Password"
 				placeholder="Create a strong password"
 				secureTextEntry
+				autoComplete="new-password"
+				textContentType="newPassword"
 				style={inputStyle}
 			/>
 

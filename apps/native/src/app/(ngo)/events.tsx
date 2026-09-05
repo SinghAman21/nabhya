@@ -1,7 +1,7 @@
 import type { EventStatus } from "@nabhya/shared";
 import { CalendarDays, Plus } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, FlatList, Pressable, RefreshControl, View } from "react-native";
+import { FlatList, RefreshControl, View } from "react-native";
 import { ApplicantsSheet } from "@/components/applicants-sheet";
 import { EventFormSheet } from "@/components/event-form-sheet";
 import {
@@ -19,10 +19,12 @@ import {
 	StatusPill,
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption } from "@/components/ui/typography";
 import { useDeleteEvent, useOrgEvents } from "@/hooks/use-events";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDateRange } from "@/lib/format";
 import type { OrgEventListItem } from "@/lib/types";

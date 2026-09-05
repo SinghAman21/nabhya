@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 import { Input } from "@/components/ui/input";
+import { Pressable } from "@/components/ui/pressable";
 import { Caption, Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/useTheme";
 

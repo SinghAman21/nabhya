@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { HEADERLESS } from "@/lib/navigation";
 
 /**
  * `index` needs a signed-in volunteer; `[code]` is public verification, which
@@ -6,7 +7,7 @@ import { Stack } from "expo-router";
  */
 export default function CertificatesLayout() {
 	return (
-		<Stack screenOptions={{ headerShown: false }}>
+		<Stack screenOptions={HEADERLESS}>
 			<Stack.Screen name="index" />
 			<Stack.Screen name="[code]" />
 		</Stack>

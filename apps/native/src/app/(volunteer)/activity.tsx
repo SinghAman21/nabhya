@@ -2,7 +2,7 @@ import { formatMinor } from "@nabhya/shared";
 import { useRouter } from "expo-router";
 import { Waypoints } from "lucide-react-native";
 import { useMemo, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { RefreshControl, ScrollView, View } from "react-native";
 import {
 	EmptyState,
 	ErrorState,
@@ -19,6 +19,7 @@ import {
 	pledgeTone,
 	StatusPill,
 } from "@/components/status-pill";
+import { Pressable } from "@/components/ui/pressable";
 import { Caption, Label } from "@/components/ui/typography";
 import {
 	useMarkNotificationsRead,

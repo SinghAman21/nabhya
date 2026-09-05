@@ -1,16 +1,8 @@
 import type { CreateFinancialReportInput } from "@nabhya/shared";
 import { FINANCIAL_REPORT_LABELS, formatFinancialYear } from "@nabhya/shared";
-import { FileText, Plus, X } from "lucide-react-native";
+import { FileText, Plus } from "lucide-react-native";
 import { useState } from "react";
-import {
-	Alert,
-	FlatList,
-	Modal,
-	Pressable,
-	RefreshControl,
-	View,
-} from "react-native";
-import { BackButton } from "@/components/back-button";
+import { FlatList, RefreshControl, View } from "react-native";
 import {
 	EmptyState,
 	ErrorState,
@@ -21,7 +13,9 @@ import {
 } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Body, Caption, H2, Label } from "@/components/ui/typography";
+import { Pressable } from "@/components/ui/pressable";
+import { Sheet } from "@/components/ui/sheet";
+import { Body, Caption, Label } from "@/components/ui/typography";
 import {
 	useCreateFinancialReport,
 	useDeleteFinancialReport,
@@ -31,6 +25,7 @@ import { useOpenDocument } from "@/hooks/use-documents";
 import { useMe } from "@/hooks/use-profile";
 import { useFileUpload } from "@/hooks/use-upload";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import type { FinancialReport } from "@/lib/types";
 
@@ -79,9 +74,8 @@ export default function OrgReports() {
 
 	return (
 		<Screen>
-			<BackButton />
-
 			<ScreenHeader
+				back
 				title="Transparency"
 				subtitle="Annual reports and audited statements, shown publicly."
 				action={
@@ -257,125 +251,95 @@ function ReportSheet({
 	} as const;
 
 	return (
-		<Modal
+		<Sheet
 			visible={visible}
-			animationType="slide"
-			presentationStyle="pageSheet"
-			onRequestClose={onClose}
+			onClose={onClose}
+			title="Publish report"
+			subtitle="Public on your profile once published."
+			footer={
+				<Button onPress={submit} loading={create.isPending}>
+					Publish
+				</Button>
+			}
 		>
-			<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						justifyContent: "space-between",
-						paddingHorizontal: spacing[6],
-						paddingTop: spacing[6],
-						paddingBottom: spacing[2],
-					}}
-				>
-					<H2>Publish report</H2>
-					<Pressable onPress={onClose} hitSlop={12}>
-						<X size={22} color={colors.text.tertiary as string} />
-					</Pressable>
-				</View>
-
-				<View style={{ padding: spacing[6], paddingTop: spacing[4] }}>
-					<Label style={{ marginBottom: spacing[2] }}>Document type</Label>
-					<View
-						style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[2] }}
-					>
-						{TYPES.map((option) => {
-							const active = type === option;
-							return (
-								<Pressable
-									key={option}
-									onPress={() => setType(option)}
-									style={{
-										paddingHorizontal: spacing[3.5],
-										paddingVertical: spacing[2],
-										borderRadius: 999,
-										backgroundColor: active
-											? colors.primary.main
-											: colors.background.tertiary,
-									}}
-								>
-									<Caption
-										weight={active ? "bold" : "medium"}
-										color={
-											active ? (colors.primary.contrast as string) : "secondary"
-										}
-									>
-										{FINANCIAL_REPORT_LABELS[option]}
-									</Caption>
-								</Pressable>
-							);
-						})}
-					</View>
-
-					<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-						Title
-					</Label>
-					<Input
-						placeholder="e.g. Annual Report 2024-25"
-						value={title}
-						onChangeText={setTitle}
-						style={inputStyle}
-					/>
-
-					<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-						Financial year starting
-					</Label>
-					<Input
-						placeholder={String(currentYear - 1)}
-						value={year}
-						onChangeText={(v) => setYear(v.replace(/\D/g, ""))}
-						keyboardType="number-pad"
-						maxLength={4}
-						style={[inputStyle, { maxWidth: 140 }]}
-					/>
-
-					<Pressable
-						onPress={attach}
-						disabled={isUploading}
-						style={{
-							marginTop: spacing[5],
-							borderWidth: 2,
-							borderStyle: "dashed",
-							borderColor: documentKey
-								? colors.success.main
-								: colors.border.medium,
-							borderRadius: 16,
-							padding: spacing[5],
-							alignItems: "center",
-						}}
-					>
-						<Caption
-							color={documentKey ? "primary" : "secondary"}
-							weight="medium"
+			<Label style={{ marginBottom: spacing[2] }}>Document type</Label>
+			<View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[2] }}>
+				{TYPES.map((option) => {
+					const active = type === option;
+					return (
+						<Pressable
+							key={option}
+							onPress={() => setType(option)}
+							style={{
+								paddingHorizontal: spacing[3.5],
+								paddingVertical: spacing[2],
+								borderRadius: 999,
+								backgroundColor: active
+									? colors.primary.main
+									: colors.background.tertiary,
+							}}
 						>
-							{isUploading ? "Uploading…" : (fileName ?? "Attach the PDF")}
-						</Caption>
-					</Pressable>
-
-					{(error || uploadError) && (
-						<Caption
-							color={colors.error.main as string}
-							style={{ marginTop: spacing[3] }}
-						>
-							{error ?? uploadError}
-						</Caption>
-					)}
-
-					<Button
-						onPress={submit}
-						loading={create.isPending}
-						style={{ marginTop: spacing[6] }}
-					>
-						Publish
-					</Button>
-				</View>
+							<Caption
+								weight={active ? "bold" : "medium"}
+								color={
+									active ? (colors.primary.contrast as string) : "secondary"
+								}
+							>
+								{FINANCIAL_REPORT_LABELS[option]}
+							</Caption>
+						</Pressable>
+					);
+				})}
 			</View>
-		</Modal>
+
+			<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
+				Title
+			</Label>
+			<Input
+				placeholder="e.g. Annual Report 2024-25"
+				value={title}
+				onChangeText={setTitle}
+				style={inputStyle}
+			/>
+
+			<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
+				Financial year starting
+			</Label>
+			<Input
+				placeholder={String(currentYear - 1)}
+				value={year}
+				onChangeText={(v) => setYear(v.replace(/\D/g, ""))}
+				keyboardType="number-pad"
+				maxLength={4}
+				style={[inputStyle, { maxWidth: 140 }]}
+			/>
+
+			<Pressable
+				onPress={attach}
+				disabled={isUploading}
+				style={{
+					marginTop: spacing[5],
+					borderWidth: 2,
+					borderStyle: "dashed",
+					borderColor: documentKey ? colors.success.main : colors.border.medium,
+					borderRadius: 16,
+					padding: spacing[5],
+					alignItems: "center",
+				}}
+			>
+				<Caption color={documentKey ? "primary" : "secondary"} weight="medium">
+					{isUploading ? "Uploading…" : (fileName ?? "Attach the PDF")}
+				</Caption>
+			</Pressable>
+
+			{(error || uploadError) && (
+				<Caption
+					color={colors.error.main as string}
+					style={{ marginTop: spacing[3] }}
+				>
+					{error ?? uploadError}
+				</Caption>
+			)}
+		</Sheet>
 	);
 }

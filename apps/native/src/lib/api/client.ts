@@ -1,4 +1,5 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
+import { router } from "expo-router";
 import { authService } from "@/lib/api/auth";
 import { API_URL } from "@/lib/env";
 import { storage } from "@/lib/storage";
@@ -43,6 +44,12 @@ apiClient.interceptors.response.use(
 			}
 			await authService.logout();
 			useAuthStore.getState().signOut();
+			// Clearing the token is not the same as leaving the screen. Without
+			// this the user stayed on whatever they were doing, now signed out:
+			// every further request went out with no Authorization header and came
+			// back "Authorization header missing", which reads like a broken API
+			// rather than an expired session.
+			router.replace("/(auth)/login");
 		}
 		return Promise.reject(error);
 	},

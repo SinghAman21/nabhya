@@ -61,3 +61,6 @@ coverage
 tmp
 temp
 .claude/
+
+# Expo CLI cache (root, when started from the workspace)
+.expo/

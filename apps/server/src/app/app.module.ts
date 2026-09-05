@@ -12,6 +12,7 @@ import { CertificatesModule } from "../modules/certificates/certificates.module"
 import { DonationsModule } from "../modules/donations/donations.module";
 import { EngagementModule } from "../modules/engagement/engagement.module";
 import { EventsModule } from "../modules/events/events.module";
+import { FeedModule } from "../modules/feed/feed.module";
 import { NeedsModule } from "../modules/needs/needs.module";
 import { NotificationsModule } from "../modules/notifications/notifications.module";
 import { OnboardingModule } from "../modules/onboarding/onboarding.module";
@@ -34,6 +35,7 @@ import { AppController } from "./app.controller";
 		CategoriesModule,
 		EventsModule,
 		NeedsModule,
+		FeedModule,
 		NotificationsModule, // global — other modules emit through it
 		EngagementModule,
 		CertificatesModule,

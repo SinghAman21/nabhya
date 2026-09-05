@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useWindowDimensions, View } from "react-native";
+import { ScrollView, useWindowDimensions, View } from "react-native";
 import { Body, Caption, H1 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -124,12 +124,24 @@ export function AuthSplitLayout({
 				</View>
 			</View>
 
-			<View
-				style={{
-					flex: 1,
+			{/*
+			 * Scrollable, not a centred flex box: on a short phone the keyboard
+			 * covered the password field and the submit button with no way to
+			 * reach them. `flexGrow` keeps the form optically centred while
+			 * there is room, and `automaticallyAdjustKeyboardInsets` insets the
+			 * scroll view by the keyboard on iOS (Android resizes the window
+			 * instead — see android.softwareKeyboardLayoutMode in app.json).
+			 */}
+			<ScrollView
+				style={{ flex: 1 }}
+				contentContainerStyle={{
+					flexGrow: 1,
 					padding: spacing[6],
 					justifyContent: "center",
 				}}
+				keyboardShouldPersistTaps="handled"
+				automaticallyAdjustKeyboardInsets
+				showsVerticalScrollIndicator={false}
 			>
 				{children}
 				{alternateLink && (
@@ -145,7 +157,7 @@ export function AuthSplitLayout({
 						{alternateLink}
 					</View>
 				)}
-			</View>
+			</ScrollView>
 		</View>
 	);
 }

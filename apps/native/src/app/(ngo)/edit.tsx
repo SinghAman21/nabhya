@@ -1,8 +1,7 @@
 import type { UpdateOrganizationInput } from "@nabhya/shared";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, View } from "react-native";
-import { BackButton } from "@/components/back-button";
+import { ScrollView, View } from "react-native";
 import {
 	ErrorState,
 	LoadingState,
@@ -11,6 +10,7 @@ import {
 } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Pressable } from "@/components/ui/pressable";
 import { Caption, Label } from "@/components/ui/typography";
 import {
 	useMyOrganization,
@@ -18,6 +18,7 @@ import {
 } from "@/hooks/use-organization";
 import { useCategories } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 
 interface Form {
@@ -144,9 +145,8 @@ export default function EditOrganization() {
 
 	return (
 		<Screen>
-			<BackButton />
-
 			<ScreenHeader
+				back
 				title="Edit profile"
 				subtitle="This is what volunteers and donors see."
 			/>
@@ -163,6 +163,7 @@ export default function EditOrganization() {
 					showsVerticalScrollIndicator={false}
 					contentContainerStyle={{ paddingBottom: spacing[12] }}
 					keyboardShouldPersistTaps="handled"
+					automaticallyAdjustKeyboardInsets
 				>
 					<Field label="Organization name">
 						<Input

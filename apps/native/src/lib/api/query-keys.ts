@@ -17,6 +17,7 @@ export const queryKeys = {
 	orgEventApplicants: (id: string, params?: unknown) =>
 		["org", "events", id, "applications", params] as const,
 
+	feed: (params?: unknown) => ["feed", params] as const,
 	publicNeeds: (params?: unknown) => ["needs", "public", params] as const,
 	publicNeed: (id: string) => ["needs", "public", "detail", id] as const,
 	myPledges: (params?: unknown) => ["needs", "me", "pledges", params] as const,
@@ -78,6 +79,7 @@ export const queryScopes = {
 	events: ["events"] as const,
 	orgEvents: ["org", "events"] as const,
 	needs: ["needs"] as const,
+	feed: ["feed"] as const,
 	orgNeeds: ["org", "needs"] as const,
 	admin: ["admin"] as const,
 	notifications: ["notifications"] as const,

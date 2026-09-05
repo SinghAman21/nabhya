@@ -1,15 +1,16 @@
 import { useRouter } from "expo-router";
 import { Bell } from "lucide-react-native";
-import { FlatList, Pressable, RefreshControl, View } from "react-native";
-import { BackButton } from "@/components/back-button";
+import { FlatList, RefreshControl, View } from "react-native";
 import {
 	EmptyState,
 	ErrorState,
 	LoadingState,
 	Screen,
+	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
-import { Body, Caption, H2 } from "@/components/ui/typography";
+import { Pressable } from "@/components/ui/pressable";
+import { Body, Caption } from "@/components/ui/typography";
 import {
 	useMarkNotificationsRead,
 	useNotifications,
@@ -51,25 +52,23 @@ export default function Notifications() {
 
 	return (
 		<Screen>
-			<BackButton />
-
-			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					justifyContent: "space-between",
-					marginBottom: spacing[5],
-				}}
-			>
-				<H2>Notifications</H2>
-				{unread > 0 && (
-					<Pressable onPress={() => markRead.mutate({})} hitSlop={8}>
-						<Caption weight="medium" color={colors.primary.main as string}>
-							Mark all read
-						</Caption>
-					</Pressable>
-				)}
-			</View>
+			<ScreenHeader
+				back
+				title="Notifications"
+				action={
+					unread > 0 ? (
+						<Pressable
+							onPress={() => markRead.mutate({})}
+							hitSlop={8}
+							accessibilityRole="button"
+						>
+							<Caption weight="medium" color={colors.primary.ink as string}>
+								Mark all read
+							</Caption>
+						</Pressable>
+					) : undefined
+				}
+			/>
 
 			{query.isLoading ? (
 				<LoadingState />
@@ -105,10 +104,7 @@ export default function Notifications() {
 							style={
 								item.readAt
 									? undefined
-									: {
-											borderColor: colors.primary.main,
-											backgroundColor: colors.background.secondary,
-										}
+									: { backgroundColor: colors.primary.tint }
 							}
 						>
 							<View

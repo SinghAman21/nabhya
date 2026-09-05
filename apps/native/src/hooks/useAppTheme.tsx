@@ -5,6 +5,7 @@ import {
 	useCallback,
 	useContext,
 	useEffect,
+	useMemo,
 	useState,
 } from "react";
 import { Platform, useColorScheme } from "react-native";
@@ -12,14 +13,19 @@ import { storage } from "@/lib/storage";
 
 const THEME_KEY = "nabhya-theme";
 
+type ColorSchemePreference = "light" | "dark" | "system";
+
 interface ThemeContextType {
 	isDark: boolean;
+	/** What the user chose, so a settings row can show it. */
+	preference: ColorSchemePreference;
 	toggleTheme: () => void;
 	setColorScheme: (scheme: "light" | "dark" | "system") => void;
 }
 
 const ThemeContext = createContext<ThemeContextType>({
 	isDark: false,
+	preference: "system",
 	toggleTheme: () => {},
 	setColorScheme: () => {},
 });
@@ -85,17 +91,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 		}
 	}, []);
 
+	// Memoised: this value feeds every `useTheme()` in the app, so a fresh object
+	// here re-renders the whole tree on any provider render.
+	const value = useMemo(
+		() => ({
+			isDark: effectiveIsDark,
+			preference: (preference ?? "system") as ColorSchemePreference,
+			toggleTheme,
+			setColorScheme,
+		}),
+		[effectiveIsDark, preference, toggleTheme, setColorScheme],
+	);
+
 	if (!restored) return null;
 
 	return (
-		<ThemeContext.Provider
-			value={{
-				isDark: effectiveIsDark,
-				toggleTheme,
-				setColorScheme,
-			}}
-		>
-			{children}
-		</ThemeContext.Provider>
+		<ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 	);
 }

@@ -7,14 +7,15 @@ import {
 	Package,
 } from "lucide-react-native";
 import { RefreshControl, ScrollView, View } from "react-native";
-import { BackButton } from "@/components/back-button";
 import {
 	ErrorState,
 	LoadingState,
 	Screen,
+	ScreenHeader,
+	SectionTitle,
 	Surface,
 } from "@/components/screen-shell";
-import { Body, Caption, H2, H3 } from "@/components/ui/typography";
+import { Body, Caption, H3 } from "@/components/ui/typography";
 import { useMyImpact } from "@/hooks/use-directory";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
@@ -35,14 +36,15 @@ export default function Impact() {
 
 	return (
 		<Screen>
-			<BackButton />
-
-			<H2 style={{ marginBottom: spacing[1] }}>Your impact</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[5] }}>
-				{impact?.firstVolunteeredAt
-					? `Volunteering since ${formatDate(impact.firstVolunteeredAt)}.`
-					: "Everything you contribute shows up here."}
-			</Body>
+			<ScreenHeader
+				back
+				title="Your impact"
+				subtitle={
+					impact?.firstVolunteeredAt
+						? `Volunteering since ${formatDate(impact.firstVolunteeredAt)}.`
+						: "Everything you contribute shows up here."
+				}
+			/>
 
 			{query.isLoading ? (
 				<LoadingState />
@@ -102,29 +104,24 @@ export default function Impact() {
 						/>
 					</View>
 
-					<Surface style={{ marginTop: spacing[5] }}>
-						<Caption
-							weight="bold"
-							color="tertiary"
-							style={{
-								letterSpacing: 1,
-								textTransform: "uppercase",
-								marginBottom: spacing[3],
-							}}
-						>
-							Applications
-						</Caption>
-						<Row
-							label="Submitted"
-							value={String(impact.applicationsSubmitted)}
-						/>
-						<Row label="Acceptance rate" value={`${impact.acceptanceRate}%`} />
-						<Row
-							label="Pledges completed"
-							value={String(impact.pledgesCompleted)}
-							last
-						/>
-					</Surface>
+					<View style={{ marginTop: spacing[5] }}>
+						<SectionTitle>Applications</SectionTitle>
+						<Surface>
+							<Row
+								label="Submitted"
+								value={String(impact.applicationsSubmitted)}
+							/>
+							<Row
+								label="Acceptance rate"
+								value={`${impact.acceptanceRate}%`}
+							/>
+							<Row
+								label="Pledges completed"
+								value={String(impact.pledgesCompleted)}
+								last
+							/>
+						</Surface>
+					</View>
 
 					{impact.eventsAttended === 0 && (
 						<Surface style={{ marginTop: spacing[4] }}>

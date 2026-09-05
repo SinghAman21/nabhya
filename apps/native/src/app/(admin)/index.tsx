@@ -10,7 +10,7 @@ import {
 	Users,
 } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { RefreshControl, ScrollView, View } from "react-native";
 import { BroadcastSheet } from "@/components/admin/broadcast-sheet";
 import {
 	ErrorState,
@@ -19,6 +19,7 @@ import {
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H3 } from "@/components/ui/typography";
 import { useAdminOverview } from "@/hooks/use-admin";
 import { useSignOut } from "@/hooks/use-auth";

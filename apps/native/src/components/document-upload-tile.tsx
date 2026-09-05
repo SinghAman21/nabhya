@@ -1,11 +1,12 @@
 import type { UploadPurpose } from "@nabhya/shared";
 import { Check, FileText, Upload } from "lucide-react-native";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import {
 	humanizeStatus,
 	StatusPill,
 	verificationTone,
 } from "@/components/status-pill";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption } from "@/components/ui/typography";
 import { useOpenDocument } from "@/hooks/use-documents";
 import { useFileUpload } from "@/hooks/use-upload";

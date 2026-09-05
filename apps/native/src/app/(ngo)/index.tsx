@@ -11,8 +11,10 @@ import {
 import { RefreshControl, ScrollView, View } from "react-native";
 import {
 	Banner,
+	ErrorState,
 	ListGroup,
 	ListRow,
+	LoadingState,
 	MetricRow,
 	Screen,
 	ScreenHeader,
@@ -24,6 +26,7 @@ import { useOrgEvents } from "@/hooks/use-events";
 import { useOrgNeeds } from "@/hooks/use-needs";
 import { useMyOrganization } from "@/hooks/use-organization";
 import { useTheme } from "@/hooks/useTheme";
+import { apiErrorMessage } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
@@ -80,6 +83,13 @@ export default function NgoDashboard() {
 
 	const impact = impactQuery.data;
 
+	// The counts below all default to 0, so rendering during the first load told
+	// an organisation with a dozen people waiting that it was "All caught up".
+	// Wait for the queries that feed those numbers before drawing them.
+	const isLoading =
+		orgQuery.isLoading || eventsQuery.isLoading || needsQuery.isLoading;
+	const error = orgQuery.error ?? eventsQuery.error ?? needsQuery.error;
+
 	return (
 		<Screen>
 			<ScreenHeader
@@ -116,137 +126,151 @@ export default function NgoDashboard() {
 					/>
 				}
 			>
-				{!isVerified && (
-					<Banner
-						tone="warning"
-						title="Verification pending"
-						description="Upload your legal documents from Profile to publish events, post needs and appear in the public directory."
-						onPress={() => router.push("/(ngo)/profile")}
-					/>
-				)}
+				{isLoading ? (
+					<LoadingState />
+				) : error ? (
+					<ErrorState message={apiErrorMessage(error)} onRetry={refetchAll} />
+				) : (
+					<>
+						{!isVerified && (
+							<Banner
+								tone="warning"
+								title="Verification pending"
+								description="Upload your legal documents from Profile to publish events, post needs and appear in the public directory."
+								onPress={() => router.push("/(ngo)/profile")}
+							/>
+						)}
 
-				{/* Anything waiting on the organiser goes first. */}
-				<View>
-					<SectionTitle>Needs your decision</SectionTitle>
-					{waiting === 0 ? (
-						<View style={{ paddingVertical: spacing[1] }}>
-							<H5>All caught up</H5>
-							<Caption color="tertiary" style={{ marginTop: spacing[0.5] }}>
-								Nothing is waiting on your review right now.
-							</Caption>
+						{/* Anything waiting on the organiser goes first. */}
+						<View>
+							<SectionTitle>Needs your decision</SectionTitle>
+							{waiting === 0 ? (
+								<View style={{ paddingVertical: spacing[1] }}>
+									<H5>All caught up</H5>
+									<Caption color="tertiary" style={{ marginTop: spacing[0.5] }}>
+										Nothing is waiting on your review right now.
+									</Caption>
+								</View>
+							) : (
+								<ListGroup>
+									{pendingApplications > 0 && (
+										<ListRow
+											label="Applicants to review"
+											hint="Across your published events"
+											value={<Count value={pendingApplications} />}
+											onPress={() => router.push("/(ngo)/events")}
+										/>
+									)}
+									{pendingPledges > 0 && (
+										<ListRow
+											label="Pledges to review"
+											hint="People offering what you asked for"
+											value={<Count value={pendingPledges} />}
+											onPress={() => router.push("/(ngo)/needs")}
+										/>
+									)}
+								</ListGroup>
+							)}
 						</View>
-					) : (
-						<ListGroup>
-							{pendingApplications > 0 && (
+
+						<View>
+							<SectionTitle>At a glance</SectionTitle>
+							<MetricRow
+								stats={[
+									{ label: "Events", value: eventsQuery.data?.meta.total ?? 0 },
+									{ label: "Open needs", value: openNeeds },
+									{
+										label: "Waiting on you",
+										value: waiting,
+										...(waiting > 0 ? { tone: "warning" as const } : {}),
+									},
+								]}
+							/>
+						</View>
+
+						{isVerified && (
+							<View>
+								<SectionTitle>Your impact</SectionTitle>
+								<MetricRow
+									stats={[
+										{
+											label: "Events hosted",
+											value: impact?.eventsHosted ?? 0,
+										},
+										{
+											label: "Volunteers engaged",
+											value: impact?.volunteersEngaged ?? 0,
+										},
+										{
+											label: "Volunteer hours",
+											value: impact?.volunteerHours ?? 0,
+										},
+										{
+											label: "Certificates issued",
+											value: impact?.certificatesIssued ?? 0,
+										},
+										{
+											label: "Needs fulfilled",
+											value: impact?.needsFulfilled ?? 0,
+										},
+										{
+											label: "Items received",
+											value: impact?.itemsReceived ?? 0,
+										},
+									]}
+								/>
+							</View>
+						)}
+
+						<View>
+							<SectionTitle>Manage</SectionTitle>
+							<ListGroup>
 								<ListRow
-									label="Applicants to review"
-									hint="Across your published events"
-									value={<Count value={pendingApplications} />}
+									icon={CalendarDays}
+									label="Events"
+									hint="Create and review applicants"
 									onPress={() => router.push("/(ngo)/events")}
 								/>
-							)}
-							{pendingPledges > 0 && (
 								<ListRow
-									label="Pledges to review"
-									hint="People offering what you asked for"
-									value={<Count value={pendingPledges} />}
+									icon={HeartHandshake}
+									label="Needs and offers"
+									hint="Post requests and review pledges"
 									onPress={() => router.push("/(ngo)/needs")}
 								/>
-							)}
-						</ListGroup>
-					)}
-				</View>
-
-				<View>
-					<SectionTitle>At a glance</SectionTitle>
-					<MetricRow
-						stats={[
-							{ label: "Events", value: eventsQuery.data?.meta.total ?? 0 },
-							{ label: "Open needs", value: openNeeds },
-							{
-								label: "Waiting on you",
-								value: waiting,
-								...(waiting > 0 ? { tone: "warning" as const } : {}),
-							},
-						]}
-					/>
-				</View>
-
-				{isVerified && (
-					<View>
-						<SectionTitle>Your impact</SectionTitle>
-						<MetricRow
-							stats={[
-								{ label: "Events hosted", value: impact?.eventsHosted ?? 0 },
-								{
-									label: "Volunteers engaged",
-									value: impact?.volunteersEngaged ?? 0,
-								},
-								{
-									label: "Volunteer hours",
-									value: impact?.volunteerHours ?? 0,
-								},
-								{
-									label: "Certificates issued",
-									value: impact?.certificatesIssued ?? 0,
-								},
-								{
-									label: "Needs fulfilled",
-									value: impact?.needsFulfilled ?? 0,
-								},
-								{ label: "Items received", value: impact?.itemsReceived ?? 0 },
-							]}
-						/>
-					</View>
+								<ListRow
+									icon={Megaphone}
+									label="Announcements"
+									hint="Post updates to your followers"
+									onPress={() => router.push("/(ngo)/announcements")}
+								/>
+								<ListRow
+									icon={Star}
+									label="Reviews"
+									hint="Read and reply to reviews"
+									onPress={() => router.push("/(ngo)/reviews")}
+								/>
+								<ListRow
+									icon={Users}
+									label="Team"
+									hint="Manage who can act for your NGO"
+									onPress={() => router.push("/(ngo)/team")}
+								/>
+								<ListRow
+									icon={FileText}
+									label="Financial reports"
+									hint="Publish transparency documents"
+									onPress={() => router.push("/(ngo)/reports")}
+								/>
+								<ListRow
+									icon={Wallet}
+									label="Donations"
+									hint="Track received donations"
+									onPress={() => router.push("/(ngo)/donations")}
+								/>
+							</ListGroup>
+						</View>
+					</>
 				)}
-
-				<View>
-					<SectionTitle>Manage</SectionTitle>
-					<ListGroup>
-						<ListRow
-							icon={CalendarDays}
-							label="Events"
-							hint="Create and review applicants"
-							onPress={() => router.push("/(ngo)/events")}
-						/>
-						<ListRow
-							icon={HeartHandshake}
-							label="Needs and offers"
-							hint="Post requests and review pledges"
-							onPress={() => router.push("/(ngo)/needs")}
-						/>
-						<ListRow
-							icon={Megaphone}
-							label="Announcements"
-							hint="Post updates to your followers"
-							onPress={() => router.push("/(ngo)/announcements")}
-						/>
-						<ListRow
-							icon={Star}
-							label="Reviews"
-							hint="Read and reply to reviews"
-							onPress={() => router.push("/(ngo)/reviews")}
-						/>
-						<ListRow
-							icon={Users}
-							label="Team"
-							hint="Manage who can act for your NGO"
-							onPress={() => router.push("/(ngo)/team")}
-						/>
-						<ListRow
-							icon={FileText}
-							label="Financial reports"
-							hint="Publish transparency documents"
-							onPress={() => router.push("/(ngo)/reports")}
-						/>
-						<ListRow
-							icon={Wallet}
-							label="Donations"
-							hint="Track received donations"
-							onPress={() => router.push("/(ngo)/donations")}
-						/>
-					</ListGroup>
-				</View>
 			</ScrollView>
 		</Screen>
 	);

@@ -1,5 +1,6 @@
-import { ActivityIndicator, Pressable, type ViewStyle } from "react-native";
-import { Body } from "@/components/ui/typography";
+import { ActivityIndicator, type ViewStyle } from "react-native";
+import { Pressable } from "@/components/ui/pressable";
+import { Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/useTheme";
 import { focusable } from "@/lib/focus";
 
@@ -37,10 +38,10 @@ const variantStyles = {
 } as const;
 
 const sizeStyles = {
-	default: { py: 3.5, px: 4, iconSize: 44 },
-	sm: { py: 2, px: 3, iconSize: 36 },
-	lg: { py: 5, px: 6, iconSize: 52 },
-	icon: { py: 0, px: 0, iconSize: 44 },
+	default: { py: 3, px: 5, iconSize: 44, minHeight: 48 },
+	sm: { py: 2, px: 3.5, iconSize: 36, minHeight: 38 },
+	lg: { py: 4, px: 6, iconSize: 52, minHeight: 56 },
+	icon: { py: 0, px: 0, iconSize: 44, minHeight: 44 },
 } as const;
 
 type Variant = keyof typeof variantStyles;
@@ -118,6 +119,7 @@ export function Button({
 					paddingVertical: spacing[s.py as keyof typeof spacing],
 					paddingHorizontal: spacing[s.px as keyof typeof spacing],
 					borderRadius: borderRadius.lg,
+					minHeight: s.minHeight,
 					alignItems: "center",
 					justifyContent: "center",
 					flexDirection: "row",
@@ -145,12 +147,13 @@ export function Button({
 			{loading ? (
 				<ActivityIndicator size="small" color={resolveColor(colors, v.text)} />
 			) : (
-				<Body
+				<Label
 					color={resolveColor(colors, v.text)}
 					weight={variant === "link" ? "medium" : "bold"}
+					numberOfLines={1}
 				>
 					{children}
-				</Body>
+				</Label>
 			)}
 		</Pressable>
 	);

@@ -6,8 +6,10 @@ import { useFonts } from "expo-font";
 import { SplashScreen, Stack } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ThemeProvider } from "@/hooks/useAppTheme";
 import { queryClient } from "@/lib/api";
+import { HEADERLESS } from "@/lib/navigation";
 import { storage } from "@/lib/storage";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -45,28 +47,32 @@ export default function RootLayout() {
 	return (
 		<QueryClientProvider client={queryClient}>
 			<ThemeProvider>
-				<View style={{ flex: 1 }}>
-					<Stack screenOptions={{ headerShown: false }}>
-						<Stack.Screen name="index" />
-						<Stack.Screen name="(auth)" />
-						<Stack.Screen name="role-select" />
-						<Stack.Screen name="(onboarding)" />
-						<Stack.Screen name="(ngo)" />
-						<Stack.Screen name="(volunteer)" />
-						<Stack.Screen name="(admin)" />
-						{/* Public — browsable without an account */}
-						<Stack.Screen name="events" />
-						<Stack.Screen name="certificates" />
-						<Stack.Screen name="notifications" />
-						<Stack.Screen name="bookmarks" />
-						<Stack.Screen name="ngos" />
-						<Stack.Screen name="impact" />
-						<Stack.Screen name="edit-profile" />
-						<Stack.Screen name="verify-identity" />
-						<Stack.Screen name="success" />
-					</Stack>
-					<PortalHost />
-				</View>
+				{/* Gesture root for the sheets and any swipe gesture below it. */}
+				<GestureHandlerRootView style={{ flex: 1 }}>
+					<View style={{ flex: 1 }}>
+						<Stack screenOptions={HEADERLESS}>
+							<Stack.Screen name="index" />
+							<Stack.Screen name="(auth)" />
+							<Stack.Screen name="role-select" />
+							<Stack.Screen name="(onboarding)" />
+							<Stack.Screen name="(ngo)" />
+							<Stack.Screen name="(volunteer)" />
+							<Stack.Screen name="(admin)" />
+							{/* Public — browsable without an account */}
+							<Stack.Screen name="events" />
+							<Stack.Screen name="certificates" />
+							<Stack.Screen name="notifications" />
+							<Stack.Screen name="bookmarks" />
+							<Stack.Screen name="ngos" />
+							<Stack.Screen name="impact" />
+							<Stack.Screen name="edit-profile" />
+							<Stack.Screen name="verify-identity" />
+							<Stack.Screen name="success" />
+							<Stack.Screen name="search" />
+						</Stack>
+						<PortalHost />
+					</View>
+				</GestureHandlerRootView>
 			</ThemeProvider>
 		</QueryClientProvider>
 	);

@@ -12,6 +12,7 @@ import type {
 	CreatePledgeInput,
 	DocumentQueueQuery,
 	DownloadUrlResponse,
+	FeedQuery,
 	OrgEventQuery,
 	OrgNeedQuery,
 	PaginationQuery,
@@ -45,6 +46,7 @@ import type {
 	AuditLogEntry,
 	Category,
 	EventApplicant,
+	FeedItem,
 	MyPledgeListItem,
 	MyProfile,
 	NeedPledge,
@@ -60,6 +62,7 @@ import {
 	ADMIN,
 	CATEGORIES,
 	EVENTS,
+	FEED,
 	NEEDS,
 	ONBOARDING,
 	ORG_EVENTS,
@@ -142,6 +145,10 @@ export const orgEventsApi = {
 			ORG_EVENTS.reviewApplication(id, applicationId),
 			input,
 		),
+};
+
+export const feedApi = {
+	list: (query: Partial<FeedQuery>) => http.getPage<FeedItem>(FEED.LIST, query),
 };
 
 export const needsApi = {

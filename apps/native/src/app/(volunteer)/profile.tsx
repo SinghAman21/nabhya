@@ -1,43 +1,56 @@
 import { isSelfieDocument } from "@nabhya/shared";
 import { useRouter } from "expo-router";
-import type { LucideIcon } from "lucide-react-native";
 import {
 	Award,
+	Bell,
 	Bookmark,
-	Building2,
-	CalendarCheck,
-	Camera,
 	ChevronRight,
-	Clock,
-	IdCard,
-	MapPin,
-	Pencil,
+	HandCoins,
+	Moon,
 	ShieldCheck,
 	TrendingUp,
+	UserRound,
 } from "lucide-react-native";
-import { Pressable, RefreshControl, ScrollView, View } from "react-native";
-import { NotificationBell } from "@/components/notification-bell";
+import { useState } from "react";
+import { RefreshControl, ScrollView, View, type ViewStyle } from "react-native";
 import {
+	Banner,
 	ErrorState,
+	ListGroup,
+	ListRow,
 	LoadingState,
+	MetricRow,
 	Screen,
 	ScreenHeader,
+	SectionTitle,
 	Surface,
 } from "@/components/screen-shell";
-import {
-	humanizeStatus,
-	StatusPill,
-	verificationTone,
-} from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
-import { Body, Caption, H4 } from "@/components/ui/typography";
+import { Sheet, SheetOption } from "@/components/ui/sheet";
+import { Caption, H3, H4 } from "@/components/ui/typography";
 import { useSignOut } from "@/hooks/use-auth";
 import { useMyImpact } from "@/hooks/use-directory";
 import { useMyUserDocuments } from "@/hooks/use-documents";
 import { useMe } from "@/hooks/use-profile";
+import { useAppTheme } from "@/hooks/useAppTheme";
+import { useMedia } from "@/hooks/useMedia";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
-import type { DocVerificationStatus } from "@/lib/types";
+
+/**
+ * The volunteer's own page, top to bottom in the order a person needs it:
+ *
+ * 1. Who I am — one tappable card: avatar, name, city, verification line.
+ *    Tapping it edits the profile; there is no separate edit button to find.
+ * 2. What I have done — three numbers, tap for the full impact page.
+ * 3. What needs me — the verification banner, only while it does.
+ * 4. Where things are — two short groups: my activity, then settings.
+ * 5. Sign out — on its own at the end, away from everything else.
+ *
+ * Email, bio and phone are not shown here; they belong to the edit page. A
+ * profile screen is a hub, and every extra line on the hub is a line before
+ * the thing the person came for.
+ */
 
 const STICKY_RAIL = {
 	width: 340,
@@ -46,14 +59,15 @@ const STICKY_RAIL = {
 	alignSelf: "flex-start",
 } as unknown as ViewStyle;
 
-import type { ViewStyle } from "react-native";
-import { useMedia } from "@/hooks/useMedia";
+const APPEARANCE_LABEL = { system: "System", light: "Light", dark: "Dark" };
 
 export default function VolunteerProfile() {
-	const { colors, spacing, withOpacity, borderRadius } = useTheme();
+	const { colors, spacing } = useTheme();
+	const { preference, setColorScheme } = useAppTheme();
 	const router = useRouter();
 	const signOut = useSignOut();
 	const { isDesktop } = useMedia();
+	const [appearanceOpen, setAppearanceOpen] = useState(false);
 
 	const me = useMe();
 	const documents = useMyUserDocuments();
@@ -68,289 +82,244 @@ export default function VolunteerProfile() {
 	const hasSubmitted = Boolean(govIdDoc || selfieDoc);
 	const reviewNote = govIdDoc?.remarks || selfieDoc?.remarks;
 	const isVerified = me.data?.verificationStatus === "VERIFIED";
+	const rejected =
+		govIdDoc?.verificationStatus === "REJECTED" ||
+		selfieDoc?.verificationStatus === "REJECTED";
 
 	const location = [me.data?.city, me.data?.state].filter(Boolean).join(", ");
-	const memberSince = me.data?.createdAt
-		? new Date(me.data.createdAt).getFullYear()
-		: null;
 
-	if (me.isLoading) {
+	if (me.isLoading || me.isError) {
 		return (
 			<Screen>
-				<ScreenHeader
-					title="Profile"
-					subtitle="Your details and identity verification."
-					action={<NotificationBell />}
-				/>
-				<LoadingState />
-			</Screen>
-		);
-	}
-
-	if (me.isError) {
-		return (
-			<Screen>
-				<ScreenHeader
-					title="Profile"
-					subtitle="Your details and identity verification."
-					action={<NotificationBell />}
-				/>
-				<ErrorState
-					message={apiErrorMessage(me.error)}
-					onRetry={() => me.refetch()}
-				/>
-			</Screen>
-		);
-	}
-
-	const identityCard = (
-		<Surface style={{ marginBottom: spacing[3] }}>
-			<InitialsAvatar name={me.data?.name} verified={isVerified} />
-			<View style={{ marginTop: spacing[3] }}>
-				<H4 numberOfLines={1}>{me.data?.name ?? "Volunteer"}</H4>
-			</View>
-			<Caption
-				color="quaternary"
-				numberOfLines={1}
-				style={{ marginTop: spacing[0.5] }}
-			>
-				{me.data?.email}
-			</Caption>
-			{location ? (
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						gap: spacing[1],
-						marginTop: spacing[1.5],
-					}}
-				>
-					<MapPin size={12} color={colors.text.tertiary as string} />
-					<Caption color="tertiary">{location}</Caption>
-				</View>
-			) : null}
-			{me.data?.bio ? (
-				<Caption color="secondary" style={{ marginTop: spacing[2.5] }}>
-					{me.data.bio}
-				</Caption>
-			) : null}
-			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					justifyContent: "space-between",
-					marginTop: spacing[3],
-					paddingTop: spacing[3],
-					borderTopWidth: 1,
-					borderTopColor: colors.border.hairline,
-				}}
-			>
-				<StatusPill
-					label={`ID ${humanizeStatus(me.data?.verificationStatus).toLowerCase()}`}
-					tone={verificationTone(me.data?.verificationStatus)}
-				/>
-				{memberSince && (
-					<Caption color="quaternary">Member since {memberSince}</Caption>
+				<ScreenHeader title="Profile" />
+				{me.isLoading ? (
+					<LoadingState />
+				) : (
+					<ErrorState
+						message={apiErrorMessage(me.error)}
+						onRetry={() => me.refetch()}
+					/>
 				)}
+			</Screen>
+		);
+	}
+
+	/* 1. Who I am ------------------------------------------------------------ */
+	const identity = (
+		<Surface
+			onPress={() => router.push("/edit-profile")}
+			style={{ marginBottom: spacing[4] }}
+		>
+			<View
+				style={{ flexDirection: "row", alignItems: "center", gap: spacing[4] }}
+			>
+				<Avatar name={me.data?.name} verified={isVerified} />
+				<View style={{ flex: 1, minWidth: 0 }}>
+					<H3 numberOfLines={1}>{me.data?.name ?? "Volunteer"}</H3>
+					{location ? (
+						<Caption color="tertiary" numberOfLines={1}>
+							{location}
+						</Caption>
+					) : (
+						<Caption color="quaternary">Add your city</Caption>
+					)}
+					<View
+						style={{
+							flexDirection: "row",
+							alignItems: "center",
+							gap: spacing[1],
+							marginTop: spacing[1.5],
+						}}
+					>
+						<ShieldCheck
+							size={13}
+							strokeWidth={2.2}
+							color={
+								isVerified
+									? (colors.success.ink as string)
+									: (colors.text.quaternary as string)
+							}
+						/>
+						<Caption
+							weight="medium"
+							color={
+								isVerified
+									? (colors.success.ink as string)
+									: (colors.text.quaternary as string)
+							}
+						>
+							{isVerified ? "Verified volunteer" : "Not verified yet"}
+						</Caption>
+					</View>
+				</View>
+				<ChevronRight size={18} color={colors.text.quaternary as string} />
 			</View>
 		</Surface>
 	);
 
-	const impactStrip = impact.data ? (
-		<Surface padded={false} style={{ marginBottom: spacing[5] }}>
-			<View style={{ flexDirection: "row" }}>
-				<ImpactCell
-					icon={Clock}
-					value={impact.data.hoursContributed}
-					label="hours given"
-					onPress={() => router.push("/impact")}
-					first
-				/>
-				<ImpactDivider />
-				<ImpactCell
-					icon={CalendarCheck}
-					value={impact.data.eventsAttended}
-					label="events"
-					onPress={() => router.push("/impact")}
-				/>
-				<ImpactDivider />
-				<ImpactCell
-					icon={Award}
-					value={impact.data.certificatesEarned}
-					label="certificates"
-					onPress={() => router.push("/certificates")}
-					last
-				/>
-			</View>
-		</Surface>
+	/* 2. What I have done ---------------------------------------------------- */
+	const numbers = impact.data ? (
+		<View style={{ marginBottom: spacing[5] }}>
+			<MetricRow
+				stats={[
+					{ label: "Hours given", value: impact.data.hoursContributed },
+					{ label: "Events", value: impact.data.eventsAttended },
+					{ label: "Certificates", value: impact.data.certificatesEarned },
+				]}
+			/>
+		</View>
 	) : null;
 
-	const verificationCard = documents.isLoading ? (
-		<LoadingState />
-	) : isVerified ? (
-		<Surface style={{ marginBottom: spacing[5] }}>
-			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[3],
-				}}
-			>
-				<IconBadge icon={ShieldCheck} color={colors.success.main as string} />
-				<View style={{ flex: 1 }}>
-					<Body weight="semibold">Identity verified</Body>
-					<Caption color="tertiary">
-						NGOs can see you're a trusted volunteer.
-					</Caption>
-				</View>
-			</View>
-		</Surface>
-	) : (
-		<Surface style={{ marginBottom: spacing[5] }}>
-			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[3],
-					marginBottom: spacing[3],
-				}}
-			>
-				<IconBadge icon={ShieldCheck} color={colors.primary.ink as string} />
-				<Body weight="semibold" style={{ flex: 1 }}>
-					Get verified
-				</Body>
-			</View>
-			<View style={{ gap: spacing[0] }}>
-				<VerificationStep
-					number={1}
-					icon={IdCard}
-					label="Government ID"
-					status={govIdDoc?.verificationStatus}
-					isLast={false}
-				/>
-				<VerificationStep
-					number={2}
-					icon={Camera}
-					label="Verification selfie"
-					status={selfieDoc?.verificationStatus}
-					isLast
+	/* 3. What needs me --------------------------------------------------------- */
+	const verification =
+		documents.isLoading || isVerified ? null : (
+			<View style={{ marginBottom: spacing[6] }}>
+				<Banner
+					tone={rejected ? "error" : hasSubmitted ? "info" : "warning"}
+					title={
+						rejected
+							? "Verification needs another look"
+							: hasSubmitted
+								? "Verification under review"
+								: "Verify your identity"
+					}
+					description={
+						rejected && reviewNote
+							? reviewNote
+							: hasSubmitted
+								? "A reviewer is checking your ID and selfie. Usually a day or two."
+								: "A government ID and a quick selfie. NGOs accept verified volunteers first."
+					}
+					onPress={() => router.push("/verify-identity")}
 				/>
 			</View>
-			{reviewNote && (
-				<View
-					style={{
-						marginTop: spacing[3],
-						padding: spacing[3],
-						borderRadius: borderRadius.lg,
-						backgroundColor: withOpacity(colors.warning.main as string, 0.08),
-					}}
-				>
-					<Caption weight="medium" color="secondary">
-						Reviewer note
-					</Caption>
-					<Caption color="tertiary" style={{ marginTop: spacing[0.5] }}>
-						{reviewNote}
-					</Caption>
-				</View>
-			)}
-			<Button
-				onPress={() => router.push("/verify-identity")}
-				style={{ marginTop: spacing[4] }}
-			>
-				{hasSubmitted ? "Update documents" : "Start verification"}
-			</Button>
-		</Surface>
-	);
+		);
 
-	const accountSection = (
-		<>
-			<Caption
-				weight="bold"
-				color="tertiary"
-				style={{
-					letterSpacing: 1,
-					textTransform: "uppercase",
-					marginBottom: spacing[2],
-				}}
-			>
-				Account
-			</Caption>
-			<Surface padded={false} style={{ marginBottom: spacing[6] }}>
-				<MenuRow
-					icon={Pencil}
-					label="Edit profile"
-					sublabel="Name, bio, location and interests"
-					onPress={() => router.push("/edit-profile")}
-					accessibilityLabel="Edit profile"
-					first
-				/>
-				<MenuDivider />
-				<MenuRow
-					icon={Award}
-					label="My certificates"
-					sublabel="Everything you've earned"
-					onPress={() => router.push("/certificates")}
-					accessibilityLabel="My certificates"
-				/>
-				<MenuDivider />
-				<MenuRow
+	/* 4. Where things are ------------------------------------------------------ */
+	const activity = (
+		<View style={{ marginBottom: spacing[6] }}>
+			<SectionTitle>Your activity</SectionTitle>
+			<ListGroup>
+				<ListRow
 					icon={TrendingUp}
-					label="My impact"
-					sublabel="Hours, events and donations"
+					label="Impact"
 					onPress={() => router.push("/impact")}
-					accessibilityLabel="My impact"
 				/>
-				<MenuDivider />
-				<MenuRow
+				<ListRow
+					icon={Award}
+					label="Certificates"
+					onPress={() => router.push("/certificates")}
+				/>
+				<ListRow
+					icon={HandCoins}
+					label="Donations"
+					onPress={() => router.push("/(volunteer)/donations")}
+				/>
+				<ListRow
 					icon={Bookmark}
-					label="Saved NGOs"
-					sublabel="Organisations you bookmarked"
+					label="NGOs you follow"
 					onPress={() => router.push("/bookmarks")}
-					accessibilityLabel="Saved NGOs"
 				/>
-				<MenuDivider />
-				<MenuRow
-					icon={Building2}
-					label="Browse NGOs"
-					sublabel="Discover verified organisations"
-					onPress={() => router.push("/ngos")}
-					accessibilityLabel="Browse NGOs"
-					last
-				/>
-			</Surface>
-		</>
+			</ListGroup>
+		</View>
 	);
 
+	const settings = (
+		<View style={{ marginBottom: spacing[8] }}>
+			<SectionTitle>Settings</SectionTitle>
+			<ListGroup>
+				<ListRow
+					icon={UserRound}
+					label="Edit profile"
+					onPress={() => router.push("/edit-profile")}
+				/>
+				<ListRow
+					icon={ShieldCheck}
+					label="Identity verification"
+					value={
+						<Caption color="tertiary">
+							{isVerified
+								? "Verified"
+								: hasSubmitted
+									? "Under review"
+									: "Not started"}
+						</Caption>
+					}
+					onPress={() => router.push("/verify-identity")}
+				/>
+				<ListRow
+					icon={Bell}
+					label="Notifications"
+					onPress={() => router.push("/notifications")}
+				/>
+				<ListRow
+					icon={Moon}
+					label="Appearance"
+					value={
+						<Caption color="tertiary">{APPEARANCE_LABEL[preference]}</Caption>
+					}
+					onPress={() => setAppearanceOpen(true)}
+				/>
+			</ListGroup>
+		</View>
+	);
+
+	/* 5. Sign out -------------------------------------------------------------- */
 	const signOutButton = (
-		<Button
-			variant="outline"
-			onPress={() => signOut.mutate()}
-			loading={signOut.isPending}
-			accessibilityLabel="Sign out"
-			accessibilityRole="button"
+		<View style={{ gap: spacing[3], alignItems: "center" }}>
+			<Button
+				variant="outline"
+				onPress={() => signOut.mutate()}
+				loading={signOut.isPending}
+				accessibilityLabel="Sign out"
+				style={{ alignSelf: "stretch" }}
+			>
+				Sign out
+			</Button>
+			<Caption color="quaternary" numberOfLines={1}>
+				{me.data?.email}
+			</Caption>
+		</View>
+	);
+
+	const appearanceSheet = (
+		<Sheet
+			visible={appearanceOpen}
+			onClose={() => setAppearanceOpen(false)}
+			title="Appearance"
+			subtitle="System follows your phone's setting."
 		>
-			Sign out
-		</Button>
+			<View style={{ paddingBottom: spacing[2] }}>
+				{(["system", "light", "dark"] as const).map((option) => (
+					<SheetOption
+						key={option}
+						label={APPEARANCE_LABEL[option]}
+						selected={preference === option}
+						onPress={() => {
+							setColorScheme(option);
+							setAppearanceOpen(false);
+						}}
+					/>
+				))}
+			</View>
+		</Sheet>
 	);
 
 	return (
 		<Screen>
-			<ScreenHeader
-				title="Profile"
-				subtitle="Your details and identity verification."
-				action={<NotificationBell />}
-			/>
+			<ScreenHeader title="Profile" />
 
 			{isDesktop ? (
 				<View style={{ flexDirection: "row", gap: spacing[6] }}>
 					<View style={STICKY_RAIL}>
-						{identityCard}
-						{verificationCard}
+						{identity}
+						{verification}
 						{signOutButton}
 					</View>
 					<View style={{ flex: 1 }}>
-						{impactStrip}
-						{accountSection}
+						{numbers}
+						{activity}
+						{settings}
 					</View>
 				</View>
 			) : (
@@ -365,22 +334,25 @@ export default function VolunteerProfile() {
 								documents.refetch();
 								impact.refetch();
 							}}
-							tintColor={colors.primary.main as string}
+							tintColor={colors.text.quaternary as string}
 						/>
 					}
 				>
-					{identityCard}
-					{impactStrip}
-					{verificationCard}
-					{accountSection}
+					{identity}
+					{numbers}
+					{verification}
+					{activity}
+					{settings}
 					{signOutButton}
 				</ScrollView>
 			)}
+
+			{appearanceSheet}
 		</Screen>
 	);
 }
 
-function InitialsAvatar({
+function Avatar({
 	name,
 	verified,
 }: {
@@ -398,14 +370,12 @@ function InitialsAvatar({
 			.toUpperCase() || "V";
 
 	return (
-		<View style={{ position: "relative", alignSelf: "flex-start" }}>
+		<View style={{ position: "relative" }}>
 			<View
 				style={{
-					width: 64,
-					height: 64,
-					borderRadius: 32,
-					borderWidth: 3,
-					borderColor: colors.primary.tint,
+					width: 60,
+					height: 60,
+					borderRadius: 30,
 					alignItems: "center",
 					justifyContent: "center",
 					backgroundColor: colors.primary.tint,
@@ -415,254 +385,24 @@ function InitialsAvatar({
 			</View>
 			{verified && (
 				<View
+					accessibilityLabel="Verified"
 					style={{
 						position: "absolute",
 						bottom: -2,
 						right: -2,
-						width: 24,
-						height: 24,
-						borderRadius: 12,
-						backgroundColor: colors.background.card,
+						width: 22,
+						height: 22,
+						borderRadius: 11,
+						backgroundColor: colors.success.main,
 						borderWidth: 2,
 						borderColor: colors.background.card,
 						alignItems: "center",
 						justifyContent: "center",
 					}}
 				>
-					<View
-						style={{
-							width: 20,
-							height: 20,
-							borderRadius: 10,
-							backgroundColor: colors.success.main,
-							alignItems: "center",
-							justifyContent: "center",
-						}}
-					>
-						<ShieldCheck size={12} color="#FFFFFF" />
-					</View>
+					<ShieldCheck size={11} color="#FFFFFF" strokeWidth={2.5} />
 				</View>
 			)}
 		</View>
-	);
-}
-
-function IconBadge({ icon: Icon, color }: { icon: LucideIcon; color: string }) {
-	const { withOpacity } = useTheme();
-	return (
-		<View
-			style={{
-				width: 40,
-				height: 40,
-				borderRadius: 20,
-				alignItems: "center",
-				justifyContent: "center",
-				backgroundColor: withOpacity(color, 0.1),
-			}}
-		>
-			<Icon size={18} color={color} />
-		</View>
-	);
-}
-
-function ImpactCell({
-	icon: Icon,
-	value,
-	label,
-	onPress,
-	first,
-	last,
-}: {
-	icon: LucideIcon;
-	value: number;
-	label: string;
-	onPress: () => void;
-	first?: boolean;
-	last?: boolean;
-}) {
-	const { colors, spacing, borderRadius } = useTheme();
-	return (
-		<Pressable
-			onPress={onPress}
-			accessibilityRole="button"
-			accessibilityLabel={`${value} ${label}`}
-			style={({ pressed }) => ({
-				flex: 1,
-				alignItems: "center",
-				paddingVertical: spacing[4],
-				backgroundColor: pressed ? colors.background.subtle : "transparent",
-				borderTopLeftRadius: first ? borderRadius.xl : 0,
-				borderTopRightRadius: first ? borderRadius.xl : 0,
-				borderBottomLeftRadius: last ? borderRadius.xl : 0,
-				borderBottomRightRadius: last ? borderRadius.xl : 0,
-			})}
-		>
-			<Icon size={16} color={colors.primary.ink as string} />
-			<Body weight="bold" style={{ marginTop: spacing[1] }}>
-				{value}
-			</Body>
-			<Caption color="tertiary" style={{ fontSize: 11 }}>
-				{label}
-			</Caption>
-		</Pressable>
-	);
-}
-
-function ImpactDivider() {
-	const { colors, spacing } = useTheme();
-	return (
-		<View
-			style={{
-				width: 1,
-				alignSelf: "stretch",
-				marginVertical: spacing[2],
-				backgroundColor: colors.border.hairline,
-			}}
-		/>
-	);
-}
-
-function VerificationStep({
-	number,
-	icon: Icon,
-	label,
-	status,
-	isLast,
-}: {
-	number: number;
-	icon: LucideIcon;
-	label: string;
-	status?: DocVerificationStatus | null;
-	isLast: boolean;
-}) {
-	const { colors, spacing } = useTheme();
-	const statusColor = !status
-		? colors.neutral[200]
-		: status === "VERIFIED"
-			? colors.success.main
-			: status === "REJECTED"
-				? colors.error.main
-				: colors.warning.main;
-
-	return (
-		<View
-			accessibilityRole="summary"
-			accessibilityLabel={`${label}: ${status ? humanizeStatus(status) : "Not submitted"}`}
-		>
-			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[2.5],
-				}}
-			>
-				<View
-					style={{
-						width: 28,
-						height: 28,
-						borderRadius: 14,
-						backgroundColor: statusColor as string,
-						alignItems: "center",
-						justifyContent: "center",
-					}}
-				>
-					<Icon size={14} color="#FFFFFF" />
-				</View>
-				<Body style={{ flex: 1 }}>{label}</Body>
-				{status ? (
-					<StatusPill
-						label={humanizeStatus(status)}
-						tone={verificationTone(status)}
-					/>
-				) : (
-					<Caption color="quaternary">Not submitted</Caption>
-				)}
-			</View>
-			{!isLast && (
-				<View
-					style={{
-						height: 1,
-						marginLeft: 14 + 8,
-						marginTop: spacing[1],
-						marginBottom: spacing[1],
-						backgroundColor: colors.border.hairline,
-					}}
-				/>
-			)}
-		</View>
-	);
-}
-
-function MenuRow({
-	icon: Icon,
-	label,
-	sublabel,
-	onPress,
-	accessibilityLabel,
-	first,
-	last,
-}: {
-	icon: LucideIcon;
-	label: string;
-	sublabel?: string;
-	onPress: () => void;
-	accessibilityLabel?: string;
-	first?: boolean;
-	last?: boolean;
-}) {
-	const { colors, spacing, borderRadius } = useTheme();
-	return (
-		<Pressable
-			onPress={onPress}
-			accessibilityRole="button"
-			accessibilityLabel={accessibilityLabel ?? label}
-			style={({ pressed }) => ({
-				flexDirection: "row",
-				alignItems: "center",
-				gap: spacing[3],
-				paddingHorizontal: spacing[4],
-				paddingVertical: spacing[3],
-				backgroundColor: pressed ? colors.background.tertiary : "transparent",
-				borderTopLeftRadius: first ? borderRadius.lg : 0,
-				borderTopRightRadius: first ? borderRadius.lg : 0,
-				borderBottomLeftRadius: last ? borderRadius.lg : 0,
-				borderBottomRightRadius: last ? borderRadius.lg : 0,
-			})}
-		>
-			<View
-				style={{
-					width: 32,
-					height: 32,
-					borderRadius: 10,
-					alignItems: "center",
-					justifyContent: "center",
-					backgroundColor: colors.background.subtle,
-				}}
-			>
-				<Icon size={16} color={colors.text.tertiary as string} />
-			</View>
-			<View style={{ flex: 1 }}>
-				<Body weight="medium">{label}</Body>
-				{sublabel && (
-					<Caption color="quaternary" numberOfLines={1}>
-						{sublabel}
-					</Caption>
-				)}
-			</View>
-			<ChevronRight size={16} color={colors.text.quaternary as string} />
-		</Pressable>
-	);
-}
-
-function MenuDivider() {
-	const { colors, spacing } = useTheme();
-	return (
-		<View
-			style={{
-				height: 1,
-				backgroundColor: colors.border.hairline,
-				marginLeft: spacing[4] + 32 + spacing[3],
-			}}
-		/>
 	);
 }

@@ -2,17 +2,17 @@ import { useRouter } from "expo-router";
 import { Building2, MapPin, Search } from "lucide-react-native";
 import { useState } from "react";
 import { FlatList, RefreshControl, View } from "react-native";
-import { BackButton } from "@/components/back-button";
 import {
 	EmptyState,
 	ErrorState,
 	FilterChips,
 	LoadingState,
 	Screen,
+	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
 import { Input } from "@/components/ui/input";
-import { Body, Caption, H2 } from "@/components/ui/typography";
+import { Body, Caption } from "@/components/ui/typography";
 import {
 	useNearbyOrganizations,
 	useOrganizations,
@@ -94,12 +94,11 @@ export default function NgoDirectory() {
 
 	return (
 		<Screen>
-			<BackButton />
-
-			<H2 style={{ marginBottom: spacing[1] }}>Organizations</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[5] }}>
-				Verified NGOs you can support.
-			</Body>
+			<ScreenHeader
+				back
+				title="Organizations"
+				subtitle="Verified NGOs you can support."
+			/>
 
 			<View
 				style={{

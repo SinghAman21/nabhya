@@ -640,3 +640,58 @@ export interface AuditLogEntry {
 	/** Null for system actions, or when the actor has since been deleted. */
 	actor: { id: string; fullName: string | null; email: string } | null;
 }
+
+// ─── Feed ────────────────────────────────────────────────────────────────────
+
+export type FeedKind = "need" | "event" | "story";
+
+interface FeedItemBase {
+	kind: FeedKind;
+	id: string;
+	title: string;
+	description: string;
+	city: string | null;
+	state: string | null;
+	postedAt: string;
+	isUrgent: boolean;
+	/** Whether the caller has bookmarked (follows) the posting NGO. */
+	isFollowing: boolean;
+	organization: OrganizationSummary;
+}
+
+export interface FeedNeedItem extends FeedItemBase {
+	kind: "need";
+	need: {
+		type: NeedType;
+		quantity: number | null;
+		unit: string | null;
+		fulfilledQuantity: number;
+		urgency: NeedUrgency;
+		status: NeedStatus;
+		expiresAt: string | null;
+	};
+}
+
+export interface FeedEventItem extends FeedItemBase {
+	kind: "event";
+	event: {
+		coverImage: string | null;
+		venue: string | null;
+		startAt: string;
+		endAt: string;
+		applicationDeadline: string | null;
+		volunteersNeeded: number;
+		acceptedCount: number;
+		status: EventStatus;
+	};
+}
+
+export interface FeedStoryItem extends FeedItemBase {
+	kind: "story";
+	story: {
+		coverImageKey: string | null;
+		isPinned: boolean;
+	};
+}
+
+export type FeedItem = FeedNeedItem | FeedEventItem | FeedStoryItem;

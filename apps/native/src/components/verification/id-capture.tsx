@@ -8,10 +8,12 @@ import * as ImagePicker from "expo-image-picker";
 import { Camera, ImageUp, RotateCcw } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { ActivityIndicator, Alert, Pressable, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption } from "@/components/ui/typography";
 import { useImageUpload } from "@/hooks/use-upload";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 
 export interface IdCaptureValue {
 	documentType: UserDocumentType;

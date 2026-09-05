@@ -1,7 +1,7 @@
 import type { PledgeStatus } from "@nabhya/shared";
-import { Package, X } from "lucide-react-native";
+import { Package } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, FlatList, Modal, Pressable, View } from "react-native";
+import { View } from "react-native";
 import {
 	EmptyState,
 	ErrorState,
@@ -15,9 +15,12 @@ import {
 	StatusPill,
 } from "@/components/status-pill";
 import { Input } from "@/components/ui/input";
-import { Body, Caption, H2, Label } from "@/components/ui/typography";
+import { Pressable } from "@/components/ui/pressable";
+import { Sheet, SheetFlatList } from "@/components/ui/sheet";
+import { Body, Caption, Label } from "@/components/ui/typography";
 import { useNeedPledges, useReviewPledge } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatProgress, formatRelative } from "@/lib/format";
 import type { NeedPledge, OrgNeedListItem } from "@/lib/types";
@@ -77,108 +80,75 @@ export function PledgesSheet({
 		);
 	};
 
+	const noteField = (
+		<View style={{ paddingTop: spacing[1], paddingBottom: spacing[4] }}>
+			{need && (
+				<Caption color="secondary" style={{ marginBottom: spacing[3] }}>
+					{formatProgress(need.fulfilledQuantity, need.quantity, need.unit)}
+				</Caption>
+			)}
+			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
+			<Label style={{ marginBottom: spacing[1.5] }}>
+				Note to the volunteer <Caption color="tertiary">(optional)</Caption>
+			</Label>
+			<Input
+				placeholder="Pickup address, timing, anything they need to know"
+				value={note}
+				onChangeText={setNote}
+				style={{
+					borderWidth: 0,
+					borderRadius: 12,
+					backgroundColor: colors.background.tertiary,
+					paddingVertical: spacing[3],
+				}}
+			/>
+		</View>
+	);
+
 	return (
-		<Modal
+		<Sheet
 			visible={!!need}
-			animationType="slide"
-			presentationStyle="pageSheet"
-			onRequestClose={close}
+			onClose={close}
+			title="Responses"
+			subtitle={need?.title}
+			scrollable={false}
+			detents={["60%", "92%"]}
 		>
-			<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
-				<View
-					style={{
-						paddingHorizontal: spacing[6],
-						paddingTop: spacing[6],
-						paddingBottom: spacing[2],
-					}}
-				>
-					<View
-						style={{
-							flexDirection: "row",
-							alignItems: "flex-start",
-							justifyContent: "space-between",
-							gap: spacing[3],
-						}}
-					>
-						<View style={{ flex: 1 }}>
-							<H2 numberOfLines={2}>Responses</H2>
-							<Caption color="tertiary" numberOfLines={1}>
-								{need?.title}
-							</Caption>
-						</View>
-						<Pressable onPress={close} hitSlop={12}>
-							<X size={22} color={colors.text.tertiary as string} />
-						</Pressable>
-					</View>
-
-					{need && (
-						<Caption color="secondary" style={{ marginTop: spacing[3] }}>
-							{formatProgress(need.fulfilledQuantity, need.quantity, need.unit)}
-						</Caption>
+			{query.isLoading ? (
+				<LoadingState label="Loading responses…" />
+			) : query.isError ? (
+				<ErrorState
+					message={apiErrorMessage(query.error)}
+					onRetry={() => query.refetch()}
+				/>
+			) : (
+				<SheetFlatList
+					data={items}
+					keyExtractor={(item) => item.id}
+					ListHeaderComponent={noteField}
+					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
+					ListEmptyComponent={
+						<EmptyState
+							icon={Package}
+							title="No responses here"
+							description={
+								filter === "PENDING"
+									? "New offers will appear here for review."
+									: "Nothing matches this filter yet."
+							}
+						/>
+					}
+					renderItem={({ item }) => (
+						<PledgeRow
+							pledge={item}
+							unit={need?.unit ?? null}
+							busy={review.isPending}
+							onDecide={(status) => decide(item, status)}
+						/>
 					)}
-				</View>
-
-				<View style={{ paddingHorizontal: spacing[6], paddingTop: spacing[4] }}>
-					<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
-
-					<Label style={{ marginBottom: spacing[1.5] }}>
-						Note to the volunteer <Caption color="tertiary">(optional)</Caption>
-					</Label>
-					<Input
-						placeholder="Pickup address, timing, anything they need to know"
-						value={note}
-						onChangeText={setNote}
-						style={{
-							borderWidth: 0,
-							borderRadius: 12,
-							backgroundColor: colors.background.tertiary,
-							paddingVertical: spacing[3],
-							marginBottom: spacing[4],
-						}}
-					/>
-				</View>
-
-				{query.isLoading ? (
-					<LoadingState label="Loading responses…" />
-				) : query.isError ? (
-					<ErrorState
-						message={apiErrorMessage(query.error)}
-						onRetry={() => query.refetch()}
-					/>
-				) : (
-					<FlatList
-						data={items}
-						keyExtractor={(item) => item.id}
-						contentContainerStyle={{
-							paddingHorizontal: spacing[6],
-							paddingBottom: spacing[10],
-						}}
-						ItemSeparatorComponent={() => (
-							<View style={{ height: spacing[3] }} />
-						)}
-						ListEmptyComponent={
-							<EmptyState
-								icon={Package}
-								title="No responses here"
-								description={
-									filter === "PENDING"
-										? "New offers will appear here for review."
-										: "Nothing matches this filter yet."
-								}
-							/>
-						}
-						renderItem={({ item }) => (
-							<PledgeRow
-								pledge={item}
-								unit={need?.unit ?? null}
-								busy={review.isPending}
-								onDecide={(status) => decide(item, status)}
-							/>
-						)}
-					/>
-				)}
-			</View>
-		</Modal>
+				/>
+			)}
+		</Sheet>
 	);
 }
 

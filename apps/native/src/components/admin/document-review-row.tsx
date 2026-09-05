@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { View } from "react-native";
 import { Surface } from "@/components/screen-shell";
 import {
 	humanizeStatus,
@@ -7,10 +7,12 @@ import {
 	verificationTone,
 } from "@/components/status-pill";
 import { Input } from "@/components/ui/input";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption } from "@/components/ui/typography";
 import { useReviewDocument } from "@/hooks/use-admin";
 import { useOpenDocument } from "@/hooks/use-documents";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import type { AdminOrgDocument } from "@/lib/types";

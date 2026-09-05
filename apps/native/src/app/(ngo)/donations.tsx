@@ -1,7 +1,6 @@
 import { formatMinor } from "@nabhya/shared";
 import { HandCoins } from "lucide-react-native";
 import { FlatList, RefreshControl, View } from "react-native";
-import { BackButton } from "@/components/back-button";
 import {
 	EmptyState,
 	ErrorState,
@@ -24,9 +23,8 @@ export default function OrgDonations() {
 
 	return (
 		<Screen>
-			<BackButton />
-
 			<ScreenHeader
+				back
 				title="Donations"
 				subtitle="Money received through Nabhya."
 			/>

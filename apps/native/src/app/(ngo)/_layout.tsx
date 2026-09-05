@@ -12,7 +12,7 @@ import {
 } from "lucide-react-native";
 import { View } from "react-native";
 import { type NavItem, Sidebar } from "@/components/sidebar";
-import { useTabBarOptions } from "@/components/tab-bar";
+import { renderTabBar, useTabBarOptions } from "@/components/tab-bar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useMyOrganization } from "@/hooks/use-organization";
 import { useMedia } from "@/hooks/useMedia";
@@ -89,7 +89,7 @@ export default function NgoLayout() {
 
 	return (
 		<View style={{ flex: 1 }}>
-			<Tabs screenOptions={tabBarOptions}>
+			<Tabs screenOptions={tabBarOptions} tabBar={renderTabBar}>
 				<Tabs.Screen
 					name="index"
 					options={{

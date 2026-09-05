@@ -1,8 +1,9 @@
 import { useRouter } from "expo-router";
 import { Bell } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { EmptyState, ListRow, LoadingState } from "@/components/screen-shell";
+import { Pressable } from "@/components/ui/pressable";
 import { Caption, Label } from "@/components/ui/typography";
 import {
 	useMarkNotificationsRead,

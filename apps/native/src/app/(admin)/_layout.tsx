@@ -8,7 +8,7 @@ import {
 } from "lucide-react-native";
 import { View } from "react-native";
 import { type NavItem, Sidebar } from "@/components/sidebar";
-import { useTabBarOptions } from "@/components/tab-bar";
+import { renderTabBar, useTabBarOptions } from "@/components/tab-bar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useMedia } from "@/hooks/useMedia";
 import { useTheme } from "@/hooks/useTheme";
@@ -73,7 +73,7 @@ export default function AdminLayout() {
 
 	return (
 		<View style={{ flex: 1 }}>
-			<Tabs screenOptions={tabBarOptions}>
+			<Tabs screenOptions={tabBarOptions} tabBar={renderTabBar}>
 				<Tabs.Screen
 					name="index"
 					options={{

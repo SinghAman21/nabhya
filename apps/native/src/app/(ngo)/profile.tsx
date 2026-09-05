@@ -10,7 +10,7 @@ import {
 	Phone,
 	ShieldCheck,
 } from "lucide-react-native";
-import { Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { RefreshControl, ScrollView, View } from "react-native";
 import {
 	ErrorState,
 	LoadingState,
@@ -24,6 +24,7 @@ import {
 	verificationTone,
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption } from "@/components/ui/typography";
 import { useSignOut } from "@/hooks/use-auth";
 import { useOrgTeam } from "@/hooks/use-directory";

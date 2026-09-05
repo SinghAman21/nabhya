@@ -4,13 +4,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Alert, Pressable } from "react-native";
 import { AuthSplitLayout } from "@/components/auth-split-layout";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { authService } from "@/lib/api/auth";
+import { apiErrorMessage } from "@/lib/api/http";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function Login() {
@@ -44,8 +46,14 @@ export default function Login() {
 				queryClient.removeQueries();
 			}
 			router.replace("/");
-		} catch {
-			Alert.alert("Error", "Sign in failed. Please try again.");
+		} catch (error) {
+			// The real reason matters here — "email not confirmed", a 401 from the
+			// API, or a network failure each need a different response from the
+			// user, and a fixed string told them none of it.
+			Alert.alert(
+				"Sign in failed",
+				apiErrorMessage(error, "Please try again."),
+			);
 		} finally {
 			setLoading(false);
 		}
@@ -76,6 +84,9 @@ export default function Login() {
 				placeholder="org@example.org"
 				keyboardType="email-address"
 				autoCapitalize="none"
+				autoComplete="email"
+				textContentType="emailAddress"
+				autoCorrect={false}
 				style={inputStyle}
 			/>
 
@@ -85,6 +96,8 @@ export default function Login() {
 				label="Password"
 				placeholder="Enter your password"
 				secureTextEntry
+				autoComplete="current-password"
+				textContentType="password"
 				style={inputStyle}
 			/>
 

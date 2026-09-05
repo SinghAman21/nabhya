@@ -1,7 +1,9 @@
-import { Check, MapPin } from "lucide-react-native";
+import { ChevronDown, MapPin } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
-import { Body, Caption, Label } from "@/components/ui/typography";
+import { View } from "react-native";
+import { Pressable } from "@/components/ui/pressable";
+import { Sheet, SheetOption } from "@/components/ui/sheet";
+import { Caption, H4 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/useTheme";
 import { focusable } from "@/lib/focus";
 
@@ -17,6 +19,10 @@ import { focusable } from "@/lib/focus";
  * The default comes from the user's profile city (set at onboarding), not from
  * GPS. No permission prompt, no `expo-location` dependency, and the answer is
  * usually better — people know where they can actually turn up.
+ *
+ * The trigger is a chip, sized to sit in the cause row; the choice opens in the
+ * shared `Sheet`. An absolutely-positioned dropdown was clipped by the sticky
+ * header and by every card below it.
  *
  * Known data problem: `organization_needs.city` is free text, so "Mumbai",
  * "mumbai" and "Bombay" are three cities to the query. The list below is a
@@ -39,20 +45,25 @@ const METROS = [
 	"Nagpur",
 ];
 
-type PressState = { pressed: boolean; hovered?: boolean };
-
 export function CityPicker({
 	value,
 	onChange,
 	homeCity,
+	variant = "chip",
 }: {
 	/** `ALL_INDIA` (empty string) means unscoped. */
 	value: string;
 	onChange: (city: string) => void;
 	/** The user's profile city, pinned to the top of the list. */
 	homeCity?: string | null;
+	/**
+	 * `chip` sits in a filter row. `title` is the home screen's top-left
+	 * control: the city *is* the page title, the way a delivery app leads with
+	 * the address, so the header needs no separate "Home" word.
+	 */
+	variant?: "chip" | "title";
 }) {
-	const { colors, spacing, borderRadius, elevation, isDark } = useTheme();
+	const { colors, spacing } = useTheme();
 	const [open, setOpen] = useState(false);
 
 	const options = [
@@ -60,151 +71,106 @@ export function CityPicker({
 		...METROS,
 	];
 
-	const trigger = (
-		<Pressable
-			onPress={() => setOpen((o) => !o)}
-			accessibilityRole="button"
-			accessibilityLabel={`Location: ${value || "All India"}`}
-			accessibilityState={{ expanded: open }}
-			{...focusable}
-			style={(state) => {
-				const { pressed, hovered } = state as PressState;
-				return {
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[2],
-					height: 38,
-					paddingHorizontal: spacing[3],
-					borderRadius: 999,
-					borderWidth: 1,
-					borderColor: colors.border.medium,
-					backgroundColor:
-						open || pressed || hovered
-							? colors.background.subtle
-							: "transparent",
-				};
-			}}
-		>
-			<MapPin
-				size={15}
-				color={colors.text.tertiary as string}
-				strokeWidth={1.9}
-			/>
-			<Caption weight="medium">{value || "All India"}</Caption>
-		</Pressable>
-	);
+	const pick = (city: string) => {
+		onChange(city);
+		setOpen(false);
+	};
 
-	if (!open) return trigger;
+	const label = value || "All India";
 
 	return (
-		<View>
-			{trigger}
-
-			<Pressable
-				onPress={() => setOpen(false)}
-				accessibilityLabel="Close location picker"
-				style={{
-					position: "absolute",
-					top: -2000,
-					left: -2000,
-					right: -2000,
-					bottom: -2000,
-					zIndex: 40,
-				}}
-			/>
-
-			<View
-				style={{
-					position: "absolute",
-					top: 44,
-					left: 0,
-					width: 240,
-					zIndex: 50,
-					backgroundColor: colors.background.card,
-					borderRadius: borderRadius.lg,
-					borderWidth: isDark ? 1 : 0,
-					borderColor: colors.border.hairline,
-					overflow: "hidden",
-					...(isDark ? {} : elevation.raised),
-				}}
-			>
-				<View
-					style={{
-						paddingHorizontal: spacing[4],
-						paddingVertical: spacing[3],
-						borderBottomWidth: 1,
-						borderBottomColor: colors.border.hairline,
-					}}
+		<>
+			{variant === "title" ? (
+				<Pressable
+					onPress={() => setOpen(true)}
+					accessibilityRole="button"
+					accessibilityLabel={`Location: ${label}. Change`}
+					hitSlop={8}
+					{...focusable}
+					style={({ pressed }) => ({
+						flexDirection: "row",
+						alignItems: "center",
+						gap: spacing[1],
+						minHeight: 40,
+						opacity: pressed ? 0.6 : 1,
+					})}
 				>
-					<Label weight="semibold">Show posts from</Label>
-				</View>
+					<MapPin
+						size={18}
+						color={colors.primary.ink as string}
+						strokeWidth={2.2}
+					/>
+					<H4 numberOfLines={1} style={{ maxWidth: 200 }}>
+						{label}
+					</H4>
+					<ChevronDown
+						size={18}
+						color={colors.text.tertiary as string}
+						strokeWidth={2.2}
+					/>
+				</Pressable>
+			) : (
+				<Pressable
+					onPress={() => setOpen(true)}
+					accessibilityRole="button"
+					accessibilityLabel={`Location: ${label}`}
+					{...focusable}
+					style={({ pressed }) => ({
+						flexDirection: "row",
+						alignItems: "center",
+						gap: spacing[1.5],
+						minHeight: 32,
+						paddingLeft: spacing[2.5],
+						paddingRight: spacing[2],
+						borderRadius: 999,
+						backgroundColor: pressed
+							? colors.background.tertiary
+							: colors.background.subtle,
+					})}
+				>
+					<MapPin
+						size={13}
+						color={colors.primary.ink as string}
+						strokeWidth={2.2}
+					/>
+					<Caption
+						weight="semibold"
+						numberOfLines={1}
+						style={{ maxWidth: 110 }}
+					>
+						{label}
+					</Caption>
+					<ChevronDown
+						size={13}
+						color={colors.text.tertiary as string}
+						strokeWidth={2.2}
+					/>
+				</Pressable>
+			)}
 
-				<ScrollView style={{ maxHeight: 320 }}>
-					<Option
+			<Sheet
+				visible={open}
+				onClose={() => setOpen(false)}
+				title="Show posts from"
+				subtitle="Volunteering is local. Pick where you can actually turn up."
+			>
+				<View style={{ paddingBottom: spacing[2] }}>
+					<SheetOption
 						label="All India"
 						selected={value === ALL_INDIA}
-						onPress={() => {
-							onChange(ALL_INDIA);
-							setOpen(false);
-						}}
+						onPress={() => pick(ALL_INDIA)}
 					/>
 					{options.map((city) => (
-						<Option
+						<SheetOption
 							key={city}
 							label={city}
 							hint={city === homeCity ? "Your city" : undefined}
 							selected={value === city}
-							onPress={() => {
-								onChange(city);
-								setOpen(false);
-							}}
+							onPress={() => pick(city)}
 						/>
 					))}
-				</ScrollView>
-			</View>
-		</View>
-	);
-}
-
-function Option({
-	label,
-	hint,
-	selected,
-	onPress,
-}: {
-	label: string;
-	hint?: string;
-	selected: boolean;
-	onPress: () => void;
-}) {
-	const { colors, spacing } = useTheme();
-
-	return (
-		<Pressable
-			onPress={onPress}
-			accessibilityRole="menuitem"
-			accessibilityState={{ selected }}
-			{...focusable}
-			style={(state) => {
-				const { pressed, hovered } = state as PressState;
-				return {
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[2],
-					paddingHorizontal: spacing[4],
-					paddingVertical: spacing[2.5],
-					backgroundColor:
-						pressed || hovered ? colors.background.subtle : "transparent",
-				};
-			}}
-		>
-			<View style={{ flex: 1 }}>
-				<Body weight={selected ? "semibold" : "normal"}>{label}</Body>
-				{hint && <Caption color="quaternary">{hint}</Caption>}
-			</View>
-			{selected && (
-				<Check size={16} color={colors.primary.ink} strokeWidth={2.2} />
-			)}
-		</Pressable>
+				</View>
+			</Sheet>
+		</>
 	);
 }

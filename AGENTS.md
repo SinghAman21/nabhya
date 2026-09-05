@@ -83,8 +83,8 @@ client-side traps: `apps/native/AGENTS.md`.
 ### Server (`apps/server`)
 
 NestJS 11, global `/api` prefix, deny-by-default JWT guard + role guard, response
-envelope `{ success, data, timestamp }`, Swagger at `/api/docs`. 91 endpoints across
-14 feature modules (16 controllers), counting the two health probes. Architecture,
+envelope `{ success, data, timestamp }`, Swagger at `/api/docs`. 92 endpoints across
+15 feature modules (17 controllers), counting the two health probes. Architecture,
 guard model, module conventions and server traps: `apps/server/AGENTS.md`.
 
 ### Auth
@@ -151,8 +151,8 @@ Dodo Payments (donations — on hold). No email provider.
 
 ## Current state
 
-**Built:** auth end-to-end; 91 REST endpoints across `users`, `onboarding`,
-`organizations`, `categories`, `events`, `needs`, `admin`, `uploads`,
+**Built:** auth end-to-end; 92 REST endpoints across `users`, `onboarding`,
+`organizations`, `categories`, `events`, `needs`, `feed`, `admin`, `uploads`,
 `engagement`, `publishing`, `certificates`, `donations` and `notifications`.
 NGO + volunteer onboarding; org events and needs management with
 applicant/pledge review; the public event feed and apply flow; the NGO
@@ -168,6 +168,18 @@ enforced by `computeUserVerificationStatus` in `@nabhya/shared`, which both the
 upload and review paths recompute from the whole document set. Monetary
 donations are wired through Dodo Payments but the feature is **on hold** at the
 user's request.
+
+The volunteer home is **one feed** (`GET /api/feed`, `modules/feed`): needs, offers,
+upcoming events and NGO announcements interleaved and ranked by one SQL `UNION ALL`
+query, so page N of the merged list is well defined. Tabs (`for_you`, `following`,
+`trending`, `urgent`), cause category and city are server filters; `for_you` ranks
+by the volunteer's `user_categories`, their profile city, then urgency. "Follow" in
+the UI is the existing bookmark. Client: `(volunteer)/index.tsx`, `components/feed/*`,
+`hooks/use-feed.ts` (the first `useInfiniteQuery` in the app). Home's header is
+the city (a picker) plus a search button; the lens chips carry a filter button that
+opens the cause sheet. `app/search.tsx` searches NGOs by name and posts across all
+of India with the same feed query. All sheets go through `components/ui/sheet.tsx`
+(`@gorhom/bottom-sheet` on native).
 
 Client route groups: `(auth)`, `(onboarding)` (`index` = NGO wizard, `volunteer` =
 volunteer wizard), `(ngo)`, `(volunteer)`, `(admin)`, and public `events/`,

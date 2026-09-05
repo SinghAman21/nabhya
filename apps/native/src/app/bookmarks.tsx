@@ -1,15 +1,16 @@
 import { useRouter } from "expo-router";
 import { Bookmark } from "lucide-react-native";
-import { FlatList, Pressable, RefreshControl, View } from "react-native";
-import { BackButton } from "@/components/back-button";
+import { FlatList, RefreshControl, View } from "react-native";
 import {
 	EmptyState,
 	ErrorState,
 	LoadingState,
 	Screen,
+	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
-import { Body, Caption, H2 } from "@/components/ui/typography";
+import { Pressable } from "@/components/ui/pressable";
+import { Body, Caption } from "@/components/ui/typography";
 import { useBookmarks, useToggleBookmark } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
@@ -23,12 +24,11 @@ export default function Bookmarks() {
 
 	return (
 		<Screen>
-			<BackButton />
-
-			<H2 style={{ marginBottom: spacing[1] }}>Saved NGOs</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[5] }}>
-				Organizations you're keeping an eye on.
-			</Body>
+			<ScreenHeader
+				back
+				title="Saved NGOs"
+				subtitle="Organizations you're keeping an eye on."
+			/>
 
 			{query.isLoading ? (
 				<LoadingState />
@@ -96,7 +96,7 @@ export default function Bookmarks() {
 									disabled={toggle.isPending}
 									hitSlop={8}
 								>
-									<Caption weight="medium" color={colors.error.main as string}>
+									<Caption weight="medium" color={colors.error.ink as string}>
 										Remove
 									</Caption>
 								</Pressable>

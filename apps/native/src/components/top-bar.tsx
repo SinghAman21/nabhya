@@ -10,8 +10,9 @@ import {
 } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Platform, Pressable, TextInput, View } from "react-native";
+import { Platform, TextInput, View } from "react-native";
 import { ListRow } from "@/components/screen-shell";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, Label } from "@/components/ui/typography";
 import { useSignOut } from "@/hooks/use-auth";
 import { useUnreadCount } from "@/hooks/use-engagement";
@@ -258,7 +259,7 @@ function TopBarSearch() {
  * is a leftover.
  */
 function AccountMenu({ profileHref }: { profileHref: string }) {
-	const { colors, spacing, borderRadius, elevation, isDark } = useTheme();
+	const { colors, borderRadius, elevation, isDark } = useTheme();
 	const { isDark: dark, toggleTheme } = useAppTheme();
 	const router = useRouter();
 	const user = useAuthStore((s) => s.user);

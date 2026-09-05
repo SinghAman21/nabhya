@@ -1,15 +1,7 @@
 import type { UpsertAnnouncementInput } from "@nabhya/shared";
-import { Megaphone, Pin, Plus, X } from "lucide-react-native";
+import { Megaphone, Pin, Plus } from "lucide-react-native";
 import { useEffect, useState } from "react";
-import {
-	Alert,
-	FlatList,
-	Modal,
-	Pressable,
-	RefreshControl,
-	View,
-} from "react-native";
-import { BackButton } from "@/components/back-button";
+import { FlatList, RefreshControl, View } from "react-native";
 import {
 	EmptyState,
 	ErrorState,
@@ -21,7 +13,9 @@ import {
 import { StatusPill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Body, Caption, H2, Label } from "@/components/ui/typography";
+import { Pressable } from "@/components/ui/pressable";
+import { Sheet } from "@/components/ui/sheet";
+import { Body, Caption, Label } from "@/components/ui/typography";
 import {
 	useCreateAnnouncement,
 	useDeleteAnnouncement,
@@ -29,6 +23,7 @@ import {
 	useUpdateAnnouncement,
 } from "@/hooks/use-directory";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatRelative } from "@/lib/format";
 import type { Announcement } from "@/lib/types";
@@ -58,9 +53,8 @@ export default function OrgAnnouncements() {
 
 	return (
 		<Screen>
-			<BackButton />
-
 			<ScreenHeader
+				back
 				title="Updates"
 				subtitle="Publishing notifies everyone who saved your organization."
 				action={
@@ -262,112 +256,89 @@ function AnnouncementSheet({
 	const saving = create.isPending || update.isPending;
 
 	return (
-		<Modal
+		<Sheet
 			visible={visible}
-			animationType="slide"
-			presentationStyle="pageSheet"
-			onRequestClose={onClose}
-		>
-			<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						justifyContent: "space-between",
-						paddingHorizontal: spacing[6],
-						paddingTop: spacing[6],
-						paddingBottom: spacing[2],
-					}}
-				>
-					<H2>{isEditing ? "Edit update" : "New update"}</H2>
-					<Pressable onPress={onClose} hitSlop={12}>
-						<X size={22} color={colors.text.tertiary as string} />
-					</Pressable>
-				</View>
-
-				<View style={{ padding: spacing[6], paddingTop: spacing[4] }}>
-					<Label style={{ marginBottom: spacing[1.5] }}>Title</Label>
-					<Input
-						placeholder="e.g. 400 blankets distributed in Dharavi"
-						value={title}
-						onChangeText={setTitle}
-						style={inputStyle}
-					/>
-
-					<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-						Update
-					</Label>
-					<Input
-						placeholder="What happened, who it helped, what's next"
-						value={body}
-						onChangeText={setBody}
-						multiline
-						style={{ ...inputStyle, minHeight: 140, textAlignVertical: "top" }}
-					/>
-
-					<Pressable
-						onPress={() => setPinned((v) => !v)}
-						style={{
-							flexDirection: "row",
-							alignItems: "center",
-							gap: spacing[3],
-							marginTop: spacing[4],
-						}}
-					>
-						<View
-							style={{
-								width: 22,
-								height: 22,
-								borderRadius: 6,
-								borderWidth: 2,
-								borderColor: isPinned
-									? colors.primary.main
-									: colors.border.dark,
-								backgroundColor: isPinned ? colors.primary.main : "transparent",
-								alignItems: "center",
-								justifyContent: "center",
-							}}
-						>
-							{isPinned && (
-								<Body
-									weight="bold"
-									color={colors.primary.contrast as string}
-									style={{ fontSize: 13, lineHeight: 16 }}
-								>
-									✓
-								</Body>
-							)}
-						</View>
-						<Caption color="secondary" style={{ flex: 1 }}>
-							Pin to the top of our profile
-						</Caption>
-					</Pressable>
-
-					{error && (
-						<Caption
-							color={colors.error.main as string}
-							style={{ marginTop: spacing[3] }}
-						>
-							{error}
-						</Caption>
-					)}
-
-					<Button
-						onPress={() => submit("PUBLISHED")}
-						loading={saving}
-						style={{ marginTop: spacing[6], marginBottom: spacing[3] }}
-					>
+			onClose={onClose}
+			title={isEditing ? "Edit update" : "New update"}
+			footer={
+				<>
+					<Button onPress={() => submit("PUBLISHED")} loading={saving}>
 						Publish update
 					</Button>
 					<Button
 						variant="outline"
 						onPress={() => submit("DRAFT")}
 						disabled={saving}
+						style={{ marginTop: spacing[2] }}
 					>
 						Save as draft
 					</Button>
+				</>
+			}
+		>
+			<Label style={{ marginBottom: spacing[1.5] }}>Title</Label>
+			<Input
+				placeholder="e.g. 400 blankets distributed in Dharavi"
+				value={title}
+				onChangeText={setTitle}
+				style={inputStyle}
+			/>
+
+			<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
+				Update
+			</Label>
+			<Input
+				placeholder="What happened, who it helped, what's next"
+				value={body}
+				onChangeText={setBody}
+				multiline
+				style={{ ...inputStyle, minHeight: 140, textAlignVertical: "top" }}
+			/>
+
+			<Pressable
+				onPress={() => setPinned((v) => !v)}
+				style={{
+					flexDirection: "row",
+					alignItems: "center",
+					gap: spacing[3],
+					marginTop: spacing[4],
+				}}
+			>
+				<View
+					style={{
+						width: 22,
+						height: 22,
+						borderRadius: 6,
+						borderWidth: 2,
+						borderColor: isPinned ? colors.primary.main : colors.border.dark,
+						backgroundColor: isPinned ? colors.primary.main : "transparent",
+						alignItems: "center",
+						justifyContent: "center",
+					}}
+				>
+					{isPinned && (
+						<Body
+							weight="bold"
+							color={colors.primary.contrast as string}
+							style={{ fontSize: 13, lineHeight: 16 }}
+						>
+							✓
+						</Body>
+					)}
 				</View>
-			</View>
-		</Modal>
+				<Caption color="secondary" style={{ flex: 1 }}>
+					Pin to the top of our profile
+				</Caption>
+			</Pressable>
+
+			{error && (
+				<Caption
+					color={colors.error.main as string}
+					style={{ marginTop: spacing[3] }}
+				>
+					{error}
+				</Caption>
+			)}
+		</Sheet>
 	);
 }

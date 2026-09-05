@@ -10,10 +10,11 @@ import {
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { StepIndicator } from "@/components/step-indicator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H2, Label } from "@/components/ui/typography";
 import {
 	useCategories,
@@ -21,6 +22,7 @@ import {
 	useMe,
 } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 
 const STEPS = ["You", "Location", "Causes", "Done"];
@@ -90,6 +92,7 @@ export default function VolunteerOnboarding() {
 				style={{ flex: 1 }}
 				contentContainerStyle={{ padding: spacing[6], paddingTop: spacing[2] }}
 				keyboardShouldPersistTaps="handled"
+				automaticallyAdjustKeyboardInsets
 			>
 				{step === 0 && (
 					<StepAbout

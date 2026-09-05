@@ -10,8 +10,9 @@ import {
 	X,
 } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, Pressable, ScrollView, View } from "react-native";
+import { Animated, Easing, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H5, Label } from "@/components/ui/typography";
 import { useSignOut } from "@/hooks/use-auth";
 import { useAppTheme } from "@/hooks/useAppTheme";

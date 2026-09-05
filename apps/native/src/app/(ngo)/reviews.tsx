@@ -1,7 +1,6 @@
 import { Star } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, FlatList, Pressable, RefreshControl, View } from "react-native";
-import { BackButton } from "@/components/back-button";
+import { FlatList, RefreshControl, View } from "react-native";
 import {
 	EmptyState,
 	ErrorState,
@@ -11,9 +10,11 @@ import {
 	Surface,
 } from "@/components/screen-shell";
 import { Input } from "@/components/ui/input";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H3 } from "@/components/ui/typography";
 import { useMyOrgReviews, useReplyToReview } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatRelative } from "@/lib/format";
 import type { ReviewItem } from "@/lib/types";
@@ -26,9 +27,8 @@ export default function OrgReviews() {
 
 	return (
 		<Screen>
-			<BackButton />
-
 			<ScreenHeader
+				back
 				title="Reviews"
 				subtitle="What volunteers say about working with you."
 			/>
@@ -101,6 +101,8 @@ export default function OrgReviews() {
 				/>
 			) : (
 				<FlatList
+					automaticallyAdjustKeyboardInsets
+					keyboardShouldPersistTaps="handled"
 					data={query.data?.items ?? []}
 					keyExtractor={(item) => item.id}
 					showsVerticalScrollIndicator={false}

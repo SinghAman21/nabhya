@@ -1,8 +1,7 @@
 import { Redirect, Slot, Tabs } from "expo-router";
-import { History, Search, User } from "lucide-react-native";
+import { History, Home, User } from "lucide-react-native";
 import { View } from "react-native";
-import { useTabBarOptions } from "@/components/tab-bar";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { renderTabBar, useTabBarOptions } from "@/components/tab-bar";
 import { TopBar, TopBarContent } from "@/components/top-bar";
 import { useMedia } from "@/hooks/useMedia";
 import { useTheme } from "@/hooks/useTheme";
@@ -39,14 +38,12 @@ export default function VolunteerLayout() {
 
 	return (
 		<View style={{ flex: 1 }}>
-			<Tabs screenOptions={tabBarOptions}>
+			<Tabs screenOptions={tabBarOptions} tabBar={renderTabBar}>
 				<Tabs.Screen
 					name="index"
 					options={{
-						title: "Discover",
-						tabBarIcon: ({ color, size }) => (
-							<Search size={size} color={color} />
-						),
+						title: "Home",
+						tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
 					}}
 				/>
 				<Tabs.Screen
@@ -70,7 +67,6 @@ export default function VolunteerLayout() {
 					}}
 				/>
 			</Tabs>
-			<ThemeToggle />
 		</View>
 	);
 }

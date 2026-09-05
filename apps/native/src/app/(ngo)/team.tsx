@@ -1,14 +1,6 @@
-import { UserPlus, Users, X } from "lucide-react-native";
+import { UserPlus, Users } from "lucide-react-native";
 import { useState } from "react";
-import {
-	Alert,
-	FlatList,
-	Modal,
-	Pressable,
-	RefreshControl,
-	View,
-} from "react-native";
-import { BackButton } from "@/components/back-button";
+import { FlatList, RefreshControl, View } from "react-native";
 import {
 	EmptyState,
 	ErrorState,
@@ -20,7 +12,9 @@ import {
 import { StatusPill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Body, Caption, H2, Label } from "@/components/ui/typography";
+import { Pressable } from "@/components/ui/pressable";
+import { Sheet } from "@/components/ui/sheet";
+import { Body, Caption, Label } from "@/components/ui/typography";
 import {
 	useInviteAdmin,
 	useOrgTeam,
@@ -28,6 +22,7 @@ import {
 	useUpdateAdmin,
 } from "@/hooks/use-directory";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type { OrgTeamMember } from "@/lib/types";
@@ -60,9 +55,8 @@ export default function OrgTeam() {
 
 	return (
 		<Screen>
-			<BackButton />
-
 			<ScreenHeader
+				back
 				title="Team"
 				subtitle="People who can manage this organization."
 				action={
@@ -286,83 +280,59 @@ function InviteSheet({
 	};
 
 	return (
-		<Modal
+		<Sheet
 			visible={visible}
-			animationType="slide"
-			presentationStyle="pageSheet"
-			onRequestClose={onClose}
+			onClose={onClose}
+			title="Add to team"
+			footer={
+				<Button onPress={submit} loading={invite.isPending}>
+					Add to team
+				</Button>
+			}
 		>
-			<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						justifyContent: "space-between",
-						paddingHorizontal: spacing[6],
-						paddingTop: spacing[6],
-						paddingBottom: spacing[2],
-					}}
+			<Caption color="tertiary" style={{ marginBottom: spacing[5] }}>
+				They need a Nabhya account already — we won't create one on their
+				behalf.
+			</Caption>
+
+			<Label style={{ marginBottom: spacing[1.5] }}>Email</Label>
+			<Input
+				placeholder="colleague@example.org"
+				value={email}
+				onChangeText={setEmail}
+				keyboardType="email-address"
+				autoCapitalize="none"
+				style={{
+					borderWidth: 0,
+					borderRadius: 12,
+					backgroundColor: colors.background.tertiary,
+					paddingVertical: spacing[3.5],
+				}}
+			/>
+
+			<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
+				Role <Caption color="tertiary">(optional)</Caption>
+			</Label>
+			<Input
+				placeholder="e.g. Programme Manager"
+				value={designation}
+				onChangeText={setDesignation}
+				style={{
+					borderWidth: 0,
+					borderRadius: 12,
+					backgroundColor: colors.background.tertiary,
+					paddingVertical: spacing[3.5],
+				}}
+			/>
+
+			{error && (
+				<Caption
+					color={colors.error.main as string}
+					style={{ marginTop: spacing[3] }}
 				>
-					<H2>Add to team</H2>
-					<Pressable onPress={onClose} hitSlop={12}>
-						<X size={22} color={colors.text.tertiary as string} />
-					</Pressable>
-				</View>
-
-				<View style={{ padding: spacing[6], paddingTop: spacing[4] }}>
-					<Caption color="tertiary" style={{ marginBottom: spacing[5] }}>
-						They need a Nabhya account already — we won't create one on their
-						behalf.
-					</Caption>
-
-					<Label style={{ marginBottom: spacing[1.5] }}>Email</Label>
-					<Input
-						placeholder="colleague@example.org"
-						value={email}
-						onChangeText={setEmail}
-						keyboardType="email-address"
-						autoCapitalize="none"
-						style={{
-							borderWidth: 0,
-							borderRadius: 12,
-							backgroundColor: colors.background.tertiary,
-							paddingVertical: spacing[3.5],
-						}}
-					/>
-
-					<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-						Role <Caption color="tertiary">(optional)</Caption>
-					</Label>
-					<Input
-						placeholder="e.g. Programme Manager"
-						value={designation}
-						onChangeText={setDesignation}
-						style={{
-							borderWidth: 0,
-							borderRadius: 12,
-							backgroundColor: colors.background.tertiary,
-							paddingVertical: spacing[3.5],
-						}}
-					/>
-
-					{error && (
-						<Caption
-							color={colors.error.main as string}
-							style={{ marginTop: spacing[3] }}
-						>
-							{error}
-						</Caption>
-					)}
-
-					<Button
-						onPress={submit}
-						loading={invite.isPending}
-						style={{ marginTop: spacing[6] }}
-					>
-						Add to team
-					</Button>
-				</View>
-			</View>
-		</Modal>
+					{error}
+				</Caption>
+			)}
+		</Sheet>
 	);
 }

@@ -69,6 +69,24 @@ Screens compose `components/screen-shell.tsx` (`ScreenHeader`, `Surface`,
 `EmptyState`, `LoadingState`, `ErrorState`, `FilterChips`) + `status-pill.tsx` —
 reuse these rather than rebuilding layouts.
 
+- **Pushed pages** render `<ScreenHeader back title=… />`: a 40pt chevron on the
+  left and the title on the same row. Never place `<BackButton />` on its own
+  line above a heading. The two hero pages (`events/[id]`, `ngos/[id]`) draw their
+  own row and must use `useSafeAreaInsets().top`, not a guessed `paddingTop`.
+- **Every sheet is `components/ui/sheet.tsx`.** Native is `@gorhom/bottom-sheet`
+  (pan to dismiss, detents, keyboard-aware, pinned title and footer); web is a
+  `Modal` behind the same props. Never import `Modal` in a screen. Body content
+  goes in `children`, the primary action in `footer`; a list body sets
+  `scrollable={false}` + `detents` and renders `SheetFlatList`; a pick-one list
+  uses `SheetOption`. `Input` already switches to gorhom's text input inside a
+  sheet, so forms need nothing special.
+- The volunteer home header is two rows ("Home" with the city chip and search on
+  the right, then the lens chips with a filter button). Search is its own route,
+  `app/search.tsx`, with example searches before typing and All / NGOs / Needs /
+  Events / Updates result tabs (the feed API takes `kind`). The cause filter is a
+  sheet. Notifications live in Activity — no bell on Home. Appearance is a row in
+  the volunteer Profile (`useAppTheme().preference`), not a floating toggle.
+
 ### Colour rules
 
 `#FF7E40` is **a fill, not an ink** — it measures 2.53:1 on white, so it fails AA
@@ -93,6 +111,12 @@ read `focused` from the style callback and draw an `outline*` — `Button` and
 
 ## Traps
 
+- **Import `Pressable` from `@/components/ui/pressable`, never from `react-native`.**
+  NativeWind's native interop flattens `style` with an object spread, so a style
+  *function* (`style={({ pressed }) => …}`) becomes `{}` on iOS and Android while
+  web renders it fine. The wrapper passes `cssInterop={false}`. `Button`, `Surface`,
+  the chips and the tab bar are all built on it; `className` is not processed on it,
+  which nothing in the app needs.
 - `expo-env.d.ts` is gitignored and generated — a fresh clone fails `tsc` on the
   `global.css` import until `expo start` (or equivalent) creates it.
 - Env: `EXPO_PUBLIC_API_URL` falls back to `10.0.2.2:3000` on Android in dev;

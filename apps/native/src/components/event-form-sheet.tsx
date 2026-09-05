@@ -1,17 +1,18 @@
 import { type CreateEventInput, createEventSchema } from "@nabhya/shared";
-import { X } from "lucide-react-native";
 import { useEffect, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, View } from "react-native";
+import { View } from "react-native";
 import { DateTimeField } from "@/components/date-time-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Caption, H2, Label } from "@/components/ui/typography";
+import { Sheet } from "@/components/ui/sheet";
+import { Caption, Label } from "@/components/ui/typography";
 import {
 	useCreateEvent,
 	useOrgEvent,
 	useUpdateEvent,
 } from "@/hooks/use-events";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import type { OrgEventListItem } from "@/lib/types";
 
@@ -169,134 +170,16 @@ export function EventFormSheet({
 	const blocked = saving || (isEditing && loadingDetail);
 
 	return (
-		<Modal
+		<Sheet
 			visible={visible}
-			animationType="slide"
-			presentationStyle="pageSheet"
-			onRequestClose={close}
-		>
-			<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						justifyContent: "space-between",
-						paddingHorizontal: spacing[6],
-						paddingTop: spacing[6],
-						paddingBottom: spacing[2],
-					}}
-				>
-					<H2>{isEditing ? "Edit event" : "New event"}</H2>
-					<Pressable onPress={close} hitSlop={12}>
-						<X size={22} color={colors.text.tertiary as string} />
-					</Pressable>
-				</View>
-
-				<ScrollView
-					contentContainerStyle={{
-						padding: spacing[6],
-						paddingTop: spacing[4],
-					}}
-					keyboardShouldPersistTaps="handled"
-				>
-					<Label style={{ marginBottom: spacing[1.5] }}>Event title</Label>
-					<Input
-						placeholder="e.g. Beach cleanup drive"
-						value={draft.title}
-						onChangeText={(v) => set("title", v)}
-						style={inputStyle}
-					/>
-					<FieldError message={errors.title} />
-
-					<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-						What will volunteers do?
-					</Label>
-					<Input
-						placeholder="Describe the work, what to bring, and who to contact"
-						value={draft.description}
-						onChangeText={(v) => set("description", v)}
-						multiline
-						style={{ ...inputStyle, minHeight: 120, textAlignVertical: "top" }}
-					/>
-					<FieldError message={errors.description} />
-
-					<View style={{ marginTop: spacing[5] }}>
-						<DateTimeField
-							label="Starts"
-							value={draft.startAt}
-							onChange={(v) => set("startAt", v)}
-							error={errors.startAt}
-						/>
-					</View>
-
-					<View style={{ marginTop: spacing[5] }}>
-						<DateTimeField
-							label="Ends"
-							value={draft.endAt}
-							onChange={(v) => set("endAt", v)}
-							error={errors.endAt}
-							shortcuts={false}
-						/>
-					</View>
-
-					<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-						Volunteers needed
-					</Label>
-					<Input
-						placeholder="e.g. 25"
-						value={draft.volunteersNeeded}
-						onChangeText={(v) => set("volunteersNeeded", v.replace(/\D/g, ""))}
-						keyboardType="number-pad"
-						style={[inputStyle, { maxWidth: 160 }]}
-					/>
-					<FieldError message={errors.volunteersNeeded} />
-
-					<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-						Venue <Caption color="tertiary">(optional)</Caption>
-					</Label>
-					<Input
-						placeholder="e.g. Juhu Beach, Gate 3"
-						value={draft.venue}
-						onChangeText={(v) => set("venue", v)}
-						style={inputStyle}
-					/>
-
-					<View
-						style={{
-							flexDirection: "row",
-							gap: spacing[3],
-							marginTop: spacing[5],
-						}}
-					>
-						<View style={{ flex: 1 }}>
-							<Label style={{ marginBottom: spacing[1.5] }}>City</Label>
-							<Input
-								placeholder="Mumbai"
-								value={draft.city}
-								onChangeText={(v) => set("city", v)}
-								style={inputStyle}
-							/>
-							<FieldError message={errors.city} />
-						</View>
-						<View style={{ flex: 1 }}>
-							<Label style={{ marginBottom: spacing[1.5] }}>State</Label>
-							<Input
-								placeholder="Maharashtra"
-								value={draft.state}
-								onChangeText={(v) => set("state", v)}
-								style={inputStyle}
-							/>
-							<FieldError message={errors.state} />
-						</View>
-					</View>
-
-					<View style={{ height: spacing[8] }} />
-
+			onClose={close}
+			title={isEditing ? "Edit event" : "New event"}
+			footer={
+				<>
 					<Button
 						onPress={() => submit("PUBLISHED")}
 						loading={saving}
 						disabled={blocked}
-						style={{ marginBottom: spacing[3] }}
 					>
 						{isEditing && event?.status === "DRAFT"
 							? "Publish this draft"
@@ -309,13 +192,99 @@ export function EventFormSheet({
 							variant="outline"
 							onPress={() => submit("DRAFT")}
 							disabled={blocked}
+							style={{ marginTop: spacing[2] }}
 						>
 							{isEditing ? "Keep as draft" : "Save as draft"}
 						</Button>
 					)}
-				</ScrollView>
+				</>
+			}
+		>
+			<Label style={{ marginBottom: spacing[1.5] }}>Event title</Label>
+			<Input
+				placeholder="e.g. Beach cleanup drive"
+				value={draft.title}
+				onChangeText={(v) => set("title", v)}
+				style={inputStyle}
+			/>
+			<FieldError message={errors.title} />
+			<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
+				What will volunteers do?
+			</Label>
+			<Input
+				placeholder="Describe the work, what to bring, and who to contact"
+				value={draft.description}
+				onChangeText={(v) => set("description", v)}
+				multiline
+				style={{ ...inputStyle, minHeight: 120, textAlignVertical: "top" }}
+			/>
+			<FieldError message={errors.description} />
+			<View style={{ marginTop: spacing[5] }}>
+				<DateTimeField
+					label="Starts"
+					value={draft.startAt}
+					onChange={(v) => set("startAt", v)}
+					error={errors.startAt}
+				/>
 			</View>
-		</Modal>
+			<View style={{ marginTop: spacing[5] }}>
+				<DateTimeField
+					label="Ends"
+					value={draft.endAt}
+					onChange={(v) => set("endAt", v)}
+					error={errors.endAt}
+					shortcuts={false}
+				/>
+			</View>
+			<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
+				Volunteers needed
+			</Label>
+			<Input
+				placeholder="e.g. 25"
+				value={draft.volunteersNeeded}
+				onChangeText={(v) => set("volunteersNeeded", v.replace(/\D/g, ""))}
+				keyboardType="number-pad"
+				style={[inputStyle, { maxWidth: 160 }]}
+			/>
+			<FieldError message={errors.volunteersNeeded} />
+			<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
+				Venue <Caption color="tertiary">(optional)</Caption>
+			</Label>
+			<Input
+				placeholder="e.g. Juhu Beach, Gate 3"
+				value={draft.venue}
+				onChangeText={(v) => set("venue", v)}
+				style={inputStyle}
+			/>
+			<View
+				style={{
+					flexDirection: "row",
+					gap: spacing[3],
+					marginTop: spacing[5],
+				}}
+			>
+				<View style={{ flex: 1 }}>
+					<Label style={{ marginBottom: spacing[1.5] }}>City</Label>
+					<Input
+						placeholder="Mumbai"
+						value={draft.city}
+						onChangeText={(v) => set("city", v)}
+						style={inputStyle}
+					/>
+					<FieldError message={errors.city} />
+				</View>
+				<View style={{ flex: 1 }}>
+					<Label style={{ marginBottom: spacing[1.5] }}>State</Label>
+					<Input
+						placeholder="Maharashtra"
+						value={draft.state}
+						onChangeText={(v) => set("state", v)}
+						style={inputStyle}
+					/>
+					<FieldError message={errors.state} />
+				</View>
+			</View>
+		</Sheet>
 	);
 }
 

@@ -9,7 +9,6 @@ import { useState } from "react";
 import {
 	FlatList,
 	Platform,
-	Pressable,
 	RefreshControl,
 	ScrollView,
 	View,
@@ -21,6 +20,7 @@ import {
 	LoadingState,
 } from "@/components/screen-shell";
 import { Input } from "@/components/ui/input";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption } from "@/components/ui/typography";
 import { usePublicEvents } from "@/hooks/use-events";
 import { useMedia } from "@/hooks/useMedia";

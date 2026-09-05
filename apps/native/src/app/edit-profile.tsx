@@ -1,7 +1,6 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, ScrollView, View } from "react-native";
-import { BackButton } from "@/components/back-button";
+import { ScrollView, View } from "react-native";
 import {
 	ErrorState,
 	LoadingState,
@@ -13,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Caption, Label } from "@/components/ui/typography";
 import { useMe, useUpdateProfile } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 
 export default function EditProfile() {
@@ -67,9 +67,8 @@ export default function EditProfile() {
 
 	return (
 		<Screen>
-			<BackButton />
-
 			<ScreenHeader
+				back
 				title="Edit profile"
 				subtitle="NGOs see this when you apply to their events."
 			/>
@@ -86,6 +85,7 @@ export default function EditProfile() {
 					showsVerticalScrollIndicator={false}
 					contentContainerStyle={{ paddingBottom: spacing[12] }}
 					keyboardShouldPersistTaps="handled"
+					automaticallyAdjustKeyboardInsets
 				>
 					<Label style={{ marginBottom: spacing[1.5] }}>Full name</Label>
 					<Input

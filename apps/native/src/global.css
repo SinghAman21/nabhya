@@ -29,6 +29,11 @@
  */
 @layer base {
 	:root {
+		/* Tells the browser which way its own widgets go — autofill, date pickers,
+		   the default scrollbar before ours applies. Without it Chrome picks a
+		   light autofill tint on a dark form. */
+		color-scheme: light;
+
 		--background: 60 20% 98%; /* #FBFBF9 warm paper */
 		--foreground: 0 0% 7%; /* #111111 */
 		--card: 0 0% 100%;
@@ -51,6 +56,8 @@
 	}
 
 	.dark:root {
+		color-scheme: dark;
+
 		--background: 0 0% 4%;
 		--foreground: 0 0% 96%;
 		--card: 0 0% 9%;
@@ -124,9 +131,27 @@
 		outline: none;
 	}
 
+	/*
+	 * Autofill.
+	 *
+	 * Autofill itself is left alone — this only stops Chrome repainting the field
+	 * when it fires. Chrome's autofill background cannot be unset, but
+	 * `background-clip: text` confines it to the glyphs themselves, so the field
+	 * keeps whatever background it already had.
+	 *
+	 * That is why this is clipped rather than covered with an opaque colour: a
+	 * field sits on a card, a tinted pill, or nothing at all, and any single colour
+	 * chosen here is wrong on two of the three. Clipping is correct on all of them.
+	 *
+	 * The ink is set explicitly rather than left to `inherit`, which would take
+	 * whatever the wrapping View computed; `-webkit-text-fill-color` is the one
+	 * that actually wins on an autofilled input.
+	 */
+	/* biome-ignore-start lint/complexity/noImportantStyles: UA autofill styles cannot be overridden without it */
 	input:-webkit-autofill,
 	input:-webkit-autofill:hover,
 	input:-webkit-autofill:focus,
+	input:-webkit-autofill:active,
 	input:autofill,
 	input:autofill:hover,
 	input:autofill:focus,
@@ -138,40 +163,69 @@
 	textarea:autofill:focus,
 	select:-webkit-autofill,
 	select:-webkit-autofill:hover,
-	select:-webkit-autofill:focus {
-		appearance: none !important;
-		background-color: hsl(var(--background)) !important;
-		background-image: none !important;
-		-webkit-box-shadow: 0 0 0px 1000px hsl(var(--background)) inset !important;
-		box-shadow: 0 0 0px 1000px hsl(var(--background)) inset !important;
-		color: inherit !important;
-		-webkit-text-fill-color: inherit !important;
-		-webkit-appearance: none !important;
+	select:-webkit-autofill:focus,
+	select:autofill {
+		/* Confines Chrome's autofill background to the text, leaving the field's
+		   own background visible underneath. */
+		-webkit-background-clip: text !important;
+		background-clip: text !important;
+		color: hsl(var(--foreground)) !important;
+		-webkit-text-fill-color: hsl(var(--foreground)) !important;
+		caret-color: hsl(var(--foreground)) !important;
+		/* Chrome re-applies its background on blur; an absurd transition duration
+		   outruns that repaint so the clip keeps holding. */
 		transition: background-color 5000s ease-in-out 0s;
 	}
+	/* biome-ignore-end lint/complexity/noImportantStyles: UA autofill styles cannot be overridden without it */
 
-	/* Theme-aware thin scrollbar */
+	/*
+	 * Scrollbars.
+	 *
+	 * Thin, trackless, and translucent so one rule works on every surface — the
+	 * page, a card, a popover — without each needing its own track colour. Drawing
+	 * an opaque `--muted` track puts a grey stripe down the side of every scrolling
+	 * card, which is a lot of furniture for something that only matters while you
+	 * are actually scrolling.
+	 *
+	 * The thumb is `--foreground` at low alpha rather than a fixed grey, so it
+	 * inverts with the theme for free. No transitions: an easing scrollbar lags
+	 * behind the content it is describing.
+	 */
 	* {
 		scrollbar-width: thin;
-		scrollbar-color: hsl(var(--muted-foreground)) hsl(var(--muted));
+		scrollbar-color: hsl(var(--foreground) / 0.25) transparent;
+	}
+
+	/* Reserve the gutter on the page only, so a list becoming scrollable does not
+	   shift the layout under it. Cards keep their full width. */
+	html {
+		scrollbar-gutter: stable;
 	}
 
 	*::-webkit-scrollbar {
-		width: 8px;
-		height: 8px;
+		width: 10px;
+		height: 10px;
 	}
 
-	*::-webkit-scrollbar-track {
-		background: hsl(var(--muted));
+	*::-webkit-scrollbar-track,
+	*::-webkit-scrollbar-corner {
+		background: transparent;
 	}
 
 	*::-webkit-scrollbar-thumb {
-		background-color: hsl(var(--muted-foreground));
+		background-color: hsl(var(--foreground) / 0.25);
 		border-radius: 9999px;
-		border: 2px solid hsl(var(--muted));
+		/* Transparent border + padding-box insets the thumb to ~6px without
+		   painting a track-coloured ring around it. */
+		border: 2px solid transparent;
+		background-clip: padding-box;
 	}
 
 	*::-webkit-scrollbar-thumb:hover {
-		background-color: hsl(var(--foreground));
+		background-color: hsl(var(--foreground) / 0.42);
+	}
+
+	*::-webkit-scrollbar-thumb:active {
+		background-color: hsl(var(--foreground) / 0.55);
 	}
 }

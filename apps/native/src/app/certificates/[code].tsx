@@ -1,11 +1,11 @@
 import { useLocalSearchParams } from "expo-router";
 import { BadgeCheck, ShieldX } from "lucide-react-native";
 import { ScrollView, View } from "react-native";
-import { BackButton } from "@/components/back-button";
 import {
 	ErrorState,
 	LoadingState,
 	Screen,
+	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
 import { Body, Caption, H2 } from "@/components/ui/typography";
@@ -29,7 +29,7 @@ export default function VerifyCertificate() {
 
 	return (
 		<Screen>
-			<BackButton />
+			<ScreenHeader back title="Certificate" />
 
 			{query.isLoading ? (
 				<LoadingState label="Checking…" />

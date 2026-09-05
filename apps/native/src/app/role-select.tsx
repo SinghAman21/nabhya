@@ -1,10 +1,12 @@
 import type { SelectableRole } from "@nabhya/shared";
 import { useRouter } from "expo-router";
 import { HandHeart, Landmark } from "lucide-react-native";
-import { ActivityIndicator, Alert, Pressable, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useSelectRole } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 
 export default function RoleSelect() {

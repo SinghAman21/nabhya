@@ -1,7 +1,8 @@
 import { Moon, Sun } from "lucide-react-native";
-import { Pressable, View, type ViewStyle } from "react-native";
+import { View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TAB_BAR_HEIGHT } from "@/components/tab-bar";
+import { Pressable } from "@/components/ui/pressable";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useTheme } from "@/hooks/useTheme";
 

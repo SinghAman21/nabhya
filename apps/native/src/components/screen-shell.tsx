@@ -2,13 +2,14 @@ import type { LucideIcon } from "lucide-react-native";
 import {
 	ActivityIndicator,
 	Platform,
-	Pressable,
 	type StyleProp,
 	View,
 	type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Body, Caption, H2, Label } from "@/components/ui/typography";
+import { BackButton } from "@/components/back-button";
+import { Pressable } from "@/components/ui/pressable";
+import { Body, Caption, H2, H3, Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/useTheme";
 import { focusable } from "@/lib/focus";
 
@@ -67,16 +68,52 @@ export function Screen({
 /* Screen header                                                              */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Two shapes, one component. A top-level tab gets the display-face title on
+ * its own line. A pushed page passes `back`, which puts the back button, a
+ * smaller title and the action on one 40pt row — the title no longer floats
+ * under a lone arrow with a gap that changes from screen to screen.
+ */
 export function ScreenHeader({
 	title,
 	subtitle,
 	action,
+	back,
 }: {
 	title: string;
 	subtitle?: string;
 	action?: React.ReactNode;
+	/** Render the back button inline, left of the title. */
+	back?: boolean;
 }) {
 	const { spacing } = useTheme();
+
+	if (back) {
+		return (
+			<View
+				style={{
+					flexDirection: "row",
+					alignItems: "center",
+					gap: spacing[3],
+					marginBottom: spacing[5],
+					minHeight: 40,
+				}}
+			>
+				<BackButton />
+				<View style={{ flex: 1 }}>
+					<H3 accessibilityRole="header" numberOfLines={1}>
+						{title}
+					</H3>
+					{subtitle && (
+						<Caption color="tertiary" numberOfLines={2}>
+							{subtitle}
+						</Caption>
+					)}
+				</View>
+				{action}
+			</View>
+		);
+	}
 
 	return (
 		<View
@@ -86,6 +123,7 @@ export function ScreenHeader({
 				justifyContent: "space-between",
 				gap: spacing[3],
 				marginBottom: spacing[5],
+				minHeight: 40,
 			}}
 		>
 			<View style={{ flex: 1 }}>

@@ -1,7 +1,8 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { CalendarDays, MapPin, Users } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BackButton } from "@/components/back-button";
 import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
 import {
@@ -19,6 +20,7 @@ import {
 } from "@/hooks/use-events";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDateRange, formatDateTime } from "@/lib/format";
 import { useAuthStore } from "@/store/auth-store";
@@ -26,6 +28,7 @@ import { useAuthStore } from "@/store/auth-store";
 export default function EventDetail() {
 	const { id } = useLocalSearchParams<{ id: string }>();
 	const { colors, spacing } = useTheme();
+	const insets = useSafeAreaInsets();
 	const router = useRouter();
 	const email = useAuthStore((s) => s.email);
 	const [message, setMessage] = useState("");
@@ -88,11 +91,11 @@ export default function EventDetail() {
 			<View
 				style={{
 					paddingHorizontal: spacing[6],
-					paddingTop: spacing[8],
+					paddingTop: insets.top + spacing[2],
 					paddingBottom: spacing[2],
 				}}
 			>
-				<BackButton style={{ marginBottom: 0 }} />
+				<BackButton />
 			</View>
 
 			{query.isLoading ? (
@@ -112,6 +115,7 @@ export default function EventDetail() {
 						paddingBottom: spacing[12],
 					}}
 					keyboardShouldPersistTaps="handled"
+					automaticallyAdjustKeyboardInsets
 				>
 					<Caption color="secondary" style={{ marginBottom: spacing[2] }}>
 						{event.organization.organizationName}

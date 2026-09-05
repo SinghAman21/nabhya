@@ -1,24 +1,19 @@
 import { Award } from "lucide-react-native";
-import {
-	Alert,
-	FlatList,
-	Linking,
-	Pressable,
-	RefreshControl,
-	View,
-} from "react-native";
-import { BackButton } from "@/components/back-button";
+import { FlatList, Linking, RefreshControl, View } from "react-native";
 import {
 	EmptyState,
 	ErrorState,
 	LoadingState,
 	Screen,
+	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
 import { StatusPill } from "@/components/status-pill";
-import { Body, Caption, H2 } from "@/components/ui/typography";
+import { Pressable } from "@/components/ui/pressable";
+import { Body, Caption } from "@/components/ui/typography";
 import { useCertificatePdf, useMyCertificates } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type { MyCertificate } from "@/lib/types";
@@ -43,13 +38,11 @@ export default function Certificates() {
 
 	return (
 		<Screen>
-			<BackButton />
-
-			<H2 style={{ marginBottom: spacing[1] }}>Certificates</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[5] }}>
-				Proof of the events you've volunteered at. Each one is independently
-				verifiable by its code.
-			</Body>
+			<ScreenHeader
+				back
+				title="Certificates"
+				subtitle="Proof of the events you've volunteered at, each verifiable by its code."
+			/>
 
 			{query.isLoading ? (
 				<LoadingState />
@@ -129,7 +122,7 @@ export default function Certificates() {
 									<Pressable onPress={() => download(item)} hitSlop={8}>
 										<Caption
 											weight="medium"
-											color={colors.primary.main as string}
+											color={colors.primary.ink as string}
 										>
 											{pdf.isPending ? "Preparing…" : "Download PDF"}
 										</Caption>

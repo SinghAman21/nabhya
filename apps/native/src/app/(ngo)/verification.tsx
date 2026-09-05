@@ -2,12 +2,12 @@ import type { UploadOrgDocumentInput } from "@nabhya/shared";
 import { ORG_DOCUMENT_LABELS } from "@nabhya/shared";
 import { ShieldCheck } from "lucide-react-native";
 import { RefreshControl, ScrollView, View } from "react-native";
-import { BackButton } from "@/components/back-button";
 import { DocumentUploadTile } from "@/components/document-upload-tile";
 import {
 	ErrorState,
 	LoadingState,
 	Screen,
+	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
 import { Body, Caption } from "@/components/ui/typography";
@@ -51,13 +51,10 @@ export default function NgoVerification() {
 
 	return (
 		<Screen>
-			<BackButton />
-			<Body weight="bold" style={{ fontSize: 22, marginBottom: spacing[1] }}>
-				Verification
-			</Body>
+			<ScreenHeader back title="Verification" />
 			<Caption
 				color="tertiary"
-				style={{ marginBottom: spacing[5], lineHeight: 20 }}
+				style={{ marginTop: -spacing[2], marginBottom: spacing[5] }}
 			>
 				Submit the documents below for verification. NGOs must upload at least
 				their registration certificate and PAN card to be eligible for

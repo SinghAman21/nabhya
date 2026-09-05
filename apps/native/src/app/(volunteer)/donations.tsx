@@ -1,7 +1,7 @@
 import { formatMinor } from "@nabhya/shared";
-import { HandCoins, Package, X } from "lucide-react-native";
+import { HandCoins, Package } from "lucide-react-native";
 import { useState } from "react";
-import { FlatList, Modal, Pressable, RefreshControl, View } from "react-native";
+import { FlatList, RefreshControl, View } from "react-native";
 import {
 	EmptyState,
 	ErrorState,
@@ -16,7 +16,9 @@ import {
 	pledgeTone,
 	StatusPill,
 } from "@/components/status-pill";
-import { Body, Caption, H2 } from "@/components/ui/typography";
+import { Pressable } from "@/components/ui/pressable";
+import { Sheet } from "@/components/ui/sheet";
+import { Body, Caption } from "@/components/ui/typography";
 import { useDonationReceipt, useMyDonations } from "@/hooks/use-engagement";
 import { useMyPledges } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/useTheme";
@@ -229,74 +231,49 @@ function ReceiptSheet({
 	id: string | null;
 	onClose: () => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const query = useDonationReceipt(id ?? undefined);
 	const receipt = query.data;
 
 	return (
-		<Modal
-			visible={!!id}
-			animationType="slide"
-			presentationStyle="pageSheet"
-			onRequestClose={onClose}
-		>
-			<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						justifyContent: "space-between",
-						paddingHorizontal: spacing[6],
-						paddingTop: spacing[6],
-						paddingBottom: spacing[2],
-					}}
-				>
-					<H2>Receipt</H2>
-					<Pressable onPress={onClose} hitSlop={12}>
-						<X size={22} color={colors.text.tertiary as string} />
-					</Pressable>
-				</View>
+		<Sheet visible={!!id} onClose={onClose} title="Receipt">
+			<View style={{ paddingTop: spacing[1], paddingBottom: spacing[2] }}>
+				{query.isLoading ? (
+					<LoadingState />
+				) : query.isError || !receipt ? (
+					<ErrorState
+						message={apiErrorMessage(query.error)}
+						onRetry={() => query.refetch()}
+					/>
+				) : (
+					<Surface>
+						<Caption color="tertiary">Receipt number</Caption>
+						<Body weight="bold" style={{ marginBottom: spacing[4] }}>
+							{receipt.receiptNumber ?? "—"}
+						</Body>
 
-				<View style={{ padding: spacing[6], paddingTop: spacing[4] }}>
-					{query.isLoading ? (
-						<LoadingState />
-					) : query.isError || !receipt ? (
-						<ErrorState
-							message={apiErrorMessage(query.error)}
-							onRetry={() => query.refetch()}
+						<ReceiptRow
+							label="Amount"
+							value={formatMinor(receipt.amountMinor, receipt.currency)}
 						/>
-					) : (
-						<Surface>
-							<Caption color="tertiary">Receipt number</Caption>
-							<Body weight="bold" style={{ marginBottom: spacing[4] }}>
-								{receipt.receiptNumber ?? "—"}
-							</Body>
-
-							<ReceiptRow
-								label="Amount"
-								value={formatMinor(receipt.amountMinor, receipt.currency)}
-							/>
-							<ReceiptRow
-								label="To"
-								value={[receipt.organizationName, receipt.organizationCity]
-									.filter(Boolean)
-									.join(", ")}
-							/>
-							<ReceiptRow label="From" value={receipt.donorName ?? "—"} />
-							<ReceiptRow
-								label="Date"
-								value={
-									receipt.completedAt
-										? formatDateTime(receipt.completedAt)
-										: "—"
-								}
-								last
-							/>
-						</Surface>
-					)}
-				</View>
+						<ReceiptRow
+							label="To"
+							value={[receipt.organizationName, receipt.organizationCity]
+								.filter(Boolean)
+								.join(", ")}
+						/>
+						<ReceiptRow label="From" value={receipt.donorName ?? "—"} />
+						<ReceiptRow
+							label="Date"
+							value={
+								receipt.completedAt ? formatDateTime(receipt.completedAt) : "—"
+							}
+							last
+						/>
+					</Surface>
+				)}
 			</View>
-		</Modal>
+		</Sheet>
 	);
 }
 

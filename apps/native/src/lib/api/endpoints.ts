@@ -36,6 +36,10 @@ export const ORG_EVENTS = {
 		`${API_PREFIX}/org/events/${id}/applications/${applicationId}`,
 } as const;
 
+export const FEED = {
+	LIST: `${API_PREFIX}/feed`,
+};
+
 export const NEEDS = {
 	LIST: `${API_PREFIX}/needs`,
 	MY_PLEDGES: `${API_PREFIX}/needs/me/pledges`,

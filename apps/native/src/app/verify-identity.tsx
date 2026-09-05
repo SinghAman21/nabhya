@@ -1,7 +1,6 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, ScrollView, View } from "react-native";
-import { BackButton } from "@/components/back-button";
+import { ScrollView, View } from "react-native";
 import { Screen, ScreenHeader } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
 import { Caption } from "@/components/ui/typography";
@@ -15,6 +14,7 @@ import {
 } from "@/components/verification/selfie-capture";
 import { useUploadUserDocument } from "@/hooks/use-documents";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 
 /**
@@ -24,7 +24,7 @@ import { apiErrorMessage } from "@/lib/api";
  * side), so this screen requires both before it lets you submit.
  */
 export default function VerifyIdentity() {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const router = useRouter();
 	const upload = useUploadUserDocument();
 
@@ -68,13 +68,8 @@ export default function VerifyIdentity() {
 
 	return (
 		<Screen>
-			<BackButton
-				size={24}
-				color={colors.text.primary as string}
-				style={{ marginBottom: spacing[2] }}
-			/>
-
 			<ScreenHeader
+				back
 				title="Get verified"
 				subtitle="Upload a government ID and take a quick selfie so NGOs know they can trust your application."
 			/>
@@ -83,6 +78,7 @@ export default function VerifyIdentity() {
 				showsVerticalScrollIndicator={false}
 				contentContainerStyle={{ paddingBottom: spacing[10], gap: spacing[8] }}
 				keyboardShouldPersistTaps="handled"
+				automaticallyAdjustKeyboardInsets
 			>
 				<IdCapture onChange={setIdValue} disabled={submitting} />
 				<SelfieCapture onChange={setSelfieValue} disabled={submitting} />

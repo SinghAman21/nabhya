@@ -73,6 +73,7 @@ export function useToggleBookmark() {
 			engagementApi.toggleBookmark(organizationId),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.bookmarks });
+			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
 		},
 	});
 }

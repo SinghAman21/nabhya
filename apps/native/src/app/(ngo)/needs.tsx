@@ -1,7 +1,7 @@
 import type { NeedType } from "@nabhya/shared";
 import { HeartHandshake, Plus } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, FlatList, Pressable, RefreshControl, View } from "react-native";
+import { FlatList, RefreshControl, View } from "react-native";
 import { NeedFormSheet } from "@/components/need-form-sheet";
 import { PledgesSheet } from "@/components/pledges-sheet";
 import {
@@ -19,10 +19,12 @@ import {
 	urgencyTone,
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption } from "@/components/ui/typography";
 import { useDeleteNeed, useOrgNeeds } from "@/hooks/use-needs";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatProgress, formatRelative } from "@/lib/format";
 import type { OrgNeedListItem } from "@/lib/types";

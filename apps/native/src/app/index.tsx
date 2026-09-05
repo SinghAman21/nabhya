@@ -19,8 +19,9 @@ export default function Index() {
 
 	const { data: status, isLoading, isError } = useOnboardingStatus(!!email);
 
-	// Access tokens expire after ~15 min but the Better Auth session cookie is
-	// long-lived — mint a fresh token on boot so a reload never starts stale.
+	// Supabase access tokens are short-lived (an hour) while the refresh token
+	// in storage is long-lived — mint a fresh one on boot so a reload never
+	// starts with a token the API will reject.
 	useEffect(() => {
 		if (email) void authService.refreshAccessToken();
 	}, [email]);

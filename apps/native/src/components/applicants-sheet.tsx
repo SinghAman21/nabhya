@@ -1,7 +1,7 @@
 import type { ApplicationStatus } from "@nabhya/shared";
-import { Users, X } from "lucide-react-native";
+import { Users } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, FlatList, Modal, Pressable, View } from "react-native";
+import { View } from "react-native";
 import {
 	EmptyState,
 	ErrorState,
@@ -15,7 +15,9 @@ import {
 	StatusPill,
 } from "@/components/status-pill";
 import { Input } from "@/components/ui/input";
-import { Body, Caption, H2, Label } from "@/components/ui/typography";
+import { Pressable } from "@/components/ui/pressable";
+import { Sheet, SheetFlatList } from "@/components/ui/sheet";
+import { Body, Caption, Label } from "@/components/ui/typography";
 import {
 	useIssueCertificate,
 	useMarkAttendance,
@@ -23,6 +25,7 @@ import {
 } from "@/hooks/use-engagement";
 import { useEventApplicants, useReviewApplication } from "@/hooks/use-events";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatRelative } from "@/lib/format";
 import type { EventApplicant } from "@/lib/types";
@@ -75,116 +78,81 @@ export function ApplicantsSheet({
 		);
 	};
 
+	const noteField = (
+		<View style={{ paddingTop: spacing[1], paddingBottom: spacing[4] }}>
+			<Caption
+				color={
+					remainingPlaces > 0 ? "secondary" : (colors.warning.ink as string)
+				}
+				style={{ marginBottom: spacing[3] }}
+			>
+				{remainingPlaces > 0
+					? `${remainingPlaces} place${remainingPlaces === 1 ? "" : "s"} remaining`
+					: "All places are filled"}
+			</Caption>
+			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
+			<Label style={{ marginBottom: spacing[1.5] }}>
+				Note to the volunteer <Caption color="tertiary">(optional)</Caption>
+			</Label>
+			<Input
+				placeholder="Where to meet, what to bring, why they weren't selected"
+				value={note}
+				onChangeText={setNote}
+				style={{
+					borderWidth: 0,
+					borderRadius: 12,
+					backgroundColor: colors.background.tertiary,
+					paddingVertical: spacing[3],
+				}}
+			/>
+		</View>
+	);
+
 	return (
-		<Modal
+		<Sheet
 			visible={!!eventId}
-			animationType="slide"
-			presentationStyle="pageSheet"
-			onRequestClose={onClose}
+			onClose={onClose}
+			title="Applicants"
+			subtitle={eventTitle}
+			scrollable={false}
+			detents={["60%", "92%"]}
 		>
-			<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
-				<View
-					style={{
-						paddingHorizontal: spacing[6],
-						paddingTop: spacing[6],
-						paddingBottom: spacing[2],
-					}}
-				>
-					<View
-						style={{
-							flexDirection: "row",
-							alignItems: "flex-start",
-							justifyContent: "space-between",
-							gap: spacing[3],
-						}}
-					>
-						<View style={{ flex: 1 }}>
-							<H2 numberOfLines={2}>Applicants</H2>
-							<Caption color="tertiary" numberOfLines={1}>
-								{eventTitle}
-							</Caption>
-						</View>
-						<Pressable onPress={onClose} hitSlop={12}>
-							<X size={22} color={colors.text.tertiary as string} />
-						</Pressable>
-					</View>
-
-					<Caption
-						color={
-							remainingPlaces > 0
-								? "secondary"
-								: (colors.warning.main as string)
-						}
-						style={{ marginTop: spacing[3] }}
-					>
-						{remainingPlaces > 0
-							? `${remainingPlaces} place${remainingPlaces === 1 ? "" : "s"} remaining`
-							: "All places are filled"}
-					</Caption>
-				</View>
-
-				<View style={{ paddingHorizontal: spacing[6], paddingTop: spacing[4] }}>
-					<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
-
-					<Label style={{ marginBottom: spacing[1.5] }}>
-						Note to the volunteer <Caption color="tertiary">(optional)</Caption>
-					</Label>
-					<Input
-						placeholder="Where to meet, what to bring, why they weren't selected"
-						value={note}
-						onChangeText={setNote}
-						style={{
-							borderWidth: 0,
-							borderRadius: 12,
-							backgroundColor: colors.background.tertiary,
-							paddingVertical: spacing[3],
-							marginBottom: spacing[4],
-						}}
-					/>
-				</View>
-
-				{query.isLoading ? (
-					<LoadingState label="Loading applicants…" />
-				) : query.isError ? (
-					<ErrorState
-						message={apiErrorMessage(query.error)}
-						onRetry={() => query.refetch()}
-					/>
-				) : (
-					<FlatList
-						data={query.data?.items ?? []}
-						keyExtractor={(item) => item.id}
-						contentContainerStyle={{
-							paddingHorizontal: spacing[6],
-							paddingBottom: spacing[10],
-						}}
-						ItemSeparatorComponent={() => (
-							<View style={{ height: spacing[3] }} />
-						)}
-						ListEmptyComponent={
-							<EmptyState
-								icon={Users}
-								title="No applicants here"
-								description={
-									filter === "PENDING"
-										? "New applications will show up here for review."
-										: "Nothing matches this filter yet."
-								}
-							/>
-						}
-						renderItem={({ item }) => (
-							<ApplicantRow
-								applicant={item}
-								eventId={eventId ?? ""}
-								canAccept={remainingPlaces > 0}
-								busy={review.isPending}
-								onDecide={(status) => decide(item, status)}
-							/>
-						)}
-					/>
-				)}
-			</View>
-		</Modal>
+			{query.isLoading ? (
+				<LoadingState label="Loading applicants…" />
+			) : query.isError ? (
+				<ErrorState
+					message={apiErrorMessage(query.error)}
+					onRetry={() => query.refetch()}
+				/>
+			) : (
+				<SheetFlatList
+					data={query.data?.items ?? []}
+					keyExtractor={(item) => item.id}
+					ListHeaderComponent={noteField}
+					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
+					ListEmptyComponent={
+						<EmptyState
+							icon={Users}
+							title="No applicants here"
+							description={
+								filter === "PENDING"
+									? "New applications will show up here for review."
+									: "Nothing matches this filter yet."
+							}
+						/>
+					}
+					renderItem={({ item }) => (
+						<ApplicantRow
+							applicant={item}
+							eventId={eventId ?? ""}
+							canAccept={remainingPlaces > 0}
+							busy={review.isPending}
+							onDecide={(status) => decide(item, status)}
+						/>
+					)}
+				/>
+			)}
+		</Sheet>
 	);
 }
 

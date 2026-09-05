@@ -2,7 +2,8 @@ import { formatFinancialYear } from "@nabhya/shared";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Award, Bookmark, Clock, FileText, Users } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BackButton } from "@/components/back-button";
 import { ReviewSheet } from "@/components/review-sheet";
 import {
@@ -17,6 +18,7 @@ import {
 	verificationTone,
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H2, H3 } from "@/components/ui/typography";
 import {
 	useAnnouncements,
@@ -26,12 +28,14 @@ import {
 } from "@/hooks/use-directory";
 import { useOpenDocument } from "@/hooks/use-documents";
 import {
+	useBookmarks,
 	useDeleteMyReview,
 	useReviews,
 	useToggleBookmark,
 } from "@/hooks/use-engagement";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/useTheme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate, formatRelative } from "@/lib/format";
 import { useAuthStore } from "@/store/auth-store";
@@ -48,6 +52,7 @@ const TABS: Array<{ value: Tab; label: string }> = [
 export default function NgoProfilePage() {
 	const { id } = useLocalSearchParams<{ id: string }>();
 	const { colors, spacing } = useTheme();
+	const insets = useSafeAreaInsets();
 	const router = useRouter();
 	const [tab, setTab] = useState<Tab>("about");
 	const [reviewOpen, setReviewOpen] = useState(false);
@@ -56,6 +61,12 @@ export default function NgoProfilePage() {
 	const org = useOrganization(id);
 	const impact = useOrganizationImpact(id);
 	const toggleBookmark = useToggleBookmark();
+	// The detail payload carries no follow flag; the caller's bookmark list is
+	// short and already cached, so read it from there.
+	const bookmarks = useBookmarks({ limit: 100 });
+	const bookmarked =
+		!!email &&
+		(bookmarks.data?.items ?? []).some((row) => row.organization.id === id);
 
 	const onBookmark = () => {
 		if (!email) {
@@ -75,13 +86,33 @@ export default function NgoProfilePage() {
 					alignItems: "center",
 					justifyContent: "space-between",
 					paddingHorizontal: spacing[6],
-					paddingTop: spacing[8],
+					paddingTop: insets.top + spacing[2],
 					paddingBottom: spacing[2],
 				}}
 			>
-				<BackButton style={{ marginBottom: 0 }} />
-				<Pressable onPress={onBookmark} hitSlop={12}>
-					<Bookmark size={22} color={colors.text.secondary as string} />
+				<BackButton />
+				<Pressable
+					onPress={onBookmark}
+					hitSlop={8}
+					accessibilityRole="button"
+					accessibilityLabel={bookmarked ? "Unfollow" : "Follow"}
+					accessibilityState={{ selected: bookmarked }}
+					style={({ pressed }) => ({
+						width: 40,
+						height: 40,
+						borderRadius: 999,
+						alignItems: "center",
+						justifyContent: "center",
+						backgroundColor: pressed
+							? colors.background.tertiary
+							: colors.background.subtle,
+					})}
+				>
+					<Bookmark
+						size={20}
+						color={colors.text.primary as string}
+						fill={bookmarked ? (colors.text.primary as string) : "transparent"}
+					/>
 				</Pressable>
 			</View>
 
