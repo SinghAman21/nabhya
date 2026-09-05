@@ -30,13 +30,13 @@ add new keys there, never inline. Forms use react-hook-form + `zodResolver` with
 schemas imported from `@nabhya/shared`; never hand-write a shape the server already
 defines.
 
-- Auth: the Better Auth adapter signs in, `getJWTToken()` is stored as
-  `accessToken` in expo-secure-store (localStorage on web); the axios interceptor
-  attaches the Bearer token and force-logs-out on any 401. See `lib/api/auth.ts`
-  and `lib/api/client.ts`.
+- Auth: `@supabase/supabase-js` signs in, the session's access token is stored as
+  `accessToken` in expo-secure-store (localStorage on web) via a thin storage
+  adapter; the axios interceptor attaches the Bearer token and force-logs-out on any
+  401. See `lib/api/auth.ts` and `lib/api/client.ts`.
 - **Sign out through `useSignOut()`, never `useAuthStore().signOut` directly.** The
   store action only drops the token and the Zustand slice — it does not revoke the
-  Neon Auth session or clear the TanStack Query cache, so on a shared device the
+  Supabase Auth session or clear the TanStack Query cache, so on a shared device the
   next person to sign in briefly sees the previous user's cached data. The hook
   does both.
 - Uploads: ask `POST /api/uploads/intent` for a pre-signed ticket, PUT the bytes
@@ -96,7 +96,8 @@ read `focused` from the style callback and draw an `outline*` — `Button` and
 - `expo-env.d.ts` is gitignored and generated — a fresh clone fails `tsc` on the
   `global.css` import until `expo start` (or equivalent) creates it.
 - Env: `EXPO_PUBLIC_API_URL` falls back to `10.0.2.2:3000` on Android in dev;
-  `EXPO_PUBLIC_NEON_AUTH_URL` throws at import if unset (`src/lib/env.ts`).
+  `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` both throw at
+  import if unset (`src/lib/env.ts`).
 - Every list endpoint returns a `Paginated<T>` envelope but screens currently render
   only page 1 — if you touch a list screen, prefer wiring real pagination over
   hardcoding page 1 again.

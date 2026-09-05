@@ -1,7 +1,7 @@
 import { config } from "dotenv";
 
-// Load .env.local first (takes priority), then .env as fallback
-config({ path: ".env.local" });
+// The server reads env from .env (not .env.local) — apps/native is the one
+// that uses .env.local, since Expo's own env loading prioritizes that file.
 config({ path: ".env" });
 
 import { createEnv } from "@t3-oss/env-core";
@@ -15,8 +15,7 @@ export const env = createEnv({
 		NODE_ENV: z
 			.enum(["development", "production", "test"])
 			.default("development"),
-		NEON_AUTH_URL: z.string().url(),
-		NEON_AUTH_JWKS_URL: z.string().url(),
+		SUPABASE_AUTH_JWKS_URL: z.string().url(),
 
 		// Cloudflare R2 (S3-compatible). All optional: when unset the server
 		// falls back to an in-memory stub so the app still boots and every

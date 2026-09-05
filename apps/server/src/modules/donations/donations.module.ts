@@ -35,7 +35,7 @@ function createPaymentProvider(): PaymentProvider {
 
 	logger.warn(
 		"Payments: stub provider (no Dodo credentials). Checkouts are simulated " +
-			"and no money moves — set the DODO_* variables in .env.local.",
+			"and no money moves — set the DODO_* variables in .env.",
 	);
 	return new StubPaymentProvider();
 }

@@ -17,13 +17,13 @@ import { createRemoteJWKSet, errors as joseErrors, jwtVerify } from "jose";
 import { DB_TOKEN } from "../database";
 import { IS_OPTIONAL_AUTH_KEY } from "../decorators/optional-auth.decorator";
 import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
-import type { AuthUser, NeonJwtPayload, UserRole } from "../types";
+import type { AuthUser, SupabaseJwtPayload, UserRole } from "../types";
 
 @Injectable()
 export class JwtGuard implements CanActivate {
 	private readonly logger = new Logger(JwtGuard.name);
-	private readonly neonJwks = createRemoteJWKSet(
-		new URL(env.NEON_AUTH_JWKS_URL),
+	private readonly supabaseJwks = createRemoteJWKSet(
+		new URL(env.SUPABASE_AUTH_JWKS_URL),
 	);
 
 	constructor(
@@ -62,7 +62,10 @@ export class JwtGuard implements CanActivate {
 		}
 
 		try {
-			const { payload } = await jwtVerify<NeonJwtPayload>(token, this.neonJwks);
+			const { payload } = await jwtVerify<SupabaseJwtPayload>(
+				token,
+				this.supabaseJwks,
+			);
 
 			if (!payload.sub || !payload.email) {
 				throw new UnauthorizedException(
@@ -70,7 +73,7 @@ export class JwtGuard implements CanActivate {
 				);
 			}
 
-			const dbUser = await this.syncNeonUser(payload);
+			const dbUser = await this.syncSupabaseUser(payload);
 
 			const roleRows = await this.db.query.userRoles.findMany({
 				where: eq(userRoles.userId, dbUser.id),
@@ -107,7 +110,7 @@ export class JwtGuard implements CanActivate {
 			if (isOptional) return true;
 			if (error instanceof HttpException) throw error;
 			if (error instanceof joseErrors.JOSEError) {
-				this.logger.warn(`Neon JWT verification failed: ${error.message}`);
+				this.logger.warn(`Supabase JWT verification failed: ${error.message}`);
 				throw new UnauthorizedException("Token validation failed");
 			}
 			// Anything else (DB/network blip) is our failure, not the caller's.
@@ -121,9 +124,12 @@ export class JwtGuard implements CanActivate {
 		}
 	}
 
-	private async syncNeonUser(payload: NeonJwtPayload) {
+	private async syncSupabaseUser(payload: SupabaseJwtPayload) {
+		const name =
+			payload.user_metadata?.name ?? payload.user_metadata?.full_name;
+
 		let dbUser = await this.db.query.users.findFirst({
-			where: eq(users.neonUserId, payload.sub),
+			where: eq(users.authUserId, payload.sub),
 		});
 
 		if (!dbUser) {
@@ -135,8 +141,8 @@ export class JwtGuard implements CanActivate {
 				const [updatedUser] = await this.db
 					.update(users)
 					.set({
-						neonUserId: payload.sub,
-						fullName: payload.name ?? existingByEmail.fullName,
+						authUserId: payload.sub,
+						fullName: name ?? existingByEmail.fullName,
 						updatedAt: new Date(),
 					})
 					.where(eq(users.id, existingByEmail.id))
@@ -146,9 +152,9 @@ export class JwtGuard implements CanActivate {
 				const [createdUser] = await this.db
 					.insert(users)
 					.values({
-						neonUserId: payload.sub,
+						authUserId: payload.sub,
 						email: payload.email.toLowerCase(),
-						fullName: payload.name ?? null,
+						fullName: name ?? null,
 						status: "ACTIVE",
 						verificationStatus: "PENDING",
 					})

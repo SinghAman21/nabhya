@@ -15,9 +15,11 @@ If you are asked to scaffold it:
   env validation validated at import (follow the pattern of
   `apps/native/src/lib/env.ts`, or extend `@nabhya/env` with a client entry);
   nothing committed to `.env*`.
-- Auth is Neon Auth (Better Auth): sign in via the adapter, call `getJWTToken()`,
-  send it as a Bearer token; on web the token lives in localStorage. Mirror the
-  native client's force-logout-on-401 interceptor behaviour.
+- Auth is Supabase Auth via `@supabase/supabase-js`'s browser client: sign in with
+  `signInWithPassword`/`signUp`, read the access token off the session, send it as a
+  Bearer token; on web the token lives in localStorage. Mirror the native client's
+  force-logout-on-401 interceptor behaviour (see `apps/native/src/lib/api/auth.ts`
+  and `client.ts` for the pattern to follow).
 - Talk to the existing API only (`/api`, port 3000, CORS via `CORS_ORIGIN` — add
   the web origin there). Do not add web-only endpoints without wiring them into the
   server's conventions (guards, Zod pipes, `Paginated<T>`, org scoping from the

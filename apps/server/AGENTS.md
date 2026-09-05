@@ -29,8 +29,8 @@ at `/api/docs`.
 Guard order (all global `APP_GUARD`s in `app.module.ts`):
 `ThrottlerGuard → JwtGuard → RolesGuard`.
 
-- **Everything is protected by default.** `JwtGuard` verifies the Neon Auth JWT
-  against a remote JWKS (`jose`), then JIT-syncs the user: lookup by `neon_user_id`,
+- **Everything is protected by default.** `JwtGuard` verifies the Supabase Auth JWT
+  against a remote JWKS (`jose`), then JIT-syncs the user: lookup by `auth_user_id`,
   fall back to email and link, else insert. It rejects suspended/inactive accounts on
   every request and does **not** assign a default role — `request.user.roles` is
   empty until the user picks one via `POST /users/me/role`.
@@ -93,7 +93,7 @@ Guard order (all global `APP_GUARD`s in `app.module.ts`):
   mock the database: the logic worth testing is unique indexes, `SELECT … FOR
   UPDATE` accounting and filtered aggregates.
 - `test/harness.ts` creates the database; `test/factories.ts` builds rows.
-- **Nothing that runs in CI may need a developer's `.env.local`.** Importing almost
+- **Nothing that runs in CI may need a developer's `.env`.** Importing almost
   anything from `common/` reaches `@nabhya/db`, which validates the server env at
   module load. `test/setup-env.ts` supplies throwaway values (wired as vitest
   `setupFiles`); `scripts/verify-di.ts` imports it dynamically before `AppModule`

@@ -2,15 +2,15 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-// Resolves to apps/server/.env.local from the monorepo root
-export const ENV_PATH = resolve(process.cwd(), "apps/server/.env.local");
+// Resolves to apps/server/.env from the monorepo root
+export const ENV_PATH = resolve(process.cwd(), "apps/server/.env");
 
 export interface EnvValues {
 	DATABASE_URL: string;
 	DIRECT_URL: string;
 	CORS_ORIGIN: string;
 	NODE_ENV: string;
-	NEON_AUTH_JWKS_URL: string;
+	SUPABASE_AUTH_JWKS_URL: string;
 }
 
 export function envExists(): boolean {
@@ -52,7 +52,7 @@ export function writeEnv(values: EnvValues): void {
 		`NODE_ENV=${values.NODE_ENV}`,
 		"",
 		"# Auth Config",
-		`NEON_AUTH_JWKS_URL="${values.NEON_AUTH_JWKS_URL}"`,
+		`SUPABASE_AUTH_JWKS_URL="${values.SUPABASE_AUTH_JWKS_URL}"`,
 		"",
 	].join("\n");
 	writeFileSync(ENV_PATH, content, "utf8");
@@ -62,6 +62,11 @@ export function generateAuthSecret(): string {
 	return randomBytes(32).toString("base64");
 }
 
+// Supabase's pooled connection is the transaction-mode pgbouncer endpoint
+// (host *.pooler.supabase.com, port 6543); the direct connection is the
+// project's own Postgres host (host db.<project-ref>.supabase.co, port
+// 5432). Neither convention uses Neon's "-pooler" host-suffix marker, so
+// these check host/port shape instead.
 export function validatePooledUrl(
 	value: string | undefined,
 ): string | undefined {
@@ -69,11 +74,8 @@ export function validatePooledUrl(
 	if (!value.startsWith("postgresql://") && !value.startsWith("postgres://")) {
 		return "Must start with postgresql://";
 	}
-	if (!value.includes("-pooler")) {
-		return 'Pooled URL must contain "-pooler" in the host (you may have pasted the direct one)';
-	}
-	if (!value.includes("sslmode=require")) {
-		return "Missing sslmode=require";
+	if (!value.includes(".pooler.supabase.com") || !value.includes(":6543")) {
+		return 'Pooled URL should use the "*.pooler.supabase.com" host on port 6543 (you may have pasted the direct one)';
 	}
 	return undefined;
 }
@@ -85,11 +87,8 @@ export function validateDirectUrl(
 	if (!value.startsWith("postgresql://") && !value.startsWith("postgres://")) {
 		return "Must start with postgresql://";
 	}
-	if (value.includes("-pooler")) {
-		return 'Direct URL must NOT contain "-pooler" (you may have pasted the pooled one)';
-	}
-	if (!value.includes("sslmode=require")) {
-		return "Missing sslmode=require";
+	if (!value.includes(".supabase.co") || !value.includes(":5432")) {
+		return 'Direct URL should use the "db.<project-ref>.supabase.co" host on port 5432 (you may have pasted the pooled one)';
 	}
 	return undefined;
 }

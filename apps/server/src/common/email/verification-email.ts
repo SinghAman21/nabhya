@@ -4,7 +4,7 @@
  * There is no email provider wired yet (root AGENTS.md — notifications are
  * in-app only), so this module is deliberately provider-agnostic: a pure
  * render function returning `{ subject, html, text }` that any transport
- * (Resend, SES, Postmark, Neon Auth's `sendVerificationEmail` hook, …) can
+ * (Resend, SES, Postmark, Supabase's email-template hooks, …) can
  * hand off as-is. No Nest dependencies on purpose — it must stay importable
  * from scripts and tests without booting the app.
  *

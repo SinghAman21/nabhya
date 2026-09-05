@@ -6,7 +6,7 @@ import { useAuthStore } from "@/store/auth-store";
  * Signs out properly — which is more than clearing local state.
  *
  * The store's `signOut` only drops the token and the Zustand slice. Used on
- * its own it leaves the Neon Auth session alive and every cached query in
+ * its own it leaves the Supabase Auth session alive and every cached query in
  * place, so the next person to sign in on the same device would briefly see
  * the previous user's data. Always sign out through here.
  *

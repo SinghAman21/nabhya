@@ -22,9 +22,16 @@ function resolveApiUrl(): string {
 
 export const API_URL = resolveApiUrl();
 
-const neonAuthUrl = process.env.EXPO_PUBLIC_NEON_AUTH_URL;
-if (!neonAuthUrl) {
-	throw new Error("EXPO_PUBLIC_NEON_AUTH_URL must be set for Neon Auth");
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+if (!supabaseUrl) {
+	throw new Error("EXPO_PUBLIC_SUPABASE_URL must be set for Supabase Auth");
 }
+export const SUPABASE_URL = supabaseUrl;
 
-export const NEON_AUTH_URL = neonAuthUrl;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+if (!supabaseAnonKey) {
+	throw new Error(
+		"EXPO_PUBLIC_SUPABASE_ANON_KEY must be set for Supabase Auth",
+	);
+}
+export const SUPABASE_ANON_KEY = supabaseAnonKey;

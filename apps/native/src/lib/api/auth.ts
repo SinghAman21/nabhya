@@ -1,46 +1,77 @@
 import "@/lib/crypto-polyfill";
-import { createInternalNeonAuth } from "@neondatabase/auth";
+import { createClient } from "@supabase/supabase-js";
 import axios from "axios";
-import { API_URL, NEON_AUTH_URL } from "@/lib/env";
+import { AppState } from "react-native";
+import "react-native-url-polyfill/auto";
+import { API_URL, SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/env";
 import type { AuthResponse, LoginInput, SignUpInput } from "@/lib/types";
 import { storage } from "../storage";
 import { USERS } from "./endpoints";
 
-const neonAuth = createInternalNeonAuth(NEON_AUTH_URL);
-const neonAuthClient = neonAuth.adapter;
+// Supabase's session storage adapter expects getItem/setItem/removeItem —
+// apps/native/src/lib/storage.ts uses get/set/remove for its other callers
+// (theme, auth-store persistence), so this is a thin shim rather than a
+// rename that would ripple through unrelated code.
+const supabaseStorage = {
+	getItem: (key: string) => storage.get(key),
+	setItem: (key: string, value: string) => storage.set(key, value),
+	removeItem: (key: string) => storage.remove(key),
+};
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+	auth: {
+		storage: supabaseStorage,
+		autoRefreshToken: true,
+		persistSession: true,
+		detectSessionInUrl: false,
+	},
+});
+
+// Supabase's token auto-refresh is driven by a timer that keeps running while
+// the app is backgrounded unless explicitly paused — this is the officially
+// recommended wiring for React Native (supabase-js docs), and has no Neon
+// Auth equivalent since that adapter managed its own session lifecycle.
+AppState.addEventListener("change", (state) => {
+	if (state === "active") {
+		supabase.auth.startAutoRefresh();
+	} else {
+		supabase.auth.stopAutoRefresh();
+	}
+});
 
 export class AuthService {
 	async signup(input: SignUpInput): Promise<AuthResponse> {
-		const result = await neonAuthClient.signUp.email({
+		const result = await supabase.auth.signUp({
 			email: input.email,
 			password: input.password,
-			name: input.name,
+			options: { data: { name: input.name } },
 		});
-		this.throwIfNeonAuthError(result.error);
-		return this.getAuthenticatedUser();
+		this.throwIfSupabaseError(result.error);
+		return this.getAuthenticatedUser(result.data.session?.access_token);
 	}
 
 	async login(input: LoginInput): Promise<AuthResponse> {
-		const result = await neonAuthClient.signIn.email({
+		const result = await supabase.auth.signInWithPassword({
 			email: input.email,
 			password: input.password,
 		});
-		this.throwIfNeonAuthError(result.error);
-		return this.getAuthenticatedUser();
+		this.throwIfSupabaseError(result.error);
+		return this.getAuthenticatedUser(result.data.session?.access_token);
 	}
 
 	async logout(): Promise<void> {
 		try {
-			await neonAuthClient.signOut();
+			await supabase.auth.signOut();
 		} finally {
 			await this.clearToken();
 		}
 	}
 
-	private async getAuthenticatedUser(): Promise<AuthResponse> {
-		const accessToken = await this.refreshAccessToken();
+	private async getAuthenticatedUser(
+		accessToken: string | undefined,
+	): Promise<AuthResponse> {
 		if (!accessToken) {
-			throw new Error("Neon Auth did not return an access token");
+			throw new Error("Supabase Auth did not return an access token");
 		}
 
 		await storage.set("accessToken", accessToken);
@@ -51,8 +82,8 @@ export class AuthService {
 		return { accessToken, user: response.data.data };
 	}
 
-	private throwIfNeonAuthError(error: { message?: string } | null) {
-		if (error) throw new Error(error.message ?? "Neon Auth request failed");
+	private throwIfSupabaseError(error: { message?: string } | null) {
+		if (error) throw new Error(error.message ?? "Supabase Auth request failed");
 	}
 
 	private async clearToken(): Promise<void> {
@@ -67,24 +98,20 @@ export class AuthService {
 	}
 
 	/**
-	 * Mint a fresh JWT from the Better Auth session. The JWTs expire after
-	 * ~15 minutes while the session itself is long-lived, so a 401 usually
-	 * just means "stale token", not "signed out".
+	 * Return a valid access token, refreshing it through Supabase when the
+	 * current one has expired. Access tokens are short-lived (an hour by
+	 * default) while the refresh token in storage is long-lived, so a 401 from
+	 * the API usually means "stale token", not "signed out".
 	 *
-	 * NB: `neonAuth.getJWTToken()` is NOT usable here — it returns the
-	 * session token minted once at sign-in, whose `exp` then passes and
-	 * never recovers. The `/token` endpoint signs a fresh JWT per call.
+	 * `getSession()` refreshes transparently when the stored token is past its
+	 * expiry, so this is one call in the common case and a null only when there
+	 * is genuinely no session left to recover.
 	 */
 	async refreshAccessToken(): Promise<string | null> {
 		try {
-			const response = await fetch(`${NEON_AUTH_URL}/token`, {
-				method: "GET",
-				headers: { "Content-Type": "application/json" },
-				credentials: "include",
-			});
-			if (!response.ok) return null;
-			const data = (await response.json()) as { token?: string };
-			const accessToken = data?.token ?? null;
+			const { data, error } = await supabase.auth.getSession();
+			if (error) return null;
+			const accessToken = data.session?.access_token ?? null;
 			if (!accessToken) return null;
 			await storage.set("accessToken", accessToken);
 			return accessToken;

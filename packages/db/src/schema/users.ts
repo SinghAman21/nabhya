@@ -38,8 +38,8 @@ export const userDocVerificationStatusEnum = pgEnum(
 
 // ─── User Table ──────────────────────────────────────────────────────────────
 export const users = pgTable("users", {
-	id: uuid("id").primaryKey().defaultRandom(), // Also sub from Neon Auth
-	neonUserId: varchar("neon_user_id").unique(),
+	id: uuid("id").primaryKey().defaultRandom(), // Also sub from Supabase Auth
+	authUserId: varchar("auth_user_id").unique(),
 	fullName: varchar("full_name"),
 	email: varchar("email").unique().notNull(),
 	phone: varchar("phone"),
