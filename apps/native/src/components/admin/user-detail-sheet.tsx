@@ -1,9 +1,16 @@
 import { USER_DOCUMENT_LABELS } from "@nabhya/shared";
-import { X } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, View } from "react-native";
+import { View } from "react-native";
 import { DocumentReviewRow } from "@/components/admin/document-review-row";
-import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
+import { FactGroup, ReasonField } from "@/components/admin/sheet-parts";
+import {
+	Banner,
+	ErrorState,
+	LoadingState,
+	MetricRow,
+	SectionTitle,
+	Surface,
+} from "@/components/screen-shell";
 import {
 	applicationTone,
 	humanizeStatus,
@@ -12,17 +19,18 @@ import {
 	verificationTone,
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Body, Caption, H2, H3, Label } from "@/components/ui/typography";
+import { Sheet } from "@/components/ui/sheet";
+import { Body, Caption } from "@/components/ui/typography";
 import { useAdminUser, useSetUserStatus } from "@/hooks/use-admin";
-import { useOpenDocument } from "@/hooks/use-documents";
 import { useTheme } from "@/hooks/use-theme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 
 /**
- * Per-user dossier. The participation lists are the point of this screen —
- * which events they applied to, what the outcome was, and what they pledged.
+ * Per-user dossier. State first, then the identity documents — the thing a
+ * reviewer most often opens this for — then the participation record that
+ * tells them whether this is a real volunteer, then the one decision.
  */
 export function UserDetailSheet({
 	userId,
@@ -31,34 +39,40 @@ export function UserDetailSheet({
 	userId: string | null;
 	onClose: () => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const [reason, setReason] = useState("");
+	const [reasonError, setReasonError] = useState<string | null>(null);
 
 	const query = useAdminUser(userId ?? undefined);
 	const setStatus = useSetUserStatus();
-	const _openDocument = useOpenDocument();
 
 	const user = query.data;
+	const suspended = user?.status === "SUSPENDED";
 
 	const close = () => {
 		setReason("");
+		setReasonError(null);
 		onClose();
+	};
+
+	const changeReason = (text: string) => {
+		setReason(text);
+		if (reasonError && text.trim()) setReasonError(null);
 	};
 
 	const toggleSuspension = () => {
 		if (!userId || !user) return;
 		const suspending = user.status !== "SUSPENDED";
+		const text = reason.trim();
 
-		if (suspending && !reason.trim()) {
-			Alert.alert(
-				"Reason required",
-				"Add a reason before suspending this user.",
-			);
+		if (suspending && !text) {
+			setReasonError("Add a reason before suspending this account.");
 			return;
 		}
+		setReasonError(null);
 
 		Alert.alert(
-			suspending ? "Suspend user" : "Reinstate user",
+			suspending ? "Suspend account?" : "Reinstate account?",
 			suspending
 				? "They will be signed out and blocked from the app until reinstated."
 				: "They will regain access immediately.",
@@ -73,7 +87,7 @@ export function UserDetailSheet({
 								id: userId,
 								input: {
 									status: suspending ? "SUSPENDED" : "ACTIVE",
-									reason: reason.trim() || undefined,
+									reason: text || undefined,
 								},
 							},
 							{
@@ -88,146 +102,113 @@ export function UserDetailSheet({
 	};
 
 	return (
-		<Modal
+		<Sheet
 			visible={!!userId}
-			animationType="slide"
-			presentationStyle="pageSheet"
-			onRequestClose={close}
+			onClose={close}
+			title={user?.fullName ?? "Account"}
+			subtitle={user?.email}
 		>
-			<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						justifyContent: "space-between",
-						paddingHorizontal: spacing[6],
-						paddingTop: spacing[6],
-						paddingBottom: spacing[2],
-					}}
-				>
-					<H2 style={{ flex: 1 }} numberOfLines={1}>
-						{user?.fullName ?? "Volunteer"}
-					</H2>
-					<Pressable onPress={close} hitSlop={12}>
-						<X size={22} color={colors.text.tertiary as string} />
-					</Pressable>
-				</View>
-
-				{query.isLoading ? (
-					<LoadingState />
-				) : query.isError || !user ? (
-					<ErrorState
-						message={apiErrorMessage(query.error)}
-						onRetry={() => query.refetch()}
-					/>
-				) : (
-					<ScrollView
-						contentContainerStyle={{
-							paddingHorizontal: spacing[6],
-							paddingBottom: spacing[12],
+			{query.isLoading ? (
+				<LoadingState />
+			) : query.isError || !user ? (
+				<ErrorState
+					message={apiErrorMessage(query.error)}
+					onRetry={() => query.refetch()}
+				/>
+			) : (
+				<>
+					<View
+						style={{
+							flexDirection: "row",
+							flexWrap: "wrap",
+							gap: spacing[2],
+							marginBottom: spacing[5],
 						}}
-						keyboardShouldPersistTaps="handled"
 					>
-						<View
-							style={{
-								flexDirection: "row",
-								flexWrap: "wrap",
-								gap: spacing[2],
-								marginBottom: spacing[5],
-							}}
-						>
-							{user.roles.map((role) => (
-								<StatusPill
-									key={role}
-									label={humanizeStatus(role)}
-									tone="info"
-								/>
-							))}
-							<StatusPill
-								label={`ID ${humanizeStatus(user.verificationStatus).toLowerCase()}`}
-								tone={verificationTone(user.verificationStatus)}
+						{user.roles.map((role) => (
+							<StatusPill key={role} label={humanizeStatus(role)} tone="info" />
+						))}
+						<StatusPill
+							label={`ID ${humanizeStatus(user.verificationStatus).toLowerCase()}`}
+							tone={verificationTone(user.verificationStatus)}
+						/>
+						{suspended && <StatusPill label="Suspended" tone="error" />}
+					</View>
+
+					{user.suspendedReason && (
+						<View style={{ marginBottom: spacing[5] }}>
+							<Banner
+								tone="error"
+								title="Suspended"
+								description={user.suspendedReason}
 							/>
-							{user.status === "SUSPENDED" && (
-								<StatusPill label="Suspended" tone="error" />
-							)}
 						</View>
+					)}
 
-						{user.suspendedReason && (
-							<Surface
-								style={{
-									marginBottom: spacing[5],
-									backgroundColor: colors.error.bg,
-									borderColor: colors.error.border,
-								}}
-							>
-								<Caption weight="bold" color={colors.error.main as string}>
-									Suspension reason
-								</Caption>
-								<Caption color="secondary">{user.suspendedReason}</Caption>
-							</Surface>
-						)}
+					<View style={{ marginBottom: spacing[5] }}>
+						<MetricRow
+							stats={[
+								{ label: "Applications", value: user.stats.applications },
+								{ label: "Accepted", value: user.stats.accepted },
+								{ label: "Pledges", value: user.stats.pledges },
+							]}
+						/>
+					</View>
 
-						<View
-							style={{
-								flexDirection: "row",
-								gap: spacing[2],
-								marginBottom: spacing[5],
-							}}
-						>
-							<StatCell label="Applications" value={user.stats.applications} />
-							<StatCell label="Accepted" value={user.stats.accepted} />
-							<StatCell label="Pledges" value={user.stats.pledges} />
-						</View>
-
-						<SectionTitle>Contact</SectionTitle>
-						<Surface style={{ marginBottom: spacing[5] }}>
-							<InfoRow label="Email" value={user.email} />
-							<InfoRow label="Phone" value={user.phone} />
-							<InfoRow
-								label="Location"
-								value={[user.city, user.state].filter(Boolean).join(", ")}
-							/>
-							<InfoRow label="Joined" value={formatDate(user.createdAt)} />
-							<InfoRow
-								label="Onboarded"
-								value={
-									user.onboardedAt
+					<Section title="Contact">
+						<FactGroup
+							facts={[
+								{ label: "Email", value: user.email },
+								{ label: "Phone", value: user.phone },
+								{
+									label: "Location",
+									value: [user.city, user.state].filter(Boolean).join(", "),
+								},
+								{ label: "Joined", value: formatDate(user.createdAt) },
+								{
+									label: "Onboarded",
+									value: user.onboardedAt
 										? formatDate(user.onboardedAt)
-										: "Not finished"
-								}
-								last
-							/>
-						</Surface>
+										: "Not finished",
+								},
+							]}
+						/>
+					</Section>
 
-						{user.organization && (
-							<>
-								<SectionTitle>Owns organization</SectionTitle>
-								<Surface style={{ marginBottom: spacing[5] }}>
-									<Body weight="bold">
+					{user.organization && (
+						<Section title="Owns organization">
+							<Surface>
+								<View
+									style={{
+										flexDirection: "row",
+										alignItems: "center",
+										gap: spacing[2],
+									}}
+								>
+									<Body weight="semibold" style={{ flex: 1 }} numberOfLines={1}>
 										{user.organization.organizationName}
 									</Body>
-									<View style={{ flexDirection: "row", marginTop: spacing[2] }}>
-										<StatusPill
-											label={humanizeStatus(
-												user.organization.verificationStatus,
-											)}
-											tone={verificationTone(
-												user.organization.verificationStatus,
-											)}
-										/>
-									</View>
-								</Surface>
-							</>
-						)}
+									<StatusPill
+										label={humanizeStatus(user.organization.verificationStatus)}
+										tone={verificationTone(
+											user.organization.verificationStatus,
+										)}
+									/>
+								</View>
+							</Surface>
+						</Section>
+					)}
 
-						<SectionTitle>Identity documents</SectionTitle>
-						<View style={{ gap: spacing[2], marginBottom: spacing[5] }}>
-							{user.documents.length === 0 ? (
-								<Surface>
-									<Caption color="tertiary">No documents submitted.</Caption>
-								</Surface>
-							) : (
-								user.documents.map((document) => (
+					<Section
+						title={`Identity documents${user.documents.length ? ` (${user.documents.length})` : ""}`}
+					>
+						{user.documents.length === 0 ? (
+							<Surface>
+								<Caption color="tertiary">No documents submitted.</Caption>
+							</Surface>
+						) : (
+							<View style={{ gap: spacing[2] }}>
+								{user.documents.map((document) => (
 									<DocumentReviewRow
 										key={document.id}
 										document={document}
@@ -237,26 +218,26 @@ export function UserDetailSheet({
 											humanizeStatus(document.documentType)
 										}
 									/>
-								))
-							)}
-						</View>
+								))}
+							</View>
+						)}
+					</Section>
 
-						<SectionTitle>Event participation</SectionTitle>
-						<View style={{ gap: spacing[2], marginBottom: spacing[5] }}>
-							{user.applications.length === 0 ? (
-								<Surface>
-									<Caption color="tertiary">
-										Hasn't applied to any events yet.
-									</Caption>
-								</Surface>
-							) : (
-								user.applications.map((application) => (
+					<Section title="Event participation">
+						{user.applications.length === 0 ? (
+							<Surface>
+								<Caption color="tertiary">
+									Hasn't applied to any events yet.
+								</Caption>
+							</Surface>
+						) : (
+							<View style={{ gap: spacing[2] }}>
+								{user.applications.map((application) => (
 									<Surface key={application.id}>
 										<View
 											style={{
 												flexDirection: "row",
 												alignItems: "center",
-												justifyContent: "space-between",
 												gap: spacing[2],
 											}}
 										>
@@ -277,24 +258,24 @@ export function UserDetailSheet({
 											{formatDate(application.event.startAt)}
 										</Caption>
 									</Surface>
-								))
-							)}
-						</View>
+								))}
+							</View>
+						)}
+					</Section>
 
-						<SectionTitle>Pledges</SectionTitle>
-						<View style={{ gap: spacing[2], marginBottom: spacing[5] }}>
-							{user.pledges.length === 0 ? (
-								<Surface>
-									<Caption color="tertiary">No pledges yet.</Caption>
-								</Surface>
-							) : (
-								user.pledges.map((pledge) => (
+					<Section title="Pledges">
+						{user.pledges.length === 0 ? (
+							<Surface>
+								<Caption color="tertiary">No pledges yet.</Caption>
+							</Surface>
+						) : (
+							<View style={{ gap: spacing[2] }}>
+								{user.pledges.map((pledge) => (
 									<Surface key={pledge.id}>
 										<View
 											style={{
 												flexDirection: "row",
 												alignItems: "center",
-												justifyContent: "space-between",
 												gap: spacing[2],
 											}}
 										>
@@ -317,100 +298,46 @@ export function UserDetailSheet({
 												: ""}
 										</Caption>
 									</Surface>
-								))
-							)}
-						</View>
+								))}
+							</View>
+						)}
+					</Section>
 
-						<SectionTitle>Moderation</SectionTitle>
-						<Label style={{ marginBottom: spacing[1.5] }}>
-							Reason <Caption color="tertiary">(required to suspend)</Caption>
-						</Label>
-						<Input
-							placeholder="Why is this account being actioned?"
-							value={reason}
-							onChangeText={setReason}
-							multiline
-							style={{
-								borderWidth: 0,
-								borderRadius: 12,
-								backgroundColor: colors.background.tertiary,
-								paddingVertical: spacing[3.5],
-								minHeight: 88,
-								textAlignVertical: "top",
-								marginBottom: spacing[4],
-							}}
-						/>
+					<SectionTitle>Decision</SectionTitle>
+					<ReasonField
+						value={reason}
+						onChangeText={changeReason}
+						placeholder="Why is this account being actioned?"
+						requiredFor="suspend"
+						error={reasonError}
+					/>
+					<View style={{ paddingBottom: spacing[2] }}>
 						<Button
-							variant={user.status === "SUSPENDED" ? "outline" : "destructive"}
+							variant={suspended ? "outline" : "destructive"}
 							onPress={toggleSuspension}
 							loading={setStatus.isPending}
 						>
-							{user.status === "SUSPENDED" ? "Reinstate user" : "Suspend user"}
+							{suspended ? "Reinstate account" : "Suspend account"}
 						</Button>
-					</ScrollView>
-				)}
-			</View>
-		</Modal>
+					</View>
+				</>
+			)}
+		</Sheet>
 	);
 }
 
-function StatCell({ label, value }: { label: string; value: number }) {
-	return (
-		<Surface style={{ flex: 1 }}>
-			<H3>{value}</H3>
-			<Caption color="tertiary">{label}</Caption>
-		</Surface>
-	);
-}
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function Section({
+	title,
+	children,
+}: {
+	title: string;
+	children: React.ReactNode;
+}) {
 	const { spacing } = useTheme();
 	return (
-		<Caption
-			weight="bold"
-			color="tertiary"
-			style={{
-				letterSpacing: 1,
-				textTransform: "uppercase",
-				marginBottom: spacing[2],
-			}}
-		>
+		<View style={{ marginBottom: spacing[5] }}>
+			<SectionTitle>{title}</SectionTitle>
 			{children}
-		</Caption>
-	);
-}
-
-function InfoRow({
-	label,
-	value,
-	last,
-}: {
-	label: string;
-	value?: string | null;
-	last?: boolean;
-}) {
-	const { colors, spacing } = useTheme();
-
-	return (
-		<View
-			style={{
-				flexDirection: "row",
-				justifyContent: "space-between",
-				gap: spacing[4],
-				paddingBottom: last ? 0 : spacing[2],
-				marginBottom: last ? 0 : spacing[2],
-				borderBottomWidth: last ? 0 : 1,
-				borderBottomColor: colors.border.light,
-			}}
-		>
-			<Caption color="tertiary">{label}</Caption>
-			<Caption
-				weight="medium"
-				color={value ? "primary" : "quaternary"}
-				style={{ flex: 1, textAlign: "right" }}
-			>
-				{value || "—"}
-			</Caption>
 		</View>
 	);
 }

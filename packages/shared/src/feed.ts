@@ -114,17 +114,64 @@ export type FeedCommentsQuery = z.infer<typeof feedCommentsQuerySchema>;
 
 // ─── Feed views ───────────────────────────────────────────────────────────────
 
-export const forYouFeedQuerySchema = paginationQuerySchema;
+/**
+ * Narrowing every feed view accepts. The ranking service scores a candidate
+ * pool and these cut the pool before scoring, so page N of a filtered view is
+ * as well defined as page N of the plain one.
+ *
+ * - `kind`       — one item type only (the search page's result tabs).
+ * - `categoryId` — only NGOs tagged with this cause (the volunteer's vertical).
+ * - `city`       — case-insensitive substring on the item's city, falling back
+ *                  to the NGO's city.
+ * - `search`     — substring over title / text / description / NGO name.
+ * - `urgent`     — HIGH-urgency needs, urgent posts, events within three days.
+ */
+export const feedFilterSchema = z.object({
+	kind: postTagSchema.optional(),
+	categoryId: z.uuid().optional(),
+	city: z.string().trim().max(80).optional(),
+	search: z.string().trim().max(120).optional(),
+	urgent: z
+		.union([z.boolean(), z.enum(["true", "false"])])
+		.transform((value) => value === true || value === "true")
+		.optional(),
+});
+export type FeedFilterQuery = z.infer<typeof feedFilterSchema>;
+
+export const forYouFeedQuerySchema = paginationQuerySchema.extend(
+	feedFilterSchema.shape,
+);
 export type ForYouFeedQuery = z.infer<typeof forYouFeedQuerySchema>;
 
-export const trendingFeedQuerySchema = paginationQuerySchema;
+export const trendingFeedQuerySchema = paginationQuerySchema.extend(
+	feedFilterSchema.shape,
+);
 export type TrendingFeedQuery = z.infer<typeof trendingFeedQuerySchema>;
 
-export const followingFeedQuerySchema = paginationQuerySchema;
+export const followingFeedQuerySchema = paginationQuerySchema.extend(
+	feedFilterSchema.shape,
+);
 export type FollowingFeedQuery = z.infer<typeof followingFeedQuerySchema>;
 
 export const feedQuerySchema = paginationQuerySchema;
 export type FeedQuery = z.infer<typeof feedQuerySchema>;
+
+// ─── Client vocabulary ───────────────────────────────────────────────────────
+
+/** The lenses the volunteer home offers; `urgent` is For You + the urgent filter. */
+export const feedTabSchema = z.enum([
+	"for_you",
+	"following",
+	"trending",
+	"urgent",
+]);
+export type FeedTab = z.infer<typeof feedTabSchema>;
+export const FEED_TAB_LABELS: Record<FeedTab, string> = {
+	for_you: "For you",
+	following: "Following",
+	trending: "Trending",
+	urgent: "Urgent",
+};
 
 // Backward-compatible type/schema aliases during API migration.
 export const feedItemTypeSchema = postTagSchema;

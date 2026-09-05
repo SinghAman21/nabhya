@@ -50,7 +50,15 @@ export function formatDateRange(
 		: `${DATE_TIME.format(from)} → ${DATE_TIME.format(to)}`;
 }
 
-/** Compact "in 3 days" / "2 hours ago" label for feed cards. */
+/**
+ * Compact "in 3 days" / "2 hours ago" label for feed cards.
+ *
+ * Written out by hand rather than with `Intl.RelativeTimeFormat`: Hermes ships
+ * only part of Intl (DateTimeFormat, NumberFormat, Collator), so on device that
+ * constructor is `undefined` and calling it threw "undefined cannot be used as
+ * a constructor" — on the volunteer feed, which is the first screen after
+ * login. It works in a browser, so the web dashboards never showed it.
+ */
 export function formatRelative(
 	value: string | Date | null | undefined,
 ): string {
@@ -63,19 +71,29 @@ export function formatRelative(
 	const hour = 60 * minute;
 	const day = 24 * hour;
 
-	const units: Array<[number, "day" | "hour" | "minute"]> = [
+	const units: Array<[number, string]> = [
 		[day, "day"],
 		[hour, "hour"],
 		[minute, "minute"],
 	];
 
 	for (const [ms, unit] of units) {
-		if (absMs >= ms) {
-			const amount = Math.round(absMs / ms);
-			const label = amount === 1 ? unit : `${unit}s`;
-			return diffMs < 0 ? `${amount} ${label} ago` : `in ${amount} ${label}`;
+		if (absMs < ms) continue;
+
+		const amount = Math.round(diffMs / ms);
+		const magnitude = Math.abs(amount);
+
+		// The named days Intl's `numeric: "auto"` would have produced.
+		if (unit === "day" && magnitude === 1) {
+			return amount < 0 ? "yesterday" : "tomorrow";
 		}
+
+		const plural = magnitude === 1 ? unit : `${unit}s`;
+		return amount < 0
+			? `${magnitude} ${plural} ago`
+			: `in ${magnitude} ${plural}`;
 	}
+
 	return "just now";
 }
 

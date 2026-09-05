@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
-import { ScrollView, useWindowDimensions, View } from "react-native";
-import { Body, Caption, H1 } from "@/components/ui/typography";
+import {
+	KeyboardAvoidingView,
+	Platform,
+	ScrollView,
+	useWindowDimensions,
+	View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Body, Caption, H1, Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 
 const BREAKPOINT = 768;
@@ -11,13 +18,36 @@ interface AuthSplitLayoutProps {
 	alternateLink: ReactNode;
 }
 
+/**
+ * The frame around sign-in and sign-up.
+ *
+ * Desktop: a dark brand panel on the left, the form centred on the right.
+ * Phone: a short dark brand bar under the status bar, then the form in a scroll
+ * view that keeps clear of the keyboard. The brand panel speaks to both kinds
+ * of account — a volunteer and an NGO land on the same door.
+ */
 export function AuthSplitLayout({
 	children,
 	alternateLink,
 }: AuthSplitLayoutProps) {
 	const { width } = useWindowDimensions();
+	const insets = useSafeAreaInsets();
 	const { colors, spacing } = useTheme();
 	const isWide = width >= BREAKPOINT;
+
+	const alternate = alternateLink && (
+		<View
+			style={{
+				borderTopWidth: 1,
+				borderTopColor: colors.border.hairline,
+				marginTop: spacing[6],
+				paddingTop: spacing[5],
+				alignItems: "center",
+			}}
+		>
+			{alternateLink}
+		</View>
+	);
 
 	if (isWide) {
 		return (
@@ -30,21 +60,15 @@ export function AuthSplitLayout({
 						padding: spacing[16],
 					}}
 				>
-					<View
-						style={{
-							flexDirection: "row",
-							alignItems: "center",
-							gap: spacing[3],
-							marginBottom: spacing[4],
-						}}
+					<H1 color="#FFFFFF" style={{ letterSpacing: 3 }}>
+						NABHYA
+					</H1>
+					<Body
+						color="#A3A3A3"
+						style={{ maxWidth: 360, marginTop: spacing[4] }}
 					>
-						<H1 color="#FFFFFF" style={{ letterSpacing: 3 }}>
-							NABHYA
-						</H1>
-					</View>
-					<Body color="#A3A3A3" style={{ maxWidth: 320 }}>
-						Your organization's hub for impact. Manage volunteers, track
-						donations, and coordinate relief - all in one place.
+						Verified NGOs and the volunteers who show up for them. Find what's
+						needed near you, help at events, give with confidence.
 					</Body>
 
 					<View
@@ -55,15 +79,15 @@ export function AuthSplitLayout({
 						}}
 					/>
 
-					<Caption color="#555555" style={{ marginTop: spacing[4] }}>
-						Built for NGOs • by NeGrOs
+					<Caption color="#8F8F8F" style={{ marginTop: spacing[4] }}>
+						For volunteers and NGOs across India
 					</Caption>
 				</View>
 
 				<View
 					style={{
 						flex: 1,
-						backgroundColor: colors.background.primary,
+						backgroundColor: colors.background.warm,
 						justifyContent: "center",
 						alignItems: "center",
 						padding: spacing[12],
@@ -71,19 +95,7 @@ export function AuthSplitLayout({
 				>
 					<View style={{ width: "100%", maxWidth: 400 }}>
 						{children}
-						{alternateLink && (
-							<View
-								style={{
-									borderTopWidth: 1,
-									borderTopColor: colors.border.light,
-									marginTop: spacing[6],
-									paddingTop: spacing[5],
-									alignItems: "center",
-								}}
-							>
-								{alternateLink}
-							</View>
-						)}
+						{alternate}
 					</View>
 				</View>
 			</View>
@@ -91,13 +103,13 @@ export function AuthSplitLayout({
 	}
 
 	return (
-		<View style={{ flex: 1, backgroundColor: colors.background.primary }}>
+		<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
 			<View
 				style={{
 					backgroundColor: BRAND_BG,
 					paddingHorizontal: spacing[5],
-					paddingTop: spacing[10],
-					paddingBottom: spacing[5],
+					paddingTop: insets.top + spacing[3],
+					paddingBottom: spacing[4],
 				}}
 			>
 				<View
@@ -114,39 +126,41 @@ export function AuthSplitLayout({
 							backgroundColor: colors.primary.main,
 						}}
 					/>
-					<Body
-						weight="bold"
-						color="#FFFFFF"
-						style={{ letterSpacing: 2, fontSize: 14 }}
-					>
+					<Label weight="bold" color="#FFFFFF" style={{ letterSpacing: 2 }}>
 						NABHYA
-					</Body>
+					</Label>
 				</View>
 			</View>
 
-			<ScrollView
-				contentContainerStyle={{
-					flexGrow: 1,
-					justifyContent: "center",
-					padding: spacing[6],
-				}}
-				keyboardShouldPersistTaps="handled"
+			{/*
+			 * Scrollable, not a centred flex box: on a short phone the keyboard
+			 * covered the password field and the submit button with no way to
+			 * reach them. `flexGrow` keeps the form optically centred while
+			 * there is room, and `automaticallyAdjustKeyboardInsets` insets the
+			 * scroll view by the keyboard on iOS (Android resizes the window
+			 * instead — see android.softwareKeyboardLayoutMode in app.json).
+			 */}
+			<KeyboardAvoidingView
+				style={{ flex: 1 }}
+				behavior={Platform.OS === "ios" ? "padding" : undefined}
 			>
-				{children}
-				{alternateLink && (
-					<View
-						style={{
-							borderTopWidth: 1,
-							borderTopColor: colors.border.light,
-							marginTop: spacing[6],
-							paddingTop: spacing[5],
-							alignItems: "center",
-						}}
-					>
-						{alternateLink}
-					</View>
-				)}
-			</ScrollView>
+				<ScrollView
+					style={{ flex: 1 }}
+					contentContainerStyle={{
+						flexGrow: 1,
+						paddingHorizontal: spacing[5],
+						paddingTop: spacing[8],
+						paddingBottom: insets.bottom + spacing[6],
+						justifyContent: "center",
+					}}
+					keyboardShouldPersistTaps="handled"
+					automaticallyAdjustKeyboardInsets
+					showsVerticalScrollIndicator={false}
+				>
+					{children}
+					{alternate}
+				</ScrollView>
+			</KeyboardAvoidingView>
 		</View>
 	);
 }

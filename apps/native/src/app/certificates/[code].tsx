@@ -1,7 +1,13 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, BadgeCheck, ShieldX } from "lucide-react-native";
-import { Pressable, ScrollView, View } from "react-native";
-import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
+import { useLocalSearchParams } from "expo-router";
+import { BadgeCheck, ShieldX } from "lucide-react-native";
+import { ScrollView, View } from "react-native";
+import {
+	ErrorState,
+	LoadingState,
+	Screen,
+	ScreenHeader,
+	Surface,
+} from "@/components/screen-shell";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useVerifyCertificate } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
@@ -12,44 +18,35 @@ import { formatDate } from "@/lib/format";
  * Public certificate verification.
  *
  * Deliberately reachable without an account — a certificate is only worth
- * something if the person being shown it can check it independently.
+ * something if the person being shown it can check it independently. The
+ * verdict comes first and unmissable; the facts follow.
  */
 export default function VerifyCertificate() {
 	const { code } = useLocalSearchParams<{ code: string }>();
 	const { colors, spacing } = useTheme();
-	const router = useRouter();
 
 	const query = useVerifyCertificate(code);
 	const certificate = query.data;
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
-			<Pressable
-				onPress={() => router.back()}
-				hitSlop={12}
-				style={{ marginBottom: spacing[4] }}
-			>
-				<ArrowLeft size={22} color={colors.text.secondary as string} />
-			</Pressable>
+		<Screen>
+			<ScreenHeader back title="Verify certificate" />
 
 			{query.isLoading ? (
-				<LoadingState label="Checking…" />
+				<LoadingState label="Checking the code" />
 			) : query.isError || !certificate ? (
 				<ErrorState
 					message={apiErrorMessage(
 						query.error,
-						"No certificate exists with that code.",
+						"No certificate exists with that code. Check it for typos and try again.",
 					)}
+					onRetry={() => query.refetch()}
 				/>
 			) : (
-				<ScrollView showsVerticalScrollIndicator={false}>
+				<ScrollView
+					showsVerticalScrollIndicator={false}
+					contentContainerStyle={{ paddingBottom: spacing[10] }}
+				>
 					<View style={{ alignItems: "center", marginBottom: spacing[6] }}>
 						<View
 							style={{
@@ -65,43 +62,41 @@ export default function VerifyCertificate() {
 							}}
 						>
 							{certificate.valid ? (
-								<BadgeCheck size={30} color={colors.success.main as string} />
+								<BadgeCheck size={30} color={colors.success.ink} />
 							) : (
-								<ShieldX size={30} color={colors.error.main as string} />
+								<ShieldX size={30} color={colors.error.ink} />
 							)}
 						</View>
 						<H2
+							accessibilityRole="header"
 							style={{ textAlign: "center" }}
-							color={
-								certificate.valid
-									? (colors.success.main as string)
-									: (colors.error.main as string)
-							}
+							color={certificate.valid ? colors.success.ink : colors.error.ink}
 						>
-							{certificate.valid ? "Valid certificate" : "Revoked"}
+							{certificate.valid ? "Valid certificate" : "Revoked certificate"}
 						</H2>
-						{certificate.revoked && certificate.revokedReason && (
-							<Caption
-								color="secondary"
-								style={{ textAlign: "center", marginTop: spacing[2] }}
-							>
-								{certificate.revokedReason}
-							</Caption>
-						)}
+						<Caption
+							color="tertiary"
+							style={{ textAlign: "center", marginTop: spacing[1] }}
+						>
+							{certificate.valid
+								? "Issued by a verified NGO on Nabhya."
+								: certificate.revokedReason ||
+									"This certificate has been withdrawn by the NGO that issued it."}
+						</Caption>
 					</View>
 
-					<Surface>
+					<Surface padded={false}>
 						<Row label="Volunteer" value={certificate.volunteerName ?? "—"} />
-						<Row label="Organization" value={certificate.organizationName} />
+						<Row label="Organisation" value={certificate.organizationName} />
 						<Row label="Event" value={certificate.eventTitle} />
 						<Row label="Event date" value={formatDate(certificate.eventDate)} />
-						<Row label="Issued" value={formatDate(certificate.issuedAt)} />
-						<Row label="Certificate ID" value={certificate.code} last />
+						<Row label="Issued on" value={formatDate(certificate.issuedAt)} />
+						<Row label="Certificate code" value={certificate.code} last />
 					</Surface>
 
 					{certificate.note && (
 						<Surface style={{ marginTop: spacing[3] }}>
-							<Caption color="tertiary">Note from the organization</Caption>
+							<Caption color="tertiary">Note from the organisation</Caption>
 							<Body color="secondary" style={{ marginTop: spacing[1] }}>
 								{certificate.note}
 							</Body>
@@ -109,7 +104,7 @@ export default function VerifyCertificate() {
 					)}
 				</ScrollView>
 			)}
-		</View>
+		</Screen>
 	);
 }
 
@@ -129,20 +124,20 @@ function Row({
 				flexDirection: "row",
 				justifyContent: "space-between",
 				gap: spacing[4],
-				paddingBottom: last ? 0 : spacing[2.5],
-				marginBottom: last ? 0 : spacing[2.5],
+				paddingHorizontal: spacing[4],
+				paddingVertical: spacing[3],
 				borderBottomWidth: last ? 0 : 1,
-				borderBottomColor: colors.border.light,
+				borderBottomColor: colors.border.hairline,
 			}}
 		>
 			<Caption color="tertiary">{label}</Caption>
-			<Caption
+			<Body
 				weight="medium"
 				style={{ flex: 1, textAlign: "right" }}
 				numberOfLines={2}
 			>
 				{value}
-			</Caption>
+			</Body>
 		</View>
 	);
 }

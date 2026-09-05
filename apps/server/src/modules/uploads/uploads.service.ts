@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { db as dbType } from "@nabhya/db";
 import { organizations } from "@nabhya/db/schema";
-import type { CreateFeedMediaIntentsInput, UploadIntentInput } from "@nabhya/shared";
+import type {
+	CreateFeedMediaIntentsInput,
+	UploadIntentInput,
+} from "@nabhya/shared";
 import {
 	BadRequestException,
 	ForbiddenException,
@@ -92,10 +95,11 @@ export class UploadsService {
 		const mediaFolder = this.createEmptyFeedMediaFolder();
 		const tickets = await Promise.all(
 			files.map(async (file) => {
-				const safeName = file.fileName
-					.toLowerCase()
-					.replace(/[^a-z0-9._-]+/g, "-")
-					.slice(-80) || "file";
+				const safeName =
+					file.fileName
+						.toLowerCase()
+						.replace(/[^a-z0-9._-]+/g, "-")
+						.slice(-80) || "file";
 				const key = `feed-media/${user.id}/${mediaFolder}/${randomUUID()}-${safeName}`;
 				return this.storage.createUploadTicket({
 					key,

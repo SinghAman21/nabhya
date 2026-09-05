@@ -1,62 +1,82 @@
 import { useRouter } from "expo-router";
-import type { LucideIcon } from "lucide-react-native";
-import {
-	Building2,
-	CalendarDays,
-	FileCheck,
-	HeartHandshake,
-	Megaphone,
-	Users,
-} from "lucide-react-native";
+import { LogOut, Megaphone } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { RefreshControl, ScrollView, View } from "react-native";
+import { AuditRow } from "@/components/admin/audit-row";
 import { BroadcastSheet } from "@/components/admin/broadcast-sheet";
+import { AdminScreen } from "@/components/admin/list-chrome";
+import { AppearanceRow } from "@/components/appearance-row";
 import {
 	ErrorState,
+	ListGroup,
+	ListRow,
 	LoadingState,
+	MetricRow,
 	ScreenHeader,
+	SectionTitle,
 	Surface,
 } from "@/components/screen-shell";
-import { Body, Caption, H3 } from "@/components/ui/typography";
-import { useAdminOverview } from "@/hooks/use-admin";
+import { Pressable } from "@/components/ui/pressable";
+import { Body, Caption, Label } from "@/components/ui/typography";
+import { useAdminOverview, useAuditLogs } from "@/hooks/use-admin";
+import { useSignOut } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
+import { focusable } from "@/lib/focus";
+import { useAuthStore } from "@/store/auth-store";
 
+/**
+ * The superadmin's front page, in the order the job goes:
+ *
+ * 1. What is waiting on me — three queues with counts, each a tap from the
+ *    list that clears it.
+ * 2. How big is the platform — numerals, quiet, no colour unless the number
+ *    is itself a decision.
+ * 3. What just happened — the last few audit entries, with a way to the log.
+ * 4. Me — appearance and sign out, at the end where settings live.
+ */
 export default function AdminOverviewScreen() {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
 	const [broadcasting, setBroadcasting] = useState(false);
+
 	const query = useAdminOverview();
+	const recent = useAuditLogs({ limit: 5 });
+	const signOut = useSignOut();
+	const user = useAuthStore((s) => s.user);
 
 	const overview = query.data;
 
-	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
+	const broadcastButton = (
+		<Pressable
+			onPress={() => setBroadcasting(true)}
+			accessibilityRole="button"
+			accessibilityLabel="Send a broadcast"
+			hitSlop={6}
+			{...focusable}
+			style={({ pressed }) => ({
+				width: 40,
+				height: 40,
+				borderRadius: 999,
+				alignItems: "center",
+				justifyContent: "center",
+				backgroundColor: pressed ? colors.primary.dark : colors.primary.main,
+			})}
 		>
+			<Megaphone
+				size={18}
+				color={colors.primary.contrast as string}
+				strokeWidth={2}
+			/>
+		</Pressable>
+	);
+
+	return (
+		<AdminScreen>
 			<ScreenHeader
 				title="Overview"
-				subtitle="Everything happening across the platform."
-				action={
-					<Pressable
-						onPress={() => setBroadcasting(true)}
-						style={{
-							width: 44,
-							height: 44,
-							borderRadius: 22,
-							alignItems: "center",
-							justifyContent: "center",
-							backgroundColor: colors.primary.main,
-						}}
-					>
-						<Megaphone size={20} color={colors.primary.contrast as string} />
-					</Pressable>
-				}
+				subtitle="Superadmin console"
+				action={broadcastButton}
 			/>
 
 			{query.isLoading ? (
@@ -73,128 +93,162 @@ export default function AdminOverviewScreen() {
 					refreshControl={
 						<RefreshControl
 							refreshing={query.isRefetching}
-							onRefresh={() => query.refetch()}
-							tintColor={colors.primary.main as string}
+							onRefresh={() => {
+								query.refetch();
+								recent.refetch();
+							}}
+							tintColor={colors.text.quaternary as string}
 						/>
 					}
 				>
-					{/* Anything needing a human decision goes first. */}
-					<ActionQueue
-						items={[
-							{
-								label: "NGOs awaiting verification",
-								count:
+					{/* 1. Needs review ------------------------------------------------ */}
+					<View style={{ marginBottom: spacing[6] }}>
+						<SectionTitle>Needs review</SectionTitle>
+						<ListGroup>
+							<ReviewRow
+								label="NGOs awaiting verification"
+								hint="Pending and under review"
+								count={
 									overview.organizations.pending +
-									overview.organizations.underReview,
-								onPress: () => router.push("/(admin)/organizations"),
-							},
-							{
-								label: "Organization documents to review",
-								count: overview.documents.pendingOrgDocuments,
-								onPress: () => router.push("/(admin)/organizations"),
-							},
-							{
-								label: "Identity documents to review",
-								count: overview.documents.pendingUserDocuments,
-								onPress: () => router.push("/(admin)/volunteers"),
-							},
-						]}
-					/>
+									overview.organizations.underReview
+								}
+								onPress={() => router.push("/(admin)/organizations")}
+							/>
+							<ReviewRow
+								label="NGO documents"
+								hint="Registration, PAN, 12A and 80G"
+								count={overview.documents.pendingOrgDocuments}
+								onPress={() =>
+									router.push({
+										pathname: "/(admin)/queue",
+										params: { kind: "organization" },
+									})
+								}
+							/>
+							<ReviewRow
+								label="Identity documents"
+								hint="Volunteer IDs and liveness selfies"
+								count={overview.documents.pendingUserDocuments}
+								onPress={() =>
+									router.push({
+										pathname: "/(admin)/queue",
+										params: { kind: "user" },
+									})
+								}
+							/>
+						</ListGroup>
+					</View>
 
-					<Section title="Organizations" icon={Building2}>
-						<StatGrid
+					{/* 2. The platform in numbers --------------------------------------- */}
+					<View style={{ marginBottom: spacing[6] }}>
+						<SectionTitle>Organizations</SectionTitle>
+						<MetricRow
 							stats={[
 								{ label: "Total", value: overview.organizations.total },
-								{
-									label: "Verified",
-									value: overview.organizations.verified,
-									tone: "success",
-								},
+								{ label: "Verified", value: overview.organizations.verified },
 								{
 									label: "Pending",
 									value: overview.organizations.pending,
-									tone: "warning",
+									...(overview.organizations.pending > 0
+										? { tone: "warning" as const }
+										: {}),
 								},
-								{
-									label: "Under review",
-									value: overview.organizations.underReview,
-									tone: "info",
-								},
-								{
-									label: "Rejected",
-									value: overview.organizations.rejected,
-									tone: "error",
-								},
-								{
-									label: "Suspended",
-									value: overview.organizations.suspended,
-									tone: "error",
-								},
+								{ label: "Suspended", value: overview.organizations.suspended },
 							]}
 						/>
-					</Section>
+					</View>
 
-					<Section title="People" icon={Users}>
-						<StatGrid
+					<View style={{ marginBottom: spacing[6] }}>
+						<SectionTitle>People</SectionTitle>
+						<MetricRow
 							stats={[
-								{ label: "Total users", value: overview.users.total },
+								{ label: "Accounts", value: overview.users.total },
 								{ label: "Volunteers", value: overview.users.volunteers },
 								{ label: "NGO accounts", value: overview.users.organisations },
-								{
-									label: "Suspended",
-									value: overview.users.suspended,
-									tone: "error",
-								},
+								{ label: "Suspended", value: overview.users.suspended },
 							]}
 						/>
-					</Section>
+					</View>
 
-					<Section title="Events" icon={CalendarDays}>
-						<StatGrid
+					<View style={{ marginBottom: spacing[6] }}>
+						<SectionTitle>Activity</SectionTitle>
+						<MetricRow
 							stats={[
-								{ label: "Total", value: overview.events.total },
+								{ label: "Events", value: overview.events.total },
+								{ label: "Upcoming", value: overview.events.upcoming },
+								{ label: "Open needs", value: overview.needs.open },
 								{
-									label: "Published",
-									value: overview.events.published,
-									tone: "success",
-								},
-								{
-									label: "Upcoming",
-									value: overview.events.upcoming,
-									tone: "info",
-								},
-							]}
-						/>
-					</Section>
-
-					<Section title="Applications" icon={FileCheck}>
-						<StatGrid
-							stats={[
-								{ label: "Total", value: overview.applications.total },
-								{
-									label: "Pending",
+									label: "Applications pending",
 									value: overview.applications.pending,
-									tone: "warning",
-								},
-								{
-									label: "Accepted",
-									value: overview.applications.accepted,
-									tone: "success",
 								},
 							]}
 						/>
-					</Section>
+					</View>
 
-					<Section title="Needs & offers" icon={HeartHandshake}>
-						<StatGrid
-							stats={[
-								{ label: "Open", value: overview.needs.open, tone: "success" },
-								{ label: "Requests", value: overview.needs.wants },
-								{ label: "Giveaways", value: overview.needs.offers },
-								{ label: "Total", value: overview.needs.total },
-							]}
-						/>
-					</Section>
+					{/* 3. What just happened -------------------------------------------- */}
+					<View style={{ marginBottom: spacing[6] }}>
+						<SectionTitle
+							action={
+								<Pressable
+									onPress={() => router.push("/(admin)/audit")}
+									accessibilityRole="link"
+									accessibilityLabel="See all activity"
+									hitSlop={8}
+									{...focusable}
+								>
+									<Caption weight="medium" color={colors.primary.ink}>
+										See all
+									</Caption>
+								</Pressable>
+							}
+						>
+							Recent activity
+						</SectionTitle>
+						{recent.isLoading ? (
+							<Surface>
+								<LoadingState />
+							</Surface>
+						) : recent.isError ? (
+							<Surface>
+								<ErrorState
+									message={apiErrorMessage(recent.error)}
+									onRetry={() => recent.refetch()}
+								/>
+							</Surface>
+						) : (recent.data?.items.length ?? 0) === 0 ? (
+							<Surface>
+								<Caption color="tertiary">
+									Moderation and lifecycle actions appear here as they happen.
+								</Caption>
+							</Surface>
+						) : (
+							<ListGroup>
+								{(recent.data?.items ?? []).map((entry) => (
+									<AuditRow key={entry.id} entry={entry} />
+								))}
+							</ListGroup>
+						)}
+					</View>
+
+					{/* 4. Me --------------------------------------------------------------- */}
+					<View style={{ marginBottom: spacing[4] }}>
+						<SectionTitle>Account</SectionTitle>
+						<ListGroup>
+							<AppearanceRow />
+							<ListRow
+								icon={LogOut}
+								label="Sign out"
+								hint={user?.email ?? undefined}
+								value={<View />}
+								onPress={() => {
+									if (signOut.isPending) return;
+									signOut.mutate(undefined, {
+										onSettled: () => router.replace("/(auth)/login"),
+									});
+								}}
+							/>
+						</ListGroup>
+					</View>
 				</ScrollView>
 			)}
 
@@ -202,137 +256,59 @@ export default function AdminOverviewScreen() {
 				visible={broadcasting}
 				onClose={() => setBroadcasting(false)}
 			/>
-		</View>
+		</AdminScreen>
 	);
 }
 
-function ActionQueue({
-	items,
+/**
+ * A queue row. The count is the loudest thing on the line — in warning ink
+ * while anything is waiting, quiet when the queue is clear.
+ */
+function ReviewRow({
+	label,
+	hint,
+	count,
+	onPress,
 }: {
-	items: Array<{ label: string; count: number; onPress: () => void }>;
+	label: string;
+	hint: string;
+	count: number;
+	onPress: () => void;
 }) {
 	const { colors, spacing } = useTheme();
-	const pending = items.filter((item) => item.count > 0);
 
-	if (pending.length === 0) {
-		return (
-			<Surface style={{ marginBottom: spacing[6] }}>
-				<Body weight="bold" color={colors.success.main as string}>
-					Queue is clear
+	return (
+		<Pressable
+			onPress={onPress}
+			accessibilityRole="button"
+			accessibilityLabel={`${label}, ${count} waiting. ${hint}`}
+			{...focusable}
+			style={({ pressed }) => ({
+				flexDirection: "row",
+				alignItems: "center",
+				gap: spacing[3.5],
+				paddingHorizontal: spacing[4],
+				paddingVertical: spacing[3.5],
+				minHeight: 56,
+				backgroundColor: pressed ? colors.background.subtle : "transparent",
+			})}
+		>
+			<View style={{ flex: 1 }}>
+				<Body weight="medium" numberOfLines={1}>
+					{label}
 				</Body>
-				<Caption color="tertiary">
-					Nothing is waiting on a decision right now.
-				</Caption>
-			</Surface>
-		);
-	}
-
-	return (
-		<View style={{ marginBottom: spacing[6], gap: spacing[2] }}>
-			{pending.map((item) => (
-				<Pressable
-					key={item.label}
-					onPress={item.onPress}
-					style={({ pressed }) => ({
-						flexDirection: "row",
-						alignItems: "center",
-						justifyContent: "space-between",
-						gap: spacing[3],
-						backgroundColor: colors.warning.bg,
-						borderWidth: 1,
-						borderColor: pressed ? colors.warning.main : colors.warning.border,
-						borderRadius: 14,
-						padding: spacing[4],
-					})}
-				>
-					<Body
-						weight="medium"
-						color={colors.warning.dark as string}
-						style={{ flex: 1 }}
-					>
-						{item.label}
-					</Body>
-					<H3 color={colors.warning.dark as string}>{item.count}</H3>
-				</Pressable>
-			))}
-		</View>
-	);
-}
-
-function Section({
-	title,
-	icon: Icon,
-	children,
-}: {
-	title: string;
-	icon: LucideIcon;
-	children: React.ReactNode;
-}) {
-	const { colors, spacing } = useTheme();
-
-	return (
-		<View style={{ marginBottom: spacing[6] }}>
-			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[2],
-					marginBottom: spacing[3],
-				}}
-			>
-				<Icon size={16} color={colors.text.tertiary as string} />
-				<Caption
-					weight="bold"
-					color="tertiary"
-					style={{ letterSpacing: 1, textTransform: "uppercase" }}
-				>
-					{title}
+				<Caption color="tertiary" numberOfLines={1}>
+					{hint}
 				</Caption>
 			</View>
-			{children}
-		</View>
-	);
-}
-
-function StatGrid({
-	stats,
-}: {
-	stats: Array<{
-		label: string;
-		value: number;
-		tone?: "success" | "warning" | "error" | "info";
-	}>;
-}) {
-	const { colors, spacing } = useTheme();
-
-	const toneColor = (tone?: string) => {
-		switch (tone) {
-			case "success":
-				return colors.success.main;
-			case "warning":
-				return colors.warning.main;
-			case "error":
-				return colors.error.main;
-			case "info":
-				return colors.info.main;
-			default:
-				return colors.text.primary;
-		}
-	};
-
-	return (
-		<View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[2] }}>
-			{stats.map((stat) => (
-				<Surface
-					key={stat.label}
-					style={{ flexGrow: 1, flexBasis: "30%", minWidth: 96 }}
-				>
-					<H3 color={toneColor(stat.tone) as string}>{stat.value}</H3>
-					<Caption color="tertiary" numberOfLines={2}>
-						{stat.label}
-					</Caption>
-				</Surface>
-			))}
-		</View>
+			<Label
+				weight="bold"
+				color={
+					count > 0 ? colors.warning.ink : (colors.text.quaternary as string)
+				}
+			>
+				{count}
+			</Label>
+		</Pressable>
 	);
 }

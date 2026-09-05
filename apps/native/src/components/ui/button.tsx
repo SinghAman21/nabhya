@@ -1,6 +1,8 @@
-import { ActivityIndicator, Pressable, type ViewStyle } from "react-native";
-import { Body } from "@/components/ui/typography";
+import { ActivityIndicator, type ViewStyle } from "react-native";
+import { Pressable } from "@/components/ui/pressable";
+import { Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
+import { focusable } from "@/lib/focus";
 
 const variantStyles = {
 	default: {
@@ -29,21 +31,28 @@ const variantStyles = {
 	},
 	link: {
 		bg: "transparent" as string,
-		text: "primary.main" as string,
+		text: "primary.ink" as string,
 		bgActive: undefined as string | undefined,
 		border: undefined as string | undefined,
 	},
 } as const;
 
 const sizeStyles = {
-	default: { py: 3.5, px: 4, iconSize: 44 },
-	sm: { py: 2, px: 3, iconSize: 36 },
-	lg: { py: 5, px: 6, iconSize: 52 },
-	icon: { py: 0, px: 0, iconSize: 44 },
+	default: { py: 3, px: 5, iconSize: 44, minHeight: 48 },
+	sm: { py: 2, px: 3.5, iconSize: 36, minHeight: 38 },
+	lg: { py: 4, px: 6, iconSize: 52, minHeight: 56 },
+	icon: { py: 0, px: 0, iconSize: 44, minHeight: 44 },
 } as const;
 
 type Variant = keyof typeof variantStyles;
 type Size = keyof typeof sizeStyles;
+
+/** `pressed` is RN; `focused`/`hovered` are react-native-web additions. */
+type PressableState = {
+	pressed: boolean;
+	focused?: boolean;
+	hovered?: boolean;
+};
 
 interface ButtonProps
 	extends Omit<React.ComponentProps<typeof Pressable>, "style"> {
@@ -91,7 +100,16 @@ export function Button({
 	return (
 		<Pressable
 			disabled={disabled || loading}
-			style={({ pressed }) => {
+			accessibilityRole="button"
+			accessibilityState={{
+				disabled: !!disabled || !!loading,
+				busy: !!loading,
+			}}
+			{...focusable}
+			style={(state) => {
+				// react-native-web also reports `focused` and `hovered` here; native
+				// only ever sets `pressed`.
+				const { pressed, hovered } = state as PressableState;
 				const isIcon = size === "icon";
 				const base: ViewStyle = {
 					backgroundColor:
@@ -101,12 +119,19 @@ export function Button({
 					paddingVertical: spacing[s.py as keyof typeof spacing],
 					paddingHorizontal: spacing[s.px as keyof typeof spacing],
 					borderRadius: borderRadius.lg,
+					minHeight: s.minHeight,
 					alignItems: "center",
 					justifyContent: "center",
 					flexDirection: "row",
 					gap: spacing[2],
 					opacity: disabled || loading ? 0.5 : 1,
+					// Respond on press-down, not on release. A scale this small reads as
+					// the surface taking the touch rather than as an animation.
+					transform: [{ scale: pressed ? 0.98 : 1 }],
 				};
+				if (hovered && !pressed && v.bgActive) {
+					base.backgroundColor = resolveColor(colors, v.bgActive);
+				}
 				if (isIcon) {
 					base.width = s.iconSize;
 					base.height = s.iconSize;
@@ -122,12 +147,13 @@ export function Button({
 			{loading ? (
 				<ActivityIndicator size="small" color={resolveColor(colors, v.text)} />
 			) : (
-				<Body
+				<Label
 					color={resolveColor(colors, v.text)}
 					weight={variant === "link" ? "medium" : "bold"}
+					numberOfLines={1}
 				>
 					{children}
-				</Body>
+				</Label>
 			)}
 		</Pressable>
 	);

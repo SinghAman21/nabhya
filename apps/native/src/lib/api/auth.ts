@@ -1,3 +1,4 @@
+import "@/lib/crypto-polyfill";
 import { createClient } from "@supabase/supabase-js";
 import axios from "axios";
 import { AppState } from "react-native";
@@ -94,6 +95,29 @@ export class AuthService {
 	 */
 	async getAccessToken(): Promise<string | null> {
 		return storage.get("accessToken");
+	}
+
+	/**
+	 * Return a valid access token, refreshing it through Supabase when the
+	 * current one has expired. Access tokens are short-lived (an hour by
+	 * default) while the refresh token in storage is long-lived, so a 401 from
+	 * the API usually means "stale token", not "signed out".
+	 *
+	 * `getSession()` refreshes transparently when the stored token is past its
+	 * expiry, so this is one call in the common case and a null only when there
+	 * is genuinely no session left to recover.
+	 */
+	async refreshAccessToken(): Promise<string | null> {
+		try {
+			const { data, error } = await supabase.auth.getSession();
+			if (error) return null;
+			const accessToken = data.session?.access_token ?? null;
+			if (!accessToken) return null;
+			await storage.set("accessToken", accessToken);
+			return accessToken;
+		} catch {
+			return null;
+		}
 	}
 }
 

@@ -52,8 +52,7 @@ export class StubPaymentProvider implements PaymentProvider {
 				event.type === "payment.failed" || event.event === "payment.failed"
 					? "FAILED"
 					: "SUCCEEDED",
-			referenceId:
-				event.referenceId ?? entity?.notes?.referenceId ?? null,
+			referenceId: event.referenceId ?? entity?.notes?.referenceId ?? null,
 			providerPaymentId:
 				event.paymentId ?? entity?.id ?? `stub_${randomUUID()}`,
 			amountMinor: event.amountMinor ?? entity?.amount ?? null,

@@ -32,9 +32,7 @@ export interface PickedUpload {
  * caller can attach it to a record. The server re-verifies the object landed
  * before it trusts that key.
  */
-export function useFileUpload(
-	purpose: UploadPurpose,
-) {
+export function useFileUpload(purpose: UploadPurpose) {
 	const [isUploading, setUploading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 

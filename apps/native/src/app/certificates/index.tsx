@@ -1,33 +1,38 @@
 import { useRouter } from "expo-router";
-import { ArrowLeft, Award } from "lucide-react-native";
-import {
-	Alert,
-	FlatList,
-	Linking,
-	Pressable,
-	RefreshControl,
-	View,
-} from "react-native";
+import { Award } from "lucide-react-native";
+import { Linking, View } from "react-native";
+import { PAGE_SIZE, PagedList, usePagedQuery } from "@/components/paged-list";
 import {
 	EmptyState,
-	ErrorState,
-	LoadingState,
+	Screen,
+	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
 import { StatusPill } from "@/components/status-pill";
-import { Body, Caption, H2 } from "@/components/ui/typography";
-import { useCertificatePdf, useMyCertificates } from "@/hooks/use-engagement";
+import { Button } from "@/components/ui/button";
+import { Pressable } from "@/components/ui/pressable";
+import { Caption, H5 } from "@/components/ui/typography";
+import { useCertificatePdf } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
-import { apiErrorMessage } from "@/lib/api";
+import { Alert } from "@/lib/alert";
+import { apiErrorMessage, certificatesApi, queryKeys } from "@/lib/api";
+import { focusable } from "@/lib/focus";
 import { formatDate } from "@/lib/format";
 import type { MyCertificate } from "@/lib/types";
 
+/**
+ * Every certificate the volunteer has earned. Each card carries the event, the
+ * NGO, the public code (which is what an employer checks), and a PDF download.
+ */
 export default function Certificates() {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
-
-	const query = useMyCertificates();
 	const pdf = useCertificatePdf();
+
+	const { query, items, loadMore } = usePagedQuery({
+		queryKey: queryKeys.certificates({ limit: PAGE_SIZE }),
+		fetchPage: (page) => certificatesApi.listMine({ page, limit: PAGE_SIZE }),
+	});
 
 	const download = (certificate: MyCertificate) => {
 		pdf.mutate(certificate.id, {
@@ -42,57 +47,37 @@ export default function Certificates() {
 	};
 
 	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingHorizontal: spacing[6],
-				paddingTop: spacing[8],
-			}}
-		>
-			<Pressable
-				onPress={() => router.back()}
-				hitSlop={12}
-				style={{ marginBottom: spacing[4] }}
-			>
-				<ArrowLeft size={22} color={colors.text.secondary as string} />
-			</Pressable>
+		<Screen>
+			<ScreenHeader
+				back
+				title="Certificates"
+				subtitle="Each one can be checked by anyone using its code."
+			/>
 
-			<H2 style={{ marginBottom: spacing[1] }}>Certificates</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[5] }}>
-				Proof of the events you've volunteered at. Each one is independently
-				verifiable by its code.
-			</Body>
-
-			{query.isLoading ? (
-				<LoadingState />
-			) : query.isError ? (
-				<ErrorState
-					message={apiErrorMessage(query.error)}
-					onRetry={() => query.refetch()}
-				/>
-			) : (
-				<FlatList
-					data={query.data?.items ?? []}
-					keyExtractor={(item) => item.id}
-					showsVerticalScrollIndicator={false}
-					contentContainerStyle={{ paddingBottom: spacing[10] }}
-					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
-					refreshControl={
-						<RefreshControl
-							refreshing={query.isRefetching}
-							onRefresh={() => query.refetch()}
-							tintColor={colors.primary.main as string}
-						/>
-					}
-					ListEmptyComponent={
-						<EmptyState
-							icon={Award}
-							title="No certificates yet"
-							description="Once an NGO confirms you attended an event, your certificate appears here."
-						/>
-					}
-					renderItem={({ item }) => (
+			<PagedList
+				query={query}
+				items={items}
+				loadMore={loadMore}
+				keyExtractor={(item) => item.id}
+				empty={
+					<EmptyState
+						icon={Award}
+						title="No certificates yet"
+						description="Volunteer at an event and, once the NGO marks you present, your certificate appears here."
+						action={
+							<Button
+								size="sm"
+								variant="outline"
+								onPress={() => router.push("/events")}
+							>
+								Find an event
+							</Button>
+						}
+					/>
+				}
+				renderItem={(item) => {
+					const busy = pdf.isPending && pdf.variables === item.id;
+					return (
 						<Surface>
 							<View
 								style={{
@@ -100,22 +85,20 @@ export default function Certificates() {
 									alignItems: "center",
 									justifyContent: "space-between",
 									gap: spacing[2],
+									marginBottom: spacing[1],
 								}}
 							>
-								<Caption
-									color="secondary"
-									numberOfLines={1}
-									style={{ flex: 1 }}
-								>
+								<Caption color="tertiary" numberOfLines={1} style={{ flex: 1 }}>
 									{item.organization.organizationName}
 								</Caption>
-								{item.revokedAt && <StatusPill label="Revoked" tone="error" />}
+								<StatusPill
+									label={item.revokedAt ? "Revoked" : "Issued"}
+									tone={item.revokedAt ? "error" : "success"}
+								/>
 							</View>
 
-							<Body weight="bold" numberOfLines={2} style={{ marginTop: 2 }}>
-								{item.event.title}
-							</Body>
-							<Caption color="tertiary" style={{ marginTop: 4 }}>
+							<H5 numberOfLines={2}>{item.event.title}</H5>
+							<Caption color="tertiary" style={{ marginTop: spacing[0.5] }}>
 								{formatDate(item.event.startAt)}
 								{item.event.city ? ` · ${item.event.city}` : ""}
 							</Caption>
@@ -131,28 +114,38 @@ export default function Certificates() {
 									flexDirection: "row",
 									alignItems: "center",
 									justifyContent: "space-between",
+									gap: spacing[3],
 									marginTop: spacing[3],
 									paddingTop: spacing[3],
 									borderTopWidth: 1,
-									borderTopColor: colors.border.light,
+									borderTopColor: colors.border.hairline,
 								}}
 							>
-								<Caption color="quaternary">{item.code}</Caption>
+								<Pressable
+									onPress={() => router.push(`/certificates/${item.code}`)}
+									hitSlop={8}
+									accessibilityRole="button"
+									accessibilityLabel={`Verify certificate ${item.code}`}
+									{...focusable}
+								>
+									<Caption color="quaternary">Code {item.code}</Caption>
+								</Pressable>
 								{!item.revokedAt && (
-									<Pressable onPress={() => download(item)} hitSlop={8}>
-										<Caption
-											weight="medium"
-											color={colors.primary.main as string}
-										>
-											{pdf.isPending ? "Preparing…" : "Download PDF"}
-										</Caption>
-									</Pressable>
+									<Button
+										size="sm"
+										variant="outline"
+										onPress={() => download(item)}
+										loading={busy}
+										accessibilityLabel={`Download PDF for ${item.event.title}`}
+									>
+										Download PDF
+									</Button>
 								)}
 							</View>
 						</Surface>
-					)}
-				/>
-			)}
-		</View>
+					);
+				}}
+			/>
+		</Screen>
 	);
 }

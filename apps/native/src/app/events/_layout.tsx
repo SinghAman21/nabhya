@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { HEADERLESS } from "@/lib/navigation";
 
 /**
  * Public event routes — reachable without an account. The API backing these
@@ -6,7 +7,7 @@ import { Stack } from "expo-router";
  */
 export default function PublicEventsLayout() {
 	return (
-		<Stack screenOptions={{ headerShown: false }}>
+		<Stack screenOptions={HEADERLESS}>
 			<Stack.Screen name="index" />
 			<Stack.Screen name="[id]" />
 		</Stack>

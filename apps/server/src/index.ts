@@ -7,6 +7,8 @@ import { AppModule } from "./app/app.module";
 import { GlobalExceptionFilter } from "./common/filters";
 import { ResponseTransformInterceptor } from "./common/interceptors";
 
+type CorsCallback = (err: Error | null, allow?: boolean) => void;
+
 async function bootstrap() {
 	// rawBody is required by the payment webhook: its signature is computed over
 	// the exact bytes sent, so a re-serialised JSON body would never verify.
@@ -26,8 +28,29 @@ async function bootstrap() {
 	// them mid-transaction during a rolling deploy.
 	app.enableShutdownHooks();
 
+	// CORS_ORIGIN is documented as comma-separated, but passing the raw string
+	// through emits it verbatim as Access-Control-Allow-Origin — a header that
+	// may name at most one origin, so browsers reject it and every cross-origin
+	// request fails. Split it so cors() echoes back just the matching origin.
+	const allowedOrigins = env.CORS_ORIGIN.split(",")
+		.map((origin) => origin.trim())
+		.filter(Boolean);
+	const isDevelopment = env.NODE_ENV !== "production";
+	const LOCALHOST = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
 	app.enableCors({
-		origin: env.CORS_ORIGIN,
+		origin: (origin: string | undefined, callback: CorsCallback) => {
+			// Native apps, curl and server-to-server calls send no Origin header;
+			// CORS only governs browsers, so there is nothing to check.
+			if (!origin) return callback(null, true);
+			if (allowedOrigins.includes(origin)) return callback(null, true);
+			// Expo's dev server takes whatever port is free — 8081, then 8082,
+			// then 8083 — so pinning one in CORS_ORIGIN silently breaks the web
+			// client every time it moves. Any localhost port is fine in dev;
+			// production stays restricted to the configured list.
+			if (isDevelopment && LOCALHOST.test(origin)) return callback(null, true);
+			return callback(null, false);
+		},
 		methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 	});
 

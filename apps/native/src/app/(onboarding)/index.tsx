@@ -8,15 +8,27 @@ import {
 	step4TeamSchema,
 } from "@nabhya/shared";
 import { useRouter } from "expo-router";
+import { FileText, ShieldCheck } from "lucide-react-native";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ChoiceChips } from "@/components/choice-chips";
+import { Field, useFieldInputStyle } from "@/components/form-field";
+import {
+	ListGroup,
+	ListRow,
+	Screen,
+	SectionTitle,
+	Surface,
+} from "@/components/screen-shell";
 import { StepIndicator } from "@/components/step-indicator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Body, Caption, H2, Label } from "@/components/ui/typography";
+import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useCompleteOrgOnboarding } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -26,11 +38,24 @@ const ORG_TYPES = [
 	{ value: "trust", label: "Trust" },
 	{ value: "society", label: "Society" },
 	{ value: "section8", label: "Section 8" },
-	{ value: "others", label: "Others" },
+	{ value: "others", label: "Other" },
 ] as const;
 
+type OrgType = (typeof ORG_TYPES)[number]["value"];
+
+const ORG_TYPE_LABEL: Record<string, string> = Object.fromEntries(
+	ORG_TYPES.map((t) => [t.value, t.label]),
+);
+
+/**
+ * The NGO setup wizard. Five short steps with one primary action each; the
+ * step indicator at the top is the only progress UI. Values collect in the
+ * persisted auth store between steps and are written to the server once, on
+ * the final step, so a closed app resumes where it left off.
+ */
 export default function OnboardingFlow() {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
+	const insets = useSafeAreaInsets();
 	const [step, setStep] = useState(0);
 	const router = useRouter();
 	const mergeProfile = useAuthStore((s) => s.mergeProfile);
@@ -50,11 +75,7 @@ export default function OnboardingFlow() {
 			{
 				orgName: orgProfile.orgName,
 				phone: orgProfile.phone,
-				orgType: orgProfile.orgType as
-					| "trust"
-					| "society"
-					| "section8"
-					| "others",
+				orgType: orgProfile.orgType as OrgType,
 				registrationNumber: orgProfile.registrationNumber,
 				address: orgProfile.address,
 				city: orgProfile.city,
@@ -77,13 +98,21 @@ export default function OnboardingFlow() {
 	};
 
 	return (
-		<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
+		// StepIndicator owns its own gutters and top padding, so the screen only
+		// supplies the real safe-area inset.
+		<Screen style={{ paddingHorizontal: 0, paddingTop: insets.top }}>
 			<StepIndicator steps={STEPS} currentStep={step} />
 
 			<ScrollView
 				style={{ flex: 1 }}
-				contentContainerStyle={{ padding: spacing[6], paddingTop: spacing[2] }}
+				contentContainerStyle={{
+					paddingHorizontal: spacing[5],
+					paddingTop: spacing[2],
+					paddingBottom: spacing[10] + insets.bottom,
+				}}
 				keyboardShouldPersistTaps="handled"
+				automaticallyAdjustKeyboardInsets
+				showsVerticalScrollIndicator={false}
 			>
 				{step === 0 && (
 					<StepBasicInfo
@@ -91,9 +120,7 @@ export default function OnboardingFlow() {
 							orgName: orgProfile.orgName,
 							phone: orgProfile.phone,
 							registrationNumber: orgProfile.registrationNumber,
-							orgType:
-								(orgProfile.orgType as Step1BasicInfo["orgType"] | "") ||
-								("" as never),
+							orgType: orgProfile.orgType,
 						}}
 						onSubmit={(data) => {
 							mergeProfile(data);
@@ -109,13 +136,14 @@ export default function OnboardingFlow() {
 							state: orgProfile.state,
 							pincode: orgProfile.pincode,
 						}}
+						onBack={back}
 						onSubmit={(data) => {
 							mergeProfile(data);
 							next();
 						}}
 					/>
 				)}
-				{step === 2 && <StepDocuments />}
+				{step === 2 && <StepDocuments onBack={back} onContinue={next} />}
 				{step === 3 && (
 					<StepTeam
 						defaultValues={{
@@ -124,6 +152,7 @@ export default function OnboardingFlow() {
 							description: orgProfile.description,
 							website: orgProfile.website,
 						}}
+						onBack={back}
 						onSubmit={(data) => {
 							mergeProfile(data);
 							next();
@@ -133,6 +162,7 @@ export default function OnboardingFlow() {
 				{step === 4 && (
 					<StepReview
 						submitting={completeOnboarding.isPending}
+						onBack={back}
 						onComplete={submit}
 						// Skipping sends them to the public event feed, which needs no
 						// role. Routing into (volunteer) would bounce: the role is
@@ -142,50 +172,70 @@ export default function OnboardingFlow() {
 					/>
 				)}
 			</ScrollView>
+		</Screen>
+	);
+}
 
-			{step > 0 && step !== 2 && step !== 4 && (
-				<View
-					style={{
-						paddingHorizontal: spacing[6],
-						paddingBottom: spacing[8],
-					}}
-				>
-					<Button variant="ghost" onPress={back}>
-						Back
-					</Button>
-				</View>
-			)}
+/* -------------------------------------------------------------------------- */
+/* Shared step furniture                                                      */
+/* -------------------------------------------------------------------------- */
 
-			{step === 2 && (
-				<View
-					style={{
-						paddingHorizontal: spacing[6],
-						paddingBottom: spacing[8],
-					}}
-				>
-					<Body
-						color="secondary"
-						style={{ textAlign: "center", marginBottom: spacing[4] }}
-					>
-						You'll upload these from your profile after setup.
-					</Body>
-					<View style={{ flexDirection: "row", gap: spacing[3] }}>
-						<View style={{ flex: 1 }}>
-							<Button variant="ghost" onPress={back}>
-								Back
-							</Button>
-						</View>
-						<View style={{ flex: 1 }}>
-							<Button onPress={next}>Continue</Button>
-						</View>
-					</View>
-				</View>
-			)}
+function StepHeading({ title, lede }: { title: string; lede: string }) {
+	const { spacing } = useTheme();
+	return (
+		<View style={{ marginBottom: spacing[6] }}>
+			<H2 accessibilityRole="header" style={{ marginBottom: spacing[1] }}>
+				{title}
+			</H2>
+			<Body color="tertiary">{lede}</Body>
 		</View>
 	);
 }
 
-// ─── Step 1: Basic Info ──────────────────────────────────────────────
+/** Back on the left, the step's one primary action on the right. */
+function StepFooter({
+	onBack,
+	primaryLabel,
+	onPrimary,
+	loading,
+	disabled,
+}: {
+	onBack?: () => void;
+	primaryLabel: string;
+	onPrimary: () => void;
+	loading?: boolean;
+	disabled?: boolean;
+}) {
+	const { spacing } = useTheme();
+	return (
+		<View
+			style={{ flexDirection: "row", gap: spacing[3], marginTop: spacing[4] }}
+		>
+			{onBack && (
+				<Button
+					variant="outline"
+					onPress={onBack}
+					disabled={loading}
+					style={{ flexBasis: 108 }}
+				>
+					Back
+				</Button>
+			)}
+			<Button
+				onPress={onPrimary}
+				loading={loading}
+				disabled={disabled}
+				style={{ flex: 1 }}
+			>
+				{primaryLabel}
+			</Button>
+		</View>
+	);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Step 1: the organisation                                                   */
+/* -------------------------------------------------------------------------- */
 
 function StepBasicInfo({
 	defaultValues,
@@ -199,7 +249,7 @@ function StepBasicInfo({
 	};
 	onSubmit: (data: Step1BasicInfo) => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const inputStyle = useFieldInputStyle();
 	const form = useForm<Step1BasicInfo>({
 		// biome-ignore lint/suspicious/noExplicitAny: @hookform/resolvers v5 Zod v4 incompatibility
 		resolver: zodResolver(step1BasicInfoSchema as any),
@@ -207,140 +257,91 @@ function StepBasicInfo({
 			orgName: defaultValues.orgName,
 			phone: defaultValues.phone,
 			registrationNumber: defaultValues.registrationNumber,
-			orgType: defaultValues.orgType as Step1BasicInfo["orgType"],
+			orgType: (defaultValues.orgType ||
+				undefined) as Step1BasicInfo["orgType"],
 		},
 	});
-	const [selType, setSelType] = useState<string>(defaultValues.orgType || "");
-
-	const inputStyle = {
-		borderWidth: 0,
-		borderRadius: 12,
-		backgroundColor: colors.background.tertiary,
-		paddingVertical: spacing[3.5],
-	} as const;
+	const errors = form.formState.errors;
+	const orgType = form.watch("orgType");
 
 	return (
 		<View>
-			<H2 style={{ marginBottom: spacing[1] }}>Organization info</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
-				Tell us about your NGO.
-			</Body>
-
-			<Label style={{ marginBottom: spacing[1.5] }}>Organization name</Label>
-			<Input
-				placeholder="e.g. Helping Hands Foundation"
-				value={form.watch("orgName")}
-				onChangeText={(v) =>
-					form.setValue("orgName", v, { shouldValidate: true })
-				}
-				autoCapitalize="words"
-				style={inputStyle}
+			<StepHeading
+				title="Your organisation"
+				lede="The name and registration a reviewer will check against your certificate."
 			/>
-			{form.formState.errors.orgName?.message && (
-				<Caption
-					color={colors.error.main as string}
-					style={{ marginTop: spacing[1] }}
-				>
-					{form.formState.errors.orgName.message}
-				</Caption>
-			)}
 
-			<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-				Phone number
-			</Label>
-			<Input
-				placeholder="e.g. +91 98765 43210"
-				value={form.watch("phone")}
-				onChangeText={(v) =>
-					form.setValue("phone", v, { shouldValidate: true })
-				}
-				keyboardType="phone-pad"
-				style={inputStyle}
+			<Field label="Organisation name" error={errors.orgName?.message}>
+				<Input
+					placeholder="e.g. Helping Hands Foundation"
+					value={form.watch("orgName")}
+					onChangeText={(v) =>
+						form.setValue("orgName", v, { shouldValidate: true })
+					}
+					autoCapitalize="words"
+					style={inputStyle}
+				/>
+			</Field>
+
+			<Field label="Registered as" error={errors.orgType?.message}>
+				<ChoiceChips
+					label="Organisation type"
+					options={ORG_TYPES}
+					value={orgType}
+					onChange={(value) =>
+						form.setValue("orgType", value, { shouldValidate: true })
+					}
+				/>
+			</Field>
+
+			<Field
+				label="Registration number"
+				error={errors.registrationNumber?.message}
+				hint="As printed on your registration certificate."
+			>
+				<Input
+					placeholder="e.g. E-12345 (Mumbai)"
+					value={form.watch("registrationNumber")}
+					onChangeText={(v) =>
+						form.setValue("registrationNumber", v, { shouldValidate: true })
+					}
+					autoCapitalize="characters"
+					autoCorrect={false}
+					style={inputStyle}
+				/>
+			</Field>
+
+			<Field
+				label="Phone"
+				error={errors.phone?.message}
+				hint="Where volunteers and the review team can reach you."
+			>
+				<Input
+					placeholder="e.g. +91 98765 43210"
+					value={form.watch("phone")}
+					onChangeText={(v) =>
+						form.setValue("phone", v, { shouldValidate: true })
+					}
+					keyboardType="phone-pad"
+					style={inputStyle}
+				/>
+			</Field>
+
+			<StepFooter
+				primaryLabel="Continue"
+				onPrimary={form.handleSubmit(onSubmit)}
 			/>
-			{form.formState.errors.phone?.message && (
-				<Caption
-					color={colors.error.main as string}
-					style={{ marginTop: spacing[1] }}
-				>
-					{form.formState.errors.phone.message}
-				</Caption>
-			)}
-
-			<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-				Registration number
-			</Label>
-			<Input
-				placeholder="As printed on your registration certificate"
-				value={form.watch("registrationNumber")}
-				onChangeText={(v) =>
-					form.setValue("registrationNumber", v, { shouldValidate: true })
-				}
-				autoCapitalize="characters"
-				style={inputStyle}
-			/>
-			{form.formState.errors.registrationNumber?.message && (
-				<Caption
-					color={colors.error.main as string}
-					style={{ marginTop: spacing[1] }}
-				>
-					{form.formState.errors.registrationNumber.message}
-				</Caption>
-			)}
-
-			<Label style={{ marginTop: spacing[5], marginBottom: spacing[2] }}>
-				Organization type
-			</Label>
-			<View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[2] }}>
-				{ORG_TYPES.map((t) => {
-					const active = selType === t.value;
-					return (
-						<Pressable
-							key={t.value}
-							onPress={() => {
-								setSelType(t.value);
-								form.setValue("orgType", t.value, { shouldValidate: true });
-							}}
-							style={{
-								paddingHorizontal: spacing[4],
-								paddingVertical: spacing[2.5],
-								borderRadius: 12,
-								backgroundColor: active
-									? colors.primary.main
-									: colors.background.tertiary,
-							}}
-						>
-							<Body
-								weight={active ? "bold" : "normal"}
-								color={
-									active ? (colors.primary.contrast as string) : "secondary"
-								}
-							>
-								{t.label}
-							</Body>
-						</Pressable>
-					);
-				})}
-			</View>
-			{form.formState.errors.orgType?.message && (
-				<Caption
-					color={colors.error.main as string}
-					style={{ marginTop: spacing[1] }}
-				>
-					{form.formState.errors.orgType.message}
-				</Caption>
-			)}
-
-			<View style={{ height: spacing[8] }} />
-
-			<Button onPress={form.handleSubmit(onSubmit)}>Continue</Button>
 		</View>
 	);
 }
 
-// ─── Step 2: Address ─────────────────────────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* Step 2: address                                                            */
+/* -------------------------------------------------------------------------- */
 
 function StepAddress({
 	defaultValues,
+	onBack,
 	onSubmit,
 }: {
 	defaultValues: {
@@ -349,9 +350,12 @@ function StepAddress({
 		state: string;
 		pincode: string;
 	};
+	onBack: () => void;
 	onSubmit: (data: Step2Address) => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
+	const inputStyle = useFieldInputStyle();
+	const textAreaStyle = useFieldInputStyle(80);
 	const form = useForm<Step2Address>({
 		// biome-ignore lint/suspicious/noExplicitAny: @hookform/resolvers v5 Zod v4 incompatibility
 		resolver: zodResolver(step2AddressSchema as any),
@@ -362,45 +366,29 @@ function StepAddress({
 			pincode: defaultValues.pincode,
 		},
 	});
-
-	const inputStyle = {
-		borderWidth: 0,
-		borderRadius: 12,
-		backgroundColor: colors.background.tertiary,
-		paddingVertical: spacing[3.5],
-	} as const;
+	const errors = form.formState.errors;
 
 	return (
 		<View>
-			<H2 style={{ marginBottom: spacing[1] }}>Address & location</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
-				Where is your organization based?
-			</Body>
-
-			<Label style={{ marginBottom: spacing[1.5] }}>Full address</Label>
-			<Input
-				placeholder="Street, building, landmark"
-				value={form.watch("address")}
-				onChangeText={(v) =>
-					form.setValue("address", v, { shouldValidate: true })
-				}
-				multiline
-				style={{ ...inputStyle, minHeight: 80, textAlignVertical: "top" }}
+			<StepHeading
+				title="Where you're based"
+				lede="Volunteers see your city first; the full address stays with the review team."
 			/>
-			{form.formState.errors.address?.message && (
-				<Caption
-					color={colors.error.main as string}
-					style={{ marginTop: spacing[1] }}
-				>
-					{form.formState.errors.address.message}
-				</Caption>
-			)}
 
-			<View
-				style={{ flexDirection: "row", gap: spacing[3], marginTop: spacing[5] }}
-			>
-				<View style={{ flex: 1 }}>
-					<Label style={{ marginBottom: spacing[1.5] }}>City</Label>
+			<Field label="Full address" error={errors.address?.message}>
+				<Input
+					placeholder="Street, building, landmark"
+					value={form.watch("address")}
+					onChangeText={(v) =>
+						form.setValue("address", v, { shouldValidate: true })
+					}
+					multiline
+					style={textAreaStyle}
+				/>
+			</Field>
+
+			<View style={{ flexDirection: "row", gap: spacing[3] }}>
+				<Field label="City" error={errors.city?.message} style={{ flex: 1 }}>
 					<Input
 						placeholder="Mumbai"
 						value={form.watch("city")}
@@ -409,17 +397,8 @@ function StepAddress({
 						}
 						style={inputStyle}
 					/>
-					{form.formState.errors.city?.message && (
-						<Caption
-							color={colors.error.main as string}
-							style={{ marginTop: spacing[1] }}
-						>
-							{form.formState.errors.city.message}
-						</Caption>
-					)}
-				</View>
-				<View style={{ flex: 1 }}>
-					<Label style={{ marginBottom: spacing[1.5] }}>State</Label>
+				</Field>
+				<Field label="State" error={errors.state?.message} style={{ flex: 1 }}>
 					<Input
 						placeholder="Maharashtra"
 						value={form.watch("state")}
@@ -428,59 +407,49 @@ function StepAddress({
 						}
 						style={inputStyle}
 					/>
-					{form.formState.errors.state?.message && (
-						<Caption
-							color={colors.error.main as string}
-							style={{ marginTop: spacing[1] }}
-						>
-							{form.formState.errors.state.message}
-						</Caption>
-					)}
-				</View>
+				</Field>
 			</View>
 
-			<View style={{ marginTop: spacing[5] }}>
-				<Label style={{ marginBottom: spacing[1.5] }}>Pincode</Label>
+			<Field label="Pincode" error={errors.pincode?.message}>
 				<Input
 					placeholder="400001"
 					value={form.watch("pincode")}
 					onChangeText={(v) =>
-						form.setValue("pincode", v, { shouldValidate: true })
+						form.setValue("pincode", v.replace(/\D/g, ""), {
+							shouldValidate: true,
+						})
 					}
 					keyboardType="number-pad"
+					maxLength={10}
 					style={[inputStyle, { maxWidth: 160 }]}
 				/>
-				{form.formState.errors.pincode?.message && (
-					<Caption
-						color={colors.error.main as string}
-						style={{ marginTop: spacing[1] }}
-					>
-						{form.formState.errors.pincode.message}
-					</Caption>
-				)}
-			</View>
+			</Field>
 
-			<View style={{ height: spacing[8] }} />
-
-			<Button onPress={form.handleSubmit(onSubmit)}>Continue</Button>
+			<StepFooter
+				onBack={onBack}
+				primaryLabel="Continue"
+				onPrimary={form.handleSubmit(onSubmit)}
+			/>
 		</View>
 	);
 }
 
-// ─── Step 3: Documents ───────────────────────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* Step 3: documents (preview)                                                */
+/* -------------------------------------------------------------------------- */
 
 const DOCUMENTS = [
 	{
 		title: "Registration certificate",
-		hint: "Trust / Society / Section 8 registration document",
+		hint: "Required · Trust deed, society registration or Section 8 certificate",
 	},
 	{
 		title: "PAN card",
-		hint: "Organization PAN card for financial verification",
+		hint: "Required · The organisation's PAN, not a trustee's",
 	},
 	{
-		title: "80G / 12A certificate",
-		hint: "If you have them — they unlock tax-deductible donations",
+		title: "80G and 12A certificates",
+		hint: "Optional · Unlock tax-deductible donations and speed up review",
 	},
 ];
 
@@ -488,57 +457,71 @@ const DOCUMENTS = [
  * Preview of what verification will ask for.
  *
  * Uploads genuinely cannot happen here: documents are stored against the
- * organization, and the organization row is only created when this wizard is
- * submitted. The real upload UI lives on the Profile tab straight afterwards.
+ * organisation, and the organisation row is only created when this wizard is
+ * submitted. The real upload UI is the Verification screen straight afterwards.
  */
-function StepDocuments() {
-	const { colors, spacing, borderRadius } = useTheme();
+function StepDocuments({
+	onBack,
+	onContinue,
+}: {
+	onBack: () => void;
+	onContinue: () => void;
+}) {
+	const { colors, spacing } = useTheme();
 
 	return (
 		<View>
-			<H2 style={{ marginBottom: spacing[1] }}>Verification documents</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[6] }}>
-				Here's what we'll ask for. You'll upload these from your profile once
-				setup is finished.
-			</Body>
+			<StepHeading
+				title="Get ready to verify"
+				lede="Nothing to upload yet. Once setup finishes you'll add these from Verification, and a reviewer approves them within a few days."
+			/>
 
-			{DOCUMENTS.map((doc) => (
-				<View
-					key={doc.title}
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						gap: spacing[3],
-						borderWidth: 1,
-						borderColor: colors.border.light,
-						backgroundColor: colors.background.primary,
-						borderRadius: borderRadius.lg,
-						padding: spacing[4],
-						marginBottom: spacing[3],
-					}}
-				>
-					<View
-						style={{
-							width: 8,
-							height: 8,
-							borderRadius: 4,
-							backgroundColor: colors.border.dark,
-						}}
+			<ListGroup>
+				{DOCUMENTS.map((doc) => (
+					<ListRow
+						key={doc.title}
+						icon={FileText}
+						label={doc.title}
+						hint={doc.hint}
 					/>
-					<View style={{ flex: 1 }}>
-						<Body weight="medium">{doc.title}</Body>
-						<Caption color="tertiary">{doc.hint}</Caption>
-					</View>
-				</View>
-			))}
+				))}
+			</ListGroup>
+
+			<View
+				style={{
+					flexDirection: "row",
+					gap: spacing[3],
+					alignItems: "flex-start",
+					marginTop: spacing[5],
+				}}
+			>
+				<ShieldCheck
+					size={16}
+					color={colors.text.quaternary as string}
+					strokeWidth={2}
+				/>
+				<Caption color="tertiary" style={{ flex: 1 }}>
+					Until you're verified, events and needs you create stay private.
+					Documents are never shown publicly.
+				</Caption>
+			</View>
+
+			<StepFooter
+				onBack={onBack}
+				primaryLabel="Continue"
+				onPrimary={onContinue}
+			/>
 		</View>
 	);
 }
 
-// ─── Step 4: Team & Description ──────────────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* Step 4: team and background                                                */
+/* -------------------------------------------------------------------------- */
 
 function StepTeam({
 	defaultValues,
+	onBack,
 	onSubmit,
 }: {
 	defaultValues: {
@@ -547,9 +530,12 @@ function StepTeam({
 		description?: string;
 		website?: string;
 	};
+	onBack: () => void;
 	onSubmit: (data: Step4Team) => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
+	const inputStyle = useFieldInputStyle();
+	const textAreaStyle = useFieldInputStyle(96);
 	const form = useForm<Step4Team>({
 		// biome-ignore lint/suspicious/noExplicitAny: @hookform/resolvers v5 Zod v4 incompatibility
 		resolver: zodResolver(step4TeamSchema as any),
@@ -560,129 +546,110 @@ function StepTeam({
 			website: defaultValues.website ?? "",
 		},
 	});
-
-	const inputStyle = {
-		borderWidth: 0,
-		borderRadius: 12,
-		backgroundColor: colors.background.tertiary,
-		paddingVertical: spacing[3.5],
-	} as const;
+	const errors = form.formState.errors;
+	const teamSize = form.watch("teamSize");
+	const foundingYear = form.watch("foundingYear");
 
 	return (
 		<View>
-			<H2 style={{ marginBottom: spacing[1] }}>Team & background</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
-				Help others understand your organization better.
-			</Body>
+			<StepHeading
+				title="About your team"
+				lede="A little background helps volunteers trust you before they've met you."
+			/>
 
 			<View style={{ flexDirection: "row", gap: spacing[3] }}>
-				<View style={{ flex: 1 }}>
-					<Label style={{ marginBottom: spacing[1.5] }}>Team size</Label>
+				<Field
+					label="Team size"
+					error={errors.teamSize?.message}
+					style={{ flex: 1 }}
+				>
 					<Input
 						placeholder="e.g. 25"
-						value={form.watch("teamSize") ? String(form.watch("teamSize")) : ""}
+						value={teamSize ? String(teamSize) : ""}
 						onChangeText={(v) =>
-							form.setValue("teamSize", v ? Number(v) : 0, {
-								shouldValidate: true,
-							})
+							form.setValue(
+								"teamSize",
+								v.replace(/\D/g, "") ? Number(v.replace(/\D/g, "")) : 0,
+								{ shouldValidate: true },
+							)
 						}
 						keyboardType="number-pad"
 						style={inputStyle}
 					/>
-					{form.formState.errors.teamSize?.message && (
-						<Caption
-							color={colors.error.main as string}
-							style={{ marginTop: spacing[1] }}
-						>
-							{form.formState.errors.teamSize.message}
-						</Caption>
-					)}
-				</View>
-				<View style={{ flex: 1 }}>
-					<Label style={{ marginBottom: spacing[1.5] }}>Founding year</Label>
+				</Field>
+				<Field
+					label="Founded in"
+					error={errors.foundingYear?.message}
+					style={{ flex: 1 }}
+				>
 					<Input
 						placeholder="e.g. 2015"
-						value={
-							form.watch("foundingYear")
-								? String(form.watch("foundingYear"))
-								: ""
-						}
+						value={foundingYear ? String(foundingYear) : ""}
 						onChangeText={(v) =>
-							form.setValue("foundingYear", v ? Number(v) : 0, {
-								shouldValidate: true,
-							})
+							form.setValue(
+								"foundingYear",
+								v.replace(/\D/g, "") ? Number(v.replace(/\D/g, "")) : 0,
+								{ shouldValidate: true },
+							)
 						}
 						keyboardType="number-pad"
+						maxLength={4}
 						style={inputStyle}
 					/>
-					{form.formState.errors.foundingYear?.message && (
-						<Caption
-							color={colors.error.main as string}
-							style={{ marginTop: spacing[1] }}
-						>
-							{form.formState.errors.foundingYear.message}
-						</Caption>
-					)}
-				</View>
+				</Field>
 			</View>
 
-			<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-				Description <Caption color="tertiary">(optional)</Caption>
-			</Label>
-			<Input
-				placeholder="Tell us about your mission and impact"
-				value={form.watch("description")}
-				onChangeText={(v) =>
-					form.setValue("description", v, { shouldValidate: true })
-				}
-				multiline
-				style={{ ...inputStyle, minHeight: 96, textAlignVertical: "top" }}
+			<Field
+				label="What you do"
+				optional
+				error={errors.description?.message}
+				hint="One or two lines. You can write more later."
+			>
+				<Input
+					placeholder="e.g. We run evening classes for 300 children in Dharavi."
+					value={form.watch("description")}
+					onChangeText={(v) =>
+						form.setValue("description", v, { shouldValidate: true })
+					}
+					multiline
+					style={textAreaStyle}
+				/>
+			</Field>
+
+			<Field label="Website" optional error={errors.website?.message}>
+				<Input
+					placeholder="https://yourngo.org"
+					value={form.watch("website")}
+					onChangeText={(v) =>
+						form.setValue("website", v, { shouldValidate: true })
+					}
+					autoCapitalize="none"
+					autoCorrect={false}
+					keyboardType="url"
+					style={inputStyle}
+				/>
+			</Field>
+
+			<StepFooter
+				onBack={onBack}
+				primaryLabel="Continue"
+				onPrimary={form.handleSubmit(onSubmit)}
 			/>
-			{form.formState.errors.description?.message && (
-				<Caption
-					color={colors.error.main as string}
-					style={{ marginTop: spacing[1] }}
-				>
-					{form.formState.errors.description.message}
-				</Caption>
-			)}
-
-			<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-				Website <Caption color="tertiary">(optional)</Caption>
-			</Label>
-			<Input
-				placeholder="https://yourngo.org"
-				value={form.watch("website")}
-				onChangeText={(v) =>
-					form.setValue("website", v, { shouldValidate: true })
-				}
-				autoCapitalize="none"
-				keyboardType="url"
-				style={inputStyle}
-			/>
-			{form.formState.errors.website?.message && (
-				<Caption
-					color={colors.error.main as string}
-					style={{ marginTop: spacing[1] }}
-				>
-					{form.formState.errors.website.message}
-				</Caption>
-			)}
-
-			<View style={{ height: spacing[8] }} />
-
-			<Button onPress={form.handleSubmit(onSubmit)}>Continue</Button>
 		</View>
 	);
 }
 
-// ─── Step 5: Review ──────────────────────────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* Step 5: review                                                             */
+/* -------------------------------------------------------------------------- */
 
 function StepReview({
+	onBack,
 	onComplete,
 	onSkip,
 	submitting,
 }: {
+	onBack: () => void;
 	onComplete: () => void;
 	onSkip: () => void;
 	submitting: boolean;
@@ -692,127 +659,93 @@ function StepReview({
 
 	const sections = [
 		{
-			label: "Organization",
+			label: "Organisation",
 			rows: [
 				{ key: "Name", val: profile.orgName },
-				{ key: "Phone", val: profile.phone },
-				{ key: "Type", val: profile.orgType },
+				{
+					key: "Type",
+					val: ORG_TYPE_LABEL[profile.orgType] ?? profile.orgType,
+				},
 				{ key: "Registration no.", val: profile.registrationNumber },
+				{ key: "Phone", val: profile.phone },
 			],
 		},
 		{
 			label: "Address",
 			rows: [
 				{ key: "Address", val: profile.address },
-				{ key: "City", val: profile.city },
-				{ key: "State", val: profile.state },
+				{
+					key: "City",
+					val: [profile.city, profile.state].filter(Boolean).join(", "),
+				},
 				{ key: "Pincode", val: profile.pincode },
 			],
 		},
 		{
 			label: "Team",
 			rows: [
-				{ key: "Size", val: profile.teamSize ? String(profile.teamSize) : "—" },
+				{ key: "Size", val: profile.teamSize ? String(profile.teamSize) : "" },
 				{
 					key: "Founded",
-					val: profile.foundingYear ? String(profile.foundingYear) : "—",
+					val: profile.foundingYear ? String(profile.foundingYear) : "",
 				},
-				{ key: "Website", val: profile.website || "—" },
+				{ key: "Website", val: profile.website },
 			],
 		},
 	];
 
 	return (
 		<View>
-			<H2 style={{ marginBottom: spacing[1] }}>Review & finish</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
-				Review your details before we set up your account.
-			</Body>
+			<StepHeading
+				title="Check and finish"
+				lede="This creates your organisation. Everything here can be edited later from Profile."
+			/>
 
-			<View
-				style={{
-					backgroundColor: colors.background.primary,
-					borderRadius: 16,
-					borderWidth: 1,
-					borderColor: colors.border.light,
-					overflow: "hidden",
-					marginBottom: spacing[8],
-				}}
-			>
-				{sections.map((section, si) => (
-					<View key={section.label}>
-						{si > 0 && (
+			{sections.map((section) => (
+				<View key={section.label} style={{ marginBottom: spacing[5] }}>
+					<SectionTitle>{section.label}</SectionTitle>
+					<Surface>
+						{section.rows.map((row, index) => (
 							<View
+								key={row.key}
 								style={{
-									height: 1,
-									backgroundColor: colors.border.light,
-									marginHorizontal: spacing[5],
-								}}
-							/>
-						)}
-						<View style={{ padding: spacing[5] }}>
-							<Body
-								weight="bold"
-								color="secondary"
-								style={{
-									fontSize: 11,
-									letterSpacing: 1,
-									textTransform: "uppercase",
-									marginBottom: spacing[3],
+									flexDirection: "row",
+									justifyContent: "space-between",
+									gap: spacing[4],
+									paddingVertical: spacing[2],
+									borderTopWidth: index === 0 ? 0 : 1,
+									borderTopColor: colors.border.hairline,
 								}}
 							>
-								{section.label}
-							</Body>
-							{section.rows.map((row) => (
-								<View
-									key={row.key}
-									style={{
-										flexDirection: "row",
-										justifyContent: "space-between",
-										paddingVertical: spacing[1.5],
-									}}
+								<Caption color="tertiary">{row.key}</Caption>
+								<Caption
+									weight="medium"
+									color={row.val ? "primary" : "quaternary"}
+									style={{ flex: 1, textAlign: "right" }}
+									numberOfLines={2}
 								>
-									<Caption color="tertiary">{row.key}</Caption>
-									<Caption
-										weight="medium"
-										color={row.val && row.val !== "—" ? "primary" : "tertiary"}
-										style={{
-											flex: 1,
-											textAlign: "right",
-											marginLeft: spacing[4],
-										}}
-										numberOfLines={1}
-									>
-										{row.val || "—"}
-									</Caption>
-								</View>
-							))}
-						</View>
-					</View>
-				))}
-			</View>
+									{row.val || "Not given"}
+								</Caption>
+							</View>
+						))}
+					</Surface>
+				</View>
+			))}
 
-			<Body
-				color="secondary"
-				style={{ textAlign: "center", marginBottom: spacing[4] }}
-			>
-				You can{" "}
-				<Body weight="bold" color="secondary">
-					edit everything later
-				</Body>{" "}
-				from settings. Documents can be uploaded after verification.
-			</Body>
+			<StepFooter
+				onBack={onBack}
+				primaryLabel="Create organisation"
+				onPrimary={onComplete}
+				loading={submitting}
+			/>
 
 			<Button
-				onPress={onComplete}
-				loading={submitting}
-				style={{ marginBottom: spacing[3] }}
+				variant="ghost"
+				onPress={onSkip}
+				disabled={submitting}
+				style={{ marginTop: spacing[2] }}
 			>
-				Complete setup
-			</Button>
-
-			<Button variant="ghost" onPress={onSkip} disabled={submitting}>
-				Skip verification — browse first
+				Not now — browse events first
 			</Button>
 		</View>
 	);

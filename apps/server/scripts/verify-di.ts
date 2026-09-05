@@ -29,6 +29,10 @@ function walk(dir: string): string[] {
 		if (statSync(full).isDirectory()) return walk(full);
 		// Skip specs: they import vitest, which only exists inside the runner.
 		if (full.endsWith(".spec.ts") || full.endsWith(".test.ts")) return [];
+		// Skip the entrypoint: importing it runs bootstrap(), which binds port
+		// 3000 — so this script could only ever run with the dev server stopped,
+		// and left a real listening server behind when it did.
+		if (full === join(SRC, "index.ts")) return [];
 		return full.endsWith(".ts") ? [full] : [];
 	});
 }

@@ -7,9 +7,14 @@ export type PillTone = "neutral" | "success" | "warning" | "error" | "info";
 /**
  * Small status chip used across the org, volunteer and admin lists.
  *
- * Built from theme tokens rather than the Tailwind-based Badge because the
- * Tailwind config has no dark palette — a Badge would stay light-on-light in
- * dark mode, unlike every other surface in the app.
+ * Built from theme tokens rather than the Tailwind-based Badge so it follows
+ * `useTheme()` like every other surface in the app.
+ *
+ * The label is drawn in the tone's **ink**, not its `main` fill colour. Tinting
+ * `main` at 12% and then writing in `main` gave 2.07:1 (warning) to 3.44:1
+ * (error) — the verification state, which is the single most load-bearing piece
+ * of information in the product, was the hardest thing on the screen to read.
+ * Ink-on-tint measures 6.8:1 to 8.0:1 in light mode and 8.5:1 to 10.4:1 in dark.
  */
 export function StatusPill({
 	label,
@@ -18,29 +23,35 @@ export function StatusPill({
 	label: string;
 	tone?: PillTone;
 }) {
-	const { colors, spacing, withOpacity } = useTheme();
+	const { colors, spacing } = useTheme();
 
-	const palette = {
-		neutral: colors.text.tertiary,
-		success: colors.success.main,
-		warning: colors.warning.main,
-		error: colors.error.main,
-		info: colors.info.main,
-	} as const;
+	const palette: Record<PillTone, { ink: string; bg: string }> = {
+		neutral: {
+			ink: colors.text.secondary as string,
+			bg: colors.background.tertiary as string,
+		},
+		success: { ink: colors.success.ink, bg: colors.success.bg },
+		warning: { ink: colors.warning.ink, bg: colors.warning.bg },
+		error: { ink: colors.error.ink, bg: colors.error.bg },
+		info: { ink: colors.info.ink, bg: colors.info.bg },
+	};
 
-	const color = palette[tone] as string;
+	const { ink, bg } = palette[tone];
 
 	return (
 		<View
+			accessible
+			accessibilityRole="text"
+			accessibilityLabel={`Status: ${label}`}
 			style={{
 				alignSelf: "flex-start",
 				paddingHorizontal: spacing[2.5],
 				paddingVertical: spacing[1],
 				borderRadius: 999,
-				backgroundColor: withOpacity(color, 0.12),
+				backgroundColor: bg,
 			}}
 		>
-			<Caption weight="medium" color={color} style={{ fontSize: 11 }}>
+			<Caption weight="medium" color={ink} style={{ fontSize: 12 }}>
 				{label}
 			</Caption>
 		</View>
