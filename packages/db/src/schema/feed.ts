@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import {
+	decimal,
 	index,
 	integer,
 	pgEnum,
@@ -9,6 +10,7 @@ import {
 	uuid,
 	varchar,
 } from "drizzle-orm/pg-core";
+import { organizations } from "./organizations";
 import { users } from "./users";
 
 export const feedMediaTypeEnum = pgEnum("feed_media_type", ["IMAGE", "VIDEO"]);
@@ -21,12 +23,26 @@ export const feedPosts = pgTable(
 		authorUserId: uuid("author_user_id")
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
+		organizationId: uuid("organization_id").references(() => organizations.id, {
+			onDelete: "set null",
+		}),
+		city: varchar("city"),
+		state: varchar("state"),
+		latitude: decimal("latitude"),
+		longitude: decimal("longitude"),
 		/** Timestamp-based storage directory, separate from the database UUID. */
 		mediaFolder: varchar("media_folder", { length: 32 }).notNull().unique(),
 		text: text("text").notNull(),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 	},
-	(table) => [index("feed_posts_created_at_idx").on(table.createdAt)],
+	(table) => [
+		index("feed_posts_created_at_idx").on(table.createdAt),
+		index("feed_posts_organization_created_idx").on(
+			table.organizationId,
+			table.createdAt,
+		),
+		index("feed_posts_city_idx").on(table.city),
+	],
 );
 
 export const feedPostMedia = pgTable(
@@ -51,6 +67,10 @@ export const feedPostsRelations = relations(feedPosts, ({ one, many }) => ({
 	author: one(users, {
 		fields: [feedPosts.authorUserId],
 		references: [users.id],
+	}),
+	organization: one(organizations, {
+		fields: [feedPosts.organizationId],
+		references: [organizations.id],
 	}),
 	media: many(feedPostMedia),
 }));

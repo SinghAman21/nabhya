@@ -1,5 +1,11 @@
 import type { db as dbType } from "@nabhya/db";
-import { bookmarks, organizations, reviews, users } from "@nabhya/db/schema";
+import {
+	bookmarks,
+	organizationFollows,
+	organizations,
+	reviews,
+	users,
+} from "@nabhya/db/schema";
 import type {
 	PaginationQuery,
 	ReplyToReviewInput,
@@ -89,6 +95,29 @@ export class EngagementService {
 		]);
 
 		return paginate(items, totals?.value ?? 0, query);
+	}
+
+	// ─── Follows ─────────────────────────────────────────────────────────────
+
+	async followOrganization(userId: string, organizationId: string) {
+		await this.organizationsService.getPublicById(organizationId);
+		await this.db
+			.insert(organizationFollows)
+			.values({ userId, organizationId })
+			.onConflictDoNothing();
+		return { following: true };
+	}
+
+	async unfollowOrganization(userId: string, organizationId: string) {
+		await this.db
+			.delete(organizationFollows)
+			.where(
+				and(
+					eq(organizationFollows.userId, userId),
+					eq(organizationFollows.organizationId, organizationId),
+				),
+			);
+		return { following: false };
 	}
 
 	// ─── Reviews ─────────────────────────────────────────────────────────────

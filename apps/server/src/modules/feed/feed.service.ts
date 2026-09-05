@@ -17,6 +17,7 @@ import { DB_TOKEN } from "../../common/database";
 import { STORAGE_TOKEN, type StorageProvider } from "../../common/storage";
 import type { AuthUser } from "../../common/types";
 import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
+import { OrganizationsService } from "../organizations/organizations.service";
 import { UploadsService } from "../uploads/uploads.service";
 
 @Injectable()
@@ -26,6 +27,8 @@ export class FeedService {
 		@Inject(STORAGE_TOKEN) private readonly storage: StorageProvider,
 		@Inject(UploadsService) private readonly uploads: UploadsService,
 		@Inject(AuditService) private readonly audit: AuditService,
+		@Inject(OrganizationsService)
+		private readonly organizationsService: OrganizationsService,
 	) {}
 
 	async createMediaIntents(user: AuthUser, input: CreateFeedMediaIntentsInput) {
@@ -36,12 +39,20 @@ export class FeedService {
 		const mediaFolder =
 			input.mediaFolder ?? this.uploads.createEmptyFeedMediaFolder();
 		await this.uploads.assertFeedMediaKeys(user, mediaFolder, input.mediaKeys);
+		const organization = user.roles.includes("organisation")
+			? await this.organizationsService.requireOwnedOrganization(user.id)
+			: null;
 		const post = await this.db.transaction(async (tx) => {
 			const created = takeFirstOrThrow(
 				await tx
 					.insert(feedPosts)
 					.values({
 						authorUserId: user.id,
+						organizationId: organization?.id,
+						city: organization?.city,
+						state: organization?.state,
+						latitude: organization?.latitude,
+						longitude: organization?.longitude,
 						mediaFolder,
 						text: input.text,
 					})
@@ -50,22 +61,19 @@ export class FeedService {
 			);
 			if (input.mediaKeys.length > 0) {
 				await tx.insert(feedPostMedia).values(
-					input.mediaKeys.map((objectKey, sortOrder) => {
-						const isVideo =
-							objectKey.endsWith(".mp4") || objectKey.endsWith(".mov");
-						const mediaType: "IMAGE" | "VIDEO" = isVideo ? "VIDEO" : "IMAGE";
-						return {
-							postId: created.id,
-							objectKey,
-							mediaType,
-							mimeType: objectKey.endsWith(".mp4")
-								? "video/mp4"
-								: objectKey.endsWith(".mov")
-									? "video/quicktime"
-									: "image/*",
-							sortOrder,
-						};
-					}),
+					input.mediaKeys.map((objectKey, sortOrder) => ({
+						postId: created.id,
+						objectKey,
+						mediaType: (objectKey.endsWith(".mp4") || objectKey.endsWith(".mov")
+							? "VIDEO"
+							: "IMAGE") as "VIDEO" | "IMAGE",
+						mimeType: objectKey.endsWith(".mp4")
+							? "video/mp4"
+							: objectKey.endsWith(".mov")
+								? "video/quicktime"
+								: "image/*",
+						sortOrder,
+					})),
 				);
 			}
 			return created;

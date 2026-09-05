@@ -133,6 +133,28 @@ pnpm web             # not a real target yet — no web app is scaffolded
 pnpm dev
 ```
 
+## Feed-ranking API (server-only)
+
+The server exposes a unified feed that mixes generic posts, published events, open needs
+and published announcements. The first client integration is intentionally pending; test
+these routes through Swagger at `http://localhost:3000/api/docs` or an API client.
+
+| Route | Access | Purpose |
+|---|---|---|
+| `GET /api/feed/for-you` | Optional auth | Personalized ranking. Uses Haversine distance when optional user coordinates are set, otherwise city/state; also considers category interests, follows, recency, urgency and engagement. |
+| `GET /api/feed/trending` | Public | Recent, time-decayed engagement ranking. A valid optional token adds location context and viewer flags. |
+| `GET /api/feed/following` | Authenticated | Reverse-chronological content from explicitly followed organizations. |
+| `POST` / `DELETE /api/organizations/:id/follow` | Authenticated | Follow or unfollow a verified, active NGO. |
+| `POST` / `DELETE /api/feed/:type/:id/like` | Authenticated | Like/unlike an item. |
+| `POST` / `DELETE /api/feed/:type/:id/save` | Authenticated | Save/unsave an item. |
+| `POST /api/feed/:type/:id/share` | Authenticated | Record a share. |
+| `POST /api/feed/:type/:id/impression` | Authenticated | Record an impression; recent impressions down-rank For You only. |
+| `GET` / `POST /api/feed/:type/:id/comments` | Public / authenticated | List or add comments. |
+
+`type` is one of `POST`, `EVENT`, `NEED`, or `ANNOUNCEMENT` (route matching is case-insensitive).
+The schema change is included in migration `0007_feed_ranking.sql`; run `pnpm db:push` in
+local development before exercising these routes.
+
 ## Everyday scripts
 
 - `pnpm check` — Biome lint/format (writes fixes)

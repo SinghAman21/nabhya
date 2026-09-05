@@ -52,5 +52,79 @@ export const createFeedPostSchema = z
 	});
 
 export type CreateFeedPostInput = z.infer<typeof createFeedPostSchema>;
+
+// ─── Feed engagement ─────────────────────────────────────────────────────────
+
+export const feedItemTypeSchema = z.enum([
+	"POST",
+	"EVENT",
+	"NEED",
+	"ANNOUNCEMENT",
+]);
+
+export type FeedItemType = z.infer<typeof feedItemTypeSchema>;
+
+export const feedInteractionTypeSchema = z.enum([
+	"LIKE",
+	"SAVE",
+	"SHARE",
+	"IMPRESSION",
+]);
+
+export type FeedInteractionType = z.infer<typeof feedInteractionTypeSchema>;
+
+export const feedItemTargetSchema = z.object({
+	targetType: feedItemTypeSchema,
+	targetId: z.uuid("Invalid feed item identifier"),
+});
+
+export type FeedItemTarget = z.infer<typeof feedItemTargetSchema>;
+
+export const createFeedInteractionSchema = feedItemTargetSchema.extend({
+	interactionType: feedInteractionTypeSchema,
+});
+
+export type CreateFeedInteractionInput = z.infer<
+	typeof createFeedInteractionSchema
+>;
+
+export const createFeedCommentSchema = feedItemTargetSchema.extend({
+	body: z
+		.string()
+		.trim()
+		.min(1, "Write a comment")
+		.max(2000, "Comment must be under 2000 characters"),
+});
+
+export type CreateFeedCommentInput = z.infer<typeof createFeedCommentSchema>;
+
+export const updateFeedCommentSchema = z.object({
+	body: z
+		.string()
+		.trim()
+		.min(1, "Write a comment")
+		.max(2000, "Comment must be under 2000 characters"),
+});
+
+export type UpdateFeedCommentInput = z.infer<typeof updateFeedCommentSchema>;
+
+export const feedCommentsQuerySchema = paginationQuerySchema;
+export type FeedCommentsQuery = z.infer<typeof feedCommentsQuerySchema>;
+
+// ─── Feed views ───────────────────────────────────────────────────────────────
+
+/** Personalized recommendations from local and engagement signals. */
+export const forYouFeedQuerySchema = paginationQuerySchema;
+export type ForYouFeedQuery = z.infer<typeof forYouFeedQuerySchema>;
+
+/** Items ranked by recent interaction volume. */
+export const trendingFeedQuerySchema = paginationQuerySchema;
+export type TrendingFeedQuery = z.infer<typeof trendingFeedQuerySchema>;
+
+/** Items published by organizations the user follows. */
+export const followingFeedQuerySchema = paginationQuerySchema;
+export type FollowingFeedQuery = z.infer<typeof followingFeedQuerySchema>;
+
+/** Backward-compatible generic chronological feed query. */
 export const feedQuerySchema = paginationQuerySchema;
 export type FeedQuery = z.infer<typeof feedQuerySchema>;
