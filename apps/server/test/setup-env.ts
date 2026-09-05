@@ -7,8 +7,8 @@
  * only ever run for whoever happened to have secrets lying around.
  *
  * None of these values are used: integration specs talk to PGlite, and the R2
- * and Dodo providers fall back to their in-memory stubs. They exist purely to
- * get past validation.
+ * and Razorpay providers fall back to their in-memory stubs. They exist purely
+ * to get past validation.
  */
 const TEST_ENV: Record<string, string> = {
 	NODE_ENV: "test",

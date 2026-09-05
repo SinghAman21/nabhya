@@ -22,16 +22,13 @@ export const env = createEnv({
 		/** Existing non-feed media (avatars, covers, certificates, etc.). */
 		SUPABASE_DEFAULT_STORAGE_BUCKET: z.string().min(1).default("user_avatars"),
 
-		// Dodo Payments. Optional for the same reason as R2: absent credentials
-		// fall back to a stub so the donation flow stays testable locally, and
-		// the stub is refused in production.
-		DODO_API_KEY: z.string().min(1).optional(),
-		DODO_WEBHOOK_SECRET: z.string().min(1).optional(),
-		/**
-		 * Dodo is product-based, so variable donations are modelled as N units
-		 * of a ₹1 "donation" product. This is that product's id.
-		 */
-		DODO_DONATION_PRODUCT_ID: z.string().min(1).optional(),
+		// Razorpay. Optional for the same reason as R2: absent credentials fall
+		// back to a stub so the donation flow stays testable locally, and the
+		// stub is refused in production.
+		/** Public — also handed to the native client to open checkout. */
+		RAZORPAY_KEY_ID: z.string().min(1).optional(),
+		RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
+		RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
 	},
 	runtimeEnv: process.env,
 	emptyStringAsUndefined: true,

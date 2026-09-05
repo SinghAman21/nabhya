@@ -47,22 +47,15 @@
 		{
 			"idx": 6,
 			"version": "7",
-			"when": 1788700801000,
-			"tag": "0006_feed_posts",
+			"when": 1788593443934,
+			"tag": "0006_clean_zarek",
 			"breakpoints": true
 		},
 		{
 			"idx": 7,
 			"version": "7",
-			"when": 1788700802000,
-			"tag": "0007_feed_ranking",
-			"breakpoints": true
-		},
-		{
-			"idx": 8,
-			"version": "7",
-			"when": 1788593289290,
-			"tag": "0008_gorgeous_caretaker",
+			"when": 1788593460442,
+			"tag": "0007_woozy_ulik",
 			"breakpoints": true
 		}
 	]

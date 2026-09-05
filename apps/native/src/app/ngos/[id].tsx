@@ -10,6 +10,7 @@ import {
 } from "lucide-react-native";
 import { useState } from "react";
 import { Alert, Pressable, ScrollView, View } from "react-native";
+import { DonateSheet } from "@/components/donate-sheet";
 import { ReviewSheet } from "@/components/review-sheet";
 import {
 	ErrorState,
@@ -57,6 +58,7 @@ export default function NgoProfilePage() {
 	const router = useRouter();
 	const [tab, setTab] = useState<Tab>("about");
 	const [reviewOpen, setReviewOpen] = useState(false);
+	const [donateOpen, setDonateOpen] = useState(false);
 
 	const email = useAuthStore((s) => s.email);
 	const org = useOrganization(id);
@@ -132,6 +134,13 @@ export default function NgoProfilePage() {
 						{org.data.foundingYear ? ` · since ${org.data.foundingYear}` : ""}
 					</Caption>
 
+					<Button
+						onPress={() => setDonateOpen(true)}
+						style={{ marginBottom: spacing[5] }}
+					>
+						Donate
+					</Button>
+
 					{/* Impact is the headline: what this NGO has actually done. */}
 					{impact.data && (
 						<View
@@ -180,6 +189,12 @@ export default function NgoProfilePage() {
 				organizationName={org.data?.organizationName ?? ""}
 				visible={reviewOpen}
 				onClose={() => setReviewOpen(false)}
+			/>
+			<DonateSheet
+				organizationId={id}
+				organizationName={org.data?.organizationName ?? ""}
+				visible={donateOpen}
+				onClose={() => setDonateOpen(false)}
 			/>
 		</View>
 	);

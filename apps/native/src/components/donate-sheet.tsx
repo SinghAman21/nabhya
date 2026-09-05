@@ -1,14 +1,9 @@
 import { DONATION_PRESETS_MINOR, formatMinor } from "@nabhya/shared";
+import { useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react-native";
 import { useState } from "react";
-import {
-	Alert,
-	Linking,
-	Modal,
-	Pressable,
-	ScrollView,
-	View,
-} from "react-native";
+import { Alert, Modal, Pressable, ScrollView, View } from "react-native";
+import RazorpayCheckout from "react-native-razorpay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Body, Caption, H2, Label } from "@/components/ui/typography";
@@ -16,21 +11,22 @@ import { useCreateDonation } from "@/hooks/use-engagement";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
+import { queryScopes } from "@/lib/api/query-keys";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
  * Donation entry point.
  *
  * The amount is captured in rupees but sent as paise — integers only, so no
- * float rounding ever reaches the ledger. Dodo is product-based, so whole
- * rupees are the finest granularity the gateway can represent.
+ * float rounding ever reaches the ledger.
  *
- * NOT CURRENTLY MOUNTED ANYWHERE. This component, its `useCreateDonation`
- * hook, and the full checkout/webhook/receipt backend behind it are complete
- * and working — monetary donations are just on hold at the user's request
- * (see donations note in the root AGENTS.md and apps/server/AGENTS.md).
- * Wiring this in is a one-line `<DonateSheet .../>` render from an NGO
- * detail screen once the hold is lifted — don't do that without asking.
+ * Checkout happens in-app via Razorpay's native SDK: the server creates an
+ * order and hands back its id plus the public key, and this sheet opens
+ * Razorpay's own checkout UI directly — nothing here ever touches card
+ * details. A successful checkout only tells the client the payment went
+ * through; the donation row itself only ever flips to COMPLETED once the
+ * server's webhook verifies it, so this sheet never assumes success beyond
+ * showing a "confirming" message and letting the donor check their history.
  */
 export function DonateSheet({
 	organizationId,
@@ -46,6 +42,7 @@ export function DonateSheet({
 	const { colors, spacing } = useTheme();
 	const email = useAuthStore((s) => s.email);
 	const { data: me } = useMe(!!email);
+	const queryClient = useQueryClient();
 
 	const [amountMinor, setAmountMinor] = useState<number>(
 		DONATION_PRESETS_MINOR[1] ?? 100_000,
@@ -84,15 +81,48 @@ export function DonateSheet({
 				donorEmail: me ? undefined : guestEmail.trim() || undefined,
 			},
 			{
-				onSuccess: async ({ checkoutUrl }) => {
+				onSuccess: async ({
+					orderId,
+					amountMinor: orderAmount,
+					currency,
+					razorpayKeyId,
+				}) => {
 					onClose();
-					const canOpen = await Linking.canOpenURL(checkoutUrl);
-					if (canOpen) await Linking.openURL(checkoutUrl);
-					else
+					try {
+						// Fields present because we always pass order_id: razorpay_payment_id,
+						// razorpay_order_id, razorpay_signature. This is fast client-side
+						// feedback only — never proof the donation is COMPLETED.
+						await RazorpayCheckout.open({
+							key: razorpayKeyId,
+							order_id: orderId,
+							amount: orderAmount,
+							currency,
+							name: organizationName,
+							description: "Donation",
+							prefill: {
+								email: me?.email ?? (guestEmail.trim() || undefined),
+								name: me?.name ?? (guestName.trim() || undefined),
+							},
+							theme: { color: colors.primary.main as string },
+						});
+						queryClient.invalidateQueries({ queryKey: queryScopes.donations });
 						Alert.alert(
-							"Could not open payment page",
-							"Please try again from a browser.",
+							"Thank you!",
+							"We're confirming your donation now — check My Donations shortly.",
 						);
+					} catch (err: unknown) {
+						// User-cancelled checkouts land here too (react-native-razorpay
+						// rejects on dismiss, not just on failure) — there is no distinct
+						// "cancelled" code documented, so this message stays generic.
+						const description =
+							typeof err === "object" && err !== null && "description" in err
+								? String((err as { description?: unknown }).description)
+								: null;
+						Alert.alert(
+							"Payment not completed",
+							description || "You can try again from My Donations.",
+						);
+					}
 				},
 				onError: (e) => setError(apiErrorMessage(e)),
 			},
@@ -292,7 +322,7 @@ export function DonateSheet({
 						color="quaternary"
 						style={{ textAlign: "center", marginTop: spacing[3] }}
 					>
-						You'll be taken to a secure payment page to finish.
+						Payment is completed securely in this app.
 					</Caption>
 				</ScrollView>
 			</View>

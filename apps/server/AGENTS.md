@@ -75,10 +75,14 @@ Guard order (all global `APP_GUARD`s in `app.module.ts`):
   which is how download authorisation works); `UploadsService.assertUploaded` HEADs
   the object before any key is persisted, because a signed PUT cannot cap body size.
   Reads go through `POST /uploads/download-url` for a short-lived signed URL.
-- Donations: amounts are server-computed integer paise; only the signature-verified
-  webhook moves a donation to COMPLETED; `provider_payment_id` is unique so webhook
-  replays cannot double-count. The feature is currently **on hold** — don't extend it
-  without asking.
+- Donations: Razorpay, native checkout SDK. Amounts are server-computed integer
+  paise; only the signature-verified webhook moves a donation to COMPLETED —
+  never the client's own checkout-success callback, even though Razorpay hands
+  the client a payment id/order id/signature on success. `provider_payment_id`
+  is unique so webhook replays cannot double-count. Razorpay's webhook scheme has
+  no timestamp/replay window (unlike the payment provider this replaced), so
+  idempotency relies entirely on the PENDING-guard + unique index, not a
+  freshness check.
 - Two endpoints are server-only by design (no screen): `POST /api/donations/webhook`
   and `POST /api/admin/events/close-finished` (cron target — the only thing that
   moves events out of PUBLISHED). If you add an endpoint, wire it to a screen or

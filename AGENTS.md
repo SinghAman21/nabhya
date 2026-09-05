@@ -150,7 +150,7 @@ Supabase wizard.
   `EXPO_PUBLIC_SUPABASE_ANON_KEY` (both throw at import if unset)
 
 Wired services: Supabase (Postgres + Auth), Cloudflare R2 (optional, stubbed in dev),
-Dodo Payments (donations — on hold). No email provider.
+Razorpay (donations, native checkout SDK). No email provider.
 
 ## Current state
 
@@ -173,19 +173,21 @@ straight to R2; an account only becomes VERIFIED once a superadmin approves
 **both** — a single document never promotes the account on its own. The rule is
 enforced by `computeUserVerificationStatus` in `@nabhya/shared`, which both the
 upload and review paths recompute from the whole document set. Monetary
-donations are wired through Dodo Payments but the feature is **on hold** at the
-user's request.
+donations go through Razorpay's native checkout SDK (`react-native-razorpay`) —
+the server creates an order and hands the client an order id + public key, the
+client opens Razorpay's own in-app checkout, and only Razorpay's
+signature-verified webhook ever moves a donation to `COMPLETED` (never the
+client's own success callback). This requires a custom Expo dev client —
+Razorpay's native module does not run in Expo Go; see `apps/native/AGENTS.md`.
 
 Client route groups: `(auth)`, `(onboarding)` (`index` = NGO wizard, `volunteer` =
 volunteer wizard), `(ngo)`, `(volunteer)`, `(admin)`, and public `events/`,
 `ngos/`, `certificates/`.
 
-The existing app reaches every endpoint except the server-only `POST /api/donations/webhook`
-(called by Dodo, signature-authenticated) and `POST /api/admin/events/close-finished`
-(a cron target — see Deploying). The new feed-ranking, interaction and organization-follow
-endpoints are intentionally **server-only until the native feed tabs and interaction UI are
-implemented**; use Swagger or an API client to test them. If you add an endpoint, wire it
-to a screen or explain here why it has none.
+Every endpoint is reachable from the app except two that are server-only by
+design: `POST /api/donations/webhook` (called by Razorpay, signature-authenticated)
+and `POST /api/admin/events/close-finished` (a cron target — see Deploying).
+If you add an endpoint, wire it to a screen or explain here why it has none.
 
 **Not built:** `apps/web`, email/push delivery (notifications are in-app only),
 and pagination controls — every list endpoint returns a `Paginated<T>` envelope

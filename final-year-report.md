@@ -109,7 +109,7 @@ This report documents the system as implemented on the `post-review-1` branch: t
 4. **Public discovery** — an anonymous-accessible feed of events, needs and an NGO directory with proximity ("near me") search, that can only ever show verified + active organisations.
 5. **Engagement layer** — bookmarks, reviews with organisation replies, announcements, public financial-transparency reports, in-app notifications and superadmin broadcast.
 6. **Certificates** — attendance-gated issuance, PDF generation, revocation, and account-less public verification by code.
-7. **Monetary donations** via a payment provider (Dodo Payments) with webhook-driven settlement that never trusts the client. *(Implemented; feature currently on hold.)*
+7. **Monetary donations** via Razorpay's native checkout SDK with webhook-driven settlement that never trusts the client's checkout-success callback.
 8. **Operational integrity** — audit trail of every administrative and sensitive action, rate limiting, and a test suite that exercises real SQL semantics (unique indexes, row locks, aggregates).
 
 ---
@@ -262,7 +262,7 @@ flowchart TB
     end
 
     R2[(Cloudflare R2 object storage)]
-    DODO[Dodo Payments]
+    RAZORPAY[Razorpay]
 
     SVC -- "Bearer JWT over HTTPS" --> THR
     STORE -- "signInWithPassword / signUp" --> IDP
@@ -270,7 +270,8 @@ flowchart TB
     SVCS --> DRZ
     SVCS -- "pre-signed URL issue / HEAD verify" --> R2
     Client -- "direct PUT/GET with signed URLs" --> R2
-    DODO -- "payment webhook (signature-verified)" --> Server
+    Client -- "native checkout (order id + key)" --> RAZORPAY
+    RAZORPAY -- "payment webhook (signature-verified)" --> Server
     Client -.imports.-> ZOD
     Server -.imports.-> ZOD
 ```
@@ -926,7 +927,7 @@ sequenceDiagram
     Note over API: unique(application_id) — re-issuing replaces the PDF,<br/>never mints a second code for the same participation
 ```
 
-### 9.6 Donation settlement (sequence — feature on hold)
+### 9.6 Donation settlement (sequence)
 
 ```mermaid
 sequenceDiagram
@@ -934,19 +935,21 @@ sequenceDiagram
     actor D as Donor (guest or signed-in)
     participant App as App
     participant API as API
-    participant Dodo as Dodo Payments
+    participant RZP as Razorpay
 
     D->>App: choose NGO + amount
     App->>API: POST /donations/checkout (OptionalAuth)
     API->>API: create donation PENDING, server-computed amount_minor
-    API->>Dodo: create checkout session
-    API-->>App: provider checkout URL
-    D->>Dodo: completes payment
-    Dodo->>API: POST /donations/webhook (raw body, signature verified)
+    API->>RZP: create order (arbitrary paise amount)
+    API-->>App: order id + public key id
+    App->>RZP: open native checkout (RazorpayCheckout.open)
+    D->>RZP: completes payment in-app
+    RZP-->>App: payment id / order id / signature (fast feedback only)
+    RZP->>API: POST /donations/webhook (raw body, signature verified)
     API->>API: idempotency: provider_payment_id is UNIQUE —<br/>a replayed webhook cannot double-count
     API->>API: donation → COMPLETED, issue receipt_number
     API--)D: receipt available
-    Note over API: the client can never move a donation to COMPLETED —<br/>only the signed webhook can
+    Note over App: the client-side success callback is never trusted —<br/>only the signed webhook can move a donation to COMPLETED
 ```
 
 ### 9.7 State machines
@@ -1136,15 +1139,17 @@ flowchart LR
     NEON[(Supabase PostgreSQL)]
     NAUTH[Supabase Auth<br/>JWKS + sessions]
     R2[(Cloudflare R2)]
-    DODO[Dodo Payments]
+    RAZORPAY[Razorpay]
 
     APP --> LB --> NEST
     APP -- sign-in / token --> NAUTH
     APP -- signed PUT/GET --> R2
+    APP -- native checkout --> RAZORPAY
     NEST --> NEON
     NEST -- JWKS fetch --> NAUTH
     NEST -- presign / HEAD --> R2
-    DODO -- webhook --> LB
+    NEST -- create order --> RAZORPAY
+    RAZORPAY -- webhook --> LB
     CRON --> LB
 ```
 
