@@ -1,6 +1,17 @@
-import { Redirect } from "expo-router";
-import { ActivityIndicator, FlatList, View } from "react-native";
+import { Redirect, useRouter } from "expo-router";
+import { useState } from "react";
+import {
+	ActivityIndicator,
+	FlatList,
+	RefreshControl,
+	View,
+} from "react-native";
 import { FeedCard } from "@/components/feed/feed-card";
+import {
+	ALL_CAUSES,
+	FeedFilterSheet,
+	FeedTabs,
+} from "@/components/feed/feed-filters";
 import {
 	EmptyState,
 	ErrorState,
@@ -10,40 +21,60 @@ import {
 } from "@/components/screen-shell";
 import { useToggleFollow } from "@/hooks/use-engagement";
 import { useFeed, useFeedReaction } from "@/hooks/use-feed";
-import { useMyOrganization } from "@/hooks/use-organization";
+import { useCategories } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
-import type { FeedItem } from "@/lib/types";
+import type { FeedItem, FeedNeedItem } from "@/lib/types";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
- * NGO feed — a posts-only view of the shared feed, with follow actions.
+ * NGO feed — the shared ranking feed with all content kinds and tab lenses.
+ *
+ * For you / Trending / Following show all tags; Urgent narrows to urgent items.
  */
 export default function NgoFeed() {
 	const role = useAuthStore((s) => s.role);
-	const { colors, spacing } = useTheme();
 	const isOrg = role === "organisation";
-	const org = useMyOrganization(isOrg);
+	const { colors, spacing } = useTheme();
+	const router = useRouter();
+	const categories = useCategories();
 	const toggleFollow = useToggleFollow();
 	const like = useFeedReaction("like");
 	const save = useFeedReaction("save");
-	const feed = useFeed({ kind: "post" }, isOrg);
+	const [tab, setTab] = useState<
+		"for_you" | "following" | "trending" | "urgent"
+	>("for_you");
+	const [categoryId, setCategoryId] = useState<string>(ALL_CAUSES);
+	const [filtersOpen, setFiltersOpen] = useState(false);
 
-	const items =
-		feed.data?.pages
-			.flatMap((page) => page.items)
-			.filter(
-				(item): item is FeedItem =>
-					item.kind === "post" &&
-					!!item.organization &&
-					item.organization.id !== org.data?.id,
-			) ?? [];
+	const feed = useFeed(
+		{
+			tab,
+			...(categoryId === ALL_CAUSES ? {} : { categoryId }),
+		},
+		isOrg,
+	);
 
-	if (role !== "organisation") return <Redirect href="/" />;
+	const items = feed.data?.pages.flatMap((page) => page.items) ?? [];
+
+	if (!isOrg) return <Redirect href="/" />;
 
 	const loadMore = () => {
 		if (feed.hasNextPage && !feed.isFetchingNextPage) feed.fetchNextPage();
 	};
+
+	const header = (
+		<View>
+			<ScreenHeader title="Feed" />
+			<FeedTabs
+				tab={tab}
+				onTab={setTab}
+				gutter={spacing[5]}
+				onOpenFilters={() => setFiltersOpen(true)}
+				filterActive={categoryId !== ALL_CAUSES}
+			/>
+		</View>
+	);
 
 	const footer = feed.isLoading ? (
 		<LoadingState label="Building the feed" />
@@ -54,8 +85,8 @@ export default function NgoFeed() {
 		/>
 	) : items.length === 0 ? (
 		<EmptyState
-			title="No NGO posts yet"
-			description="Once other organisations share updates, they’ll appear here."
+			title="Nothing here yet"
+			description="Try another tab or remove the cause filter."
 		/>
 	) : feed.isFetchingNextPage ? (
 		<View style={{ paddingVertical: spacing[6], alignItems: "center" }}>
@@ -65,21 +96,28 @@ export default function NgoFeed() {
 		<View style={{ paddingVertical: spacing[8], alignItems: "center" }}>
 			<EmptyState
 				title="You're all caught up"
-				description="Follow more NGOs to shape this feed."
+				description="Refresh anytime for new posts."
 			/>
 		</View>
 	);
 
 	return (
 		<Screen>
-			<ScreenHeader title="Feed" />
+			{header}
 			<FlatList
 				data={items}
-				keyExtractor={(item) => `${item.kind}:${item.id}`}
+				keyExtractor={(item: FeedItem) => `${item.kind}:${item.id}`}
 				renderItem={({ item }) => (
 					<FeedCard
 						item={item}
-						onRespond={() => {}}
+						onRespond={(need: FeedNeedItem) => {
+							if (need.organization?.id) {
+								router.push({
+									pathname: "/ngos/[id]",
+									params: { id: need.organization.id },
+								});
+							}
+						}}
 						onToggleFollow={(organizationId, following) =>
 							toggleFollow.mutate({ organizationId, following })
 						}
@@ -97,9 +135,25 @@ export default function NgoFeed() {
 				onEndReachedThreshold={0.6}
 				showsVerticalScrollIndicator={false}
 				contentContainerStyle={{
+					paddingHorizontal: spacing[5],
+					paddingTop: spacing[4],
 					paddingBottom: spacing[12],
 				}}
-				refreshControl={undefined}
+				refreshControl={
+					<RefreshControl
+						refreshing={feed.isRefetching && !feed.isFetchingNextPage}
+						onRefresh={() => feed.refetch()}
+						tintColor={colors.text.quaternary as string}
+					/>
+				}
+			/>
+
+			<FeedFilterSheet
+				visible={filtersOpen}
+				onClose={() => setFiltersOpen(false)}
+				categories={categories.data ?? []}
+				categoryId={categoryId}
+				onCategory={setCategoryId}
 			/>
 		</Screen>
 	);
