@@ -4,7 +4,6 @@ export * from "./certificates";
 export * from "./donations";
 export * from "./engagement";
 export * from "./events";
-export * from "./feed";
 export * from "./needs";
 export * from "./organizations";
 export * from "./publishing";

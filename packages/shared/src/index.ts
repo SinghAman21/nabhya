@@ -5,7 +5,6 @@ export * from "./common";
 export * from "./donations";
 export * from "./engagement";
 export * from "./events";
-export * from "./feed";
 export * from "./needs";
 export * from "./onboarding";
 export * from "./organization";

@@ -1,27 +1,26 @@
 import { env } from "@nabhya/env/server";
 import { Logger, Module } from "@nestjs/common";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { DodoPaymentProvider } from "./dodo-payment.provider";
 import { DonationsController } from "./donations.controller";
 import { DonationsService } from "./donations.service";
 import { PAYMENT_PROVIDER_TOKEN, type PaymentProvider } from "./payment.types";
-import { RazorpayPaymentProvider } from "./razorpay-payment.provider";
 import { StubPaymentProvider } from "./stub-payment.provider";
 
 const logger = new Logger("DonationsModule");
 
 function createPaymentProvider(): PaymentProvider {
 	const configured =
-		env.RAZORPAY_KEY_ID &&
-		env.RAZORPAY_KEY_SECRET &&
-		env.RAZORPAY_WEBHOOK_SECRET;
+		env.DODO_API_KEY && env.DODO_WEBHOOK_SECRET && env.DODO_DONATION_PRODUCT_ID;
 
 	if (configured) {
 		const mode = env.NODE_ENV === "production" ? "live" : "test";
-		logger.log(`Payments: Razorpay (${mode} mode)`);
-		return new RazorpayPaymentProvider({
-			keyId: env.RAZORPAY_KEY_ID as string,
-			keySecret: env.RAZORPAY_KEY_SECRET as string,
-			webhookSecret: env.RAZORPAY_WEBHOOK_SECRET as string,
+		logger.log(`Payments: Dodo Payments (${mode} mode)`);
+		return new DodoPaymentProvider({
+			apiKey: env.DODO_API_KEY as string,
+			webhookSecret: env.DODO_WEBHOOK_SECRET as string,
+			productId: env.DODO_DONATION_PRODUCT_ID as string,
+			mode,
 		});
 	}
 
@@ -29,14 +28,14 @@ function createPaymentProvider(): PaymentProvider {
 	// nothing — refuse to start rather than pretend.
 	if (env.NODE_ENV === "production") {
 		throw new Error(
-			"Payments are not configured. Set RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET " +
-				"and RAZORPAY_WEBHOOK_SECRET before starting in production.",
+			"Payments are not configured. Set DODO_API_KEY, DODO_WEBHOOK_SECRET " +
+				"and DODO_DONATION_PRODUCT_ID before starting in production.",
 		);
 	}
 
 	logger.warn(
-		"Payments: stub provider (no Razorpay credentials). Checkouts are " +
-			"simulated and no money moves — set the RAZORPAY_* variables in .env.",
+		"Payments: stub provider (no Dodo credentials). Checkouts are simulated " +
+			"and no money moves — set the DODO_* variables in .env.",
 	);
 	return new StubPaymentProvider();
 }

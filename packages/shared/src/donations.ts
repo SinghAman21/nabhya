@@ -36,12 +36,10 @@ export type CreateDonationInput = z.infer<typeof createDonationSchema>;
 
 export interface DonationCheckout {
 	donationId: string;
-	/** Razorpay order id — the client opens the native checkout with this. */
-	orderId: string;
+	/** Provider-hosted payment page the client opens. */
+	checkoutUrl: string;
 	amountMinor: number;
 	currency: string;
-	/** Razorpay's public key id, safe to hand to the client. */
-	razorpayKeyId: string;
 }
 
 export const donationQuerySchema = paginationQuerySchema.extend({
