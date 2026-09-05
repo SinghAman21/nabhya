@@ -76,7 +76,10 @@ export class SupabaseStorageProvider implements StorageProvider {
 			if (error.statusCode === "404") return null;
 			throw new Error(`Could not inspect uploaded file: ${error.message}`);
 		}
-		if (!data) return null;
+		// `size` is typed optional by the SDK but should always be present for a
+		// real object; treat a missing size as "not inspectable" rather than
+		// defaulting to 0, which would silently bypass the caller's size cap.
+		if (!data || data.size === undefined) return null;
 		return {
 			key,
 			size: data.size,

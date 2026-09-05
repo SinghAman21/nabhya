@@ -50,20 +50,22 @@ export class FeedService {
 			);
 			if (input.mediaKeys.length > 0) {
 				await tx.insert(feedPostMedia).values(
-					input.mediaKeys.map((objectKey, sortOrder) => ({
-						postId: created.id,
-						objectKey,
-						mediaType:
-							objectKey.endsWith(".mp4") || objectKey.endsWith(".mov")
-								? "VIDEO"
-								: "IMAGE",
-						mimeType: objectKey.endsWith(".mp4")
-							? "video/mp4"
-							: objectKey.endsWith(".mov")
-								? "video/quicktime"
-								: "image/*",
-						sortOrder,
-					})),
+					input.mediaKeys.map((objectKey, sortOrder) => {
+						const isVideo =
+							objectKey.endsWith(".mp4") || objectKey.endsWith(".mov");
+						const mediaType: "IMAGE" | "VIDEO" = isVideo ? "VIDEO" : "IMAGE";
+						return {
+							postId: created.id,
+							objectKey,
+							mediaType,
+							mimeType: objectKey.endsWith(".mp4")
+								? "video/mp4"
+								: objectKey.endsWith(".mov")
+									? "video/quicktime"
+									: "image/*",
+							sortOrder,
+						};
+					}),
 				);
 			}
 			return created;
