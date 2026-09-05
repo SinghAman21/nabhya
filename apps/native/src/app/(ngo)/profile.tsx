@@ -12,9 +12,11 @@ import {
 	UserRound,
 	Users,
 } from "lucide-react-native";
+import { useMemo, useState } from "react";
 import { RefreshControl, ScrollView, View, type ViewStyle } from "react-native";
 import { AppearanceRow } from "@/components/appearance-row";
 import { InitialAvatar } from "@/components/initial-avatar";
+import { PostComposerSheet } from "@/components/post-composer-sheet";
 import {
 	Banner,
 	ErrorState,
@@ -32,10 +34,13 @@ import { Caption, H3 } from "@/components/ui/typography";
 import { useSignOut } from "@/hooks/use-auth";
 import { useOrgTeam } from "@/hooks/use-directory";
 import { useMyOrgDocuments } from "@/hooks/use-documents";
+import { useFeed } from "@/hooks/use-feed";
 import { useMyOrganization } from "@/hooks/use-organization";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { apiErrorMessage } from "@/lib/api";
+import { splitPostText } from "@/lib/post-text";
+import type { FeedItem } from "@/lib/types";
 
 /** The two documents a reviewer needs before an NGO can be verified. */
 const REQUIRED_DOCS = ["NGO_REGISTRATION_CERTIFICATE", "PAN_CARD"];
@@ -70,6 +75,9 @@ export default function NgoProfile() {
 	const org = useMyOrganization();
 	const documents = useMyOrgDocuments();
 	const team = useOrgTeam();
+	const postsFeed = useFeed({ kind: "post" });
+	const [composerOpen, setComposerOpen] = useState(false);
+	const [composerKey, setComposerKey] = useState(0);
 
 	const data = org.data;
 	const status = data?.verificationStatus;
@@ -85,6 +93,16 @@ export default function NgoProfile() {
 
 	const location = [data?.city, data?.state].filter(Boolean).join(", ");
 	const causes = data?.categories?.map((c) => c.name).join(" · ");
+	const posts = useMemo(
+		() =>
+			postsFeed.data?.pages
+				.flatMap((page) => page.items)
+				.filter(
+					(item): item is FeedItem & { kind: "post" } =>
+						item.kind === "post" && item.organization?.id === data?.id,
+				) ?? [],
+		[postsFeed.data, data?.id],
+	);
 	const typeLine = [
 		data?.orgType,
 		data?.foundingYear ? `Founded ${data.foundingYear}` : null,
@@ -321,6 +339,73 @@ export default function NgoProfile() {
 		</View>
 	);
 
+	const postsSection = (
+		<View style={{ marginBottom: spacing[6] }}>
+			<View
+				style={{
+					flexDirection: "row",
+					alignItems: "center",
+					justifyContent: "space-between",
+					marginBottom: spacing[3],
+				}}
+			>
+				<SectionTitle>Posts</SectionTitle>
+				<View style={{ flexDirection: "row", gap: spacing[2] }}>
+					<Button
+						variant="outline"
+						size="sm"
+						onPress={() => router.push("/feed")}
+					>
+						View feed
+					</Button>
+					<Button
+						size="sm"
+						onPress={() => {
+							setComposerKey((value) => value + 1);
+							setComposerOpen(true);
+						}}
+					>
+						Create post
+					</Button>
+				</View>
+			</View>
+			{posts.length === 0 ? (
+				<Surface>
+					<Caption color="tertiary">
+						No posts yet. Use the button above to publish your first update.
+					</Caption>
+				</Surface>
+			) : (
+				<View style={{ gap: spacing[3] }}>
+					{posts.map((post) => {
+						const parsed = splitPostText(post.post.text);
+						return (
+							<Surface key={post.id}>
+								<View style={{ gap: spacing[1.5] }}>
+									<Caption color="quaternary">
+										{post.organization?.organizationName ??
+											data?.organizationName}
+									</Caption>
+									{parsed.title ? <H3>{parsed.title}</H3> : null}
+									<Caption
+										color="secondary"
+										numberOfLines={parsed.title ? 4 : 6}
+									>
+										{parsed.description || post.post.text}
+									</Caption>
+									<Caption color="quaternary">
+										{post.post.media.length} media ·{" "}
+										{new Date(post.postedAt).toLocaleDateString()}
+									</Caption>
+								</View>
+							</Surface>
+						);
+					})}
+				</View>
+			)}
+		</View>
+	);
+
 	const money = (
 		<View style={{ marginBottom: spacing[8] }}>
 			<SectionTitle>Money</SectionTitle>
@@ -375,6 +460,7 @@ export default function NgoProfile() {
 						{numbers}
 						{organisation}
 						{programme}
+						{postsSection}
 						{money}
 					</View>
 				</View>
@@ -399,10 +485,17 @@ export default function NgoProfile() {
 					{numbers}
 					{organisation}
 					{programme}
+					{postsSection}
 					{money}
 					{signOutButton}
 				</ScrollView>
 			)}
+
+			<PostComposerSheet
+				key={composerKey}
+				visible={composerOpen}
+				onClose={() => setComposerOpen(false)}
+			/>
 		</Screen>
 	);
 }

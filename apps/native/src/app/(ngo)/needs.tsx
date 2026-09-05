@@ -106,7 +106,7 @@ export default function NgoNeeds() {
 				action={
 					isVerified ? (
 						<Button size="sm" onPress={openCreate}>
-							New post
+							New need
 						</Button>
 					) : undefined
 				}

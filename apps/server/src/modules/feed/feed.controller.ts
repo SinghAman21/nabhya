@@ -49,8 +49,9 @@ export class FeedController {
 	) {}
 
 	@Get()
+	@Roles("organisation", "superadmin")
 	@ApiBearerAuth("access-token")
-	@ApiOperation({ summary: "Shared volunteer and NGO feed" })
+	@ApiOperation({ summary: "Organization post feed" })
 	list(@Query(new ZodValidationPipe(feedQuerySchema)) query: FeedQuery) {
 		return this.feed.list(query);
 	}
@@ -92,7 +93,7 @@ export class FeedController {
 	}
 
 	@Post("upload-intents")
-	@Roles("volunteer", "organisation")
+	@Roles("organisation", "superadmin")
 	@ApiBearerAuth("access-token")
 	@ApiOperation({
 		summary: "Create up to four signed upload URLs for a new feed post",
@@ -106,7 +107,7 @@ export class FeedController {
 	}
 
 	@Post()
-	@Roles("volunteer", "organisation")
+	@Roles("organisation", "superadmin")
 	@ApiBearerAuth("access-token")
 	@ApiOperation({ summary: "Publish a feed post" })
 	create(
@@ -118,6 +119,7 @@ export class FeedController {
 	}
 
 	@Post(":type/:id/like")
+	@Roles("volunteer", "organisation", "superadmin")
 	@ApiBearerAuth("access-token")
 	@ApiOperation({ summary: "Like a feed item" })
 	like(
@@ -133,6 +135,7 @@ export class FeedController {
 	}
 
 	@Delete(":type/:id/like")
+	@Roles("volunteer", "organisation", "superadmin")
 	@ApiBearerAuth("access-token")
 	@ApiOperation({ summary: "Remove a feed item like" })
 	unlike(
@@ -148,6 +151,7 @@ export class FeedController {
 	}
 
 	@Post(":type/:id/save")
+	@Roles("volunteer", "organisation", "superadmin")
 	@ApiBearerAuth("access-token")
 	@ApiOperation({ summary: "Save a feed item" })
 	save(
@@ -163,6 +167,7 @@ export class FeedController {
 	}
 
 	@Delete(":type/:id/save")
+	@Roles("volunteer", "organisation", "superadmin")
 	@ApiBearerAuth("access-token")
 	@ApiOperation({ summary: "Remove a saved feed item" })
 	unsave(
@@ -178,6 +183,7 @@ export class FeedController {
 	}
 
 	@Post(":type/:id/share")
+	@Roles("volunteer", "organisation", "superadmin")
 	@ApiBearerAuth("access-token")
 	@ApiOperation({ summary: "Record a feed item share" })
 	share(
@@ -193,6 +199,7 @@ export class FeedController {
 	}
 
 	@Post(":type/:id/impression")
+	@Roles("volunteer", "organisation", "superadmin")
 	@ApiBearerAuth("access-token")
 	@ApiOperation({ summary: "Record that a feed item was shown" })
 	impression(
@@ -220,6 +227,7 @@ export class FeedController {
 	}
 
 	@Post(":type/:id/comments")
+	@Roles("volunteer", "organisation", "superadmin")
 	@ApiBearerAuth("access-token")
 	@ApiOperation({ summary: "Comment on a feed item" })
 	comment(
@@ -240,6 +248,7 @@ export class FeedController {
 	}
 
 	@Delete("comments/:commentId")
+	@Roles("volunteer", "organisation", "superadmin")
 	@ApiBearerAuth("access-token")
 	@ApiOperation({
 		summary: "Delete your comment, or moderate it as superadmin",
@@ -252,7 +261,7 @@ export class FeedController {
 	}
 
 	@Delete(":id")
-	@Roles("volunteer", "organisation", "superadmin")
+	@Roles("organisation", "superadmin")
 	@ApiBearerAuth("access-token")
 	@ApiOperation({
 		summary: "Delete your own post, or moderate it as a superadmin",

@@ -8,9 +8,10 @@ import {
 } from "@/components/screen-shell";
 import { Caption, Label } from "@/components/ui/typography";
 import { usePublicEvents } from "@/hooks/use-events";
-import { usePublicNeeds } from "@/hooks/use-needs";
+import { useFeed } from "@/hooks/use-feed";
 import { useTheme } from "@/hooks/use-theme";
 import { formatRelative } from "@/lib/format";
+import type { FeedNeedItem } from "@/lib/types";
 import { useFeedStore } from "@/store/feed-store";
 
 /**
@@ -18,9 +19,8 @@ import { useFeedStore } from "@/store/feed-store";
  *
  * Its job is to surface what the feed's current filter and scroll position hide —
  * so both sections are **server-filtered**, not a slice of the page already on
- * screen. `publicNeedQuerySchema` takes `urgency` and `publicEventQuerySchema`
- * takes `when`, so both of these are real queries rather than a client-side
- * reinterpretation of the feed.
+ * screen. The urgent rail now reuses the feed's `urgent` + `kind=need` filter,
+ * while upcoming events still come from the public event list.
  *
  * Deliberately not here: "trending". There is no metric for it — no view counts,
  * no pledge velocity, no follower counts anywhere in the schema. Trending would
@@ -46,12 +46,21 @@ export function DiscoverRail() {
 function UrgentNow() {
 	const router = useRouter();
 	const city = useFeedStore((s) => s.city);
-	const query = usePublicNeeds({
-		urgency: "HIGH",
-		limit: RAIL_LIMIT,
-		...(city ? { city } : {}),
-	});
-	const needs = query.data?.items ?? [];
+	const query = useFeed(
+		{ tab: "urgent", kind: "need", ...(city ? { city } : {}) },
+		true,
+	);
+	const needs =
+		query.data?.pages
+			.flatMap((page) => page.items)
+			.filter(
+				(
+					item,
+				): item is FeedNeedItem & {
+					organization: NonNullable<FeedNeedItem["organization"]>;
+				} => item.kind === "need" && item.organization !== null,
+			)
+			.slice(0, RAIL_LIMIT) ?? [];
 
 	if (needs.length === 0) return null;
 
