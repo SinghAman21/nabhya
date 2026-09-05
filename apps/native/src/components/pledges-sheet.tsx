@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Body, Caption, H2, Label } from "@/components/ui/typography";
 import { useNeedPledges, useReviewPledge } from "@/hooks/use-needs";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatProgress, formatRelative } from "@/lib/format";
 import type { NeedPledge, OrgNeedListItem } from "@/lib/types";

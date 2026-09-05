@@ -1,6 +1,6 @@
 import { View } from "react-native";
 import { Caption } from "@/components/ui/typography";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 
 export type PillTone = "neutral" | "success" | "warning" | "error" | "info";
 

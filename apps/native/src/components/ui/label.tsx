@@ -1,6 +1,6 @@
 import type { TextProps } from "react-native";
 import { Label as TypographyLabel } from "@/components/ui/typography";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 
 interface LabelProps extends TextProps {}
 

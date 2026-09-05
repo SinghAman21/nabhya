@@ -4,7 +4,7 @@ import { HandHeart, Landmark } from "lucide-react-native";
 import { ActivityIndicator, Alert, Pressable, View } from "react-native";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useSelectRole } from "@/hooks/use-profile";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 
 export default function RoleSelect() {

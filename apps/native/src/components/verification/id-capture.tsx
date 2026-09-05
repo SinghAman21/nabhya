@@ -10,8 +10,8 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { ActivityIndicator, Alert, Pressable, View } from "react-native";
 import { Body, Caption } from "@/components/ui/typography";
+import { useTheme } from "@/hooks/use-theme";
 import { useImageUpload } from "@/hooks/use-upload";
-import { useTheme } from "@/hooks/useTheme";
 
 export interface IdCaptureValue {
 	documentType: UserDocumentType;

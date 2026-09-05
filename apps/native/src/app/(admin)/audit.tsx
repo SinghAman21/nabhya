@@ -14,7 +14,7 @@ import { humanizeStatus, StatusPill } from "@/components/status-pill";
 import { Input } from "@/components/ui/input";
 import { Body, Caption } from "@/components/ui/typography";
 import { useAuditLogs } from "@/hooks/use-admin";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 

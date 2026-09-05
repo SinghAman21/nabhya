@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Body, Caption, H2, Label } from "@/components/ui/typography";
 import { useCreateDonation } from "@/hooks/use-engagement";
 import { useMe } from "@/hooks/use-profile";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -24,6 +24,13 @@ import { useAuthStore } from "@/store/auth-store";
  * The amount is captured in rupees but sent as paise — integers only, so no
  * float rounding ever reaches the ledger. Dodo is product-based, so whole
  * rupees are the finest granularity the gateway can represent.
+ *
+ * NOT CURRENTLY MOUNTED ANYWHERE. This component, its `useCreateDonation`
+ * hook, and the full checkout/webhook/receipt backend behind it are complete
+ * and working — monetary donations are just on hold at the user's request
+ * (see donations note in the root AGENTS.md and apps/server/AGENTS.md).
+ * Wiring this in is a one-line `<DonateSheet .../>` render from an NGO
+ * detail screen once the hold is lifted — don't do that without asking.
  */
 export function DonateSheet({
 	organizationId,

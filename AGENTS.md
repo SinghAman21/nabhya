@@ -241,7 +241,8 @@ non-existent endpoints, `JwtGuard`'s hardcoded `volunteer` assignment, and the
 
 | File | Trust |
 |---|---|
-| `final-year-report.md` | Full project report — architecture, ER diagram, all 91 endpoints, UML flows. Accurate as of July 2026 (branch `post-review-1`); regenerate counts after adding endpoints/tables. |
+| `final-year-report.md` | Full project report — architecture, ER diagram, all 91 endpoints, UML flows. Accurate as of July 2026 (branch `post-review-1`); Neon/Better Auth references were updated to Supabase after the migration (commit `1ac2fdf`). Regenerate counts after adding endpoints/tables. |
+| `july-20-2026.md` | Changelog from the `backend` branch (baseline `b7acfdc`) — role-vocabulary unification, JwtGuard defaults, early onboarding/needs/events work. Superseded by `final-year-report.md` for anything still true; kept as historical record, not a live doc. |
 | `notes.md` | Architecture doc — Zod as single source of truth, target layout, hardening checklist, roadmap. Partly stale (claims `packages/db` is empty). |
 | `schema.md` | 19-entity target domain model + mermaid. Read the **Amendments** section: item donations (`OrganizationNeed` + `ItemDonation`) are the core differentiator, drop hand-rolled auth tables, store object-storage keys not URLs. |
 | `misc.md` | Table-by-table longform, v1 — pre-amendment. |

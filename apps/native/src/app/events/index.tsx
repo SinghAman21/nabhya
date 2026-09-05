@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { EventFeed } from "@/components/event-feed";
 import { ScreenHeader } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { useAuthStore } from "@/store/auth-store";
 
 /**

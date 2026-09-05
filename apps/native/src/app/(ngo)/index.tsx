@@ -18,7 +18,7 @@ import { useOrganizationImpact } from "@/hooks/use-directory";
 import { useOrgEvents } from "@/hooks/use-events";
 import { useOrgNeeds } from "@/hooks/use-needs";
 import { useMyOrganization } from "@/hooks/use-organization";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { useAuthStore } from "@/store/auth-store";
 
 /**

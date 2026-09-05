@@ -6,7 +6,7 @@
 |---|---|
 | **Project** | Nabhya — a verified NGO ↔ volunteer platform for India |
 | **Repository** | `SinghAman21/nabhya` (branch `post-review-1`) |
-| **Platform** | Mobile app (Expo / React Native) + REST API (NestJS) + PostgreSQL (Neon) |
+| **Platform** | Mobile app (Expo / React Native) + REST API (NestJS) + PostgreSQL (Supabase) |
 | **Report date** | July 2026 |
 
 ---
@@ -37,7 +37,7 @@ Nabhya is a mobile-first platform that connects **verified NGOs** with **volunte
 
 Volunteers browse a public feed of events and needs, apply to events, pledge items against needs, bookmark and review organisations, donate money, and collect **publicly verifiable participation certificates** whose codes anyone can validate without an account.
 
-The system is built as a TypeScript monorepo: an **Expo (React Native) client**, a **NestJS 11 REST API** (91 endpoints across 14 feature modules), and a **PostgreSQL database on Neon** accessed through Drizzle ORM (22 tables). Authentication is delegated to **Neon Auth** (Better Auth) with stateless JWT verification against a remote JWKS. Files are stored in **Cloudflare R2** object storage using a pre-signed-URL flow so bytes never pass through the API. The server ships with a Vitest integration suite that runs against a real in-process Postgres (PGlite) built from the committed migrations.
+The system is built as a TypeScript monorepo: an **Expo (React Native) client**, a **NestJS 11 REST API** (91 endpoints across 14 feature modules), and a **PostgreSQL database on Supabase** accessed through Drizzle ORM (22 tables). Authentication is delegated to **Supabase Auth** with stateless JWT verification against a remote JWKS. Files are stored in **Cloudflare R2** object storage using a pre-signed-URL flow so bytes never pass through the API. The server ships with a Vitest integration suite that runs against a real in-process Postgres (PGlite) built from the committed migrations.
 
 ---
 
@@ -148,7 +148,7 @@ packages/db        Drizzle ORM schema + pg client        (@nabhya/db)
 packages/env       t3-oss/env runtime env validation      (@nabhya/env)
 packages/shared    Zod schemas shared client ↔ server     (@nabhya/shared)
 packages/config    Shared biome / tsconfig presets        (@nabhya/config)
-scripts/           Interactive Neon setup wizard (pnpm db:setup)
+scripts/           Interactive Supabase setup wizard (pnpm db:setup)
 ```
 
 ### 5.2 Key technologies and versions
@@ -168,9 +168,9 @@ scripts/           Interactive Neon setup wizard (pnpm db:setup)
 | | jose | 5.x | JWT verification against remote JWKS |
 | | pdf-lib | 1.17 | Certificate PDF rendering |
 | | AWS SDK v3 (S3 + presigner) | 3.x | Cloudflare R2 object storage (S3-compatible) |
-| Data | PostgreSQL (Neon serverless) | — | Primary datastore |
+| Data | PostgreSQL (Supabase) | — | Primary datastore |
 | | Drizzle ORM / drizzle-kit | 0.45 | Typed schema, queries, migrations |
-| Auth | Neon Auth (Better Auth) | 0.4.2-beta | Hosted identity provider issuing JWTs |
+| Auth | Supabase Auth | — | Hosted identity provider issuing JWTs |
 | Validation | Zod | 4.x (catalog) | Single source of truth for all request/response shapes |
 | Testing | Vitest + PGlite | 4.x / 0.5 | Integration tests on real in-process Postgres |
 | Tooling | Biome, Turborepo, tsdown/tsx | — | Lint/format, task graph, esbuild-based build/dev |
@@ -196,7 +196,7 @@ flowchart TB
         UI --> STORE
     end
 
-    subgraph Auth["Neon Auth (Better Auth)"]
+    subgraph Auth["Supabase Auth"]
         IDP[Identity provider]
         JWKS[JWKS endpoint]
     end
@@ -219,7 +219,7 @@ flowchart TB
 
     subgraph Data["Data layer"]
         DRZ[Drizzle ORM - packages/db]
-        PG[(Neon PostgreSQL - 22 tables)]
+        PG[(Supabase PostgreSQL - 22 tables)]
         DRZ --> PG
     end
 
@@ -227,7 +227,7 @@ flowchart TB
     DODO[Dodo Payments]
 
     SVC -- "Bearer JWT over HTTPS" --> THR
-    STORE -- "sign-in / getJWTToken" --> IDP
+    STORE -- "signInWithPassword / signUp" --> IDP
     JWT -- "fetch signing keys" --> JWKS
     SVCS --> DRZ
     SVCS -- "pre-signed URL issue / HEAD verify" --> R2
@@ -305,8 +305,8 @@ sequenceDiagram
     C->>T: HTTPS request, Authorization: Bearer JWT
     T->>T: rate-limit check (default 120/min, strict 10/min)
     T->>J: pass
-    J->>J: verify signature vs Neon JWKS (jose)
-    J->>D: JIT sync: find by neon_user_id → fall back to email+link → insert
+    J->>J: verify signature vs Supabase JWKS (jose)
+    J->>D: JIT sync: find by auth_user_id → fall back to email+link → insert
     J->>J: reject if suspended / deleted, then load roles onto request.user
     J->>R: pass
     R->>R: @Roles(...) OR-check (403 with descriptive message)
@@ -323,7 +323,7 @@ sequenceDiagram
 
 ## 7. Database Design
 
-Drizzle ORM on Neon PostgreSQL. **22 tables** across 10 schema files in `packages/db/src/schema/`, UUID primary keys throughout, generated SQL migrations committed in `packages/db/src/migrations/`. Seed data (`db:seed`) creates the three roles and ten cause categories.
+Drizzle ORM on Supabase PostgreSQL. **22 tables** across 10 schema files in `packages/db/src/schema/`, UUID primary keys throughout, generated SQL migrations committed in `packages/db/src/migrations/`. Seed data (`db:seed`) creates the three roles and ten cause categories.
 
 ### 7.1 Entity–Relationship diagram
 
@@ -362,7 +362,7 @@ erDiagram
 
     USERS {
         uuid id PK
-        varchar neon_user_id UK "link to Neon Auth subject"
+        varchar auth_user_id UK "link to Supabase Auth subject"
         varchar email UK
         varchar full_name
         varchar phone
@@ -739,23 +739,21 @@ sequenceDiagram
     autonumber
     actor U as User
     participant App as Expo app
-    participant NA as Neon Auth (Better Auth)
+    participant SA as Supabase Auth
     participant API as NestJS API
     participant DB as Postgres
 
     U->>App: email + password
-    App->>NA: signIn()
-    NA-->>App: session
-    App->>NA: getJWTToken()
-    NA-->>App: JWT (signed, short-lived)
-    App->>App: store as accessToken in expo-secure-store
+    App->>SA: signInWithPassword() / signUp()
+    SA-->>App: session (includes access token)
+    App->>App: store session.access_token as accessToken in expo-secure-store
     App->>API: any request, Authorization: Bearer JWT
-    API->>NA: fetch JWKS (cached) and verify signature
-    API->>DB: SELECT user WHERE neon_user_id = jwt.sub
+    API->>SA: fetch JWKS (cached) and verify signature
+    API->>DB: SELECT user WHERE auth_user_id = jwt.sub
     alt not found
         API->>DB: SELECT user WHERE email = jwt.email
         alt email match
-            API->>DB: UPDATE user SET neon_user_id (link account)
+            API->>DB: UPDATE user SET auth_user_id (link account)
         else no match
             API->>DB: INSERT user (JIT provisioning)
         end
@@ -998,7 +996,7 @@ Two systems coexist deliberately: NativeWind v4 / Tailwind 3.4 (brand primary `#
 
 | Concern | Mechanism |
 |---|---|
-| **Authentication** | Delegated to Neon Auth (Better Auth). The API never sees passwords — it statelessly verifies JWTs against the provider's remote JWKS (`jose`), then JIT-syncs the user row. Tokens live in `expo-secure-store` on device |
+| **Authentication** | Delegated to Supabase Auth. The API never sees passwords — it statelessly verifies JWTs against the provider's remote JWKS (`jose`), then JIT-syncs the user row. Tokens live in `expo-secure-store` on device |
 | **Authorisation** | Deny-by-default global guard; explicit `@Public`/`@OptionalAuth` opt-outs; `@Roles` guard with descriptive 403s. No default role at signup — an account can do nothing role-gated until it explicitly picks a role |
 | **Tenant isolation** | Org-scoped routes resolve the organisation from the token (`requireOwnedOrganization`); an org id is never accepted from the client. Public visibility additionally requires `requireVerifiedOrganization` |
 | **Public-surface safety** | Every public list inner-joins `organizations` filtered to `VERIFIED + ACTIVE` — moderation takes effect immediately across the whole public surface |
@@ -1065,8 +1063,8 @@ flowchart LR
         NEST[NestJS :3000]
     end
     CRON[Scheduler<br/>hourly close-finished]
-    NEON[(Neon PostgreSQL<br/>serverless)]
-    NAUTH[Neon Auth<br/>JWKS + sessions]
+    NEON[(Supabase PostgreSQL)]
+    NAUTH[Supabase Auth<br/>JWKS + sessions]
     R2[(Cloudflare R2)]
     DODO[Dodo Payments]
 

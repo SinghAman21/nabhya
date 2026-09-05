@@ -3,7 +3,7 @@ import { Bell } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 import { Caption } from "@/components/ui/typography";
 import { useUnreadCount } from "@/hooks/use-engagement";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { useAuthStore } from "@/store/auth-store";
 
 /**

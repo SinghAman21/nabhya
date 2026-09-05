@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react-native";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import { Body, Caption, H2 } from "@/components/ui/typography";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 
 /** Standard screen title block — matches the spacing used by the onboarding steps. */
 export function ScreenHeader({

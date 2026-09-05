@@ -34,7 +34,7 @@ import { useSignOut } from "@/hooks/use-auth";
 import { useMyImpact } from "@/hooks/use-directory";
 import { useMyUserDocuments } from "@/hooks/use-documents";
 import { useMe } from "@/hooks/use-profile";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import type { DocVerificationStatus } from "@/lib/types";
 

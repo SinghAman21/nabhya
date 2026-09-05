@@ -22,7 +22,7 @@ import {
 	useRevokeCertificate,
 } from "@/hooks/use-engagement";
 import { useEventApplicants, useReviewApplication } from "@/hooks/use-events";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatRelative } from "@/lib/format";
 import type { EventApplicant } from "@/lib/types";

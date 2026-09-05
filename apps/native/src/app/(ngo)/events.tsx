@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Body, Caption } from "@/components/ui/typography";
 import { useDeleteEvent, useOrgEvents } from "@/hooks/use-events";
 import { useMe } from "@/hooks/use-profile";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDateRange } from "@/lib/format";
 import type { OrgEventListItem } from "@/lib/types";

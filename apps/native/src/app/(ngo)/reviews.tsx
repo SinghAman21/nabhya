@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Body, Caption, H3 } from "@/components/ui/typography";
 import { useMyOrgReviews, useReplyToReview } from "@/hooks/use-engagement";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatRelative } from "@/lib/format";
 import type { ReviewItem } from "@/lib/types";

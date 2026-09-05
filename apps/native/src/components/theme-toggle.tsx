@@ -1,6 +1,6 @@
 import { Pressable, Text, View, type ViewStyle } from "react-native";
-import { useAppTheme } from "@/hooks/useAppTheme";
-import { useTheme } from "@/hooks/useTheme";
+import { useAppTheme } from "@/hooks/use-app-theme";
+import { useTheme } from "@/hooks/use-theme";
 
 export function ThemeToggle() {
 	const { isDark, toggleTheme } = useAppTheme();

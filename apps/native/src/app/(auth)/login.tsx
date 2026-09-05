@@ -8,7 +8,7 @@ import { AuthSplitLayout } from "@/components/auth-split-layout";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form";
 import { Body, Caption, H2 } from "@/components/ui/typography";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { authService } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/auth-store";
 

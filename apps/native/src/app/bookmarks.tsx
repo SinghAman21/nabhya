@@ -9,7 +9,7 @@ import {
 } from "@/components/screen-shell";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useBookmarks, useToggleBookmark } from "@/hooks/use-engagement";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 
 export default function Bookmarks() {

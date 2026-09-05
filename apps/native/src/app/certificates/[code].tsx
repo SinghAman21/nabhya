@@ -4,7 +4,7 @@ import { Pressable, ScrollView, View } from "react-native";
 import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useVerifyCertificate } from "@/hooks/use-engagement";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 

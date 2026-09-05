@@ -13,7 +13,7 @@ import {
 	typography,
 	withOpacity,
 } from "@/constants/design-system";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/use-app-theme";
 
 export function useTheme() {
 	const { isDark } = useAppTheme();
