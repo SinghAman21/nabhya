@@ -19,7 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Body, Caption } from "@/components/ui/typography";
 import { useAdminOrganizations } from "@/hooks/use-admin";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type { AdminOrgListItem } from "@/lib/types";

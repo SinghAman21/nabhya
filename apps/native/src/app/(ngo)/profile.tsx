@@ -30,7 +30,7 @@ import { useSignOut } from "@/hooks/use-auth";
 import { useOrgTeam } from "@/hooks/use-directory";
 import { useMyOrgDocuments } from "@/hooks/use-documents";
 import { useMyOrganization } from "@/hooks/use-organization";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 
 const REQUIRED_DOCS: UploadOrgDocumentInput["documentType"][] = [

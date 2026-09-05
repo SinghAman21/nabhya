@@ -3,7 +3,7 @@ import {
 	useBottomSheetInternal,
 } from "@gorhom/bottom-sheet";
 import { TextInput, type TextInputProps } from "react-native";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 
 export interface InputProps extends TextInputProps {}
 

@@ -1,4 +1,3 @@
-import type { FeedKind } from "@nabhya/shared";
 import { useRouter } from "expo-router";
 import {
 	Bookmark,
@@ -27,13 +26,13 @@ import {
 import { Pressable } from "@/components/ui/pressable";
 import { Caption } from "@/components/ui/typography";
 import { useOrganizations } from "@/hooks/use-directory";
-import { useToggleBookmark } from "@/hooks/use-engagement";
-import { useFeed } from "@/hooks/use-feed";
+import { useToggleFollow } from "@/hooks/use-engagement";
+import { useFeed, useFeedReaction } from "@/hooks/use-feed";
+import { useTheme } from "@/hooks/use-theme";
 import { useDebounced } from "@/hooks/useDebounced";
-import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
 import { focusable } from "@/lib/focus";
-import type { FeedItem, FeedNeedItem } from "@/lib/types";
+import type { FeedItem, FeedKind, FeedNeedItem } from "@/lib/types";
 
 /**
  * Search, as its own page.
@@ -55,6 +54,7 @@ const SCOPES: Array<{ value: Scope; label: string }> = [
 	{ value: "need", label: "Needs" },
 	{ value: "event", label: "Events" },
 	{ value: "story", label: "Updates" },
+	{ value: "post", label: "Posts" },
 ];
 
 /** Concrete, not abstract: a person should be able to tap one and see results. */
@@ -85,15 +85,16 @@ export default function SearchScreen() {
 		wantOrgs ? { search: term, limit: scope === "ngos" ? 25 : 5 } : {},
 	);
 	const feed = useFeed(
-		wantPosts
-			? {
-					tab: "for_you",
-					search: term,
-					...(scope === "all" ? {} : { kind: scope }),
-				}
-			: {},
+		{
+			tab: "for_you",
+			search: term,
+			...(scope === "all" || scope === "ngos" ? {} : { kind: scope }),
+		},
+		wantPosts,
 	);
-	const toggleFollow = useToggleBookmark();
+	const toggleFollow = useToggleFollow();
+	const like = useFeedReaction("like");
+	const save = useFeedReaction("save");
 
 	const items = useMemo(
 		() =>
@@ -264,7 +265,15 @@ export default function SearchScreen() {
 					<FeedCard
 						item={item}
 						onRespond={setResponding}
-						onToggleFollow={(id) => toggleFollow.mutate(id)}
+						onToggleFollow={(organizationId, following) =>
+							toggleFollow.mutate({ organizationId, following })
+						}
+						onToggleLike={(row, liked) =>
+							like.mutate({ item: row, on: !liked })
+						}
+						onToggleSave={(row, saved) =>
+							save.mutate({ item: row, on: !saved })
+						}
 					/>
 				)}
 				ListHeaderComponent={active ? resultsHeader : guide}

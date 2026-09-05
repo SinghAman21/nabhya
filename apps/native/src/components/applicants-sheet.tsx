@@ -24,7 +24,7 @@ import {
 	useRevokeCertificate,
 } from "@/hooks/use-engagement";
 import { useEventApplicants, useReviewApplication } from "@/hooks/use-events";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatRelative } from "@/lib/format";

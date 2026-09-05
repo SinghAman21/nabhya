@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Pressable } from "@/components/ui/pressable";
 import { fonts } from "@/constants/fonts";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { HEADERLESS } from "@/lib/navigation";
 
 /** Bar height above the home-indicator inset. */

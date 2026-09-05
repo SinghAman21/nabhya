@@ -41,6 +41,9 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
+# Expo
+.expo/
+
 # Turbo
 .turbo
 .nx
@@ -64,3 +67,4 @@ temp
 
 # Expo CLI cache (root, when started from the workspace)
 .expo/
+x-algorithm/

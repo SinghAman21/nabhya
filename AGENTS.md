@@ -83,8 +83,8 @@ client-side traps: `apps/native/AGENTS.md`.
 ### Server (`apps/server`)
 
 NestJS 11, global `/api` prefix, deny-by-default JWT guard + role guard, response
-envelope `{ success, data, timestamp }`, Swagger at `/api/docs`. 92 endpoints across
-15 feature modules (17 controllers), counting the two health probes. Architecture,
+envelope `{ success, data, timestamp }`, Swagger at `/api/docs`. 94 endpoints across
+14 feature modules (16 controllers), counting the two health probes. Architecture,
 guard model, module conventions and server traps: `apps/server/AGENTS.md`.
 
 ### Auth
@@ -106,8 +106,9 @@ Drizzle ORM on Supabase Postgres. Schema in `packages/db/src/schema/`, config at
 `packages/db/src/migrations/` (`pnpm db:generate` after schema changes); the server
 test suite builds its database from them, so drift fails tests.
 
-**22 tables across 10 schema files:**
-- `users.ts` — `users` (`auth_user_id`, `bio`, `city`, `state`, `onboarded_at`,
+**25 tables across 10 schema files:**
+- `users.ts` — `users` (`auth_user_id`, `bio`, `city`, `state`, optional `latitude` /
+  `longitude`, `onboarded_at`,
   `suspended_reason`, verification + status), `roles`, `user_roles`, `user_documents`
 - `organizations.ts` — `organizations` (+ `org_type`, `team_size`, `founding_year`,
   `rejection_reason`, `reviewed_by/at`; unique index on `owner_user_id`),
@@ -121,8 +122,10 @@ test suite builds its database from them, so drift fails tests.
   `pdf_key`, revocation fields)
 - `donations.ts` — `donations` (integer `amount_minor` in paise, unique
   `provider_payment_id` against webhook replay, nullable donor for guests)
-- `engagement.ts` — `bookmarks` (unique per user+org), `reviews` (unique per
-  user+org, org `reply`), `notifications` (14-type enum, per-recipient rows)
+- `engagement.ts` — `bookmarks` (unique per user+org), `organization_follows`
+  (unique per user+org), `reviews` (unique per user+org, org `reply`), polymorphic
+  `feed_interactions` / `feed_comments` for `POST` / `EVENT` / `NEED` /
+  `ANNOUNCEMENT`, and `notifications` (14-type enum, per-recipient rows)
 - `publishing.ts` — `announcements` (draft/published, pinning), `financial_reports`
   (public transparency docs — distinct from private `organization_documents`)
 - `audit.ts` — `audit_logs`
@@ -147,18 +150,22 @@ Supabase wizard.
   `EXPO_PUBLIC_SUPABASE_ANON_KEY` (both throw at import if unset)
 
 Wired services: Supabase (Postgres + Auth), Cloudflare R2 (optional, stubbed in dev),
-Dodo Payments (donations — on hold). No email provider.
+Razorpay (donations, native checkout SDK). No email provider.
 
 ## Current state
 
-**Built:** auth end-to-end; 92 REST endpoints across `users`, `onboarding`,
+**Built:** auth end-to-end; 94 REST endpoints across `users`, `onboarding`,
 `organizations`, `categories`, `events`, `needs`, `feed`, `admin`, `uploads`,
 `engagement`, `publishing`, `certificates`, `donations` and `notifications`.
 NGO + volunteer onboarding; org events and needs management with
 applicant/pledge review; the public event feed and apply flow; the NGO
 directory; attendance and certificates (issue, revoke, public verification);
-bookmarks, reviews, announcements, financial reports, team management,
-in-app notifications and superadmin broadcast; R2 uploads; the superadmin
+bookmarks, explicit organization follows, reviews, announcements, financial reports,
+team management, in-app notifications and superadmin broadcast; a unified server-side
+For You / Trending / Following feed ranks generic posts, events, needs and
+announcements using location, category, recency, follow, urgency and engagement signals.
+It records likes, saves, shares, comments and impressions; recent impressions down-rank
+For You but do not affect Following. R2 uploads; the superadmin
 console including the cross-org document verification queue and audit log.
 Volunteer identity verification captures a government ID plus a liveness selfie
 (front camera, guided two-frame challenge via `expo-camera`/`expo-image-picker`)
@@ -166,8 +173,12 @@ straight to R2; an account only becomes VERIFIED once a superadmin approves
 **both** — a single document never promotes the account on its own. The rule is
 enforced by `computeUserVerificationStatus` in `@nabhya/shared`, which both the
 upload and review paths recompute from the whole document set. Monetary
-donations are wired through Dodo Payments but the feature is **on hold** at the
-user's request.
+donations go through Razorpay's native checkout SDK (`react-native-razorpay`) —
+the server creates an order and hands the client an order id + public key, the
+client opens Razorpay's own in-app checkout, and only Razorpay's
+signature-verified webhook ever moves a donation to `COMPLETED` (never the
+client's own success callback). This requires a custom Expo dev client —
+Razorpay's native module does not run in Expo Go; see `apps/native/AGENTS.md`.
 
 The volunteer home is **one feed** (`GET /api/feed`, `modules/feed`): needs, offers,
 upcoming events and NGO announcements interleaved and ranked by one SQL `UNION ALL`
@@ -186,7 +197,7 @@ volunteer wizard), `(ngo)`, `(volunteer)`, `(admin)`, and public `events/`,
 `ngos/`, `certificates/`.
 
 Every endpoint is reachable from the app except two that are server-only by
-design: `POST /api/donations/webhook` (called by Dodo, signature-authenticated)
+design: `POST /api/donations/webhook` (called by Razorpay, signature-authenticated)
 and `POST /api/admin/events/close-finished` (a cron target — see Deploying).
 If you add an endpoint, wire it to a screen or explain here why it has none.
 
@@ -253,7 +264,7 @@ non-existent endpoints, `JwtGuard`'s hardcoded `volunteer` assignment, and the
 
 | File | Trust |
 |---|---|
-| `final-year-report.md` | Full project report — architecture, ER diagram, all 91 endpoints, UML flows. Accurate as of July 2026 (branch `post-review-1`); regenerate counts after adding endpoints/tables. |
+| `final-year-report.md` | Full project report — architecture, ER diagram and UML flows. A feed-ranking addendum records the 104-endpoint / 25-table state; older historical narrative may retain its July 2026 snapshot. |
 | `notes.md` | Architecture doc — Zod as single source of truth, target layout, hardening checklist, roadmap. Partly stale (claims `packages/db` is empty). |
 | `schema.md` | 19-entity target domain model + mermaid. Read the **Amendments** section: item donations (`OrganizationNeed` + `ItemDonation`) are the core differentiator, drop hand-rolled auth tables, store object-storage keys not URLs. |
 | `misc.md` | Table-by-table longform, v1 — pre-amendment. |

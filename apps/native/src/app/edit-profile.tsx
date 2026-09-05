@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Caption, Label } from "@/components/ui/typography";
 import { useMe, useUpdateProfile } from "@/hooks/use-profile";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 

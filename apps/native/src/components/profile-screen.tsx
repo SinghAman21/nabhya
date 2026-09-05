@@ -2,7 +2,7 @@ import type { Role } from "@nabhya/shared";
 import { View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Body, Caption, H2 } from "@/components/ui/typography";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { useAuthStore } from "@/store/auth-store";
 
 const ROLE_LABELS: Record<Role, string> = {

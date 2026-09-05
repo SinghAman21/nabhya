@@ -21,6 +21,14 @@ Organizations
 ✔ Filter NGOs
 ✔ View NGO Details
 ✔ Bookmark NGO
+✔ Follow NGO
+
+Feed
+----
+✔ Browse personalized For You feed
+✔ Browse public Trending feed
+✔ Browse followed-NGO feed
+✔ Like, save, share and comment on feed items
 
 Donations
 ---------
@@ -192,6 +200,12 @@ Reviews
 -------
 ✔ View Reviews
 ✔ Reply to Reviews
+
+Feed
+----
+✔ Publish organization feed updates
+✔ Appear in For You, Trending and followers' feeds
+✔ Receive likes, saves, shares and comments on public feed items
 
 Notifications
 -------------

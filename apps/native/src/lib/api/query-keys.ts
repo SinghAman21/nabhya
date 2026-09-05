@@ -17,7 +17,6 @@ export const queryKeys = {
 	orgEventApplicants: (id: string, params?: unknown) =>
 		["org", "events", id, "applications", params] as const,
 
-	feed: (params?: unknown) => ["feed", params] as const,
 	publicNeeds: (params?: unknown) => ["needs", "public", params] as const,
 	publicNeed: (id: string) => ["needs", "public", "detail", id] as const,
 	myPledges: (params?: unknown) => ["needs", "me", "pledges", params] as const,
@@ -69,6 +68,8 @@ export const queryKeys = {
 		["announcements", "me", params] as const,
 	reports: (id: string) => ["reports", id] as const,
 	team: ["org", "team"] as const,
+
+	feed: (params?: unknown) => ["feed", params] as const,
 
 	myImpact: ["impact", "me"] as const,
 	orgImpact: (id: string) => ["impact", "org", id] as const,

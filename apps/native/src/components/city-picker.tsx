@@ -4,7 +4,7 @@ import { View } from "react-native";
 import { Pressable } from "@/components/ui/pressable";
 import { Sheet, SheetOption } from "@/components/ui/sheet";
 import { Caption, H4 } from "@/components/ui/typography";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { focusable } from "@/lib/focus";
 
 /**

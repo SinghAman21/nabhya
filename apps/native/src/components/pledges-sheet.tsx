@@ -19,7 +19,7 @@ import { Pressable } from "@/components/ui/pressable";
 import { Sheet, SheetFlatList } from "@/components/ui/sheet";
 import { Body, Caption, Label } from "@/components/ui/typography";
 import { useNeedPledges, useReviewPledge } from "@/hooks/use-needs";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatProgress, formatRelative } from "@/lib/format";

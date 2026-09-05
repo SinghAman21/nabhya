@@ -11,8 +11,8 @@ import { useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption } from "@/components/ui/typography";
+import { useTheme } from "@/hooks/use-theme";
 import { useImageUpload } from "@/hooks/use-upload";
-import { useTheme } from "@/hooks/useTheme";
 import { Alert } from "@/lib/alert";
 
 export interface IdCaptureValue {

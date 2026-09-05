@@ -3,8 +3,8 @@ import { View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TAB_BAR_HEIGHT } from "@/components/tab-bar";
 import { Pressable } from "@/components/ui/pressable";
-import { useAppTheme } from "@/hooks/useAppTheme";
-import { useTheme } from "@/hooks/useTheme";
+import { useAppTheme } from "@/hooks/use-app-theme";
+import { useTheme } from "@/hooks/use-theme";
 
 /**
  * Floating theme switch, rendered beside the tab navigator on mobile. It clears

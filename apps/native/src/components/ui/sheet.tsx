@@ -25,8 +25,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H4 } from "@/components/ui/typography";
+import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
-import { useTheme } from "@/hooks/useTheme";
 import { focusable } from "@/lib/focus";
 
 /**

@@ -10,8 +10,8 @@ import { View } from "react-native";
 import { type NavItem, Sidebar } from "@/components/sidebar";
 import { renderTabBar, useTabBarOptions } from "@/components/tab-bar";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
-import { useTheme } from "@/hooks/useTheme";
 import { useAuthStore } from "@/store/auth-store";
 
 const ADMIN_NAV_ITEMS: NavItem[] = [

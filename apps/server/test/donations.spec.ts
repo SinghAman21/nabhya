@@ -100,10 +100,16 @@ describe("DonationsService", () => {
 
 		await service.handleWebhook(
 			JSON.stringify({
-				type: "payment.succeeded",
-				referenceId: checkout.donationId,
-				paymentId: "pay_test_1",
-				amountMinor: 250_000,
+				event: "payment.captured",
+				payload: {
+					payment: {
+						entity: {
+							id: "pay_test_1",
+							amount: 250_000,
+							notes: { referenceId: checkout.donationId },
+						},
+					},
+				},
 			}),
 			{},
 		);
@@ -125,10 +131,16 @@ describe("DonationsService", () => {
 		);
 
 		const payload = JSON.stringify({
-			type: "payment.succeeded",
-			referenceId: checkout.donationId,
-			paymentId: "pay_test_2",
-			amountMinor: 100_000,
+			event: "payment.captured",
+			payload: {
+				payment: {
+					entity: {
+						id: "pay_test_2",
+						amount: 100_000,
+						notes: { referenceId: checkout.donationId },
+					},
+				},
+			},
 		});
 
 		await service.handleWebhook(payload, {});
@@ -152,10 +164,16 @@ describe("DonationsService", () => {
 		await expect(
 			service.handleWebhook(
 				JSON.stringify({
-					type: "payment.succeeded",
-					referenceId: checkout.donationId,
-					paymentId: "pay_test_3",
-					amountMinor: 1_000_000, // ten times the real amount
+					event: "payment.captured",
+					payload: {
+						payment: {
+							entity: {
+								id: "pay_test_3",
+								amount: 1_000_000, // ten times the real amount
+								notes: { referenceId: checkout.donationId },
+							},
+						},
+					},
 				}),
 				{},
 			),
@@ -181,10 +199,16 @@ describe("DonationsService", () => {
 		);
 		await service.handleWebhook(
 			JSON.stringify({
-				type: "payment.succeeded",
-				referenceId: checkout.donationId,
-				paymentId: "pay_test_4",
-				amountMinor: 100_000,
+				event: "payment.captured",
+				payload: {
+					payment: {
+						entity: {
+							id: "pay_test_4",
+							amount: 100_000,
+							notes: { referenceId: checkout.donationId },
+						},
+					},
+				},
 			}),
 			{},
 		);
@@ -209,9 +233,15 @@ describe("DonationsService", () => {
 
 		await service.handleWebhook(
 			JSON.stringify({
-				type: "payment.failed",
-				referenceId: checkout.donationId,
-				paymentId: "pay_test_5",
+				event: "payment.failed",
+				payload: {
+					payment: {
+						entity: {
+							id: "pay_test_5",
+							notes: { referenceId: checkout.donationId },
+						},
+					},
+				},
 			}),
 			{},
 		);

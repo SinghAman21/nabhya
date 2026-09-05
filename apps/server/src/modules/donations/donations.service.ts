@@ -1,6 +1,5 @@
 import type { db as dbType } from "@nabhya/db";
 import { donations, organizations } from "@nabhya/db/schema";
-import { env } from "@nabhya/env/server";
 import type {
 	CreateDonationInput,
 	DonationCheckout,
@@ -93,7 +92,6 @@ export class DonationsService {
 			organizationName: organization.organizationName,
 			donorName: donation.donorName,
 			donorEmail: donation.donorEmail,
-			returnUrl: `${env.CORS_ORIGIN.split(",")[0]}/donations/${donation.id}`,
 		});
 
 		await this.db
@@ -106,9 +104,10 @@ export class DonationsService {
 
 		return {
 			donationId: donation.id,
-			checkoutUrl: checkout.checkoutUrl,
-			amountMinor: donation.amountMinor,
-			currency: donation.currency,
+			orderId: checkout.providerCheckoutId,
+			amountMinor: checkout.amountMinor,
+			currency: checkout.currency,
+			razorpayKeyId: checkout.publicKeyId,
 		};
 	}
 

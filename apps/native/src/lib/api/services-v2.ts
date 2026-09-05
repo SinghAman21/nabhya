@@ -53,6 +53,11 @@ export const engagementApi = {
 		http.post<{ bookmarked: boolean }>(ENGAGEMENT.bookmark(organizationId)),
 	listBookmarks: (query: Partial<PaginationQuery>) =>
 		http.getPage<BookmarkListItem>(ENGAGEMENT.MY_BOOKMARKS, query),
+	/** Following is what the Following feed reads; a bookmark is a private save. */
+	follow: (organizationId: string) =>
+		http.post<{ following: boolean }>(ENGAGEMENT.follow(organizationId)),
+	unfollow: (organizationId: string) =>
+		http.delete<{ following: boolean }>(ENGAGEMENT.follow(organizationId)),
 
 	listReviews: (organizationId: string, query: Partial<ReviewQuery>) =>
 		http.get<Paginated<ReviewItem> & { summary: ReviewSummary }>(

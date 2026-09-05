@@ -16,7 +16,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption, H3, Label } from "@/components/ui/typography";
 import { useAdminUser, useSetUserStatus } from "@/hooks/use-admin";
 import { useOpenDocument } from "@/hooks/use-documents";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";

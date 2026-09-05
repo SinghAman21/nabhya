@@ -3,8 +3,8 @@ import { History, Home, User } from "lucide-react-native";
 import { View } from "react-native";
 import { renderTabBar, useTabBarOptions } from "@/components/tab-bar";
 import { TopBar, TopBarContent } from "@/components/top-bar";
+import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
-import { useTheme } from "@/hooks/useTheme";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function VolunteerLayout() {

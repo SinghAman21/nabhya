@@ -29,7 +29,7 @@ import {
 } from "@/hooks/use-engagement";
 import { useMyApplications } from "@/hooks/use-events";
 import { useMyPledges } from "@/hooks/use-needs";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { focusable } from "@/lib/focus";
 import { formatDateRange, formatRelative } from "@/lib/format";

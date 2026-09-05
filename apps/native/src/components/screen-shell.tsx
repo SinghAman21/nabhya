@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BackButton } from "@/components/back-button";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H2, H3, Label } from "@/components/ui/typography";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { focusable } from "@/lib/focus";
 
 /**

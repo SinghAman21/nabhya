@@ -28,13 +28,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetOption } from "@/components/ui/sheet";
 import { Caption, H3, H4 } from "@/components/ui/typography";
+import { useAppTheme } from "@/hooks/use-app-theme";
 import { useSignOut } from "@/hooks/use-auth";
 import { useMyImpact } from "@/hooks/use-directory";
 import { useMyUserDocuments } from "@/hooks/use-documents";
 import { useMe } from "@/hooks/use-profile";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
-import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
 
 /**

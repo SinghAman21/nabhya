@@ -22,7 +22,7 @@ import {
 	useMyAnnouncements,
 	useUpdateAnnouncement,
 } from "@/hooks/use-directory";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatRelative } from "@/lib/format";

@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { Input } from "@/components/ui/input";
 import { Pressable } from "@/components/ui/pressable";
 import { Caption, Label } from "@/components/ui/typography";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 
 /**
  * Dependency-free date + time entry.

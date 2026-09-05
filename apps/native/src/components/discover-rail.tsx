@@ -9,7 +9,7 @@ import {
 import { Caption, Label } from "@/components/ui/typography";
 import { usePublicEvents } from "@/hooks/use-events";
 import { usePublicNeeds } from "@/hooks/use-needs";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { formatRelative } from "@/lib/format";
 import { useFeedStore } from "@/store/feed-store";
 

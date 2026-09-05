@@ -10,8 +10,8 @@ import { View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption } from "@/components/ui/typography";
+import { useTheme } from "@/hooks/use-theme";
 import { useImageUpload } from "@/hooks/use-upload";
-import { useTheme } from "@/hooks/useTheme";
 
 export interface SelfieCaptureValue {
 	primaryKey: string;

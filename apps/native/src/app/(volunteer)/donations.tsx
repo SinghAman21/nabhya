@@ -21,7 +21,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption } from "@/components/ui/typography";
 import { useDonationReceipt, useMyDonations } from "@/hooks/use-engagement";
 import { useMyPledges } from "@/hooks/use-needs";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDateTime, formatRelative } from "@/lib/format";
 

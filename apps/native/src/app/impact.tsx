@@ -17,7 +17,7 @@ import {
 } from "@/components/screen-shell";
 import { Body, Caption, H3 } from "@/components/ui/typography";
 import { useMyImpact } from "@/hooks/use-directory";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 

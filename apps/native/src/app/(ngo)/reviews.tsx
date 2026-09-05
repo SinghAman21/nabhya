@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H3 } from "@/components/ui/typography";
 import { useMyOrgReviews, useReplyToReview } from "@/hooks/use-engagement";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatRelative } from "@/lib/format";

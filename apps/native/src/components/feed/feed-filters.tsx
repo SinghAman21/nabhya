@@ -4,7 +4,7 @@ import { ScrollView, View } from "react-native";
 import { Pressable } from "@/components/ui/pressable";
 import { Sheet, SheetOption } from "@/components/ui/sheet";
 import { Caption } from "@/components/ui/typography";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { focusable } from "@/lib/focus";
 import type { Category } from "@/lib/types";
 

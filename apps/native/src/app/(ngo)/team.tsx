@@ -21,7 +21,7 @@ import {
 	useRemoveAdmin,
 	useUpdateAdmin,
 } from "@/hooks/use-directory";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";

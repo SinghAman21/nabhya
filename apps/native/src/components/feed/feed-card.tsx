@@ -1,25 +1,29 @@
+import { Image } from "expo-image";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import {
 	BadgeCheck,
+	Bookmark,
 	CalendarDays,
+	Heart,
 	MapPin,
 	Pin,
 	Share2,
 	Users,
 } from "lucide-react-native";
 import { useState } from "react";
-import { Share, View } from "react-native";
+import { Share, useWindowDimensions, View } from "react-native";
 import { Surface } from "@/components/screen-shell";
 import { StatusPill } from "@/components/status-pill";
 import { Pressable } from "@/components/ui/pressable";
-import { Caption, H5, Label } from "@/components/ui/typography";
-import { useTheme } from "@/hooks/useTheme";
+import { Body, Caption, H5, Label } from "@/components/ui/typography";
+import { useTheme } from "@/hooks/use-theme";
 import { formatDateRange, formatProgress, formatRelative } from "@/lib/format";
 import type {
 	FeedEventItem,
 	FeedItem,
 	FeedNeedItem,
+	FeedPostItem,
 	PublicNeed,
 } from "@/lib/types";
 
@@ -34,9 +38,23 @@ export function toPublicNeed(item: FeedNeedItem): PublicNeed {
 		city: item.city,
 		state: item.state,
 		createdAt: item.postedAt,
-		organization: item.organization,
+		organization: item.organization ?? {
+			id: "",
+			organizationName: "NGO",
+			logo: null,
+			city: null,
+			state: null,
+		},
 		...item.need,
 	};
+}
+
+export interface FeedCardActions {
+	/** Opens the pledge sheet for a need. Events navigate to their own page. */
+	onRespond: (item: FeedNeedItem) => void;
+	onToggleFollow: (organizationId: string, following: boolean) => void;
+	onToggleLike?: (item: FeedItem, liked: boolean) => void;
+	onToggleSave?: (item: FeedItem, saved: boolean) => void;
 }
 
 /**
@@ -44,32 +62,37 @@ export function toPublicNeed(item: FeedNeedItem): PublicNeed {
  *
  * Every card reads the same way top to bottom — who, what kind of thing, what,
  * the facts that decide it, then one action — so the eye never has to relearn
- * the layout between a need, an event and an update. Kind is said in words on
- * the eyebrow line, never by colour alone.
+ * the layout between a need, an event, an update and a plain post. Kind is
+ * said in words on the eyebrow line, never by colour alone. The footer holds
+ * the one primary action on the left and the light-touch reactions on the
+ * right, in the order people expect from every other feed: like, save, share.
  */
 export function FeedCard({
 	item,
 	onRespond,
 	onToggleFollow,
-}: {
-	item: FeedItem;
-	/** Opens the pledge sheet for a need. Events navigate to their own page. */
-	onRespond: (item: FeedNeedItem) => void;
-	onToggleFollow: (organizationId: string) => void;
-}) {
+	onToggleLike,
+	onToggleSave,
+}: { item: FeedItem } & FeedCardActions) {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
 	const [expanded, setExpanded] = useState(false);
 
 	const org = item.organization;
 	const closed = item.kind === "need" && item.need.status !== "OPEN";
+	const headline =
+		item.title || org?.organizationName || item.author?.fullName || "Post";
 
 	const share = async () => {
 		const path =
-			item.kind === "event" ? `/events/${item.id}` : `/ngos/${org.id}`;
+			item.kind === "event"
+				? `/events/${item.id}`
+				: org
+					? `/ngos/${org.id}`
+					: "/";
 		try {
 			await Share.share({
-				message: `${item.title} — ${org.organizationName} on Nabhya\n${Linking.createURL(path)}`,
+				message: `${headline}${org ? ` — ${org.organizationName}` : ""} on Nabhya\n${Linking.createURL(path)}`,
 			});
 		} catch {
 			// Web without the share API, or the user dismissed the sheet.
@@ -94,36 +117,55 @@ export function FeedCard({
 					disabled: false,
 					onPress: () => router.push(`/events/${item.id}`),
 				};
-			default:
+			case "story":
 				return {
 					label: expanded ? "Show less" : "Read more",
 					disabled: false,
 					onPress: () => setExpanded((v) => !v),
 				};
+			default:
+				return org
+					? {
+							label: "View NGO",
+							disabled: false,
+							onPress: () => router.push(`/ngos/${org.id}`),
+						}
+					: null;
 		}
 	})();
+
+	const liked = item.viewer?.liked ?? false;
+	const saved = item.viewer?.saved ?? false;
 
 	return (
 		<Surface padded={false} style={{ overflow: "hidden" }}>
 			<View style={{ padding: spacing[4], gap: spacing[3] }}>
-				<OrgHeader
+				<PosterHeader
 					item={item}
-					onOpen={() => router.push(`/ngos/${org.id}`)}
-					onToggleFollow={() => onToggleFollow(org.id)}
+					onOpen={org ? () => router.push(`/ngos/${org.id}`) : undefined}
+					onToggleFollow={
+						org ? () => onToggleFollow(org.id, item.isFollowing) : undefined
+					}
 				/>
 
-				<View style={{ gap: spacing[1] }}>
-					<Eyebrow item={item} />
-					<H5 numberOfLines={2}>{item.title}</H5>
-					<Caption
-						color="tertiary"
-						numberOfLines={
-							item.kind === "story" ? (expanded ? undefined : 4) : 2
-						}
-					>
-						{item.description}
-					</Caption>
-				</View>
+				{item.kind === "post" ? (
+					<PostBody item={item} expanded={expanded} onExpand={setExpanded} />
+				) : (
+					<View style={{ gap: spacing[1] }}>
+						<Eyebrow item={item} />
+						<H5 numberOfLines={2}>{item.title}</H5>
+						{item.description ? (
+							<Caption
+								color="tertiary"
+								numberOfLines={
+									item.kind === "story" ? (expanded ? undefined : 4) : 2
+								}
+							>
+								{item.description}
+							</Caption>
+						) : null}
+					</View>
+				)}
 
 				{item.kind === "need" && <NeedFacts item={item} />}
 				{item.kind === "event" && <EventFacts item={item} />}
@@ -131,49 +173,50 @@ export function FeedCard({
 
 			<View style={{ height: 1, backgroundColor: colors.border.hairline }} />
 
-			<View style={{ flexDirection: "row", alignItems: "stretch" }}>
-				<Pressable
-					onPress={primary.onPress}
-					disabled={primary.disabled}
-					accessibilityRole="button"
-					accessibilityState={{ disabled: primary.disabled }}
-					accessibilityLabel={`${primary.label}: ${item.title}`}
-					style={({ pressed }) => ({
-						flex: 1,
-						alignItems: "center",
-						justifyContent: "center",
-						paddingVertical: spacing[3.5],
-						opacity: primary.disabled ? 0.45 : 1,
-						backgroundColor: pressed
-							? (colors.background.subtle as string)
-							: "transparent",
-					})}
-				>
-					<Label weight="semibold" color={colors.primary.ink}>
-						{primary.label}
-					</Label>
-				</Pressable>
-				<View style={{ width: 1, backgroundColor: colors.border.hairline }} />
-				<Pressable
-					onPress={share}
-					accessibilityRole="button"
-					accessibilityLabel={`Share ${item.title}`}
-					hitSlop={6}
-					style={({ pressed }) => ({
-						width: 56,
-						alignItems: "center",
-						justifyContent: "center",
-						backgroundColor: pressed
-							? (colors.background.subtle as string)
-							: "transparent",
-					})}
-				>
-					<Share2
-						size={18}
-						color={colors.text.tertiary as string}
-						strokeWidth={1.9}
-					/>
-				</Pressable>
+			<View
+				style={{ flexDirection: "row", alignItems: "stretch", minHeight: 48 }}
+			>
+				{primary ? (
+					<Pressable
+						onPress={primary.onPress}
+						disabled={primary.disabled}
+						accessibilityRole="button"
+						accessibilityState={{ disabled: primary.disabled }}
+						accessibilityLabel={`${primary.label}: ${headline}`}
+						style={({ pressed }) => ({
+							flex: 1,
+							alignItems: "center",
+							justifyContent: "center",
+							paddingVertical: spacing[3],
+							opacity: primary.disabled ? 0.45 : 1,
+							backgroundColor: pressed
+								? (colors.background.subtle as string)
+								: "transparent",
+						})}
+					>
+						<Label weight="semibold" color={colors.primary.ink}>
+							{primary.label}
+						</Label>
+					</Pressable>
+				) : (
+					<View style={{ flex: 1 }} />
+				)}
+				<Reaction
+					icon={Heart}
+					active={liked}
+					count={item.engagement.likes}
+					label={liked ? "Unlike" : "Like"}
+					activeColor={colors.error.main as string}
+					onPress={onToggleLike ? () => onToggleLike(item, liked) : undefined}
+				/>
+				<Reaction
+					icon={Bookmark}
+					active={saved}
+					label={saved ? "Unsave" : "Save"}
+					activeColor={colors.text.primary as string}
+					onPress={onToggleSave ? () => onToggleSave(item, saved) : undefined}
+				/>
+				<Reaction icon={Share2} label={`Share ${headline}`} onPress={share} />
 			</View>
 		</Surface>
 	);
@@ -183,20 +226,79 @@ export function FeedCard({
 /* Pieces                                                                     */
 /* -------------------------------------------------------------------------- */
 
-function OrgHeader({
+function Reaction({
+	icon: Icon,
+	active,
+	count,
+	label,
+	activeColor,
+	onPress,
+}: {
+	icon: typeof Heart;
+	active?: boolean;
+	count?: number;
+	label: string;
+	activeColor?: string;
+	onPress?: () => void;
+}) {
+	const { colors, spacing } = useTheme();
+	const color = active
+		? (activeColor ?? (colors.text.primary as string))
+		: (colors.text.tertiary as string);
+	return (
+		<>
+			<View style={{ width: 1, backgroundColor: colors.border.hairline }} />
+			<Pressable
+				onPress={onPress}
+				disabled={!onPress}
+				accessibilityRole="button"
+				accessibilityLabel={label}
+				accessibilityState={
+					active === undefined ? undefined : { selected: active }
+				}
+				hitSlop={4}
+				style={({ pressed }) => ({
+					minWidth: 52,
+					paddingHorizontal: spacing[2.5],
+					flexDirection: "row",
+					alignItems: "center",
+					justifyContent: "center",
+					gap: spacing[1],
+					backgroundColor: pressed
+						? (colors.background.subtle as string)
+						: "transparent",
+				})}
+			>
+				<Icon
+					size={18}
+					color={color}
+					strokeWidth={1.9}
+					fill={active ? color : "transparent"}
+				/>
+				{count ? (
+					<Caption weight="medium" color={active ? color : "tertiary"}>
+						{count}
+					</Caption>
+				) : null}
+			</Pressable>
+		</>
+	);
+}
+
+function PosterHeader({
 	item,
 	onOpen,
 	onToggleFollow,
 }: {
 	item: FeedItem;
-	onOpen: () => void;
-	onToggleFollow: () => void;
+	onOpen?: () => void;
+	onToggleFollow?: () => void;
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
 	const org = item.organization;
-	const verified = org.verificationStatus === "VERIFIED";
-	const place = item.city ?? org.city ?? item.state ?? "India";
-	const initial = org.organizationName?.charAt(0).toUpperCase() ?? "N";
+	const name = org?.organizationName ?? item.author?.fullName ?? "Volunteer";
+	const place = item.city ?? item.state ?? "India";
+	const initial = name.charAt(0).toUpperCase() || "N";
 
 	return (
 		<View
@@ -204,8 +306,9 @@ function OrgHeader({
 		>
 			<Pressable
 				onPress={onOpen}
-				accessibilityRole="link"
-				accessibilityLabel={`Open ${org.organizationName}`}
+				disabled={!onOpen}
+				accessibilityRole={onOpen ? "link" : undefined}
+				accessibilityLabel={onOpen ? `Open ${name}` : name}
 				hitSlop={4}
 				style={{
 					flex: 1,
@@ -214,18 +317,27 @@ function OrgHeader({
 					gap: spacing[2.5],
 				}}
 			>
-				<View
-					style={{
-						width: 36,
-						height: 36,
-						borderRadius: borderRadius.sm,
-						backgroundColor: colors.background.subtle,
-						alignItems: "center",
-						justifyContent: "center",
-					}}
-				>
-					<Label weight="bold">{initial}</Label>
-				</View>
+				{org?.logo ? (
+					<Image
+						source={{ uri: org.logo }}
+						style={{ width: 36, height: 36, borderRadius: borderRadius.sm }}
+						contentFit="cover"
+						accessibilityIgnoresInvertColors
+					/>
+				) : (
+					<View
+						style={{
+							width: 36,
+							height: 36,
+							borderRadius: org ? borderRadius.sm : 18,
+							backgroundColor: colors.background.subtle,
+							alignItems: "center",
+							justifyContent: "center",
+						}}
+					>
+						<Label weight="bold">{initial}</Label>
+					</View>
+				)}
 				<View style={{ flex: 1 }}>
 					<View
 						style={{
@@ -239,9 +351,9 @@ function OrgHeader({
 							numberOfLines={1}
 							style={{ flexShrink: 1 }}
 						>
-							{org.organizationName}
+							{name}
 						</Label>
-						{verified && (
+						{org && (
 							<BadgeCheck
 								size={15}
 								color={colors.info.ink}
@@ -256,39 +368,42 @@ function OrgHeader({
 				</View>
 			</Pressable>
 
-			<Pressable
-				onPress={onToggleFollow}
-				accessibilityRole="button"
-				accessibilityState={{ selected: item.isFollowing }}
-				accessibilityLabel={
-					item.isFollowing
-						? `Unfollow ${org.organizationName}`
-						: `Follow ${org.organizationName}`
-				}
-				hitSlop={8}
-				style={({ pressed }) => ({
-					minHeight: 30,
-					justifyContent: "center",
-					paddingHorizontal: spacing[3],
-					borderRadius: 999,
-					borderWidth: 1,
-					borderColor: item.isFollowing
-						? "transparent"
-						: (colors.border.medium as string),
-					backgroundColor: item.isFollowing
-						? (colors.background.subtle as string)
-						: pressed
-							? (colors.background.subtle as string)
-							: "transparent",
-				})}
-			>
-				<Caption
-					weight="medium"
-					color={item.isFollowing ? "tertiary" : (colors.primary.ink as string)}
+			{onToggleFollow && org && (
+				<Pressable
+					onPress={onToggleFollow}
+					accessibilityRole="button"
+					accessibilityState={{ selected: item.isFollowing }}
+					accessibilityLabel={
+						item.isFollowing
+							? `Unfollow ${org.organizationName}`
+							: `Follow ${org.organizationName}`
+					}
+					hitSlop={8}
+					style={({ pressed }) => ({
+						minHeight: 30,
+						justifyContent: "center",
+						paddingHorizontal: spacing[3],
+						borderRadius: 999,
+						borderWidth: 1,
+						borderColor: item.isFollowing
+							? "transparent"
+							: (colors.border.medium as string),
+						backgroundColor:
+							item.isFollowing || pressed
+								? (colors.background.subtle as string)
+								: "transparent",
+					})}
 				>
-					{item.isFollowing ? "Following" : "Follow"}
-				</Caption>
-			</Pressable>
+					<Caption
+						weight="medium"
+						color={
+							item.isFollowing ? "tertiary" : (colors.primary.ink as string)
+						}
+					>
+						{item.isFollowing ? "Following" : "Follow"}
+					</Caption>
+				</Pressable>
+			)}
 		</View>
 	);
 }
@@ -316,6 +431,69 @@ function Eyebrow({ item }: { item: FeedItem }) {
 			{item.isUrgent && <StatusPill label="Urgent" tone="error" />}
 			{item.kind === "story" && item.story.isPinned && (
 				<Pin size={12} color={colors.text.quaternary as string} />
+			)}
+		</View>
+	);
+}
+
+/**
+ * A plain post: the text, then up to four media tiles. One image gets the
+ * full width at 4:3; two or more share a row of squares. Videos show a still
+ * frame placeholder — playback is the detail page's job.
+ */
+function PostBody({
+	item,
+	expanded,
+	onExpand,
+}: {
+	item: FeedPostItem;
+	expanded: boolean;
+	onExpand: (next: boolean) => void;
+}) {
+	const { colors, spacing, borderRadius } = useTheme();
+	const { width } = useWindowDimensions();
+	const media = item.post.media.filter((m) => m.type === "IMAGE").slice(0, 4);
+	const long = item.post.text.length > 220;
+	// Card width minus page gutters and card padding, capped for desktop.
+	const inner = Math.min(width, 720) - spacing[5] * 2 - spacing[4] * 2;
+	const gap = spacing[1.5];
+	const tile = media.length > 1 ? (inner - gap) / 2 : inner;
+
+	return (
+		<View style={{ gap: spacing[3] }}>
+			{item.post.text ? (
+				<Body numberOfLines={expanded ? undefined : 6}>{item.post.text}</Body>
+			) : null}
+			{long && (
+				<Pressable
+					onPress={() => onExpand(!expanded)}
+					accessibilityRole="button"
+					hitSlop={6}
+					style={{ alignSelf: "flex-start" }}
+				>
+					<Caption weight="medium" color={colors.primary.ink as string}>
+						{expanded ? "Show less" : "Read more"}
+					</Caption>
+				</Pressable>
+			)}
+			{media.length > 0 && (
+				<View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>
+					{media.map((m) => (
+						<Image
+							key={m.id}
+							source={{ uri: m.url }}
+							contentFit="cover"
+							transition={150}
+							accessibilityIgnoresInvertColors
+							style={{
+								width: tile,
+								height: media.length === 1 ? tile * 0.75 : tile,
+								borderRadius: borderRadius.md,
+								backgroundColor: colors.background.subtle,
+							}}
+						/>
+					))}
+				</View>
 			)}
 		</View>
 	);
@@ -415,10 +593,8 @@ function EventFacts({ item }: { item: FeedEventItem }) {
 						? `${remaining} of ${event.volunteersNeeded} spots left`
 						: "All spots filled"}
 				</Fact>
-				{event.applicationDeadline && remaining > 0 && (
-					<Caption color={item.isUrgent ? colors.warning.ink : "quaternary"}>
-						Apply {formatRelative(event.applicationDeadline)}
-					</Caption>
+				{item.isUrgent && remaining > 0 && (
+					<Caption color={colors.warning.ink}>Starts soon</Caption>
 				)}
 			</View>
 		</View>

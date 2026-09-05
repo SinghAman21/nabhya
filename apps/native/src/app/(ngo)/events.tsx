@@ -23,7 +23,7 @@ import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption } from "@/components/ui/typography";
 import { useDeleteEvent, useOrgEvents } from "@/hooks/use-events";
 import { useMe } from "@/hooks/use-profile";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDateRange } from "@/lib/format";

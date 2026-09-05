@@ -1,7 +1,7 @@
 import { ActivityIndicator, type ViewStyle } from "react-native";
 import { Pressable } from "@/components/ui/pressable";
 import { Label } from "@/components/ui/typography";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { focusable } from "@/lib/focus";
 
 const variantStyles = {

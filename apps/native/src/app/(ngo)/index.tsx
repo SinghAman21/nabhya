@@ -4,6 +4,7 @@ import {
 	FileText,
 	HeartHandshake,
 	Megaphone,
+	PenLine,
 	Star,
 	Users,
 	Wallet,
@@ -25,7 +26,7 @@ import { useOrganizationImpact } from "@/hooks/use-directory";
 import { useOrgEvents } from "@/hooks/use-events";
 import { useOrgNeeds } from "@/hooks/use-needs";
 import { useMyOrganization } from "@/hooks/use-organization";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -225,6 +226,12 @@ export default function NgoDashboard() {
 						<View>
 							<SectionTitle>Manage</SectionTitle>
 							<ListGroup>
+								<ListRow
+									icon={PenLine}
+									label="Share an update"
+									hint="Post to every volunteer's feed"
+									onPress={() => router.push("/feed")}
+								/>
 								<ListRow
 									icon={CalendarDays}
 									label="Events"

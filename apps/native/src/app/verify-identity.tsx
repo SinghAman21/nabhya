@@ -13,7 +13,7 @@ import {
 	type SelfieCaptureValue,
 } from "@/components/verification/selfie-capture";
 import { useUploadUserDocument } from "@/hooks/use-documents";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 

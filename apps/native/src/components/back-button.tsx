@@ -2,8 +2,8 @@ import { useRouter } from "expo-router";
 import { ChevronLeft } from "lucide-react-native";
 import type { ViewStyle } from "react-native";
 import { Pressable } from "@/components/ui/pressable";
+import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
-import { useTheme } from "@/hooks/useTheme";
 import { focusable } from "@/lib/focus";
 
 interface BackButtonProps {

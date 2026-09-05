@@ -34,8 +34,8 @@ import { AppController } from "./app.controller";
 		OrganizationsModule,
 		CategoriesModule,
 		EventsModule,
-		NeedsModule,
 		FeedModule,
+		NeedsModule,
 		NotificationsModule, // global — other modules emit through it
 		EngagementModule,
 		CertificatesModule,

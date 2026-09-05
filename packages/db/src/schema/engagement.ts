@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
 	index,
 	integer,
@@ -66,6 +66,105 @@ export const reviews = pgTable(
 	],
 );
 
+// ─── Organization follows ────────────────────────────────────────────────────
+
+export const organizationFollows = pgTable(
+	"organization_follows",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		organizationId: uuid("organization_id")
+			.notNull()
+			.references(() => organizations.id, { onDelete: "cascade" }),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(table) => [
+		uniqueIndex("organization_follows_user_organization_unique").on(
+			table.userId,
+			table.organizationId,
+		),
+		index("organization_follows_organization_idx").on(table.organizationId),
+	],
+);
+
+// ─── Feed interactions ───────────────────────────────────────────────────────
+
+export const feedItemTypeEnum = pgEnum("feed_item_type", [
+	"POST",
+	"EVENT",
+	"NEED",
+	"ANNOUNCEMENT",
+]);
+
+export const feedInteractionTypeEnum = pgEnum("feed_interaction_type", [
+	"LIKE",
+	"SAVE",
+	"SHARE",
+	"IMPRESSION",
+]);
+
+/**
+ * A polymorphic engagement record for every item that may appear in the feed.
+ * `targetId` intentionally has no foreign key because it can reference four tables.
+ */
+export const feedInteractions = pgTable(
+	"feed_interactions",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		targetType: feedItemTypeEnum("target_type").notNull(),
+		targetId: uuid("target_id").notNull(),
+		interactionType: feedInteractionTypeEnum("interaction_type").notNull(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(table) => [
+		// LIKE and SAVE are idempotent. SHARE and IMPRESSION intentionally retain
+		// every occurrence for analytics.
+		uniqueIndex("feed_interactions_user_target_like_save_unique")
+			.on(table.userId, table.targetType, table.targetId, table.interactionType)
+			.where(sql`${table.interactionType} in ('LIKE', 'SAVE')`),
+		index("feed_interactions_target_type_created_idx").on(
+			table.targetType,
+			table.targetId,
+			table.createdAt,
+		),
+		index("feed_interactions_user_created_idx").on(
+			table.userId,
+			table.createdAt,
+		),
+	],
+);
+
+// ─── Feed comments ───────────────────────────────────────────────────────────
+
+/** Comments on any item that can appear in the feed. */
+export const feedComments = pgTable(
+	"feed_comments",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		targetType: feedItemTypeEnum("target_type").notNull(),
+		targetId: uuid("target_id").notNull(),
+		body: text("body").notNull(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(table) => [
+		index("feed_comments_target_created_idx").on(
+			table.targetType,
+			table.targetId,
+			table.createdAt,
+		),
+		index("feed_comments_user_idx").on(table.userId),
+	],
+);
+
 // ─── Notifications ───────────────────────────────────────────────────────────
 export const notificationTypeEnum = pgEnum("notification_type", [
 	"APPLICATION_ACCEPTED",
@@ -128,6 +227,37 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
 	organization: one(organizations, {
 		fields: [reviews.organizationId],
 		references: [organizations.id],
+	}),
+}));
+
+export const organizationFollowsRelations = relations(
+	organizationFollows,
+	({ one }) => ({
+		user: one(users, {
+			fields: [organizationFollows.userId],
+			references: [users.id],
+		}),
+		organization: one(organizations, {
+			fields: [organizationFollows.organizationId],
+			references: [organizations.id],
+		}),
+	}),
+);
+
+export const feedInteractionsRelations = relations(
+	feedInteractions,
+	({ one }) => ({
+		user: one(users, {
+			fields: [feedInteractions.userId],
+			references: [users.id],
+		}),
+	}),
+);
+
+export const feedCommentsRelations = relations(feedComments, ({ one }) => ({
+	user: one(users, {
+		fields: [feedComments.userId],
+		references: [users.id],
 	}),
 }));
 

@@ -7,7 +7,7 @@ import { SplashScreen, Stack } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { ThemeProvider } from "@/hooks/useAppTheme";
+import { ThemeProvider } from "@/hooks/use-app-theme";
 import { queryClient } from "@/lib/api";
 import { HEADERLESS } from "@/lib/navigation";
 import { storage } from "@/lib/storage";
@@ -69,6 +69,7 @@ export default function RootLayout() {
 							<Stack.Screen name="verify-identity" />
 							<Stack.Screen name="success" />
 							<Stack.Screen name="search" />
+							<Stack.Screen name="feed" />
 						</Stack>
 						<PortalHost />
 					</View>

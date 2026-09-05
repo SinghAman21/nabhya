@@ -36,10 +36,6 @@ export const ORG_EVENTS = {
 		`${API_PREFIX}/org/events/${id}/applications/${applicationId}`,
 } as const;
 
-export const FEED = {
-	LIST: `${API_PREFIX}/feed`,
-};
-
 export const NEEDS = {
 	LIST: `${API_PREFIX}/needs`,
 	MY_PLEDGES: `${API_PREFIX}/needs/me/pledges`,
@@ -79,6 +75,17 @@ export const CATEGORIES = {
 	LIST: `${API_PREFIX}/categories`,
 } as const;
 
+export const FEED = {
+	LIST: `${API_PREFIX}/feed`,
+	FOR_YOU: `${API_PREFIX}/feed/for-you`,
+	TRENDING: `${API_PREFIX}/feed/trending`,
+	FOLLOWING: `${API_PREFIX}/feed/following`,
+	UPLOAD_INTENTS: `${API_PREFIX}/feed/upload-intents`,
+	detail: (id: string) => `${API_PREFIX}/feed/${id}`,
+	interaction: (type: string, id: string, action: "like" | "save" | "share") =>
+		`${API_PREFIX}/feed/${type}/${id}/${action}`,
+} as const;
+
 export const UPLOADS = {
 	INTENT: `${API_PREFIX}/uploads/intent`,
 	DOWNLOAD_URL: `${API_PREFIX}/uploads/download-url`,
@@ -95,6 +102,7 @@ export const ENGAGEMENT = {
 	MY_BOOKMARKS: `${API_PREFIX}/me/bookmarks`,
 	ORG_REVIEWS: `${API_PREFIX}/org/reviews`,
 	bookmark: (id: string) => `${API_PREFIX}/organizations/${id}/bookmark`,
+	follow: (id: string) => `${API_PREFIX}/organizations/${id}/follow`,
 	reviews: (id: string) => `${API_PREFIX}/organizations/${id}/reviews`,
 	myReview: (id: string) => `${API_PREFIX}/organizations/${id}/reviews/me`,
 	replyToReview: (reviewId: string) =>

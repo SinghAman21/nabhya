@@ -15,7 +15,7 @@ import {
 	typography,
 	withOpacity,
 } from "@/constants/design-system";
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppTheme } from "@/hooks/use-app-theme";
 
 /**
  * Memoised on `isDark`, and everything inside it is a module constant, so the

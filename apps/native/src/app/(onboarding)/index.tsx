@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H2, Label } from "@/components/ui/typography";
 import { useCompleteOrgOnboarding } from "@/hooks/use-profile";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";

@@ -15,7 +15,7 @@ import {
 import { humanizeStatus } from "@/components/status-pill";
 import { Caption } from "@/components/ui/typography";
 import { useOrgDocumentQueue, useUserDocumentQueue } from "@/hooks/use-admin";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 
 type Kind = "organization" | "user";

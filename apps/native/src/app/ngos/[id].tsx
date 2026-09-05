@@ -34,7 +34,7 @@ import {
 	useToggleBookmark,
 } from "@/hooks/use-engagement";
 import { useMe } from "@/hooks/use-profile";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate, formatRelative } from "@/lib/format";

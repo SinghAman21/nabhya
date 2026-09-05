@@ -25,6 +25,8 @@ J --> L[Volunteer Attends Event]
 L --> M[Generate Certificate]
 
 E --> N[Post Announcement]
+E --> U[Publish NGO Feed Post]
+U --> V[Appear in For You / Trending / Following]
 
 E --> O[Upload Financial Reports]
 

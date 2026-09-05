@@ -21,7 +21,7 @@ import {
 	useCompleteVolunteerOnboarding,
 	useMe,
 } from "@/hooks/use-profile";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 

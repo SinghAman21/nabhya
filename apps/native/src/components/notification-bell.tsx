@@ -10,8 +10,8 @@ import {
 	useNotifications,
 	useUnreadCount,
 } from "@/hooks/use-engagement";
+import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
-import { useTheme } from "@/hooks/useTheme";
 import { focusable } from "@/lib/focus";
 import { formatRelative } from "@/lib/format";
 import { useAuthStore } from "@/store/auth-store";

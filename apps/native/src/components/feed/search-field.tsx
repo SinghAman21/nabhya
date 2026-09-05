@@ -1,7 +1,7 @@
 import { Search, X } from "lucide-react-native";
 import { TextInput, View } from "react-native";
 import { Pressable } from "@/components/ui/pressable";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { focusWithin } from "@/lib/focus";
 
 /**

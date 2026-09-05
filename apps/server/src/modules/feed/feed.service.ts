@@ -1,220 +1,178 @@
 import type { db as dbType } from "@nabhya/db";
-import type { FeedKind, FeedQuery, Paginated } from "@nabhya/shared";
-import { Inject, Injectable } from "@nestjs/common";
-import { type SQL, sql } from "drizzle-orm";
+import { feedPostMedia, feedPosts, users } from "@nabhya/db/schema";
+import type {
+	CreateFeedMediaIntentsInput,
+	CreateFeedPostInput,
+	FeedQuery,
+} from "@nabhya/shared";
+import {
+	ForbiddenException,
+	Inject,
+	Injectable,
+	NotFoundException,
+} from "@nestjs/common";
+import { count, desc, eq } from "drizzle-orm";
+import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
-import { paginate, toOffset } from "../../common/utils";
+import { STORAGE_TOKEN, type StorageProvider } from "../../common/storage";
+import type { AuthUser } from "../../common/types";
+import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
+import { OrganizationsService } from "../organizations/organizations.service";
+import { UploadsService } from "../uploads/uploads.service";
 
-/**
- * One row of the unified feed as the client receives it. The kind-specific
- * facts sit under a key named after the kind so a card can narrow on `kind`.
- */
-export interface FeedItem {
-	kind: FeedKind;
-	id: string;
-	title: string;
-	description: string;
-	city: string | null;
-	state: string | null;
-	postedAt: string;
-	isUrgent: boolean;
-	isFollowing: boolean;
-	organization: {
-		id: string;
-		organizationName: string;
-		logo: string | null;
-		city: string | null;
-		state: string | null;
-		verificationStatus: string | null;
-	};
-	need?: Record<string, unknown>;
-	event?: Record<string, unknown>;
-	story?: Record<string, unknown>;
-}
-
-interface FeedRow {
-	kind: FeedKind;
-	id: string;
-	title: string;
-	description: string;
-	city: string | null;
-	state: string | null;
-	posted_at: Date | string;
-	urgent: boolean;
-	recent_engagement: string | number;
-	payload: Record<string, unknown>;
-	organization: FeedItem["organization"];
-	is_following: boolean;
-	total: string | number;
-}
-
-/**
- * Written as one SQL statement rather than three Drizzle queries merged in
- * JS: three separately paginated lists cannot be interleaved — page 2 of the
- * merged result is undefined — so the union, the ranking and the offset all
- * have to happen in the database. Literal, table-qualified SQL throughout; see
- * `apps/server/AGENTS.md` on why `${table.column}` inside a select is a trap.
- */
 @Injectable()
 export class FeedService {
-	constructor(@Inject(DB_TOKEN) private readonly db: typeof dbType) {}
+	constructor(
+		@Inject(DB_TOKEN) private readonly db: typeof dbType,
+		@Inject(STORAGE_TOKEN) private readonly storage: StorageProvider,
+		@Inject(UploadsService) private readonly uploads: UploadsService,
+		@Inject(AuditService) private readonly audit: AuditService,
+		@Inject(OrganizationsService)
+		private readonly organizationsService: OrganizationsService,
+	) {}
 
-	async list(
-		query: FeedQuery,
-		userId: string | null,
-	): Promise<Paginated<FeedItem>> {
-		// "Following" is meaningless without a signed-in follower.
-		if (query.tab === "following" && !userId) {
-			return paginate([], 0, query);
-		}
+	async createMediaIntents(user: AuthUser, input: CreateFeedMediaIntentsInput) {
+		return this.uploads.createFeedMediaIntents(user, input.files);
+	}
 
-		const { limit, offset } = toOffset(query);
-		const conditions: SQL[] = [
-			sql`o.verification_status = 'VERIFIED'`,
-			sql`o.status = 'ACTIVE'`,
-		];
-
-		if (query.categoryId) {
-			conditions.push(
-				sql`exists (select 1 from organization_categories oc
-					where oc.organization_id = o.id and oc.category_id = ${query.categoryId})`,
+	async create(user: AuthUser, input: CreateFeedPostInput) {
+		const mediaFolder =
+			input.mediaFolder ?? this.uploads.createEmptyFeedMediaFolder();
+		await this.uploads.assertFeedMediaKeys(user, mediaFolder, input.mediaKeys);
+		const organization = user.roles.includes("organisation")
+			? await this.organizationsService.requireOwnedOrganization(user.id)
+			: null;
+		const post = await this.db.transaction(async (tx) => {
+			const created = takeFirstOrThrow(
+				await tx
+					.insert(feedPosts)
+					.values({
+						authorUserId: user.id,
+						organizationId: organization?.id,
+						city: organization?.city,
+						state: organization?.state,
+						latitude: organization?.latitude,
+						longitude: organization?.longitude,
+						mediaFolder,
+						text: input.text,
+					})
+					.returning(),
+				"create feed post",
 			);
-		}
-		if (query.kind) {
-			conditions.push(sql`i.kind = ${query.kind}`);
-		}
-		if (query.city) {
-			const term = `%${query.city}%`;
-			conditions.push(
-				sql`(i.city ilike ${term} or (i.city is null and o.city ilike ${term}))`,
-			);
-		}
-		if (query.search) {
-			const term = `%${query.search}%`;
-			conditions.push(
-				sql`(i.title ilike ${term} or i.description ilike ${term} or o.organization_name ilike ${term})`,
-			);
-		}
-
-		const following = userId
-			? sql`exists (select 1 from bookmarks b
-					where b.user_id = ${userId} and b.organization_id = o.id)`
-			: sql`false`;
-
-		let orderBy: SQL;
-		switch (query.tab) {
-			case "following":
-				conditions.push(following);
-				orderBy = sql`i.posted_at desc`;
-				break;
-			case "trending":
-				// Stories have no engagement signal; a trending list of them would
-				// be a ranked list of nothing.
-				conditions.push(sql`i.kind <> 'story'`);
-				conditions.push(sql`i.recent_engagement > 0`);
-				orderBy = sql`i.recent_engagement desc, i.posted_at desc`;
-				break;
-			case "urgent":
-				conditions.push(sql`i.urgent`);
-				orderBy = sql`i.posted_at desc`;
-				break;
-			default: {
-				// Interest match outweighs proximity, proximity outweighs urgency,
-				// and recency breaks ties. Anonymous callers only have the last two.
-				const interest = userId
-					? sql`(case when exists (select 1 from organization_categories oc
-							join user_categories uc on uc.category_id = oc.category_id
-							where oc.organization_id = o.id and uc.user_id = ${userId}) then 3 else 0 end)`
-					: sql`0`;
-				const proximity = userId
-					? sql`(case when coalesce(i.city, o.city) ilike
-							(select u.city from users u where u.id = ${userId}) then 2 else 0 end)`
-					: sql`0`;
-				orderBy = sql`(${interest} + ${proximity} + (case when i.urgent then 1 else 0 end)) desc, i.posted_at desc`;
+			if (input.mediaKeys.length > 0) {
+				await tx.insert(feedPostMedia).values(
+					input.mediaKeys.map((objectKey, sortOrder) => ({
+						postId: created.id,
+						objectKey,
+						mediaType: (objectKey.endsWith(".mp4") || objectKey.endsWith(".mov")
+							? "VIDEO"
+							: "IMAGE") as "VIDEO" | "IMAGE",
+						mimeType: objectKey.endsWith(".mp4")
+							? "video/mp4"
+							: objectKey.endsWith(".mov")
+								? "video/quicktime"
+								: "image/*",
+						sortOrder,
+					})),
+				);
 			}
-		}
-
-		const where = sql.join(conditions, sql` and `);
-
-		const statement = sql`
-			with items as (
-				select 'need' as kind, n.id, n.organization_id, n.title, n.description,
-					n.city, n.state, n.created_at as posted_at,
-					(n.urgency = 'HIGH') as urgent,
-					(select count(*) from need_pledges p
-						where p.need_id = n.id and p.created_at > now() - interval '7 days') as recent_engagement,
-					json_build_object(
-						'type', n.type, 'quantity', n.quantity, 'unit', n.unit,
-						'fulfilledQuantity', n.fulfilled_quantity, 'urgency', n.urgency,
-						'status', n.status, 'expiresAt', n.expires_at
-					) as payload
-				from organization_needs n
-				where n.status = 'OPEN' and (n.expires_at is null or n.expires_at > now())
-
-				union all
-
-				select 'event', e.id, e.organization_id, e.title, e.description,
-					e.city, e.state, e.created_at,
-					(coalesce(e.application_deadline, e.start_at) < now() + interval '3 days'),
-					(select count(*) from event_applications a
-						where a.event_id = e.id and a.applied_at > now() - interval '7 days'),
-					json_build_object(
-						'coverImage', e.cover_image, 'venue', e.venue, 'startAt', e.start_at,
-						'endAt', e.end_at, 'applicationDeadline', e.application_deadline,
-						'volunteersNeeded', e.volunteers_needed, 'acceptedCount', e.accepted_count,
-						'status', e.status
-					)
-				from events e
-				where e.status = 'PUBLISHED' and e.start_at > now()
-
-				union all
-
-				select 'story', a.id, a.organization_id, a.title, a.body,
-					null, null, coalesce(a.published_at, a.created_at),
-					false, 0::bigint,
-					json_build_object('coverImageKey', a.cover_image_key, 'isPinned', a.is_pinned)
-				from announcements a
-				where a.status = 'PUBLISHED'
-			)
-			select i.kind, i.id, i.title, i.description, i.city, i.state, i.posted_at,
-				i.urgent, i.recent_engagement, i.payload,
-				json_build_object(
-					'id', o.id, 'organizationName', o.organization_name, 'logo', o.logo,
-					'city', o.city, 'state', o.state, 'verificationStatus', o.verification_status
-				) as organization,
-				${following} as is_following,
-				count(*) over() as total
-			from items i
-			join organizations o on o.id = i.organization_id
-			where ${where}
-			order by ${orderBy}
-			limit ${limit} offset ${offset}
-		`;
-
-		const result = await this.db.execute(statement);
-		const rows = result.rows as unknown as FeedRow[];
-		const total = rows.length > 0 ? Number(rows[0]?.total ?? 0) : 0;
-
-		const items = rows.map((row): FeedItem => {
-			const postedAt =
-				row.posted_at instanceof Date
-					? row.posted_at.toISOString()
-					: new Date(row.posted_at).toISOString();
-			return {
-				kind: row.kind,
-				id: row.id,
-				title: row.title,
-				description: row.description,
-				city: row.city,
-				state: row.state,
-				postedAt,
-				isUrgent: row.urgent,
-				isFollowing: row.is_following,
-				organization: row.organization,
-				[row.kind]: row.payload,
-			};
+			return created;
 		});
+		void this.audit.record({
+			performedBy: user.id,
+			action: "CREATE_FEED_POST",
+			entityName: "FEED_POST",
+			entityId: post.id,
+		});
+		return this.getPost(post.id);
+	}
 
-		return paginate(items, total, query);
+	async list(query: FeedQuery) {
+		const { limit, offset } = toOffset(query);
+		const [posts, [totals]] = await Promise.all([
+			this.db
+				.select({
+					id: feedPosts.id,
+					text: feedPosts.text,
+					createdAt: feedPosts.createdAt,
+					author: {
+						id: users.id,
+						fullName: users.fullName,
+						profileImage: users.profileImage,
+					},
+				})
+				.from(feedPosts)
+				.innerJoin(users, eq(feedPosts.authorUserId, users.id))
+				.orderBy(desc(feedPosts.createdAt))
+				.limit(limit)
+				.offset(offset),
+			this.db.select({ value: count() }).from(feedPosts),
+		]);
+		return paginate(
+			await Promise.all(posts.map((post) => this.withMedia(post))),
+			totals?.value ?? 0,
+			query,
+		);
+	}
+
+	async remove(user: AuthUser, postId: string) {
+		const post = await this.db.query.feedPosts.findFirst({
+			where: eq(feedPosts.id, postId),
+			with: { media: true },
+		});
+		if (!post) throw new NotFoundException("Post not found");
+		if (!user.roles.includes("superadmin") && post.authorUserId !== user.id) {
+			throw new ForbiddenException("You can only delete your own posts.");
+		}
+		await this.db.delete(feedPosts).where(eq(feedPosts.id, postId));
+		await Promise.all(
+			post.media.map((media) => this.storage.delete(media.objectKey)),
+		);
+		void this.audit.record({
+			performedBy: user.id,
+			action: "DELETE_FEED_POST",
+			entityName: "FEED_POST",
+			entityId: postId,
+		});
+		return { deleted: true };
+	}
+
+	private async getPost(postId: string) {
+		const post = await this.db
+			.select({
+				id: feedPosts.id,
+				text: feedPosts.text,
+				createdAt: feedPosts.createdAt,
+				author: {
+					id: users.id,
+					fullName: users.fullName,
+					profileImage: users.profileImage,
+				},
+			})
+			.from(feedPosts)
+			.innerJoin(users, eq(feedPosts.authorUserId, users.id))
+			.where(eq(feedPosts.id, postId))
+			.then((rows) => rows[0]);
+		if (!post) throw new NotFoundException("Post not found");
+		return this.withMedia(post);
+	}
+
+	private async withMedia<T extends { id: string }>(post: T) {
+		const media = await this.db
+			.select()
+			.from(feedPostMedia)
+			.where(eq(feedPostMedia.postId, post.id))
+			.orderBy(feedPostMedia.sortOrder);
+		return {
+			...post,
+			media: await Promise.all(
+				media.map(async (item) => ({
+					id: item.id,
+					type: item.mediaType,
+					url: await this.storage.createDownloadUrl(item.objectKey),
+					sortOrder: item.sortOrder,
+				})),
+			),
+		};
 	}
 }

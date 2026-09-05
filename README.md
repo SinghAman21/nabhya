@@ -74,9 +74,9 @@ SUPABASE_AUTH_JWKS_URL="https://<project-ref>.supabase.co/auth/v1/.well-known/jw
 ```
 
 `<project-ref>`, `<password>` and `<region>` come from the connection strings you
-copied in step 2. R2 (object storage) and Dodo (payments) vars are optional — see
-`apps/server/.env.example` for the full list; leaving them unset falls back to
-in-memory stubs in development.
+copied in step 2. R2 (object storage) and Razorpay (payments) vars are optional
+— see `apps/server/.env.example` for the full list; leaving them unset falls
+back to in-memory stubs in development.
 
 Fastest path for this file: run `pnpm db:setup` from the repo root — an interactive
 wizard that asks for these same values and writes the file for you.
@@ -132,6 +132,28 @@ pnpm web             # not a real target yet — no web app is scaffolded
 ```bash
 pnpm dev
 ```
+
+## Feed-ranking API (server-only)
+
+The server exposes a unified feed that mixes generic posts, published events, open needs
+and published announcements. The first client integration is intentionally pending; test
+these routes through Swagger at `http://localhost:3000/api/docs` or an API client.
+
+| Route | Access | Purpose |
+|---|---|---|
+| `GET /api/feed/for-you` | Optional auth | Personalized ranking. Uses Haversine distance when optional user coordinates are set, otherwise city/state; also considers category interests, follows, recency, urgency and engagement. |
+| `GET /api/feed/trending` | Public | Recent, time-decayed engagement ranking. A valid optional token adds location context and viewer flags. |
+| `GET /api/feed/following` | Authenticated | Reverse-chronological content from explicitly followed organizations. |
+| `POST` / `DELETE /api/organizations/:id/follow` | Authenticated | Follow or unfollow a verified, active NGO. |
+| `POST` / `DELETE /api/feed/:type/:id/like` | Authenticated | Like/unlike an item. |
+| `POST` / `DELETE /api/feed/:type/:id/save` | Authenticated | Save/unsave an item. |
+| `POST /api/feed/:type/:id/share` | Authenticated | Record a share. |
+| `POST /api/feed/:type/:id/impression` | Authenticated | Record an impression; recent impressions down-rank For You only. |
+| `GET` / `POST /api/feed/:type/:id/comments` | Public / authenticated | List or add comments. |
+
+`type` is one of `POST`, `EVENT`, `NEED`, or `ANNOUNCEMENT` (route matching is case-insensitive).
+The schema change is included in migration `0007_feed_ranking.sql`; run `pnpm db:push` in
+local development before exercising these routes.
 
 ## Everyday scripts
 

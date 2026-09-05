@@ -9,6 +9,10 @@ E -->|Approved| F[Browse NGOs]
 E -->|Rejected| D
 
 F --> G[Search & Filter NGOs]
+F --> V[Browse For You / Trending feeds]
+V --> W[Like, save, share or comment]
+V --> X[Follow NGO]
+X --> Y[View Following feed]
 F --> H[View NGO Details]
 
 H --> I[Bookmark NGO]

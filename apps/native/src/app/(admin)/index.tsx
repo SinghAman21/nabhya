@@ -23,7 +23,7 @@ import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H3 } from "@/components/ui/typography";
 import { useAdminOverview } from "@/hooks/use-admin";
 import { useSignOut } from "@/hooks/use-auth";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 
 export default function AdminOverviewScreen() {

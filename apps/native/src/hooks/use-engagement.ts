@@ -78,6 +78,32 @@ export function useToggleBookmark() {
 	});
 }
 
+/**
+ * Follow or unfollow an NGO. The server keeps follows and bookmarks apart;
+ * the feed's "Follow" pill is this one, because the Following lens reads
+ * `organization_follows`.
+ */
+export function useToggleFollow() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({
+			organizationId,
+			following,
+		}: {
+			organizationId: string;
+			/** The current state — true means this call unfollows. */
+			following: boolean;
+		}) =>
+			following
+				? engagementApi.unfollow(organizationId)
+				: engagementApi.follow(organizationId),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
+			queryClient.invalidateQueries({ queryKey: queryScopes.organizations });
+		},
+	});
+}
+
 // ─── Reviews ─────────────────────────────────────────────────────────────────
 
 export function useReviews(

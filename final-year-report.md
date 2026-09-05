@@ -6,7 +6,7 @@
 |---|---|
 | **Project** | Nabhya — a verified NGO ↔ volunteer platform for India |
 | **Repository** | `SinghAman21/nabhya` (branch `post-review-1`) |
-| **Platform** | Mobile app (Expo / React Native) + REST API (NestJS) + PostgreSQL (Neon) |
+| **Platform** | Mobile app (Expo / React Native) + REST API (NestJS) + PostgreSQL (Supabase) |
 | **Report date** | July 2026 |
 
 ---
@@ -28,6 +28,44 @@
 13. [Deployment & Operations](#13-deployment--operations)
 14. [Limitations & Future Work](#14-limitations--future-work)
 15. [Conclusion](#15-conclusion)
+16. [Feed-ranking implementation addendum](#feed-ranking-implementation-addendum-september-2026)
+
+---
+
+## Feed-ranking implementation addendum (September 2026)
+
+> This addendum supersedes the feed-related counts and descriptions in the July 2026
+> snapshot below. The historical narrative remains useful for the original project scope.
+
+Nabhya now exposes a **unified server-side recommendation feed** that combines generic
+feed posts, published events, open needs/offers, and published announcements. It has three
+separate views:
+
+- **For You** — deterministic ranking over location, cause-category affinity, follows,
+  recency, urgency and meaningful engagement. It uses Haversine distance when optional
+  viewer coordinates exist, otherwise city/state matching; recent impressions down-rank
+  rather than permanently hide candidates.
+- **Trending** — public, time-decayed ranking using likes, saves, shares, comments, event
+  applications and need pledges. An optional authenticated viewer adds location context.
+- **Following** — reverse-chronological content from explicitly followed verified NGOs;
+  it intentionally does not apply seen-content suppression.
+
+The ranking implementation follows a candidate-pipeline approach: fetch each content source,
+apply public-visibility/expiry/status filters, hydrate category, follow and engagement signals,
+score candidates, then select a diverse result. Selection avoids more than two consecutive
+items from one organisation and avoids extended runs of a single item type.
+
+The database now has **25 tables** and the API has **104 endpoints**. New persistence includes
+`organization_follows`, polymorphic `feed_interactions` (`LIKE`, `SAVE`, `SHARE`,
+`IMPRESSION`) and `feed_comments`; generic feed posts can belong to an NGO and carry location.
+Interactions target `POST`, `EVENT`, `NEED` or `ANNOUNCEMENT`, and the service validates each
+target is still publicly visible before accepting an action. Migration
+`0007_feed_ranking.sql` records these changes.
+
+The routes are `GET /api/feed/for-you`, `GET /api/feed/trending`, and
+`GET /api/feed/following`, with follow and interaction routes documented in the current README
+and Swagger. They are presently **server-only**: native feed tabs and interaction controls are
+future client work.
 
 ---
 
@@ -37,7 +75,7 @@ Nabhya is a mobile-first platform that connects **verified NGOs** with **volunte
 
 Volunteers browse a public feed of events and needs, apply to events, pledge items against needs, bookmark and review organisations, donate money, and collect **publicly verifiable participation certificates** whose codes anyone can validate without an account.
 
-The system is built as a TypeScript monorepo: an **Expo (React Native) client**, a **NestJS 11 REST API** (91 endpoints across 14 feature modules), and a **PostgreSQL database on Neon** accessed through Drizzle ORM (22 tables). Authentication is delegated to **Neon Auth** (Better Auth) with stateless JWT verification against a remote JWKS. Files are stored in **Cloudflare R2** object storage using a pre-signed-URL flow so bytes never pass through the API. The server ships with a Vitest integration suite that runs against a real in-process Postgres (PGlite) built from the committed migrations.
+The system is built as a TypeScript monorepo: an **Expo (React Native) client**, a **NestJS 11 REST API** (91 endpoints across 14 feature modules), and a **PostgreSQL database on Supabase** accessed through Drizzle ORM (22 tables). Authentication is delegated to **Supabase Auth** with stateless JWT verification against a remote JWKS. Files are stored in **Cloudflare R2** object storage using a pre-signed-URL flow so bytes never pass through the API. The server ships with a Vitest integration suite that runs against a real in-process Postgres (PGlite) built from the committed migrations.
 
 ---
 
@@ -71,7 +109,7 @@ This report documents the system as implemented on the `post-review-1` branch: t
 4. **Public discovery** — an anonymous-accessible feed of events, needs and an NGO directory with proximity ("near me") search, that can only ever show verified + active organisations.
 5. **Engagement layer** — bookmarks, reviews with organisation replies, announcements, public financial-transparency reports, in-app notifications and superadmin broadcast.
 6. **Certificates** — attendance-gated issuance, PDF generation, revocation, and account-less public verification by code.
-7. **Monetary donations** via a payment provider (Dodo Payments) with webhook-driven settlement that never trusts the client. *(Implemented; feature currently on hold.)*
+7. **Monetary donations** via Razorpay's native checkout SDK with webhook-driven settlement that never trusts the client's checkout-success callback.
 8. **Operational integrity** — audit trail of every administrative and sensitive action, rate limiting, and a test suite that exercises real SQL semantics (unique indexes, row locks, aggregates).
 
 ---
@@ -148,7 +186,7 @@ packages/db        Drizzle ORM schema + pg client        (@nabhya/db)
 packages/env       t3-oss/env runtime env validation      (@nabhya/env)
 packages/shared    Zod schemas shared client ↔ server     (@nabhya/shared)
 packages/config    Shared biome / tsconfig presets        (@nabhya/config)
-scripts/           Interactive Neon setup wizard (pnpm db:setup)
+scripts/           Interactive Supabase setup wizard (pnpm db:setup)
 ```
 
 ### 5.2 Key technologies and versions
@@ -168,9 +206,9 @@ scripts/           Interactive Neon setup wizard (pnpm db:setup)
 | | jose | 5.x | JWT verification against remote JWKS |
 | | pdf-lib | 1.17 | Certificate PDF rendering |
 | | AWS SDK v3 (S3 + presigner) | 3.x | Cloudflare R2 object storage (S3-compatible) |
-| Data | PostgreSQL (Neon serverless) | — | Primary datastore |
+| Data | PostgreSQL (Supabase) | — | Primary datastore |
 | | Drizzle ORM / drizzle-kit | 0.45 | Typed schema, queries, migrations |
-| Auth | Neon Auth (Better Auth) | 0.4.2-beta | Hosted identity provider issuing JWTs |
+| Auth | Supabase Auth | — | Hosted identity provider issuing JWTs |
 | Validation | Zod | 4.x (catalog) | Single source of truth for all request/response shapes |
 | Testing | Vitest + PGlite | 4.x / 0.5 | Integration tests on real in-process Postgres |
 | Tooling | Biome, Turborepo, tsdown/tsx | — | Lint/format, task graph, esbuild-based build/dev |
@@ -196,7 +234,7 @@ flowchart TB
         UI --> STORE
     end
 
-    subgraph Auth["Neon Auth (Better Auth)"]
+    subgraph Auth["Supabase Auth"]
         IDP[Identity provider]
         JWKS[JWKS endpoint]
     end
@@ -219,20 +257,21 @@ flowchart TB
 
     subgraph Data["Data layer"]
         DRZ[Drizzle ORM - packages/db]
-        PG[(Neon PostgreSQL - 22 tables)]
+        PG[(Supabase PostgreSQL - 22 tables)]
         DRZ --> PG
     end
 
     R2[(Cloudflare R2 object storage)]
-    DODO[Dodo Payments]
+    RAZORPAY[Razorpay]
 
     SVC -- "Bearer JWT over HTTPS" --> THR
-    STORE -- "sign-in / getJWTToken" --> IDP
+    STORE -- "signInWithPassword / signUp" --> IDP
     JWT -- "fetch signing keys" --> JWKS
     SVCS --> DRZ
     SVCS -- "pre-signed URL issue / HEAD verify" --> R2
     Client -- "direct PUT/GET with signed URLs" --> R2
-    DODO -- "payment webhook (signature-verified)" --> Server
+    Client -- "native checkout (order id + key)" --> RAZORPAY
+    RAZORPAY -- "payment webhook (signature-verified)" --> Server
     Client -.imports.-> ZOD
     Server -.imports.-> ZOD
 ```
@@ -305,8 +344,8 @@ sequenceDiagram
     C->>T: HTTPS request, Authorization: Bearer JWT
     T->>T: rate-limit check (default 120/min, strict 10/min)
     T->>J: pass
-    J->>J: verify signature vs Neon JWKS (jose)
-    J->>D: JIT sync: find by neon_user_id → fall back to email+link → insert
+    J->>J: verify signature vs Supabase JWKS (jose)
+    J->>D: JIT sync: find by auth_user_id → fall back to email+link → insert
     J->>J: reject if suspended / deleted, then load roles onto request.user
     J->>R: pass
     R->>R: @Roles(...) OR-check (403 with descriptive message)
@@ -323,7 +362,7 @@ sequenceDiagram
 
 ## 7. Database Design
 
-Drizzle ORM on Neon PostgreSQL. **22 tables** across 10 schema files in `packages/db/src/schema/`, UUID primary keys throughout, generated SQL migrations committed in `packages/db/src/migrations/`. Seed data (`db:seed`) creates the three roles and ten cause categories.
+Drizzle ORM on Supabase PostgreSQL. **22 tables** across 10 schema files in `packages/db/src/schema/`, UUID primary keys throughout, generated SQL migrations committed in `packages/db/src/migrations/`. Seed data (`db:seed`) creates the three roles and ten cause categories.
 
 ### 7.1 Entity–Relationship diagram
 
@@ -353,6 +392,10 @@ erDiagram
     USERS |o--o{ DONATIONS : "donates (nullable for guests)"
     USERS ||--o{ BOOKMARKS : "saves"
     ORGANIZATIONS ||--o{ BOOKMARKS : "saved by"
+    USERS ||--o{ ORGANIZATION_FOLLOWS : "follows"
+    ORGANIZATIONS ||--o{ ORGANIZATION_FOLLOWS : "followed by"
+    USERS ||--o{ FEED_INTERACTIONS : "records"
+    USERS ||--o{ FEED_COMMENTS : "writes"
     ORGANIZATIONS ||--o{ REVIEWS : "reviewed"
     USERS ||--o{ REVIEWS : "writes"
     USERS ||--o{ NOTIFICATIONS : "receives"
@@ -362,7 +405,7 @@ erDiagram
 
     USERS {
         uuid id PK
-        varchar neon_user_id UK "link to Neon Auth subject"
+        varchar auth_user_id UK "link to Supabase Auth subject"
         varchar email UK
         varchar full_name
         varchar phone
@@ -469,7 +512,7 @@ erDiagram
     }
 ```
 
-*(Join/support tables — `roles`, `user_roles`, `user_documents`, `organization_admins`, `organization_documents`, `categories`, `organization_categories`, `user_categories`, `bookmarks`, `reviews`, `notifications`, `announcements`, `financial_reports` — are shown as relationships above and detailed in the data dictionary below.)*
+*(Join/support tables — `roles`, `user_roles`, `user_documents`, `organization_admins`, `organization_documents`, `categories`, `organization_categories`, `user_categories`, `bookmarks`, `organization_follows`, `feed_interactions`, `feed_comments`, `reviews`, `notifications`, `announcements`, `financial_reports` — are shown as relationships above and detailed in the data dictionary below.)*
 
 ### 7.2 Data dictionary
 
@@ -477,7 +520,7 @@ erDiagram
 
 | Table | Columns (key ones) | Constraints & indexes |
 |---|---|---|
-| `users` | `id`, `neon_user_id`, `full_name`, `email`, `phone`, `profile_image`, `bio`, `city`, `state`, `email_verified`, `verification_status`, `status`, `suspended_reason`, `onboarded_at`, timestamps | `neon_user_id` unique, `email` unique. `onboarded_at` gates volunteer entry into the app (orgs are gated by the existence of their organisation row) |
+| `users` | `id`, `neon_user_id`, `full_name`, `email`, `phone`, `profile_image`, `bio`, `city`, `state`, optional `latitude`/`longitude`, `email_verified`, `verification_status`, `status`, `suspended_reason`, `onboarded_at`, timestamps | `neon_user_id` unique, `email` unique. Optional coordinates enable distance ranking; `onboarded_at` gates volunteer entry into the app (orgs are gated by the existence of their organisation row) |
 | `roles` | `id`, `name`, `description` | `name` unique. Seeded: `volunteer`, `organisation`, `superadmin` |
 | `user_roles` | `id`, `user_id`, `role_id`, `assigned_at` | FKs cascade on delete |
 | `user_documents` | `id`, `user_id`, `document_type` (AADHAR_CARD/OTHER), `document_key`, `verification_status`, `remarks`, `verified_by`, `verified_at` | `verified_by` → users (reviewer). Stores object-storage **keys**, not URLs |
@@ -497,6 +540,13 @@ erDiagram
 | `categories` | 10 seeded cause categories (`slug` unique, lucide `icon` name, `is_active`) |
 | `organization_categories` | M:N org ↔ category, unique per pair |
 | `user_categories` | M:N volunteer interest ↔ category, unique per pair |
+
+#### Generic feed posts (`feed.ts`)
+
+| Table | Columns (key ones) | Constraints & indexes |
+|---|---|---|
+| `feed_posts` | author, optional organisation, optional city/state/coordinates, text, media folder, created timestamp | Organization/time and city indexes support unified retrieval. NGO-authored posts inherit the owner's organization and location. |
+| `feed_post_media` | post, object key, image/video type, MIME type, sort order | Object keys are unique; `(post, sort_order)` preserves the submitted media sequence. |
 
 #### Events (`events.ts`)
 
@@ -530,6 +580,9 @@ erDiagram
 |---|---|---|
 | `bookmarks` | user, org, `created_at` | Unique `(user, org)` makes the bookmark toggle idempotent under double-taps |
 | `reviews` | org, user, `rating`, `body`, `reply` (org's public response), `replied_at` | Unique `(org, user)` — one review per person, editing updates in place |
+| `organization_follows` | user, org, `created_at` | Unique `(user, org)`; separate from a private bookmark and drives the Following feed |
+| `feed_interactions` | user, polymorphic `target_type` + `target_id`, `interaction_type`, `created_at` | Targets POST/EVENT/NEED/ANNOUNCEMENT. LIKE and SAVE are unique per user/target; SHARE and IMPRESSION are append-only analytics events |
+| `feed_comments` | user, polymorphic `target_type` + `target_id`, `body`, timestamps | Indexed by target chronology and author; the service validates target visibility before writes |
 | `notifications` | user, `type` (14-value enum: application/pledge outcomes, org/document verification, certificate, donation, review, broadcast), `title`, `body`, `entity_name` + `entity_id` (client deep-link), `read_at` | A broadcast fans out into one row per user, so read state and the unread badge stay a plain indexed query |
 
 #### Publishing (`publishing.ts`)
@@ -646,17 +699,35 @@ erDiagram
 | `GET /api/org/needs/:id/pledges` | organisation | List responses |
 | `PATCH /api/org/needs/:id/pledges/:pledgeId` | organisation | Accept / reject / complete a pledge (locked counter update) |
 
-#### Engagement (bookmarks & reviews)
+#### Engagement (bookmarks, follows & reviews)
 
 | Route | Gate | Purpose |
 |---|---|---|
 | `POST /api/organizations/:id/bookmark` | volunteer | Toggle bookmark |
 | `GET /api/me/bookmarks` | volunteer | Own bookmarked NGOs |
+| `POST /api/organizations/:id/follow` | authenticated | Follow a verified active NGO (idempotent) |
+| `DELETE /api/organizations/:id/follow` | authenticated | Unfollow an NGO |
 | `GET /api/organizations/:id/reviews` | Public | Reviews + rating summary |
 | `POST /api/organizations/:id/reviews` | volunteer *(strict throttle)* | Leave or edit review |
 | `DELETE /api/organizations/:id/reviews/me` | volunteer | Delete own review |
 | `GET /api/org/reviews` | organisation | Reviews of caller's org |
 | `PATCH /api/org/reviews/:reviewId/reply` | organisation | Public reply to a review |
+
+#### Unified feed and interactions
+
+| Route | Gate | Purpose |
+|---|---|---|
+| `GET /api/feed/for-you` | OptionalAuth | Unified personalized ranking; anonymous callers receive an unpersonalized fallback |
+| `GET /api/feed/trending` | Public / OptionalAuth | Unified recent-engagement ranking |
+| `GET /api/feed/following` | authenticated | Reverse-chronological content from followed NGOs |
+| `POST` / `DELETE /api/feed/:type/:id/like` | authenticated | Like or unlike a unified feed item |
+| `POST` / `DELETE /api/feed/:type/:id/save` | authenticated | Save or unsave a unified feed item |
+| `POST /api/feed/:type/:id/share` | authenticated | Record a share event |
+| `POST /api/feed/:type/:id/impression` | authenticated | Record an impression for For You novelty ranking |
+| `GET` / `POST /api/feed/:type/:id/comments` | Public / authenticated | List or add comments |
+| `DELETE /api/feed/comments/:commentId` | authenticated | Delete own comment; superadmin may moderate |
+
+`type` is `POST`, `EVENT`, `NEED` or `ANNOUNCEMENT`; all actions validate public visibility.
 
 #### Certificates & Attendance
 
@@ -739,23 +810,21 @@ sequenceDiagram
     autonumber
     actor U as User
     participant App as Expo app
-    participant NA as Neon Auth (Better Auth)
+    participant SA as Supabase Auth
     participant API as NestJS API
     participant DB as Postgres
 
     U->>App: email + password
-    App->>NA: signIn()
-    NA-->>App: session
-    App->>NA: getJWTToken()
-    NA-->>App: JWT (signed, short-lived)
-    App->>App: store as accessToken in expo-secure-store
+    App->>SA: signInWithPassword() / signUp()
+    SA-->>App: session (includes access token)
+    App->>App: store session.access_token as accessToken in expo-secure-store
     App->>API: any request, Authorization: Bearer JWT
-    API->>NA: fetch JWKS (cached) and verify signature
-    API->>DB: SELECT user WHERE neon_user_id = jwt.sub
+    API->>SA: fetch JWKS (cached) and verify signature
+    API->>DB: SELECT user WHERE auth_user_id = jwt.sub
     alt not found
         API->>DB: SELECT user WHERE email = jwt.email
         alt email match
-            API->>DB: UPDATE user SET neon_user_id (link account)
+            API->>DB: UPDATE user SET auth_user_id (link account)
         else no match
             API->>DB: INSERT user (JIT provisioning)
         end
@@ -858,7 +927,7 @@ sequenceDiagram
     Note over API: unique(application_id) — re-issuing replaces the PDF,<br/>never mints a second code for the same participation
 ```
 
-### 9.6 Donation settlement (sequence — feature on hold)
+### 9.6 Donation settlement (sequence)
 
 ```mermaid
 sequenceDiagram
@@ -866,19 +935,21 @@ sequenceDiagram
     actor D as Donor (guest or signed-in)
     participant App as App
     participant API as API
-    participant Dodo as Dodo Payments
+    participant RZP as Razorpay
 
     D->>App: choose NGO + amount
     App->>API: POST /donations/checkout (OptionalAuth)
     API->>API: create donation PENDING, server-computed amount_minor
-    API->>Dodo: create checkout session
-    API-->>App: provider checkout URL
-    D->>Dodo: completes payment
-    Dodo->>API: POST /donations/webhook (raw body, signature verified)
+    API->>RZP: create order (arbitrary paise amount)
+    API-->>App: order id + public key id
+    App->>RZP: open native checkout (RazorpayCheckout.open)
+    D->>RZP: completes payment in-app
+    RZP-->>App: payment id / order id / signature (fast feedback only)
+    RZP->>API: POST /donations/webhook (raw body, signature verified)
     API->>API: idempotency: provider_payment_id is UNIQUE —<br/>a replayed webhook cannot double-count
     API->>API: donation → COMPLETED, issue receipt_number
     API--)D: receipt available
-    Note over API: the client can never move a donation to COMPLETED —<br/>only the signed webhook can
+    Note over App: the client-side success callback is never trusted —<br/>only the signed webhook can move a donation to COMPLETED
 ```
 
 ### 9.7 State machines
@@ -998,7 +1069,7 @@ Two systems coexist deliberately: NativeWind v4 / Tailwind 3.4 (brand primary `#
 
 | Concern | Mechanism |
 |---|---|
-| **Authentication** | Delegated to Neon Auth (Better Auth). The API never sees passwords — it statelessly verifies JWTs against the provider's remote JWKS (`jose`), then JIT-syncs the user row. Tokens live in `expo-secure-store` on device |
+| **Authentication** | Delegated to Supabase Auth. The API never sees passwords — it statelessly verifies JWTs against the provider's remote JWKS (`jose`), then JIT-syncs the user row. Tokens live in `expo-secure-store` on device |
 | **Authorisation** | Deny-by-default global guard; explicit `@Public`/`@OptionalAuth` opt-outs; `@Roles` guard with descriptive 403s. No default role at signup — an account can do nothing role-gated until it explicitly picks a role |
 | **Tenant isolation** | Org-scoped routes resolve the organisation from the token (`requireOwnedOrganization`); an org id is never accepted from the client. Public visibility additionally requires `requireVerifiedOrganization` |
 | **Public-surface safety** | Every public list inner-joins `organizations` filtered to `VERIFIED + ACTIVE` — moderation takes effect immediately across the whole public surface |
@@ -1065,18 +1136,20 @@ flowchart LR
         NEST[NestJS :3000]
     end
     CRON[Scheduler<br/>hourly close-finished]
-    NEON[(Neon PostgreSQL<br/>serverless)]
-    NAUTH[Neon Auth<br/>JWKS + sessions]
+    NEON[(Supabase PostgreSQL)]
+    NAUTH[Supabase Auth<br/>JWKS + sessions]
     R2[(Cloudflare R2)]
-    DODO[Dodo Payments]
+    RAZORPAY[Razorpay]
 
     APP --> LB --> NEST
     APP -- sign-in / token --> NAUTH
     APP -- signed PUT/GET --> R2
+    APP -- native checkout --> RAZORPAY
     NEST --> NEON
     NEST -- JWKS fetch --> NAUTH
     NEST -- presign / HEAD --> R2
-    DODO -- webhook --> LB
+    NEST -- create order --> RAZORPAY
+    RAZORPAY -- webhook --> LB
     CRON --> LB
 ```
 

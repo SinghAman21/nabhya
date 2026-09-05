@@ -11,7 +11,7 @@ import {
 	useOrgEvent,
 	useUpdateEvent,
 } from "@/hooks/use-events";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import type { OrgEventListItem } from "@/lib/types";

@@ -1,6 +1,6 @@
 import { Text, type TextProps } from "react-native";
 import { displayByWeight, fontByWeight } from "@/constants/fonts";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { cn } from "@/lib/utils";
 
 type TextColor = keyof ReturnType<typeof useTheme>["colors"]["text"] | string;

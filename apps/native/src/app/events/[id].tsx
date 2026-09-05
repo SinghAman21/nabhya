@@ -19,7 +19,7 @@ import {
 	useWithdrawApplication,
 } from "@/hooks/use-events";
 import { useMe } from "@/hooks/use-profile";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDateRange, formatDateTime } from "@/lib/format";

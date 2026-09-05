@@ -1,7 +1,7 @@
 import { DONATION_PRESETS_MINOR, formatMinor } from "@nabhya/shared";
 import { Check } from "lucide-react-native";
 import { useState } from "react";
-import { Linking, View } from "react-native";
+import { View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pressable } from "@/components/ui/pressable";
@@ -9,7 +9,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption, Label } from "@/components/ui/typography";
 import { useCreateDonation } from "@/hooks/use-engagement";
 import { useMe } from "@/hooks/use-profile";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
@@ -21,6 +21,26 @@ import { useAuthStore } from "@/store/auth-store";
  * float rounding ever reaches the ledger. Dodo is product-based, so whole
  * rupees are the finest granularity the gateway can represent.
  */
+interface RazorpayCheckout {
+	open: (options: Record<string, unknown>) => Promise<unknown>;
+}
+
+/**
+ * Razorpay ships a native module, so it exists only in a dev client or a store
+ * build. Loading it lazily keeps Expo Go and web booting; there the donor is
+ * told to use the app build instead.
+ */
+function loadRazorpay(): RazorpayCheckout | null {
+	try {
+		const mod = require("react-native-razorpay") as {
+			default?: RazorpayCheckout;
+		};
+		return mod.default ?? null;
+	} catch {
+		return null;
+	}
+}
+
 export function DonateSheet({
 	organizationId,
 	organizationName,
@@ -73,15 +93,51 @@ export function DonateSheet({
 				donorEmail: me ? undefined : guestEmail.trim() || undefined,
 			},
 			{
-				onSuccess: async ({ checkoutUrl }) => {
+				onSuccess: async ({
+					orderId,
+					amountMinor: orderAmount,
+					currency,
+					razorpayKeyId,
+				}) => {
 					onClose();
-					const canOpen = await Linking.canOpenURL(checkoutUrl);
-					if (canOpen) await Linking.openURL(checkoutUrl);
-					else
+					const checkout = loadRazorpay();
+					if (!checkout) {
 						Alert.alert(
-							"Could not open payment page",
-							"Please try again from a browser.",
+							"Payments need the app build",
+							"Donations open Razorpay's secure checkout, which is not available in this preview.",
 						);
+						return;
+					}
+					try {
+						// Fast client-side feedback only — the donation is COMPLETED only
+						// once the server's webhook verifies Razorpay's signature.
+						await checkout.open({
+							key: razorpayKeyId,
+							order_id: orderId,
+							amount: orderAmount,
+							currency,
+							name: organizationName,
+							description: "Donation",
+							prefill: {
+								email: me?.email ?? (guestEmail.trim() || undefined),
+								name: me?.name ?? (guestName.trim() || undefined),
+							},
+							theme: { color: colors.primary.main as string },
+						});
+						Alert.alert(
+							"Thank you!",
+							"We're confirming your donation now. Check Donations shortly.",
+						);
+					} catch (err: unknown) {
+						const description =
+							typeof err === "object" && err !== null && "description" in err
+								? String((err as { description?: unknown }).description)
+								: null;
+						Alert.alert(
+							"Payment not completed",
+							description ?? "You can try again any time.",
+						);
+					}
 				},
 				onError: (e) => setError(apiErrorMessage(e)),
 			},

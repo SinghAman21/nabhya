@@ -12,7 +12,7 @@ import {
 } from "@/components/screen-shell";
 import { Body, Caption } from "@/components/ui/typography";
 import { useMyOrgDocuments, useUploadOrgDocument } from "@/hooks/use-documents";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 
 const REQUIRED_DOCS: UploadOrgDocumentInput["documentType"][] = [

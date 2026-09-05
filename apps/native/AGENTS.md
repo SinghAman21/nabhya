@@ -10,6 +10,12 @@ Repo-wide rules and context live in the root `AGENTS.md`. Expo SDK 56 + Expo Rou
 (file-based, typed routes, React Compiler on), React 19.2.3 / RN 0.85.3. **No
 Playwright or browser automation** — there is no web target yet.
 
+**Expo Go no longer works for this app.** `react-native-razorpay` (donation
+checkout) is a real native module and does not run in Expo Go. Every
+contributor needs a custom dev client: `npx expo prebuild` then
+`npx expo run:android` / `run:ios` once, then `expo start --dev-client` for the
+regular dev loop.
+
 ## Routing
 
 - Gate is `src/app/index.tsx`: no email → `/(auth)/login`, no role → `/role-select`,
