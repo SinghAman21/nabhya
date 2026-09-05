@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 import {
 	boolean,
+	decimal,
 	jsonb,
 	pgEnum,
 	pgTable,
@@ -47,6 +48,8 @@ export const users = pgTable("users", {
 	bio: text("bio"),
 	city: varchar("city"),
 	state: varchar("state"),
+	latitude: decimal("latitude"),
+	longitude: decimal("longitude"),
 	emailVerified: boolean("email_verified").default(false),
 	verificationStatus: verificationStatusEnum("verification_status").default(
 		"PENDING",
