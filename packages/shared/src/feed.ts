@@ -36,9 +36,19 @@ export interface FeedMediaIntentsResponse {
 	tickets: UploadTicketResponse[];
 }
 
+export const postTagSchema = z.enum([
+	"POST",
+	"EVENT",
+	"NEED",
+	"ANNOUNCEMENT",
+	"URGENT",
+]);
+export type PostTag = z.infer<typeof postTagSchema>;
+
 export const createFeedPostSchema = z
 	.object({
 		text: z.string().trim().min(1, "Write something to share").max(5000),
+		tag: postTagSchema.default("POST"),
 		mediaFolder: z
 			.string()
 			.trim()
@@ -53,16 +63,7 @@ export const createFeedPostSchema = z
 
 export type CreateFeedPostInput = z.infer<typeof createFeedPostSchema>;
 
-// ─── Feed engagement ─────────────────────────────────────────────────────────
-
-export const feedItemTypeSchema = z.enum([
-	"POST",
-	"EVENT",
-	"NEED",
-	"ANNOUNCEMENT",
-]);
-
-export type FeedItemType = z.infer<typeof feedItemTypeSchema>;
+// ─── Post engagement ─────────────────────────────────────────────────────────
 
 export const feedInteractionTypeSchema = z.enum([
 	"LIKE",
@@ -73,14 +74,14 @@ export const feedInteractionTypeSchema = z.enum([
 
 export type FeedInteractionType = z.infer<typeof feedInteractionTypeSchema>;
 
-export const feedItemTargetSchema = z.object({
-	targetType: feedItemTypeSchema,
-	targetId: z.uuid("Invalid feed item identifier"),
+export const postTargetSchema = z.object({
+	tag: postTagSchema,
+	postId: z.uuid("Invalid post identifier"),
 });
 
-export type FeedItemTarget = z.infer<typeof feedItemTargetSchema>;
+export type PostTarget = z.infer<typeof postTargetSchema>;
 
-export const createFeedInteractionSchema = feedItemTargetSchema.extend({
+export const createFeedInteractionSchema = postTargetSchema.extend({
 	interactionType: feedInteractionTypeSchema,
 });
 
@@ -88,7 +89,7 @@ export type CreateFeedInteractionInput = z.infer<
 	typeof createFeedInteractionSchema
 >;
 
-export const createFeedCommentSchema = feedItemTargetSchema.extend({
+export const createFeedCommentSchema = postTargetSchema.extend({
 	body: z
 		.string()
 		.trim()
@@ -113,18 +114,20 @@ export type FeedCommentsQuery = z.infer<typeof feedCommentsQuerySchema>;
 
 // ─── Feed views ───────────────────────────────────────────────────────────────
 
-/** Personalized recommendations from local and engagement signals. */
 export const forYouFeedQuerySchema = paginationQuerySchema;
 export type ForYouFeedQuery = z.infer<typeof forYouFeedQuerySchema>;
 
-/** Items ranked by recent interaction volume. */
 export const trendingFeedQuerySchema = paginationQuerySchema;
 export type TrendingFeedQuery = z.infer<typeof trendingFeedQuerySchema>;
 
-/** Items published by organizations the user follows. */
 export const followingFeedQuerySchema = paginationQuerySchema;
 export type FollowingFeedQuery = z.infer<typeof followingFeedQuerySchema>;
 
-/** Backward-compatible generic chronological feed query. */
 export const feedQuerySchema = paginationQuerySchema;
 export type FeedQuery = z.infer<typeof feedQuerySchema>;
+
+// Backward-compatible type/schema aliases during API migration.
+export const feedItemTypeSchema = postTagSchema;
+export const feedItemTargetSchema = postTargetSchema;
+export type FeedItemType = PostTag;
+export type FeedItemTarget = PostTarget;

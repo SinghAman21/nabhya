@@ -7,17 +7,25 @@ import {
 	pgTable,
 	text,
 	timestamp,
+	unique,
 	uuid,
 	varchar,
 } from "drizzle-orm/pg-core";
 import { organizations } from "./organizations";
 import { users } from "./users";
 
-export const feedMediaTypeEnum = pgEnum("feed_media_type", ["IMAGE", "VIDEO"]);
+export const postMediaTypeEnum = pgEnum("post_media_type", ["IMAGE", "VIDEO"]);
+export const postTagEnum = pgEnum("post_tag", [
+	"POST",
+	"EVENT",
+	"NEED",
+	"ANNOUNCEMENT",
+	"URGENT",
+]);
 
-/** A shared, chronological feed written by volunteers and organisations. */
-export const feedPosts = pgTable(
-	"feed_posts",
+/** A shared feed item written by volunteers and organisations. */
+export const posts = pgTable(
+	"posts",
 	{
 		id: uuid("id").primaryKey().defaultRandom(),
 		authorUserId: uuid("author_user_id")
@@ -26,6 +34,7 @@ export const feedPosts = pgTable(
 		organizationId: uuid("organization_id").references(() => organizations.id, {
 			onDelete: "set null",
 		}),
+		tag: postTagEnum("tag").notNull().default("POST"),
 		city: varchar("city"),
 		state: varchar("state"),
 		latitude: decimal("latitude"),
@@ -36,48 +45,55 @@ export const feedPosts = pgTable(
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 	},
 	(table) => [
-		index("feed_posts_created_at_idx").on(table.createdAt),
-		index("feed_posts_organization_created_idx").on(
+		unique("posts_id_tag_unique").on(table.id, table.tag),
+		index("posts_created_at_idx").on(table.createdAt),
+		index("posts_organization_created_idx").on(
 			table.organizationId,
 			table.createdAt,
 		),
-		index("feed_posts_city_idx").on(table.city),
+		index("posts_tag_created_idx").on(table.tag, table.createdAt),
+		index("posts_city_idx").on(table.city),
 	],
 );
 
-export const feedPostMedia = pgTable(
-	"feed_post_media",
+export const postsMedia = pgTable(
+	"posts_media",
 	{
 		id: uuid("id").primaryKey().defaultRandom(),
 		postId: uuid("post_id")
 			.notNull()
-			.references(() => feedPosts.id, { onDelete: "cascade" }),
+			.references(() => posts.id, { onDelete: "cascade" }),
 		objectKey: text("object_key").notNull().unique(),
-		mediaType: feedMediaTypeEnum("media_type").notNull(),
+		mediaType: postMediaTypeEnum("media_type").notNull(),
 		mimeType: varchar("mime_type", { length: 100 }).notNull(),
 		sortOrder: integer("sort_order").notNull(),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 	},
 	(table) => [
-		index("feed_post_media_post_sort_idx").on(table.postId, table.sortOrder),
+		index("posts_media_post_sort_idx").on(table.postId, table.sortOrder),
 	],
 );
 
-export const feedPostsRelations = relations(feedPosts, ({ one, many }) => ({
+export const postsRelations = relations(posts, ({ one, many }) => ({
 	author: one(users, {
-		fields: [feedPosts.authorUserId],
+		fields: [posts.authorUserId],
 		references: [users.id],
 	}),
 	organization: one(organizations, {
-		fields: [feedPosts.organizationId],
+		fields: [posts.organizationId],
 		references: [organizations.id],
 	}),
-	media: many(feedPostMedia),
+	media: many(postsMedia),
 }));
 
-export const feedPostMediaRelations = relations(feedPostMedia, ({ one }) => ({
-	post: one(feedPosts, {
-		fields: [feedPostMedia.postId],
-		references: [feedPosts.id],
+export const postsMediaRelations = relations(postsMedia, ({ one }) => ({
+	post: one(posts, {
+		fields: [postsMedia.postId],
+		references: [posts.id],
 	}),
 }));
+
+// Backward-compatible exports for code that still imports the old symbol names.
+export const feedPosts = posts;
+export const feedPostMedia = postsMedia;
+export const feedMediaTypeEnum = postMediaTypeEnum;

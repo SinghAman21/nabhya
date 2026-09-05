@@ -1,17 +1,14 @@
 import type { db as dbType } from "@nabhya/db";
 import {
-	announcements,
-	events,
-	feedComments,
-	feedInteractions,
-	feedPosts,
-	organizationNeeds,
 	organizations,
+	postComments,
+	postInteractions,
+	posts,
 } from "@nabhya/db/schema";
 import type {
 	CreateFeedCommentInput,
 	FeedCommentsQuery,
-	FeedItemTarget,
+	PostTarget,
 } from "@nabhya/shared";
 import {
 	ForbiddenException,
@@ -30,25 +27,25 @@ export class FeedEngagementService {
 
 	async addInteraction(
 		userId: string,
-		target: FeedItemTarget,
+		target: PostTarget,
 		interactionType: "LIKE" | "SAVE" | "SHARE" | "IMPRESSION",
 	) {
 		await this.assertVisible(target);
 		if (interactionType === "LIKE" || interactionType === "SAVE") {
 			await this.db
-				.insert(feedInteractions)
+				.insert(postInteractions)
 				.values({
 					userId,
-					targetType: target.targetType,
-					targetId: target.targetId,
+					tag: target.tag,
+					postId: target.postId,
 					interactionType,
 				})
 				.onConflictDoNothing();
 		} else {
-			await this.db.insert(feedInteractions).values({
+			await this.db.insert(postInteractions).values({
 				userId,
-				targetType: target.targetType,
-				targetId: target.targetId,
+				tag: target.tag,
+				postId: target.postId,
 				interactionType,
 			});
 		}
@@ -57,17 +54,17 @@ export class FeedEngagementService {
 
 	async removeInteraction(
 		userId: string,
-		target: FeedItemTarget,
+		target: PostTarget,
 		interactionType: "LIKE" | "SAVE",
 	) {
 		await this.db
-			.delete(feedInteractions)
+			.delete(postInteractions)
 			.where(
 				and(
-					eq(feedInteractions.userId, userId),
-					eq(feedInteractions.targetType, target.targetType),
-					eq(feedInteractions.targetId, target.targetId),
-					eq(feedInteractions.interactionType, interactionType),
+					eq(postInteractions.userId, userId),
+					eq(postInteractions.tag, target.tag),
+					eq(postInteractions.postId, target.postId),
+					eq(postInteractions.interactionType, interactionType),
 				),
 			);
 		return { deleted: true };
@@ -77,11 +74,11 @@ export class FeedEngagementService {
 		await this.assertVisible(input);
 		return takeFirstOrThrow(
 			await this.db
-				.insert(feedComments)
+				.insert(postComments)
 				.values({
 					userId,
-					targetType: input.targetType,
-					targetId: input.targetId,
+					tag: input.tag,
+					postId: input.postId,
 					body: input.body,
 				})
 				.returning(),
@@ -89,40 +86,40 @@ export class FeedEngagementService {
 		);
 	}
 
-	async listComments(target: FeedItemTarget, query: FeedCommentsQuery) {
+	async listComments(target: PostTarget, query: FeedCommentsQuery) {
 		await this.assertVisible(target);
 		const where = and(
-			eq(feedComments.targetType, target.targetType),
-			eq(feedComments.targetId, target.targetId),
+			eq(postComments.tag, target.tag),
+			eq(postComments.postId, target.postId),
 		);
 		const { limit, offset } = toOffset(query);
 		const [items, [total]] = await Promise.all([
-			this.db.query.feedComments.findMany({
+			this.db.query.postComments.findMany({
 				where,
 				with: {
 					user: { columns: { id: true, fullName: true, profileImage: true } },
 				},
-				orderBy: desc(feedComments.createdAt),
+				orderBy: desc(postComments.createdAt),
 				limit,
 				offset,
 			}),
-			this.db.select({ value: count() }).from(feedComments).where(where),
+			this.db.select({ value: count() }).from(postComments).where(where),
 		]);
 		return paginate(items, total?.value ?? 0, query);
 	}
 
 	async deleteComment(user: AuthUser, commentId: string) {
-		const comment = await this.db.query.feedComments.findFirst({
-			where: eq(feedComments.id, commentId),
+		const comment = await this.db.query.postComments.findFirst({
+			where: eq(postComments.id, commentId),
 		});
 		if (!comment) throw new NotFoundException("Comment not found");
 		if (comment.userId !== user.id && !user.roles.includes("superadmin"))
 			throw new ForbiddenException("You can only delete your own comments.");
-		await this.db.delete(feedComments).where(eq(feedComments.id, commentId));
+		await this.db.delete(postComments).where(eq(postComments.id, commentId));
 		return { deleted: true };
 	}
 
-	async assertVisible(target: FeedItemTarget) {
+	async assertVisible(target: PostTarget) {
 		const visibleOrganization = async (
 			organizationId: string | null | undefined,
 		) => {
@@ -136,40 +133,10 @@ export class FeedEngagementService {
 			});
 			if (!organization) throw new NotFoundException("Feed item not found");
 		};
-		if (target.targetType === "POST") {
-			const post = await this.db.query.feedPosts.findFirst({
-				where: eq(feedPosts.id, target.targetId),
-			});
-			if (!post) throw new NotFoundException("Feed item not found");
-			return visibleOrganization(post.organizationId);
-		}
-		if (target.targetType === "EVENT") {
-			const item = await this.db.query.events.findFirst({
-				where: and(
-					eq(events.id, target.targetId),
-					eq(events.status, "PUBLISHED"),
-				),
-			});
-			if (!item) throw new NotFoundException("Feed item not found");
-			return visibleOrganization(item.organizationId);
-		}
-		if (target.targetType === "NEED") {
-			const item = await this.db.query.organizationNeeds.findFirst({
-				where: and(
-					eq(organizationNeeds.id, target.targetId),
-					eq(organizationNeeds.status, "OPEN"),
-				),
-			});
-			if (!item) throw new NotFoundException("Feed item not found");
-			return visibleOrganization(item.organizationId);
-		}
-		const item = await this.db.query.announcements.findFirst({
-			where: and(
-				eq(announcements.id, target.targetId),
-				eq(announcements.status, "PUBLISHED"),
-			),
+		const post = await this.db.query.posts.findFirst({
+			where: and(eq(posts.id, target.postId), eq(posts.tag, target.tag)),
 		});
-		if (!item) throw new NotFoundException("Feed item not found");
-		return visibleOrganization(item.organizationId);
+		if (!post) throw new NotFoundException("Feed item not found");
+		return visibleOrganization(post.organizationId);
 	}
 }

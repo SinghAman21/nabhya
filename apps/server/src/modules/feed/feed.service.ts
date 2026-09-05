@@ -1,5 +1,5 @@
 import type { db as dbType } from "@nabhya/db";
-import { feedPostMedia, feedPosts, users } from "@nabhya/db/schema";
+import { posts, postsMedia, users } from "@nabhya/db/schema";
 import type {
 	CreateFeedMediaIntentsInput,
 	CreateFeedPostInput,
@@ -45,10 +45,11 @@ export class FeedService {
 		const post = await this.db.transaction(async (tx) => {
 			const created = takeFirstOrThrow(
 				await tx
-					.insert(feedPosts)
+					.insert(posts)
 					.values({
 						authorUserId: user.id,
 						organizationId: organization?.id,
+						tag: input.tag,
 						city: organization?.city,
 						state: organization?.state,
 						latitude: organization?.latitude,
@@ -60,7 +61,7 @@ export class FeedService {
 				"create feed post",
 			);
 			if (input.mediaKeys.length > 0) {
-				await tx.insert(feedPostMedia).values(
+				await tx.insert(postsMedia).values(
 					input.mediaKeys.map((objectKey, sortOrder) => ({
 						postId: created.id,
 						objectKey,
@@ -80,8 +81,8 @@ export class FeedService {
 		});
 		void this.audit.record({
 			performedBy: user.id,
-			action: "CREATE_FEED_POST",
-			entityName: "FEED_POST",
+			action: "CREATE_POST",
+			entityName: "POST",
 			entityId: post.id,
 		});
 		return this.getPost(post.id);
@@ -89,49 +90,50 @@ export class FeedService {
 
 	async list(query: FeedQuery) {
 		const { limit, offset } = toOffset(query);
-		const [posts, [totals]] = await Promise.all([
+		const [postRows, [totals]] = await Promise.all([
 			this.db
 				.select({
-					id: feedPosts.id,
-					text: feedPosts.text,
-					createdAt: feedPosts.createdAt,
+					id: posts.id,
+					tag: posts.tag,
+					text: posts.text,
+					createdAt: posts.createdAt,
 					author: {
 						id: users.id,
 						fullName: users.fullName,
 						profileImage: users.profileImage,
 					},
 				})
-				.from(feedPosts)
-				.innerJoin(users, eq(feedPosts.authorUserId, users.id))
-				.orderBy(desc(feedPosts.createdAt))
+				.from(posts)
+				.innerJoin(users, eq(posts.authorUserId, users.id))
+				.orderBy(desc(posts.createdAt))
 				.limit(limit)
 				.offset(offset),
-			this.db.select({ value: count() }).from(feedPosts),
+			this.db.select({ value: count() }).from(posts),
 		]);
 		return paginate(
-			await Promise.all(posts.map((post) => this.withMedia(post))),
+			await Promise.all(postRows.map((post) => this.withMedia(post))),
 			totals?.value ?? 0,
 			query,
 		);
 	}
 
 	async remove(user: AuthUser, postId: string) {
-		const post = await this.db.query.feedPosts.findFirst({
-			where: eq(feedPosts.id, postId),
+		const post = await this.db.query.posts.findFirst({
+			where: eq(posts.id, postId),
 			with: { media: true },
 		});
 		if (!post) throw new NotFoundException("Post not found");
 		if (!user.roles.includes("superadmin") && post.authorUserId !== user.id) {
 			throw new ForbiddenException("You can only delete your own posts.");
 		}
-		await this.db.delete(feedPosts).where(eq(feedPosts.id, postId));
+		await this.db.delete(posts).where(eq(posts.id, postId));
 		await Promise.all(
 			post.media.map((media) => this.storage.delete(media.objectKey)),
 		);
 		void this.audit.record({
 			performedBy: user.id,
-			action: "DELETE_FEED_POST",
-			entityName: "FEED_POST",
+			action: "DELETE_POST",
+			entityName: "POST",
 			entityId: postId,
 		});
 		return { deleted: true };
@@ -140,18 +142,19 @@ export class FeedService {
 	private async getPost(postId: string) {
 		const post = await this.db
 			.select({
-				id: feedPosts.id,
-				text: feedPosts.text,
-				createdAt: feedPosts.createdAt,
+				id: posts.id,
+				tag: posts.tag,
+				text: posts.text,
+				createdAt: posts.createdAt,
 				author: {
 					id: users.id,
 					fullName: users.fullName,
 					profileImage: users.profileImage,
 				},
 			})
-			.from(feedPosts)
-			.innerJoin(users, eq(feedPosts.authorUserId, users.id))
-			.where(eq(feedPosts.id, postId))
+			.from(posts)
+			.innerJoin(users, eq(posts.authorUserId, users.id))
+			.where(eq(posts.id, postId))
 			.then((rows) => rows[0]);
 		if (!post) throw new NotFoundException("Post not found");
 		return this.withMedia(post);
@@ -160,9 +163,9 @@ export class FeedService {
 	private async withMedia<T extends { id: string }>(post: T) {
 		const media = await this.db
 			.select()
-			.from(feedPostMedia)
-			.where(eq(feedPostMedia.postId, post.id))
-			.orderBy(feedPostMedia.sortOrder);
+			.from(postsMedia)
+			.where(eq(postsMedia.postId, post.id))
+			.orderBy(postsMedia.sortOrder);
 		return {
 			...post,
 			media: await Promise.all(

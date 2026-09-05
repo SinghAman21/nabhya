@@ -3,22 +3,22 @@ import {
 	announcements,
 	eventApplications,
 	events,
-	feedComments,
-	feedInteractions,
-	feedPostMedia,
-	feedPosts,
 	needPledges,
 	organizationCategories,
 	organizationFollows,
 	organizationNeeds,
 	organizations,
+	postComments,
+	postInteractions,
+	posts,
+	postsMedia,
 	userCategories,
 	users,
 } from "@nabhya/db/schema";
 import type {
-	FeedItemType,
 	FollowingFeedQuery,
 	ForYouFeedQuery,
+	PostTag,
 	TrendingFeedQuery,
 } from "@nabhya/shared";
 import { Inject, Injectable } from "@nestjs/common";
@@ -30,7 +30,7 @@ import { paginate, toOffset } from "../../common/utils";
 
 type Candidate = {
 	id: string;
-	type: FeedItemType;
+	type: PostTag;
 	organizationId: string | null;
 	organization: { id: string; name: string; logo: string | null } | null;
 	author: {
@@ -126,15 +126,12 @@ export class FeedRankingService {
 		const [postRows, eventRows, needRows, announcementRows] = await Promise.all(
 			[
 				this.db
-					.select({ post: feedPosts, org: organizations, author: users })
-					.from(feedPosts)
-					.leftJoin(
-						organizations,
-						eq(feedPosts.organizationId, organizations.id),
-					)
-					.innerJoin(users, eq(feedPosts.authorUserId, users.id))
-					.where(sql`(${feedPosts.organizationId} is null or (${visibleOrg}))`)
-					.orderBy(desc(feedPosts.createdAt))
+					.select({ post: posts, org: organizations, author: users })
+					.from(posts)
+					.leftJoin(organizations, eq(posts.organizationId, organizations.id))
+					.innerJoin(users, eq(posts.authorUserId, users.id))
+					.where(sql`(${posts.organizationId} is null or (${visibleOrg}))`)
+					.orderBy(desc(posts.createdAt))
 					.limit(SOURCE_LIMIT),
 				this.db
 					.select({ event: events, org: organizations, author: users })
@@ -192,16 +189,16 @@ export class FeedRankingService {
 		const media = postIds.length
 			? await this.db
 					.select()
-					.from(feedPostMedia)
-					.where(inArray(feedPostMedia.postId, postIds))
-					.orderBy(feedPostMedia.sortOrder)
+					.from(postsMedia)
+					.where(inArray(postsMedia.postId, postIds))
+					.orderBy(postsMedia.sortOrder)
 			: [];
 		const mediaByPost = Map.groupBy(media, (item) => item.postId);
 		const result: Candidate[] = [
 			...(await Promise.all(
 				postRows.map(async ({ post, org, author }) => ({
 					id: post.id,
-					type: "POST" as const,
+					type: post.tag,
 					organizationId: post.organizationId,
 					organization: org ? orgSummary(org) : null,
 					author: userSummary(author),
@@ -210,7 +207,7 @@ export class FeedRankingService {
 					state: post.state ?? org?.state ?? null,
 					latitude: numberOrNull(post.latitude ?? org?.latitude),
 					longitude: numberOrNull(post.longitude ?? org?.longitude),
-					urgency: null,
+					urgency: post.tag === "URGENT" ? ("HIGH" as const) : null,
 					categoryIds: [],
 					engagement: emptyEngagement(),
 					viewer: null,
@@ -334,19 +331,19 @@ export class FeedRankingService {
 				: [],
 			this.db
 				.select()
-				.from(feedInteractions)
+				.from(postInteractions)
 				.where(
 					gte(
-						feedInteractions.createdAt,
+						postInteractions.createdAt,
 						new Date(Date.now() - RECENT_INTERACTION_DAYS * 86_400_000),
 					),
 				),
 			this.db
 				.select({
-					targetType: feedComments.targetType,
-					targetId: feedComments.targetId,
+					tag: postComments.tag,
+					postId: postComments.postId,
 				})
-				.from(feedComments),
+				.from(postComments),
 			this.db
 				.select({
 					id: eventApplications.eventId,
@@ -370,7 +367,7 @@ export class FeedRankingService {
 			(row) => row.organizationId,
 		);
 		const commentsByTarget = countBy(
-			commentRows.map((row) => `${row.targetType}:${row.targetId}`),
+			commentRows.map((row) => `${row.tag}:${row.postId}`),
 		);
 		const applicationCounts = new Map(
 			applications.map((row) => [row.id, row.count]),
@@ -391,8 +388,8 @@ export class FeedRankingService {
 				candidate.type === "NEED" ? (pledgeCounts.get(candidate.id) ?? 0) : 0;
 			for (const interaction of interactionRows)
 				if (
-					interaction.targetType === candidate.type &&
-					interaction.targetId === candidate.id
+					interaction.tag === candidate.type &&
+					interaction.postId === candidate.id
 				) {
 					if (interaction.interactionType === "LIKE")
 						candidate.engagement.likes++;
@@ -409,15 +406,15 @@ export class FeedRankingService {
 					liked: interactionRows.some(
 						(item) =>
 							item.userId === viewerId &&
-							item.targetType === candidate.type &&
-							item.targetId === candidate.id &&
+							item.tag === candidate.type &&
+							item.postId === candidate.id &&
 							item.interactionType === "LIKE",
 					),
 					saved: interactionRows.some(
 						(item) =>
 							item.userId === viewerId &&
-							item.targetType === candidate.type &&
-							item.targetId === candidate.id &&
+							item.tag === candidate.type &&
+							item.postId === candidate.id &&
 							item.interactionType === "SAVE",
 					),
 				};
@@ -447,16 +444,16 @@ export class FeedRankingService {
 				.where(eq(organizationFollows.userId, userId)),
 			this.db
 				.select({
-					targetType: feedInteractions.targetType,
-					targetId: feedInteractions.targetId,
+					tag: postInteractions.tag,
+					postId: postInteractions.postId,
 				})
-				.from(feedInteractions)
+				.from(postInteractions)
 				.where(
 					and(
-						eq(feedInteractions.userId, userId),
-						eq(feedInteractions.interactionType, "IMPRESSION"),
+						eq(postInteractions.userId, userId),
+						eq(postInteractions.interactionType, "IMPRESSION"),
 						gte(
-							feedInteractions.createdAt,
+							postInteractions.createdAt,
 							new Date(Date.now() - 7 * 86_400_000),
 						),
 					),
@@ -469,9 +466,7 @@ export class FeedRankingService {
 			longitude: numberOrNull(viewer?.longitude),
 			categoryIds: new Set(interests.map((row) => row.categoryId)),
 			following: new Set(following.map((row) => row.organizationId)),
-			seen: new Set(
-				impressions.map((row) => `${row.targetType}:${row.targetId}`),
-			),
+			seen: new Set(impressions.map((row) => `${row.tag}:${row.postId}`)),
 		};
 	}
 

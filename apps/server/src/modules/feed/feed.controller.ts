@@ -13,10 +13,10 @@ import {
 	createFeedMediaIntentsSchema,
 	createFeedPostSchema,
 	feedCommentsQuerySchema,
-	feedItemTargetSchema,
 	feedQuerySchema,
 	followingFeedQuerySchema,
 	forYouFeedQuerySchema,
+	postTargetSchema,
 	trendingFeedQuerySchema,
 } from "@nabhya/shared";
 import {
@@ -228,10 +228,10 @@ export class FeedController {
 		@Param("id", ParseUUIDPipe) id: string,
 		@Body(
 			new ZodValidationPipe(
-				createFeedCommentSchema.omit({ targetType: true, targetId: true }),
+				createFeedCommentSchema.omit({ tag: true, postId: true }),
 			),
 		)
-		body: Omit<CreateFeedCommentInput, "targetType" | "targetId">,
+		body: Omit<CreateFeedCommentInput, "tag" | "postId">,
 	) {
 		return this.engagement.createComment(
 			user.id,
@@ -265,9 +265,9 @@ export class FeedController {
 	}
 
 	private target(type: string, id: string) {
-		return feedItemTargetSchema.parse({
-			targetType: type.toUpperCase(),
-			targetId: id,
+		return postTargetSchema.parse({
+			tag: type.toUpperCase(),
+			postId: id,
 		});
 	}
 }
