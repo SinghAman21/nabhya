@@ -7,10 +7,10 @@ import {
 	EmptyState,
 	ErrorState,
 	FilterChips,
+	ListGroup,
 	LoadingState,
 	Screen,
 	ScreenHeader,
-	Surface,
 } from "@/components/screen-shell";
 import {
 	applicationTone,
@@ -19,6 +19,7 @@ import {
 	pledgeTone,
 	StatusPill,
 } from "@/components/status-pill";
+import { Button } from "@/components/ui/button";
 import { Pressable } from "@/components/ui/pressable";
 import { Caption, Label } from "@/components/ui/typography";
 import {
@@ -253,11 +254,34 @@ export default function Activity() {
 			) : visible.length === 0 ? (
 				<EmptyState
 					icon={Waypoints}
-					title="Nothing here yet"
+					title={
+						filter === "ALL" ? "Nothing here yet" : "Nothing under this filter"
+					}
 					description={
 						filter === "ALL"
-							? "Pledge an item or apply to an event and it will show up here."
-							: "Nothing under this filter yet."
+							? "Pledge an item or apply to an event from Home. Every step — reviewed, accepted, certificate issued — lands here."
+							: filter === "ALERTS"
+								? "Updates from NGOs about your pledges and applications arrive here."
+								: "Try another filter, or see everything under All."
+					}
+					action={
+						filter === "ALL" ? (
+							<Button
+								size="sm"
+								variant="outline"
+								onPress={() => router.push("/(volunteer)")}
+							>
+								See what's needed
+							</Button>
+						) : (
+							<Button
+								size="sm"
+								variant="outline"
+								onPress={() => setFilter("ALL")}
+							>
+								Show all activity
+							</Button>
+						)
 					}
 				/>
 			) : (
@@ -283,29 +307,19 @@ export default function Activity() {
 							>
 								{day.label}
 							</Caption>
-							<Surface padded={false} style={{ overflow: "hidden" }}>
-								{day.entries.map((entry, index) => (
-									<View key={entry.id}>
-										{index > 0 && (
-											<View
-												style={{
-													height: 1,
-													marginLeft: spacing[4],
-													backgroundColor: colors.border.hairline,
-												}}
-											/>
-										)}
-										<TimelineRow
-											entry={entry}
-											{...(entry.href
-												? {
-														onPress: () => router.push(entry.href as never),
-													}
-												: {})}
-										/>
-									</View>
+							<ListGroup>
+								{day.entries.map((entry) => (
+									<TimelineRow
+										key={entry.id}
+										entry={entry}
+										{...(entry.href
+											? {
+													onPress: () => router.push(entry.href as never),
+												}
+											: {})}
+									/>
 								))}
-							</Surface>
+							</ListGroup>
 						</View>
 					))}
 				</ScrollView>

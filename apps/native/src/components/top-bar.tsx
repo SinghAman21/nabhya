@@ -1,19 +1,16 @@
 import { useRouter, useSegments } from "expo-router/build/hooks";
-import {
-	History,
-	LogOut,
-	Moon,
-	Search,
-	Sun,
-	User,
-	X,
-} from "lucide-react-native";
+import { History, LogOut, Search, User, X } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Platform, TextInput, View } from "react-native";
+import {
+	APPEARANCE_LABEL,
+	AppearanceSheet,
+	appearanceIcon,
+} from "@/components/appearance-row";
 import { ListRow } from "@/components/screen-shell";
 import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption, Label } from "@/components/ui/typography";
+import { Body, Caption, H5, Label } from "@/components/ui/typography";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useSignOut } from "@/hooks/use-auth";
 import { useUnreadCount } from "@/hooks/use-engagement";
@@ -57,7 +54,7 @@ export function TopBar({
 	/** Shows the search field. Only the feed consumes the term. */
 	searchable?: boolean;
 }) {
-	const { colors, spacing } = useTheme();
+	const { colors, spacing, borderRadius } = useTheme();
 	const router = useRouter();
 	// Typed routes make `useSegments()` a union of known segments, so `includes`
 	// narrows its argument to `never`. The check here is a plain string compare.
@@ -65,6 +62,7 @@ export function TopBar({
 
 	return (
 		<View
+			accessibilityRole="header"
 			style={{
 				height: TOP_BAR_HEIGHT,
 				flexDirection: "row",
@@ -81,13 +79,20 @@ export function TopBar({
 				accessibilityRole="link"
 				accessibilityLabel="nabhya, home"
 				{...focusable}
-				style={(state) => ({
-					opacity: (state as PressState).pressed ? 0.7 : 1,
-				})}
+				style={(state) => {
+					const { pressed, hovered } = state as PressState;
+					return {
+						minHeight: 40,
+						justifyContent: "center",
+						paddingHorizontal: spacing[2],
+						marginLeft: -spacing[2],
+						borderRadius: borderRadius.sm,
+						backgroundColor:
+							pressed || hovered ? colors.background.subtle : "transparent",
+					};
+				}}
 			>
-				<Label weight="bold" style={{ fontSize: 18 }}>
-					nabhya
-				</Label>
+				<H5>nabhya</H5>
 			</Pressable>
 
 			<View style={{ flex: 1, alignItems: "center" }}>
@@ -142,7 +147,7 @@ function ActivityButton({
 					flexDirection: "row",
 					alignItems: "center",
 					gap: spacing[2],
-					height: 36,
+					height: 40,
 					paddingHorizontal: spacing[3],
 					borderRadius: borderRadius.sm,
 					backgroundColor:
@@ -161,31 +166,36 @@ function ActivityButton({
 						: (colors.text.tertiary as string)
 				}
 			/>
-			<Body weight={active ? "semibold" : "normal"} color="secondary">
+			<Body
+				weight={active ? "semibold" : "normal"}
+				color={active ? "primary" : "secondary"}
+			>
 				Activity
 			</Body>
-			{unread > 0 && (
-				<View
-					style={{
-						minWidth: 18,
-						height: 18,
-						borderRadius: 9,
-						paddingHorizontal: 5,
-						alignItems: "center",
-						justifyContent: "center",
-						backgroundColor: colors.primary.main,
-					}}
-				>
-					<Caption
-						weight="bold"
-						color={colors.primary.contrast as string}
-						style={{ fontSize: 10, lineHeight: 13 }}
-					>
-						{unread > 9 ? "9+" : unread}
-					</Caption>
-				</View>
-			)}
+			{unread > 0 && <UnreadBadge count={unread} />}
 		</Pressable>
+	);
+}
+
+/** Ink on the brand tint: readable, and quieter than a filled orange dot. */
+function UnreadBadge({ count }: { count: number }) {
+	const { colors, spacing } = useTheme();
+	return (
+		<View
+			style={{
+				minWidth: 20,
+				height: 20,
+				borderRadius: 10,
+				paddingHorizontal: spacing[1.5],
+				alignItems: "center",
+				justifyContent: "center",
+				backgroundColor: colors.primary.tint,
+			}}
+		>
+			<Caption weight="bold" color={colors.primary.ink}>
+				{count > 99 ? "99+" : count}
+			</Caption>
+		</View>
 	);
 }
 
@@ -201,13 +211,14 @@ function TopBarSearch() {
 	return (
 		<View
 			{...focusWithin}
+			accessibilityRole="search"
 			style={{
 				flexDirection: "row",
 				alignItems: "center",
 				gap: spacing[2.5],
 				width: "100%",
 				maxWidth: 440,
-				height: 38,
+				height: 40,
 				paddingHorizontal: spacing[3.5],
 				borderRadius: borderRadius.md,
 				backgroundColor: colors.background.subtle,
@@ -229,7 +240,8 @@ function TopBarSearch() {
 				style={{
 					flex: 1,
 					fontFamily: "MonaSans",
-					fontSize: 14,
+					fontSize: 15,
+					lineHeight: 20,
 					color: colors.text.primary as string,
 					borderWidth: 0,
 					paddingVertical: 0,
@@ -241,6 +253,17 @@ function TopBarSearch() {
 					accessibilityRole="button"
 					accessibilityLabel="Clear search"
 					hitSlop={10}
+					{...focusable}
+					style={({ pressed }) => ({
+						width: 28,
+						height: 28,
+						borderRadius: 999,
+						alignItems: "center",
+						justifyContent: "center",
+						backgroundColor: pressed
+							? colors.background.tertiary
+							: "transparent",
+					})}
 				>
 					<X size={15} color={colors.text.tertiary as string} strokeWidth={2} />
 				</Pressable>
@@ -253,21 +276,21 @@ function TopBarSearch() {
 /* Account menu                                                               */
 /* -------------------------------------------------------------------------- */
 
+const MENU_WIDTH = 248;
+
 /**
- * Where settings live on desktop — which is also what retires the floating theme
- * button for this role. A control hovering over every screen is not a setting, it
- * is a leftover.
+ * Where settings live on desktop. Appearance opens the same three-way sheet
+ * every other surface uses, so a person who switches between phone and laptop
+ * meets one control, not two.
  */
 function AccountMenu({ profileHref }: { profileHref: string }) {
 	const { colors, borderRadius, elevation, isDark } = useTheme();
-	const { isDark: dark, toggleTheme } = useAppTheme();
-	const router = useRouter();
 	const user = useAuthStore((s) => s.user);
-	const signOut = useSignOut();
 	const [open, setOpen] = useState(false);
+	const [appearanceOpen, setAppearanceOpen] = useState(false);
 	// Viewport position of the trigger, so the panel can be portalled to
 	// document.body on web and escape every ancestor stacking context.
-	const [anchor, setAnchor] = useState({ x: 0, y: 0, width: 36, height: 36 });
+	const [anchor, setAnchor] = useState({ x: 0, y: 0, width: 40, height: 40 });
 
 	const initials = useMemo(() => {
 		if (!user?.name) return user?.email?.charAt(0).toUpperCase() ?? "?";
@@ -293,8 +316,8 @@ function AccountMenu({ profileHref }: { profileHref: string }) {
 				style={(state) => {
 					const { pressed, hovered } = state as PressState;
 					return {
-						width: 36,
-						height: 36,
+						width: 40,
+						height: 40,
 						borderRadius: borderRadius.sm,
 						alignItems: "center",
 						justifyContent: "center",
@@ -310,10 +333,35 @@ function AccountMenu({ profileHref }: { profileHref: string }) {
 		</View>
 	);
 
-	if (!open) return trigger;
+	const sheet = (
+		<AppearanceSheet
+			visible={appearanceOpen}
+			onClose={() => setAppearanceOpen(false)}
+		/>
+	);
+
+	const body = (
+		<MenuBody
+			profileHref={profileHref}
+			onClose={() => setOpen(false)}
+			onAppearance={() => {
+				setOpen(false);
+				setAppearanceOpen(true);
+			}}
+		/>
+	);
+
+	if (!open) {
+		return (
+			<>
+				{trigger}
+				{sheet}
+			</>
+		);
+	}
 
 	const panelStyle = {
-		width: 248,
+		width: MENU_WIDTH,
 		backgroundColor: colors.background.card,
 		borderRadius: borderRadius.lg,
 		borderWidth: isDark ? 1 : 0,
@@ -329,10 +377,12 @@ function AccountMenu({ profileHref }: { profileHref: string }) {
 		return (
 			<>
 				{trigger}
+				{sheet}
 				{createPortal(
 					<>
 						<Pressable
 							onPress={() => setOpen(false)}
+							accessibilityRole="button"
 							accessibilityLabel="Close account menu"
 							style={
 								{
@@ -343,25 +393,18 @@ function AccountMenu({ profileHref }: { profileHref: string }) {
 							}
 						/>
 						<View
+							accessibilityRole="menu"
 							style={
 								{
 									position: "fixed",
 									top: anchor.y + anchor.height + 8,
-									left: Math.max(8, anchor.x + anchor.width - 248),
+									left: Math.max(8, anchor.x + anchor.width - MENU_WIDTH),
 									zIndex: 9999,
 									...panelStyle,
 								} as never
 							}
 						>
-							<MenuBody
-								user={user}
-								dark={dark}
-								toggleTheme={toggleTheme}
-								onClose={() => setOpen(false)}
-								signOut={signOut}
-								router={router}
-								profileHref={profileHref}
-							/>
+							{body}
 						</View>
 					</>,
 					document.body,
@@ -373,10 +416,12 @@ function AccountMenu({ profileHref }: { profileHref: string }) {
 	return (
 		<View>
 			{trigger}
+			{sheet}
 
 			{/* Click-away, behind the panel. */}
 			<Pressable
 				onPress={() => setOpen(false)}
+				accessibilityRole="button"
 				accessibilityLabel="Close account menu"
 				style={{
 					position: "absolute",
@@ -389,23 +434,16 @@ function AccountMenu({ profileHref }: { profileHref: string }) {
 			/>
 
 			<View
+				accessibilityRole="menu"
 				style={{
 					position: "absolute",
-					top: 44,
+					top: 48,
 					right: 0,
 					zIndex: 50,
 					...panelStyle,
 				}}
 			>
-				<MenuBody
-					user={user}
-					dark={dark}
-					toggleTheme={toggleTheme}
-					onClose={() => setOpen(false)}
-					signOut={signOut}
-					router={router}
-					profileHref={profileHref}
-				/>
+				{body}
 			</View>
 		</View>
 	);
@@ -416,27 +454,25 @@ function AccountMenu({ profileHref }: { profileHref: string }) {
  * document.body portal (web).
  */
 function MenuBody({
-	user,
-	dark,
-	toggleTheme,
-	onClose,
-	signOut,
-	router,
 	profileHref,
+	onClose,
+	onAppearance,
 }: {
-	user: ReturnType<typeof useAuthStore.getState>["user"];
-	dark: boolean;
-	toggleTheme: () => void;
-	onClose: () => void;
-	signOut: ReturnType<typeof useSignOut>;
-	router: ReturnType<typeof useRouter>;
 	profileHref: string;
+	onClose: () => void;
+	onAppearance: () => void;
 }) {
 	const { colors, spacing } = useTheme();
+	const { preference } = useAppTheme();
+	const router = useRouter();
+	const user = useAuthStore((s) => s.user);
+	const signOut = useSignOut();
 
 	return (
 		<>
 			<View
+				accessible
+				accessibilityRole="text"
 				style={{
 					paddingHorizontal: spacing[4],
 					paddingVertical: spacing[3],
@@ -462,15 +498,20 @@ function MenuBody({
 			/>
 			<Divider />
 			<ListRow
-				icon={dark ? Sun : Moon}
-				label={dark ? "Light mode" : "Dark mode"}
-				onPress={toggleTheme}
+				icon={appearanceIcon(preference)}
+				label="Appearance"
+				value={
+					<Caption color="tertiary">{APPEARANCE_LABEL[preference]}</Caption>
+				}
+				onPress={onAppearance}
 			/>
 			<Divider />
 			<ListRow
 				icon={LogOut}
 				label="Sign out"
+				value={<View />}
 				onPress={() => {
+					if (signOut.isPending) return;
 					onClose();
 					signOut.mutate();
 				}}

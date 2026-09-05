@@ -1,23 +1,25 @@
 import type { AuditLogQuery } from "@nabhya/shared";
-import { ScrollText, Search } from "lucide-react-native";
+import { ScrollText } from "lucide-react-native";
 import { useState } from "react";
 import { FlatList, RefreshControl, View } from "react-native";
+import { AuditRow } from "@/components/admin/audit-row";
+import {
+	AdminScreen,
+	ListFooter,
+	ResultCount,
+	SearchField,
+} from "@/components/admin/list-chrome";
 import {
 	EmptyState,
 	ErrorState,
 	FilterChips,
 	LoadingState,
-	Screen,
 	ScreenHeader,
-	Surface,
 } from "@/components/screen-shell";
-import { humanizeStatus, StatusPill } from "@/components/status-pill";
-import { Input } from "@/components/ui/input";
-import { Body, Caption } from "@/components/ui/typography";
-import { useAuditLogs } from "@/hooks/use-admin";
+import { useAuditLogsPaged } from "@/hooks/use-admin-lists";
 import { useTheme } from "@/hooks/use-theme";
+import { useDebounced } from "@/hooks/useDebounced";
 import { apiErrorMessage } from "@/lib/api";
-import { formatDateTime } from "@/lib/format";
 
 type EntityFilter = NonNullable<AuditLogQuery["entityName"]> | "ALL";
 
@@ -29,57 +31,35 @@ const FILTERS: Array<{ value: EntityFilter; label: string }> = [
 	{ value: "DONATION", label: "Donations" },
 ];
 
-/** Colour by intent, so destructive actions are scannable in a long list. */
-function toneFor(action: string) {
-	if (/REJECT|SUSPEND|DELETE|REVOKE|CANCEL/.test(action)) return "error";
-	if (/VERIFIED|ACCEPT|COMPLETE|GRANT/.test(action)) return "success";
-	return "neutral";
-}
-
+/**
+ * The audit log. A ledger, not a feed: one hairline-divided line per action,
+ * paged, with the actor first because "who did this" is the question that
+ * brings someone here.
+ */
 export default function AdminAuditLog() {
 	const { colors, spacing } = useTheme();
 	const [entity, setEntity] = useState<EntityFilter>("ALL");
 	const [search, setSearch] = useState("");
 
-	const query = useAuditLogs({
-		action: search.trim() || undefined,
+	const action = useDebounced(search.trim().toUpperCase().replace(/\s+/g, "_"));
+	const query = useAuditLogsPaged({
+		...(action ? { action } : {}),
 		...(entity === "ALL" ? {} : { entityName: entity }),
 	});
 
 	return (
-		<Screen>
+		<AdminScreen>
 			<ScreenHeader
 				title="Activity"
-				subtitle="Every moderation and lifecycle action, newest first."
+				subtitle="Every moderation and lifecycle action, newest first"
 			/>
 
-			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[2],
-					backgroundColor: colors.background.tertiary,
-					borderRadius: 12,
-					paddingHorizontal: spacing[3.5],
-					marginBottom: spacing[4],
-				}}
-			>
-				<Search size={18} color={colors.text.quaternary as string} />
-				<Input
-					placeholder="Search actions, e.g. SUSPEND"
-					value={search}
-					onChangeText={setSearch}
-					autoCapitalize="characters"
-					style={{
-						flex: 1,
-						backgroundColor: "transparent",
-						borderWidth: 0,
-						paddingHorizontal: 0,
-						paddingVertical: spacing[3.5],
-					}}
-				/>
-			</View>
-
+			<SearchField
+				value={search}
+				onChangeText={setSearch}
+				placeholder="Filter by action, e.g. suspend"
+				autoCapitalize="characters"
+			/>
 			<FilterChips options={FILTERS} value={entity} onChange={setEntity} />
 
 			{query.isLoading ? (
@@ -91,61 +71,54 @@ export default function AdminAuditLog() {
 				/>
 			) : (
 				<FlatList
-					data={query.data?.items ?? []}
+					data={query.items}
 					keyExtractor={(item) => item.id}
 					showsVerticalScrollIndicator={false}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
-					ItemSeparatorComponent={() => <View style={{ height: spacing[2] }} />}
+					ItemSeparatorComponent={() => (
+						<View
+							style={{
+								height: 1,
+								marginLeft: spacing[4],
+								backgroundColor: colors.border.hairline,
+							}}
+						/>
+					)}
+					onEndReached={() => {
+						if (query.hasNextPage && !query.isFetchingNextPage)
+							query.fetchNextPage();
+					}}
+					onEndReachedThreshold={0.6}
 					refreshControl={
 						<RefreshControl
-							refreshing={query.isRefetching}
+							refreshing={query.isRefetching && !query.isFetchingNextPage}
 							onRefresh={() => query.refetch()}
-							tintColor={colors.primary.main as string}
+							tintColor={colors.text.quaternary as string}
 						/>
 					}
+					ListHeaderComponent={<ResultCount total={query.total} noun="entry" />}
 					ListEmptyComponent={
 						<EmptyState
 							icon={ScrollText}
 							title="Nothing recorded"
 							description={
-								search
-									? "No actions match that search."
+								action
+									? "No actions match that filter."
 									: "Moderation and lifecycle actions appear here as they happen."
 							}
 						/>
 					}
-					renderItem={({ item }) => (
-						<Surface>
-							<View
-								style={{
-									flexDirection: "row",
-									alignItems: "center",
-									justifyContent: "space-between",
-									gap: spacing[2],
-								}}
-							>
-								<StatusPill
-									label={humanizeStatus(item.action)}
-									tone={toneFor(item.action)}
-								/>
-								<Caption color="quaternary">
-									{formatDateTime(item.createdAt)}
-								</Caption>
-							</View>
-
-							<Body weight="medium" style={{ marginTop: spacing[2] }}>
-								{item.actor?.fullName ?? item.actor?.email ?? "System"}
-							</Body>
-							{item.entityName && (
-								<Caption color="tertiary">
-									{humanizeStatus(item.entityName)}
-									{item.entityId ? ` · ${item.entityId.slice(0, 8)}` : ""}
-								</Caption>
-							)}
-						</Surface>
-					)}
+					ListFooterComponent={
+						<ListFooter
+							count={query.items.length}
+							hasMore={!!query.hasNextPage}
+							fetching={query.isFetchingNextPage}
+							onLoadMore={() => query.fetchNextPage()}
+						/>
+					}
+					renderItem={({ item }) => <AuditRow entry={item} />}
 				/>
 			)}
-		</Screen>
+		</AdminScreen>
 	);
 }

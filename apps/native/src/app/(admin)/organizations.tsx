@@ -1,13 +1,18 @@
-import { Building2, Search } from "lucide-react-native";
+import { Building2 } from "lucide-react-native";
 import { useState } from "react";
 import { FlatList, RefreshControl, View } from "react-native";
+import {
+	AdminScreen,
+	ListFooter,
+	ResultCount,
+	SearchField,
+} from "@/components/admin/list-chrome";
 import { OrgDetailSheet } from "@/components/admin/org-detail-sheet";
 import {
 	EmptyState,
 	ErrorState,
 	FilterChips,
 	LoadingState,
-	Screen,
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
@@ -16,23 +21,38 @@ import {
 	StatusPill,
 	verificationTone,
 } from "@/components/status-pill";
-import { Input } from "@/components/ui/input";
 import { Body, Caption } from "@/components/ui/typography";
-import { useAdminOrganizations } from "@/hooks/use-admin";
+import { useAdminOrganizationsPaged } from "@/hooks/use-admin-lists";
 import { useTheme } from "@/hooks/use-theme";
+import { useDebounced } from "@/hooks/useDebounced";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type { AdminOrgListItem } from "@/lib/types";
 
-type Filter = "ALL" | "PENDING" | "UNDER_REVIEW" | "VERIFIED" | "REJECTED";
+type Filter =
+	| "ALL"
+	| "PENDING"
+	| "UNDER_REVIEW"
+	| "VERIFIED"
+	| "REJECTED"
+	| "SUSPENDED";
 
 const FILTERS: Array<{ value: Filter; label: string }> = [
 	{ value: "PENDING", label: "Pending" },
 	{ value: "UNDER_REVIEW", label: "In review" },
 	{ value: "VERIFIED", label: "Verified" },
 	{ value: "REJECTED", label: "Rejected" },
+	{ value: "SUSPENDED", label: "Suspended" },
 	{ value: "ALL", label: "All" },
 ];
+
+/** One chip row over the API's two filters: verification state, or account state. */
+function toQuery(filter: Filter, search: string) {
+	const base = search ? { search } : {};
+	if (filter === "ALL") return base;
+	if (filter === "SUSPENDED") return { ...base, status: "SUSPENDED" as const };
+	return { ...base, verificationStatus: filter };
+}
 
 export default function AdminOrganizations() {
 	const { colors, spacing } = useTheme();
@@ -40,45 +60,21 @@ export default function AdminOrganizations() {
 	const [search, setSearch] = useState("");
 	const [selected, setSelected] = useState<string | null>(null);
 
-	const query = useAdminOrganizations({
-		search: search.trim(),
-		...(filter === "ALL" ? {} : { verificationStatus: filter }),
-	});
+	const debouncedSearch = useDebounced(search.trim());
+	const query = useAdminOrganizationsPaged(toQuery(filter, debouncedSearch));
 
 	return (
-		<Screen>
+		<AdminScreen>
 			<ScreenHeader
-				title="Organizations"
-				subtitle="Verify NGOs and monitor what they publish."
+				title="NGOs"
+				subtitle="Verify organizations and keep an eye on what they publish"
 			/>
 
-			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[2],
-					backgroundColor: colors.background.tertiary,
-					borderRadius: 12,
-					paddingHorizontal: spacing[3.5],
-					marginBottom: spacing[4],
-				}}
-			>
-				<Search size={18} color={colors.text.quaternary as string} />
-				<Input
-					placeholder="Search by name, email or registration no."
-					value={search}
-					onChangeText={setSearch}
-					autoCapitalize="none"
-					style={{
-						flex: 1,
-						backgroundColor: "transparent",
-						borderWidth: 0,
-						paddingHorizontal: 0,
-						paddingVertical: spacing[3.5],
-					}}
-				/>
-			</View>
-
+			<SearchField
+				value={search}
+				onChangeText={setSearch}
+				placeholder="Search by name, email or registration number"
+			/>
 			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
 
 			{query.isLoading ? (
@@ -90,27 +86,51 @@ export default function AdminOrganizations() {
 				/>
 			) : (
 				<FlatList
-					data={query.data?.items ?? []}
+					data={query.items}
 					keyExtractor={(item) => item.id}
 					showsVerticalScrollIndicator={false}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
-					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
+					ItemSeparatorComponent={() => <View style={{ height: spacing[2] }} />}
+					onEndReached={() => {
+						if (query.hasNextPage && !query.isFetchingNextPage)
+							query.fetchNextPage();
+					}}
+					onEndReachedThreshold={0.6}
 					refreshControl={
 						<RefreshControl
-							refreshing={query.isRefetching}
+							refreshing={query.isRefetching && !query.isFetchingNextPage}
 							onRefresh={() => query.refetch()}
-							tintColor={colors.primary.main as string}
+							tintColor={colors.text.quaternary as string}
 						/>
+					}
+					ListHeaderComponent={
+						<ResultCount total={query.total} noun="organization" />
 					}
 					ListEmptyComponent={
 						<EmptyState
 							icon={Building2}
-							title="Nothing here"
-							description={
-								filter === "PENDING"
-									? "No organizations are waiting for verification."
-									: "No organizations match this filter."
+							title={
+								debouncedSearch
+									? "No matching organizations"
+									: filter === "PENDING"
+										? "Nothing waiting"
+										: "Nothing here"
 							}
+							description={
+								debouncedSearch
+									? "Try a shorter name, or the registration number."
+									: filter === "PENDING"
+										? "No organizations are waiting for verification."
+										: "No organizations match this filter."
+							}
+						/>
+					}
+					ListFooterComponent={
+						<ListFooter
+							count={query.items.length}
+							hasMore={!!query.hasNextPage}
+							fetching={query.isFetchingNextPage}
+							onLoadMore={() => query.fetchNextPage()}
 						/>
 					}
 					renderItem={({ item }) => (
@@ -123,10 +143,14 @@ export default function AdminOrganizations() {
 				organizationId={selected}
 				onClose={() => setSelected(null)}
 			/>
-		</Screen>
+		</AdminScreen>
 	);
 }
 
+/**
+ * Compact: name and place on the first line, state pills on the second, a
+ * quiet footer with the numbers a reviewer glances at before opening.
+ */
 function OrgRow({
 	org,
 	onPress,
@@ -134,37 +158,21 @@ function OrgRow({
 	org: AdminOrgListItem;
 	onPress: () => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
+	const place = [org.city, org.state].filter(Boolean).join(", ");
 
 	return (
 		<Surface onPress={onPress}>
 			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[3],
-				}}
+				style={{ flexDirection: "row", alignItems: "center", gap: spacing[3] }}
 			>
-				<View
-					style={{
-						width: 40,
-						height: 40,
-						borderRadius: 20,
-						backgroundColor: colors.background.tertiary,
-						alignItems: "center",
-						justifyContent: "center",
-					}}
-				>
-					<Body weight="bold" color="secondary">
-						{org.organizationName[0]?.toUpperCase()}
-					</Body>
-				</View>
-				<View style={{ flex: 1 }}>
-					<Body weight="bold" numberOfLines={1}>
+				<Initial text={org.organizationName} />
+				<View style={{ flex: 1, minWidth: 0 }}>
+					<Body weight="semibold" numberOfLines={1}>
 						{org.organizationName}
 					</Body>
 					<Caption color="tertiary" numberOfLines={1}>
-						{[org.city, org.state].filter(Boolean).join(", ") || org.email}
+						{place || org.email || "No location"}
 					</Caption>
 				</View>
 			</View>
@@ -173,6 +181,7 @@ function OrgRow({
 				style={{
 					flexDirection: "row",
 					flexWrap: "wrap",
+					alignItems: "center",
 					gap: spacing[2],
 					marginTop: spacing[3],
 				}}
@@ -190,23 +199,37 @@ function OrgRow({
 						tone="warning"
 					/>
 				)}
-			</View>
-
-			<View
-				style={{
-					flexDirection: "row",
-					justifyContent: "space-between",
-					marginTop: spacing[3],
-					paddingTop: spacing[3],
-					borderTopWidth: 1,
-					borderTopColor: colors.border.light,
-				}}
-			>
-				<Caption color="quaternary">
-					{org.eventCount} events · {org.needCount} needs
-				</Caption>
+				<View style={{ flex: 1 }} />
 				<Caption color="quaternary">Joined {formatDate(org.createdAt)}</Caption>
 			</View>
+
+			<Caption color="quaternary" style={{ marginTop: spacing[2] }}>
+				{org.eventCount} event{org.eventCount === 1 ? "" : "s"} ·{" "}
+				{org.needCount} need{org.needCount === 1 ? "" : "s"}
+				{org.owner.fullName ? ` · Owner ${org.owner.fullName}` : ""}
+			</Caption>
 		</Surface>
+	);
+}
+
+function Initial({ text }: { text: string }) {
+	const { colors } = useTheme();
+	return (
+		<View
+			accessibilityElementsHidden
+			importantForAccessibility="no-hide-descendants"
+			style={{
+				width: 40,
+				height: 40,
+				borderRadius: 20,
+				backgroundColor: colors.background.subtle,
+				alignItems: "center",
+				justifyContent: "center",
+			}}
+		>
+			<Body weight="bold" color="secondary">
+				{text.trim()[0]?.toUpperCase() ?? "?"}
+			</Body>
+		</View>
 	);
 }

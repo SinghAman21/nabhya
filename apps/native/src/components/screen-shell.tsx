@@ -273,6 +273,7 @@ export function ListRow({
 	hint,
 	value,
 	onPress,
+	chevron = true,
 }: {
 	icon?: LucideIcon;
 	label: string;
@@ -280,6 +281,8 @@ export function ListRow({
 	/** Trailing content — a count, a pill, a switch. Replaces the chevron. */
 	value?: React.ReactNode;
 	onPress?: () => void;
+	/** Set false for an action row (sign out) that does not navigate anywhere. */
+	chevron?: boolean;
 }) {
 	const { colors, spacing } = useTheme();
 
@@ -311,7 +314,7 @@ export function ListRow({
 					</Caption>
 				)}
 			</View>
-			{value ?? (onPress ? <Chevron /> : null)}
+			{value ?? (onPress && chevron ? <Chevron /> : null)}
 		</View>
 	);
 

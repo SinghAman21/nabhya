@@ -1,40 +1,87 @@
-import type { UpsertAnnouncementInput } from "@nabhya/shared";
-import { Megaphone, Pin, Plus } from "lucide-react-native";
+import {
+	type UpsertAnnouncementInput,
+	upsertAnnouncementSchema,
+} from "@nabhya/shared";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { Check, Megaphone, Pin } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { FlatList, RefreshControl, View } from "react-native";
+import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
+import { LoadMoreFooter } from "@/components/load-more-footer";
 import {
 	EmptyState,
 	ErrorState,
+	FilterChips,
 	LoadingState,
 	Screen,
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
 import { StatusPill } from "@/components/status-pill";
+import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pressable } from "@/components/ui/pressable";
 import { Sheet } from "@/components/ui/sheet";
-import { Body, Caption, Label } from "@/components/ui/typography";
+import { Body, Caption } from "@/components/ui/typography";
 import {
 	useCreateAnnouncement,
 	useDeleteAnnouncement,
-	useMyAnnouncements,
 	useUpdateAnnouncement,
 } from "@/hooks/use-directory";
 import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
-import { apiErrorMessage } from "@/lib/api";
+import { apiErrorMessage, publishingApi, queryKeys } from "@/lib/api";
+import { focusable } from "@/lib/focus";
 import { formatRelative } from "@/lib/format";
 import type { Announcement } from "@/lib/types";
 
+type StatusFilter = "ALL" | "PUBLISHED" | "DRAFT";
+
+const FILTERS: Array<{ value: StatusFilter; label: string }> = [
+	{ value: "ALL", label: "All" },
+	{ value: "PUBLISHED", label: "Published" },
+	{ value: "DRAFT", label: "Drafts" },
+];
+
+const PAGE_SIZE = 20;
+
+/** Own announcements, page by page; the status filter is applied locally. */
+function useMyAnnouncementPages() {
+	return useInfiniteQuery({
+		queryKey: queryKeys.myAnnouncements({ paged: true }),
+		queryFn: ({ pageParam }) =>
+			publishingApi.listMyAnnouncements({
+				page: pageParam,
+				limit: PAGE_SIZE,
+			}),
+		initialPageParam: 1,
+		getNextPageParam: (last) =>
+			last.meta.hasMore ? last.meta.page + 1 : undefined,
+	});
+}
+
+/**
+ * Announcements on the public profile. Distinct from "Share an update"
+ * (`/feed`), which is a feed post: these are pinned, titled, and can be held
+ * as drafts.
+ */
 export default function OrgAnnouncements() {
 	const { colors, spacing } = useTheme();
+	const [filter, setFilter] = useState<StatusFilter>("ALL");
 	const [composing, setComposing] = useState(false);
 	const [editing, setEditing] = useState<Announcement | null>(null);
 
-	const query = useMyAnnouncements();
+	const query = useMyAnnouncementPages();
 	const remove = useDeleteAnnouncement();
+
+	const all = query.data?.pages.flatMap((page) => page.items) ?? [];
+	const items =
+		filter === "ALL" ? all : all.filter((item) => item.status === filter);
+
+	const loadMore = () => {
+		if (query.hasNextPage && !query.isFetchingNextPage) query.fetchNextPage();
+	};
 
 	const confirmDelete = (announcement: Announcement) => {
 		Alert.alert("Delete update", `"${announcement.title}" will be removed.`, [
@@ -51,28 +98,22 @@ export default function OrgAnnouncements() {
 		]);
 	};
 
+	const openCreate = () => setComposing(true);
+
 	return (
 		<Screen>
 			<ScreenHeader
 				back
 				title="Updates"
-				subtitle="Publishing notifies everyone who saved your organization."
+				subtitle="Shown on your public profile"
 				action={
-					<Pressable
-						onPress={() => setComposing(true)}
-						style={{
-							width: 44,
-							height: 44,
-							borderRadius: 22,
-							alignItems: "center",
-							justifyContent: "center",
-							backgroundColor: colors.primary.main,
-						}}
-					>
-						<Plus size={22} color={colors.primary.contrast as string} />
-					</Pressable>
+					<Button size="sm" onPress={openCreate}>
+						New update
+					</Button>
 				}
 			/>
+
+			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
 
 			{query.isLoading ? (
 				<LoadingState />
@@ -83,91 +124,43 @@ export default function OrgAnnouncements() {
 				/>
 			) : (
 				<FlatList
-					data={query.data?.items ?? []}
+					data={items}
 					keyExtractor={(item) => item.id}
 					showsVerticalScrollIndicator={false}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
 					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
+					onEndReached={loadMore}
+					onEndReachedThreshold={0.5}
 					refreshControl={
 						<RefreshControl
-							refreshing={query.isRefetching}
+							refreshing={query.isRefetching && !query.isFetchingNextPage}
 							onRefresh={() => query.refetch()}
-							tintColor={colors.primary.main as string}
+							tintColor={colors.text.quaternary as string}
 						/>
 					}
 					ListEmptyComponent={
 						<EmptyState
 							icon={Megaphone}
-							title="No updates yet"
-							description="Share what you've been doing — it appears on your public profile."
-							action={
-								<Button onPress={() => setComposing(true)}>
-									Post your first update
-								</Button>
-							}
+							title={filter === "DRAFT" ? "No drafts" : "No updates yet"}
+							description="Progress reports, thank-yous, what's coming next. Published updates appear on your profile and notify people who follow you."
+							action={<Button onPress={openCreate}>Write an update</Button>}
+						/>
+					}
+					ListFooterComponent={
+						<LoadMoreFooter
+							hasMore={!!query.hasNextPage}
+							loading={query.isFetchingNextPage}
+							onLoadMore={loadMore}
+							count={items.length}
+							noun="updates"
 						/>
 					}
 					renderItem={({ item }) => (
-						<Surface onPress={() => setEditing(item)}>
-							<View
-								style={{
-									flexDirection: "row",
-									alignItems: "center",
-									gap: spacing[2],
-									marginBottom: spacing[2],
-								}}
-							>
-								{item.status === "DRAFT" && (
-									<StatusPill label="Draft" tone="neutral" />
-								)}
-								{item.isPinned && (
-									<View
-										style={{
-											flexDirection: "row",
-											alignItems: "center",
-											gap: spacing[1],
-										}}
-									>
-										<Pin size={12} color={colors.primary.main as string} />
-										<Caption color={colors.primary.main as string}>
-											Pinned
-										</Caption>
-									</View>
-								)}
-							</View>
-
-							<Body weight="bold" numberOfLines={2}>
-								{item.title}
-							</Body>
-							<Caption
-								color="tertiary"
-								numberOfLines={3}
-								style={{ marginTop: 4 }}
-							>
-								{item.body}
-							</Caption>
-
-							<View
-								style={{
-									flexDirection: "row",
-									alignItems: "center",
-									justifyContent: "space-between",
-									marginTop: spacing[3],
-									paddingTop: spacing[3],
-									borderTopWidth: 1,
-									borderTopColor: colors.border.light,
-								}}
-							>
-								<Caption color="quaternary">
-									{formatRelative(item.publishedAt ?? item.createdAt)}
-								</Caption>
-								<Pressable onPress={() => confirmDelete(item)} hitSlop={8}>
-									<Caption weight="medium" color={colors.error.main as string}>
-										Delete
-									</Caption>
-								</Pressable>
-							</View>
-						</Surface>
+						<AnnouncementRow
+							announcement={item}
+							onEdit={() => setEditing(item)}
+							onDelete={() => confirmDelete(item)}
+						/>
 					)}
 				/>
 			)}
@@ -184,6 +177,94 @@ export default function OrgAnnouncements() {
 	);
 }
 
+function AnnouncementRow({
+	announcement,
+	onEdit,
+	onDelete,
+}: {
+	announcement: Announcement;
+	onEdit: () => void;
+	onDelete: () => void;
+}) {
+	const { colors, spacing } = useTheme();
+	const isDraft = announcement.status === "DRAFT";
+
+	return (
+		<Surface onPress={onEdit}>
+			{(isDraft || announcement.isPinned) && (
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						gap: spacing[2],
+						marginBottom: spacing[2.5],
+					}}
+				>
+					{isDraft && <StatusPill label="Draft" tone="neutral" />}
+					{announcement.isPinned && (
+						<View
+							style={{
+								flexDirection: "row",
+								alignItems: "center",
+								gap: spacing[1],
+							}}
+						>
+							<Pin size={12} color={colors.primary.ink} strokeWidth={2.2} />
+							<Caption weight="medium" color={colors.primary.ink}>
+								Pinned
+							</Caption>
+						</View>
+					)}
+				</View>
+			)}
+
+			<Body weight="bold" numberOfLines={2}>
+				{announcement.title}
+			</Body>
+			<Caption
+				color="tertiary"
+				numberOfLines={3}
+				style={{ marginTop: spacing[1] }}
+			>
+				{announcement.body}
+			</Caption>
+
+			<View
+				style={{
+					flexDirection: "row",
+					alignItems: "center",
+					justifyContent: "space-between",
+					gap: spacing[3],
+					marginTop: spacing[3],
+					paddingTop: spacing[3],
+					borderTopWidth: 1,
+					borderTopColor: colors.border.hairline,
+				}}
+			>
+				<Caption color="quaternary" style={{ flex: 1 }} numberOfLines={1}>
+					{isDraft
+						? `Saved ${formatRelative(announcement.updatedAt)}`
+						: `Published ${formatRelative(announcement.publishedAt ?? announcement.createdAt)}`}
+				</Caption>
+				<View style={{ flexDirection: "row", gap: spacing[3] }}>
+					<TextAction
+						label={isDraft ? "Edit & publish" : "Edit"}
+						tone={isDraft ? "brand" : "default"}
+						onPress={onEdit}
+						accessibilityLabel={`Edit ${announcement.title}`}
+					/>
+					<TextAction
+						label="Delete"
+						tone="danger"
+						onPress={onDelete}
+						accessibilityLabel={`Delete ${announcement.title}`}
+					/>
+				</View>
+			</View>
+		</Surface>
+	);
+}
+
 function AnnouncementSheet({
 	visible,
 	announcement,
@@ -194,10 +275,12 @@ function AnnouncementSheet({
 	onClose: () => void;
 }) {
 	const { colors, spacing } = useTheme();
+	const inputStyle = useFieldInputStyle();
+	const textAreaStyle = useFieldInputStyle(140);
 	const [title, setTitle] = useState("");
 	const [body, setBody] = useState("");
 	const [isPinned, setPinned] = useState(false);
-	const [error, setError] = useState<string | null>(null);
+	const [errors, setErrors] = useState<Record<string, string>>({});
 
 	const create = useCreateAnnouncement();
 	const update = useUpdateAnnouncement();
@@ -213,37 +296,31 @@ function AnnouncementSheet({
 			setBody("");
 			setPinned(false);
 		}
-		setError(null);
+		setErrors({});
 	}, [announcement]);
 
-	const inputStyle = {
-		borderWidth: 0,
-		borderRadius: 12,
-		backgroundColor: colors.background.tertiary,
-		paddingVertical: spacing[3.5],
-	} as const;
-
 	const submit = (status: "DRAFT" | "PUBLISHED") => {
-		const payload: UpsertAnnouncementInput = {
-			title: title.trim(),
-			body: body.trim(),
+		const parsed = upsertAnnouncementSchema.safeParse({
+			title,
+			body,
 			status,
 			isPinned,
-		};
-
-		if (payload.title.length < 4) {
-			setError("Give the update a title of at least 4 characters.");
+		});
+		if (!parsed.success) {
+			const fieldErrors: Record<string, string> = {};
+			for (const issue of parsed.error.issues) {
+				const key = String(issue.path[0] ?? "form");
+				if (!fieldErrors[key]) fieldErrors[key] = issue.message;
+			}
+			setErrors(fieldErrors);
 			return;
 		}
-		if (payload.body.length < 10) {
-			setError("Write at least a sentence.");
-			return;
-		}
 
-		setError(null);
+		setErrors({});
+		const payload = parsed.data as UpsertAnnouncementInput;
 		const options = {
 			onSuccess: onClose,
-			onError: (e: unknown) => setError(apiErrorMessage(e)),
+			onError: (e: unknown) => setErrors({ form: apiErrorMessage(e) }),
 		};
 
 		if (isEditing && announcement) {
@@ -254,91 +331,103 @@ function AnnouncementSheet({
 	};
 
 	const saving = create.isPending || update.isPending;
+	const publishLabel =
+		isEditing && announcement?.status === "DRAFT"
+			? "Publish this draft"
+			: isEditing
+				? "Save changes"
+				: "Publish update";
 
 	return (
 		<Sheet
 			visible={visible}
 			onClose={onClose}
 			title={isEditing ? "Edit update" : "New update"}
+			subtitle="Publishing notifies everyone who follows you."
 			footer={
-				<>
+				<View style={{ gap: spacing[2] }}>
+					<FieldError message={errors.form} />
 					<Button onPress={() => submit("PUBLISHED")} loading={saving}>
-						Publish update
+						{publishLabel}
 					</Button>
-					<Button
-						variant="outline"
-						onPress={() => submit("DRAFT")}
-						disabled={saving}
-						style={{ marginTop: spacing[2] }}
-					>
-						Save as draft
-					</Button>
-				</>
-			}
-		>
-			<Label style={{ marginBottom: spacing[1.5] }}>Title</Label>
-			<Input
-				placeholder="e.g. 400 blankets distributed in Dharavi"
-				value={title}
-				onChangeText={setTitle}
-				style={inputStyle}
-			/>
-
-			<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-				Update
-			</Label>
-			<Input
-				placeholder="What happened, who it helped, what's next"
-				value={body}
-				onChangeText={setBody}
-				multiline
-				style={{ ...inputStyle, minHeight: 140, textAlignVertical: "top" }}
-			/>
-
-			<Pressable
-				onPress={() => setPinned((v) => !v)}
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[3],
-					marginTop: spacing[4],
-				}}
-			>
-				<View
-					style={{
-						width: 22,
-						height: 22,
-						borderRadius: 6,
-						borderWidth: 2,
-						borderColor: isPinned ? colors.primary.main : colors.border.dark,
-						backgroundColor: isPinned ? colors.primary.main : "transparent",
-						alignItems: "center",
-						justifyContent: "center",
-					}}
-				>
-					{isPinned && (
-						<Body
-							weight="bold"
-							color={colors.primary.contrast as string}
-							style={{ fontSize: 13, lineHeight: 16 }}
+					{(!isEditing || announcement?.status === "DRAFT") && (
+						<Button
+							variant="outline"
+							onPress={() => submit("DRAFT")}
+							disabled={saving}
 						>
-							✓
-						</Body>
+							{isEditing ? "Keep as draft" : "Save as draft"}
+						</Button>
 					)}
 				</View>
-				<Caption color="secondary" style={{ flex: 1 }}>
-					Pin to the top of our profile
-				</Caption>
-			</Pressable>
+			}
+		>
+			<View style={{ paddingTop: spacing[2] }}>
+				<Field label="Title" error={errors.title}>
+					<Input
+						placeholder="e.g. 400 blankets distributed in Dharavi"
+						value={title}
+						onChangeText={setTitle}
+						style={inputStyle}
+					/>
+				</Field>
 
-			{error && (
-				<Caption
-					color={colors.error.main as string}
-					style={{ marginTop: spacing[3] }}
+				<Field label="Update" error={errors.body}>
+					<Input
+						placeholder="What happened, who it helped, what's next"
+						value={body}
+						onChangeText={setBody}
+						multiline
+						style={textAreaStyle}
+					/>
+				</Field>
+
+				<Pressable
+					onPress={() => setPinned((v) => !v)}
+					accessibilityRole="checkbox"
+					accessibilityState={{ checked: isPinned }}
+					accessibilityLabel="Pin to the top of our profile"
+					hitSlop={6}
+					{...focusable}
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						gap: spacing[3],
+						minHeight: 44,
+					}}
 				>
-					{error}
-				</Caption>
-			)}
+					<View
+						style={{
+							width: 22,
+							height: 22,
+							borderRadius: 6,
+							borderWidth: 1.5,
+							borderColor: isPinned
+								? (colors.text.primary as string)
+								: colors.border.dark,
+							backgroundColor: isPinned
+								? (colors.text.primary as string)
+								: "transparent",
+							alignItems: "center",
+							justifyContent: "center",
+						}}
+					>
+						{isPinned && (
+							<Check
+								size={14}
+								color={colors.text.inverse as string}
+								strokeWidth={3}
+							/>
+						)}
+					</View>
+					<View style={{ flex: 1 }}>
+						<Body>Pin to the top of our profile</Body>
+						<Caption color="quaternary">
+							Pinned updates show first on your public profile.
+						</Caption>
+					</View>
+				</Pressable>
+			</View>
 		</Sheet>
 	);
 }

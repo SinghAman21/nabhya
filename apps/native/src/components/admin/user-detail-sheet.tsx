@@ -2,7 +2,15 @@ import { USER_DOCUMENT_LABELS } from "@nabhya/shared";
 import { useState } from "react";
 import { View } from "react-native";
 import { DocumentReviewRow } from "@/components/admin/document-review-row";
-import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
+import { FactGroup, ReasonField } from "@/components/admin/sheet-parts";
+import {
+	Banner,
+	ErrorState,
+	LoadingState,
+	MetricRow,
+	SectionTitle,
+	Surface,
+} from "@/components/screen-shell";
 import {
 	applicationTone,
 	humanizeStatus,
@@ -11,19 +19,18 @@ import {
 	verificationTone,
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Sheet } from "@/components/ui/sheet";
-import { Body, Caption, H3, Label } from "@/components/ui/typography";
+import { Body, Caption } from "@/components/ui/typography";
 import { useAdminUser, useSetUserStatus } from "@/hooks/use-admin";
-import { useOpenDocument } from "@/hooks/use-documents";
 import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 
 /**
- * Per-user dossier. The participation lists are the point of this screen —
- * which events they applied to, what the outcome was, and what they pledged.
+ * Per-user dossier. State first, then the identity documents — the thing a
+ * reviewer most often opens this for — then the participation record that
+ * tells them whether this is a real volunteer, then the one decision.
  */
 export function UserDetailSheet({
 	userId,
@@ -32,34 +39,40 @@ export function UserDetailSheet({
 	userId: string | null;
 	onClose: () => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const [reason, setReason] = useState("");
+	const [reasonError, setReasonError] = useState<string | null>(null);
 
 	const query = useAdminUser(userId ?? undefined);
 	const setStatus = useSetUserStatus();
-	const _openDocument = useOpenDocument();
 
 	const user = query.data;
+	const suspended = user?.status === "SUSPENDED";
 
 	const close = () => {
 		setReason("");
+		setReasonError(null);
 		onClose();
+	};
+
+	const changeReason = (text: string) => {
+		setReason(text);
+		if (reasonError && text.trim()) setReasonError(null);
 	};
 
 	const toggleSuspension = () => {
 		if (!userId || !user) return;
 		const suspending = user.status !== "SUSPENDED";
+		const text = reason.trim();
 
-		if (suspending && !reason.trim()) {
-			Alert.alert(
-				"Reason required",
-				"Add a reason before suspending this user.",
-			);
+		if (suspending && !text) {
+			setReasonError("Add a reason before suspending this account.");
 			return;
 		}
+		setReasonError(null);
 
 		Alert.alert(
-			suspending ? "Suspend user" : "Reinstate user",
+			suspending ? "Suspend account?" : "Reinstate account?",
 			suspending
 				? "They will be signed out and blocked from the app until reinstated."
 				: "They will regain access immediately.",
@@ -74,7 +87,7 @@ export function UserDetailSheet({
 								id: userId,
 								input: {
 									status: suspending ? "SUSPENDED" : "ACTIVE",
-									reason: reason.trim() || undefined,
+									reason: text || undefined,
 								},
 							},
 							{
@@ -92,7 +105,7 @@ export function UserDetailSheet({
 		<Sheet
 			visible={!!userId}
 			onClose={close}
-			title={user?.fullName ?? "Volunteer"}
+			title={user?.fullName ?? "Account"}
 			subtitle={user?.email}
 		>
 			{query.isLoading ? (
@@ -119,62 +132,62 @@ export function UserDetailSheet({
 							label={`ID ${humanizeStatus(user.verificationStatus).toLowerCase()}`}
 							tone={verificationTone(user.verificationStatus)}
 						/>
-						{user.status === "SUSPENDED" && (
-							<StatusPill label="Suspended" tone="error" />
-						)}
+						{suspended && <StatusPill label="Suspended" tone="error" />}
 					</View>
 
 					{user.suspendedReason && (
-						<Surface
-							style={{
-								marginBottom: spacing[5],
-								backgroundColor: colors.error.bg,
-								borderColor: colors.error.border,
-							}}
-						>
-							<Caption weight="bold" color={colors.error.main as string}>
-								Suspension reason
-							</Caption>
-							<Caption color="secondary">{user.suspendedReason}</Caption>
-						</Surface>
+						<View style={{ marginBottom: spacing[5] }}>
+							<Banner
+								tone="error"
+								title="Suspended"
+								description={user.suspendedReason}
+							/>
+						</View>
 					)}
 
-					<View
-						style={{
-							flexDirection: "row",
-							gap: spacing[2],
-							marginBottom: spacing[5],
-						}}
-					>
-						<StatCell label="Applications" value={user.stats.applications} />
-						<StatCell label="Accepted" value={user.stats.accepted} />
-						<StatCell label="Pledges" value={user.stats.pledges} />
+					<View style={{ marginBottom: spacing[5] }}>
+						<MetricRow
+							stats={[
+								{ label: "Applications", value: user.stats.applications },
+								{ label: "Accepted", value: user.stats.accepted },
+								{ label: "Pledges", value: user.stats.pledges },
+							]}
+						/>
 					</View>
 
-					<SectionTitle>Contact</SectionTitle>
-					<Surface style={{ marginBottom: spacing[5] }}>
-						<InfoRow label="Email" value={user.email} />
-						<InfoRow label="Phone" value={user.phone} />
-						<InfoRow
-							label="Location"
-							value={[user.city, user.state].filter(Boolean).join(", ")}
+					<Section title="Contact">
+						<FactGroup
+							facts={[
+								{ label: "Email", value: user.email },
+								{ label: "Phone", value: user.phone },
+								{
+									label: "Location",
+									value: [user.city, user.state].filter(Boolean).join(", "),
+								},
+								{ label: "Joined", value: formatDate(user.createdAt) },
+								{
+									label: "Onboarded",
+									value: user.onboardedAt
+										? formatDate(user.onboardedAt)
+										: "Not finished",
+								},
+							]}
 						/>
-						<InfoRow label="Joined" value={formatDate(user.createdAt)} />
-						<InfoRow
-							label="Onboarded"
-							value={
-								user.onboardedAt ? formatDate(user.onboardedAt) : "Not finished"
-							}
-							last
-						/>
-					</Surface>
+					</Section>
 
 					{user.organization && (
-						<>
-							<SectionTitle>Owns organization</SectionTitle>
-							<Surface style={{ marginBottom: spacing[5] }}>
-								<Body weight="bold">{user.organization.organizationName}</Body>
-								<View style={{ flexDirection: "row", marginTop: spacing[2] }}>
+						<Section title="Owns organization">
+							<Surface>
+								<View
+									style={{
+										flexDirection: "row",
+										alignItems: "center",
+										gap: spacing[2],
+									}}
+								>
+									<Body weight="semibold" style={{ flex: 1 }} numberOfLines={1}>
+										{user.organization.organizationName}
+									</Body>
 									<StatusPill
 										label={humanizeStatus(user.organization.verificationStatus)}
 										tone={verificationTone(
@@ -183,32 +196,34 @@ export function UserDetailSheet({
 									/>
 								</View>
 							</Surface>
-						</>
+						</Section>
 					)}
 
-					<SectionTitle>Identity documents</SectionTitle>
-					<View style={{ gap: spacing[2], marginBottom: spacing[5] }}>
+					<Section
+						title={`Identity documents${user.documents.length ? ` (${user.documents.length})` : ""}`}
+					>
 						{user.documents.length === 0 ? (
 							<Surface>
 								<Caption color="tertiary">No documents submitted.</Caption>
 							</Surface>
 						) : (
-							user.documents.map((document) => (
-								<DocumentReviewRow
-									key={document.id}
-									document={document}
-									kind="user"
-									label={
-										USER_DOCUMENT_LABELS[document.documentType] ??
-										humanizeStatus(document.documentType)
-									}
-								/>
-							))
+							<View style={{ gap: spacing[2] }}>
+								{user.documents.map((document) => (
+									<DocumentReviewRow
+										key={document.id}
+										document={document}
+										kind="user"
+										label={
+											USER_DOCUMENT_LABELS[document.documentType] ??
+											humanizeStatus(document.documentType)
+										}
+									/>
+								))}
+							</View>
 						)}
-					</View>
+					</Section>
 
-					<SectionTitle>Event participation</SectionTitle>
-					<View style={{ gap: spacing[2], marginBottom: spacing[5] }}>
+					<Section title="Event participation">
 						{user.applications.length === 0 ? (
 							<Surface>
 								<Caption color="tertiary">
@@ -216,158 +231,113 @@ export function UserDetailSheet({
 								</Caption>
 							</Surface>
 						) : (
-							user.applications.map((application) => (
-								<Surface key={application.id}>
-									<View
-										style={{
-											flexDirection: "row",
-											alignItems: "center",
-											justifyContent: "space-between",
-											gap: spacing[2],
-										}}
-									>
-										<Body weight="medium" style={{ flex: 1 }} numberOfLines={1}>
-											{application.event.title}
-										</Body>
-										<StatusPill
-											label={humanizeStatus(application.status)}
-											tone={applicationTone(application.status)}
-										/>
-									</View>
-									<Caption color="tertiary" style={{ marginTop: spacing[1] }}>
-										{application.organization.organizationName} ·{" "}
-										{formatDate(application.event.startAt)}
-									</Caption>
-								</Surface>
-							))
+							<View style={{ gap: spacing[2] }}>
+								{user.applications.map((application) => (
+									<Surface key={application.id}>
+										<View
+											style={{
+												flexDirection: "row",
+												alignItems: "center",
+												gap: spacing[2],
+											}}
+										>
+											<Body
+												weight="medium"
+												style={{ flex: 1 }}
+												numberOfLines={1}
+											>
+												{application.event.title}
+											</Body>
+											<StatusPill
+												label={humanizeStatus(application.status)}
+												tone={applicationTone(application.status)}
+											/>
+										</View>
+										<Caption color="tertiary" style={{ marginTop: spacing[1] }}>
+											{application.organization.organizationName} ·{" "}
+											{formatDate(application.event.startAt)}
+										</Caption>
+									</Surface>
+								))}
+							</View>
 						)}
-					</View>
+					</Section>
 
-					<SectionTitle>Pledges</SectionTitle>
-					<View style={{ gap: spacing[2], marginBottom: spacing[5] }}>
+					<Section title="Pledges">
 						{user.pledges.length === 0 ? (
 							<Surface>
 								<Caption color="tertiary">No pledges yet.</Caption>
 							</Surface>
 						) : (
-							user.pledges.map((pledge) => (
-								<Surface key={pledge.id}>
-									<View
-										style={{
-											flexDirection: "row",
-											alignItems: "center",
-											justifyContent: "space-between",
-											gap: spacing[2],
-										}}
-									>
-										<Body weight="medium" style={{ flex: 1 }} numberOfLines={1}>
-											{pledge.need.title}
-										</Body>
-										<StatusPill
-											label={humanizeStatus(pledge.status)}
-											tone={pledgeTone(pledge.status)}
-										/>
-									</View>
-									<Caption color="tertiary" style={{ marginTop: spacing[1] }}>
-										{pledge.organization.organizationName}
-										{pledge.quantity
-											? ` · ${pledge.quantity}${pledge.need.unit ? ` ${pledge.need.unit}` : ""}`
-											: ""}
-									</Caption>
-								</Surface>
-							))
+							<View style={{ gap: spacing[2] }}>
+								{user.pledges.map((pledge) => (
+									<Surface key={pledge.id}>
+										<View
+											style={{
+												flexDirection: "row",
+												alignItems: "center",
+												gap: spacing[2],
+											}}
+										>
+											<Body
+												weight="medium"
+												style={{ flex: 1 }}
+												numberOfLines={1}
+											>
+												{pledge.need.title}
+											</Body>
+											<StatusPill
+												label={humanizeStatus(pledge.status)}
+												tone={pledgeTone(pledge.status)}
+											/>
+										</View>
+										<Caption color="tertiary" style={{ marginTop: spacing[1] }}>
+											{pledge.organization.organizationName}
+											{pledge.quantity
+												? ` · ${pledge.quantity}${pledge.need.unit ? ` ${pledge.need.unit}` : ""}`
+												: ""}
+										</Caption>
+									</Surface>
+								))}
+							</View>
 						)}
-					</View>
+					</Section>
 
-					<SectionTitle>Moderation</SectionTitle>
-					<Label style={{ marginBottom: spacing[1.5] }}>
-						Reason <Caption color="tertiary">(required to suspend)</Caption>
-					</Label>
-					<Input
-						placeholder="Why is this account being actioned?"
+					<SectionTitle>Decision</SectionTitle>
+					<ReasonField
 						value={reason}
-						onChangeText={setReason}
-						multiline
-						style={{
-							borderWidth: 0,
-							borderRadius: 12,
-							backgroundColor: colors.background.tertiary,
-							paddingVertical: spacing[3.5],
-							minHeight: 88,
-							textAlignVertical: "top",
-							marginBottom: spacing[4],
-						}}
+						onChangeText={changeReason}
+						placeholder="Why is this account being actioned?"
+						requiredFor="suspend"
+						error={reasonError}
 					/>
-					<Button
-						variant={user.status === "SUSPENDED" ? "outline" : "destructive"}
-						onPress={toggleSuspension}
-						loading={setStatus.isPending}
-					>
-						{user.status === "SUSPENDED" ? "Reinstate user" : "Suspend user"}
-					</Button>
+					<View style={{ paddingBottom: spacing[2] }}>
+						<Button
+							variant={suspended ? "outline" : "destructive"}
+							onPress={toggleSuspension}
+							loading={setStatus.isPending}
+						>
+							{suspended ? "Reinstate account" : "Suspend account"}
+						</Button>
+					</View>
 				</>
 			)}
 		</Sheet>
 	);
 }
 
-function StatCell({ label, value }: { label: string; value: number }) {
-	return (
-		<Surface style={{ flex: 1 }}>
-			<H3>{value}</H3>
-			<Caption color="tertiary">{label}</Caption>
-		</Surface>
-	);
-}
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function Section({
+	title,
+	children,
+}: {
+	title: string;
+	children: React.ReactNode;
+}) {
 	const { spacing } = useTheme();
 	return (
-		<Caption
-			weight="bold"
-			color="tertiary"
-			style={{
-				letterSpacing: 1,
-				textTransform: "uppercase",
-				marginBottom: spacing[2],
-			}}
-		>
+		<View style={{ marginBottom: spacing[5] }}>
+			<SectionTitle>{title}</SectionTitle>
 			{children}
-		</Caption>
-	);
-}
-
-function InfoRow({
-	label,
-	value,
-	last,
-}: {
-	label: string;
-	value?: string | null;
-	last?: boolean;
-}) {
-	const { colors, spacing } = useTheme();
-
-	return (
-		<View
-			style={{
-				flexDirection: "row",
-				justifyContent: "space-between",
-				gap: spacing[4],
-				paddingBottom: last ? 0 : spacing[2],
-				marginBottom: last ? 0 : spacing[2],
-				borderBottomWidth: last ? 0 : 1,
-				borderBottomColor: colors.border.light,
-			}}
-		>
-			<Caption color="tertiary">{label}</Caption>
-			<Caption
-				weight="medium"
-				color={value ? "primary" : "quaternary"}
-				style={{ flex: 1, textAlign: "right" }}
-			>
-				{value || "—"}
-			</Caption>
 		</View>
 	);
 }

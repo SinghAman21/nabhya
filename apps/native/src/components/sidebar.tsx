@@ -3,17 +3,20 @@ import type { LucideIcon } from "lucide-react-native";
 import {
 	LogOut,
 	Menu,
-	Moon,
 	PanelLeftClose,
 	PanelLeftOpen,
-	Sun,
 	X,
 } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+	APPEARANCE_LABEL,
+	AppearanceSheet,
+	appearanceIcon,
+} from "@/components/appearance-row";
 import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption, H5, Label } from "@/components/ui/typography";
+import { Body, Caption, H5 } from "@/components/ui/typography";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useSignOut } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
@@ -35,6 +38,10 @@ import { useAuthStore } from "@/store/auth-store";
  * timeline to fall out of step with the first. The row tree is identical in both
  * states: labels are clipped by the container rather than unmounted, which is
  * what keeps the transition seamless instead of a layout swap mid-animation.
+ *
+ * The footer is where settings live on desktop: an Appearance row that opens
+ * the same three-way sheet the phone uses, then the account block — who is
+ * signed in, as what, and the way out.
  */
 
 export interface NavItem {
@@ -108,33 +115,43 @@ function groupBySection(navItems: NavItem[]) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Nav item row                                                               */
+/* Rail row                                                                   */
 /* -------------------------------------------------------------------------- */
 
-function NavItemRow({
-	item,
-	segments,
+/**
+ * The one row shape: icon, label, optional trailing value. Nav items and the
+ * Appearance footer row share it so they line up to the pixel in both widths.
+ */
+function RailRow({
+	icon: Icon,
+	label,
+	value,
+	active = false,
 	onPress,
 	labelOpacity,
 	collapsed,
+	role = "link",
+	accessibilityLabel,
 }: {
-	item: NavItem;
-	segments: string[];
+	icon: LucideIcon;
+	label: string;
+	value?: string;
+	active?: boolean;
 	onPress: () => void;
 	collapsed: boolean;
-	/** 1 when expanded, 0 when collapsed. Null in the drawer, which never collapses. */
+	/** 1 when expanded, 0 when collapsed. Absent in the drawer, which never collapses. */
 	labelOpacity?: Animated.AnimatedInterpolation<number>;
+	role?: "link" | "button";
+	accessibilityLabel?: string;
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
-	const Icon = item.icon;
-	const active = isActive(item.href, segments);
 
 	return (
 		<Pressable
 			onPress={onPress}
-			accessibilityRole="link"
-			accessibilityLabel={item.label}
-			accessibilityState={{ selected: active }}
+			accessibilityRole={role}
+			accessibilityLabel={accessibilityLabel ?? label}
+			{...(role === "link" ? { accessibilityState: { selected: active } } : {})}
 			{...focusable}
 			style={(state) => {
 				const { pressed, hovered } = state as PressState;
@@ -144,7 +161,8 @@ function NavItemRow({
 					gap: collapsed ? 0 : ICON_GAP,
 					marginHorizontal: ROW_MARGIN,
 					marginVertical: 1,
-					paddingVertical: spacing[3],
+					minHeight: 40,
+					paddingVertical: spacing[2.5],
 					paddingLeft: ROW_INSET,
 					borderRadius: borderRadius.md,
 					backgroundColor: active
@@ -167,6 +185,9 @@ function NavItemRow({
 			<Animated.View
 				style={{
 					flex: 1,
+					flexDirection: "row",
+					alignItems: "center",
+					gap: spacing[2],
 					// The row has no right padding: this carries it, so it can shrink
 					// to nothing instead of reserving space in a 68px rail.
 					paddingRight: spacing[3],
@@ -177,9 +198,15 @@ function NavItemRow({
 					weight={active ? "semibold" : "normal"}
 					color={active ? "primary" : "secondary"}
 					numberOfLines={1}
+					style={{ flex: 1 }}
 				>
-					{item.label}
+					{label}
 				</Body>
+				{value && (
+					<Caption color="quaternary" numberOfLines={1}>
+						{value}
+					</Caption>
+				)}
 			</Animated.View>
 		</Pressable>
 	);
@@ -254,26 +281,27 @@ function IconButton({
 	icon: Icon,
 	label,
 	onPress,
-	role = "button",
-	checked,
 	expanded,
+	disabled,
 }: {
 	icon: LucideIcon;
 	label: string;
 	onPress: () => void;
-	role?: "button" | "switch";
-	checked?: boolean;
 	expanded?: boolean;
+	disabled?: boolean;
 }) {
 	const { colors, borderRadius } = useTheme();
 
 	return (
 		<Pressable
 			onPress={onPress}
-			accessibilityRole={role}
+			disabled={disabled}
+			accessibilityRole="button"
 			accessibilityLabel={label}
-			{...(role === "switch" ? { accessibilityState: { checked } } : {})}
-			{...(expanded === undefined ? {} : { accessibilityState: { expanded } })}
+			accessibilityState={{
+				...(expanded === undefined ? {} : { expanded }),
+				...(disabled ? { disabled: true } : {}),
+			}}
 			hitSlop={6}
 			{...focusable}
 			style={(state) => {
@@ -284,13 +312,14 @@ function IconButton({
 					borderRadius: borderRadius.sm,
 					alignItems: "center",
 					justifyContent: "center",
+					opacity: disabled ? 0.5 : 1,
 					backgroundColor:
 						pressed || hovered ? colors.background.subtle : "transparent",
 				};
 			}}
 		>
 			<Icon
-				size={16}
+				size={17}
 				color={colors.text.tertiary as string}
 				strokeWidth={1.9}
 			/>
@@ -299,21 +328,22 @@ function IconButton({
 }
 
 /* -------------------------------------------------------------------------- */
-/* User / account section                                                     */
+/* Footer: appearance + account                                               */
 /* -------------------------------------------------------------------------- */
 
-function UserSection({
+function RailFooter({
 	labelOpacity,
 	collapsed,
 }: {
 	labelOpacity?: Animated.AnimatedInterpolation<number>;
-	collapsed?: boolean;
+	collapsed: boolean;
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
-	const { isDark, toggleTheme } = useAppTheme();
+	const { preference } = useAppTheme();
 	const user = useAuthStore((s) => s.user);
 	const role = useAuthStore((s) => s.role);
 	const signOut = useSignOut();
+	const [appearanceOpen, setAppearanceOpen] = useState(false);
 
 	const initials = useMemo(() => {
 		if (!user?.name) return user?.email?.charAt(0).toUpperCase() ?? "?";
@@ -327,13 +357,15 @@ function UserSection({
 
 	const roleLabel =
 		role === "superadmin"
-			? "Admin"
+			? "Superadmin"
 			: role === "organisation"
 				? "NGO"
 				: "Volunteer";
 
 	const avatar = (
 		<View
+			accessibilityElementsHidden
+			importantForAccessibility="no-hide-descendants"
 			style={{
 				width: 34,
 				height: 34,
@@ -347,78 +379,110 @@ function UserSection({
 		</View>
 	);
 
+	const appearanceRow = (
+		<RailRow
+			icon={appearanceIcon(preference)}
+			label="Appearance"
+			value={APPEARANCE_LABEL[preference]}
+			role="button"
+			accessibilityLabel={`Appearance, ${APPEARANCE_LABEL[preference]}`}
+			collapsed={collapsed}
+			onPress={() => setAppearanceOpen(true)}
+			{...(labelOpacity ? { labelOpacity } : {})}
+		/>
+	);
+
+	const sheet = (
+		<AppearanceSheet
+			visible={appearanceOpen}
+			onClose={() => setAppearanceOpen(false)}
+		/>
+	);
+
+	const signOutButton = (
+		<IconButton
+			icon={LogOut}
+			label="Sign out"
+			disabled={signOut.isPending}
+			onPress={() => signOut.mutate()}
+		/>
+	);
+
 	// Collapsed, the account block stacks: the row would only ever show its
-	// avatar with the two controls clipped off the edge.
+	// avatar with the control clipped off the edge.
 	if (collapsed) {
 		return (
 			<View
 				style={{
-					paddingVertical: spacing[3],
-					alignItems: "center",
-					gap: spacing[1],
+					borderTopWidth: 1,
+					borderTopColor: colors.border.hairline,
+					paddingTop: spacing[2],
+					paddingBottom: spacing[3],
 				}}
 			>
-				{avatar}
-				<IconButton
-					icon={isDark ? Sun : Moon}
-					label="Dark mode"
-					role="switch"
-					checked={isDark}
-					onPress={toggleTheme}
-				/>
-				<IconButton
-					icon={LogOut}
-					label="Sign out"
-					onPress={() => signOut.mutate()}
-				/>
+				{appearanceRow}
+				<View
+					accessible
+					accessibilityRole="text"
+					accessibilityLabel={`${user?.name ?? "Signed in"}, ${roleLabel}`}
+					style={{
+						alignItems: "center",
+						marginTop: spacing[2],
+						gap: spacing[1],
+					}}
+				>
+					{avatar}
+					{signOutButton}
+				</View>
+				{sheet}
 			</View>
 		);
 	}
 
 	return (
-		<View style={{ padding: spacing[3] }}>
+		<View
+			style={{
+				borderTopWidth: 1,
+				borderTopColor: colors.border.hairline,
+				paddingTop: spacing[2],
+				paddingBottom: spacing[3],
+			}}
+		>
+			{appearanceRow}
 			<View
 				style={{
 					flexDirection: "row",
 					alignItems: "center",
 					gap: spacing[3],
-					paddingLeft: spacing[1],
+					marginTop: spacing[2],
+					paddingLeft: ROW_MARGIN + spacing[1],
+					paddingRight: ROW_MARGIN,
 				}}
 			>
 				{avatar}
 				<Animated.View
+					accessible
+					accessibilityRole="text"
+					accessibilityLabel={`${user?.name ?? "Signed in"}, ${roleLabel}`}
 					style={{
 						flex: 1,
 						...(labelOpacity ? { opacity: labelOpacity } : null),
 					}}
 				>
 					<Body weight="semibold" numberOfLines={1}>
-						{user?.name ?? "User"}
+						{user?.name ?? user?.email ?? "Signed in"}
 					</Body>
 					<Caption color="quaternary" numberOfLines={1}>
 						{roleLabel}
 					</Caption>
 				</Animated.View>
 				<Animated.View
-					style={{
-						flexDirection: "row",
-						...(labelOpacity ? { opacity: labelOpacity } : null),
-					}}
+					style={labelOpacity ? { opacity: labelOpacity } : undefined}
 				>
-					<IconButton
-						icon={isDark ? Sun : Moon}
-						label="Dark mode"
-						role="switch"
-						checked={isDark}
-						onPress={toggleTheme}
-					/>
-					<IconButton
-						icon={LogOut}
-						label="Sign out"
-						onPress={() => signOut.mutate()}
-					/>
+					{signOutButton}
 				</Animated.View>
 			</View>
+			{sheet}
 		</View>
 	);
 }
@@ -454,9 +518,7 @@ function BrandHeader({
 					gap: spacing[1],
 				}}
 			>
-				<Label weight="bold" style={{ fontSize: 18 }}>
-					n
-				</Label>
+				<H5 accessibilityLabel="nabhya">n</H5>
 				{trailing}
 			</View>
 		);
@@ -487,9 +549,7 @@ function BrandHeader({
 						</Caption>
 					</>
 				) : (
-					<Label weight="bold" style={{ fontSize: 18 }}>
-						nabhya
-					</Label>
+					<H5 numberOfLines={1}>nabhya</H5>
 				)}
 			</Animated.View>
 			{trailing}
@@ -568,6 +628,10 @@ export function Sidebar({
 	const [drawerMounted, setDrawerMounted] = useState(false);
 	const drawerAnim = useRef(new Animated.Value(0)).current;
 
+	// Opening mounts then slides in; closing slides out then unmounts. The close
+	// branch runs unconditionally: from a never-opened state it animates 0 → 0 and
+	// its completion callback is a no-op, which is what lets the effect depend on
+	// exactly what it reads.
 	useEffect(() => {
 		if (mobileOpen) {
 			setDrawerMounted(true);
@@ -577,18 +641,17 @@ export function Sidebar({
 				easing: Easing.bezier(0.22, 1, 0.36, 1),
 				useNativeDriver: true,
 			}).start();
-		} else if (drawerMounted) {
-			Animated.timing(drawerAnim, {
-				toValue: 0,
-				duration: 220,
-				easing: Easing.in(Easing.cubic),
-				useNativeDriver: true,
-			}).start(({ finished }) => {
-				if (finished) setDrawerMounted(false);
-			});
+			return;
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [mobileOpen]);
+		Animated.timing(drawerAnim, {
+			toValue: 0,
+			duration: 220,
+			easing: Easing.in(Easing.cubic),
+			useNativeDriver: true,
+		}).start(({ finished }) => {
+			if (finished) setDrawerMounted(false);
+		});
+	}, [mobileOpen, drawerAnim]);
 
 	const drawerTranslateX = drawerAnim.interpolate({
 		inputRange: [0, 1],
@@ -617,10 +680,11 @@ export function Sidebar({
 						{...(animated ? { labelOpacity, railOpacity } : {})}
 					/>
 					{group.items.map((item) => (
-						<NavItemRow
+						<RailRow
 							key={item.href}
-							item={item}
-							segments={segments}
+							icon={item.icon}
+							label={item.label}
+							active={isActive(item.href, segments)}
 							collapsed={animated ? collapsed : false}
 							onPress={() => handleNavigate(item.href)}
 							{...(animated ? { labelOpacity } : {})}
@@ -650,6 +714,7 @@ export function Sidebar({
 
 		return (
 			<Animated.View
+				accessibilityRole="none"
 				style={{
 					width: railWidth,
 					backgroundColor: colors.background.card,
@@ -678,7 +743,7 @@ export function Sidebar({
 				>
 					{renderNavList(true)}
 				</ScrollView>
-				<UserSection labelOpacity={labelOpacity} collapsed={collapsed} />
+				<RailFooter labelOpacity={labelOpacity} collapsed={collapsed} />
 			</Animated.View>
 		);
 	}
@@ -697,7 +762,9 @@ export function Sidebar({
 					onPress={() => setMobileOpen(true)}
 					accessibilityRole="button"
 					accessibilityLabel="Open navigation menu"
+					accessibilityState={{ expanded: mobileOpen }}
 					hitSlop={6}
+					{...focusable}
 					style={({ pressed }) => ({
 						width: 44,
 						height: 44,
@@ -765,7 +832,9 @@ export function Sidebar({
 						>
 							{renderNavList(false)}
 						</ScrollView>
-						<UserSection />
+						<View style={{ paddingBottom: insets.bottom }}>
+							<RailFooter collapsed={false} />
+						</View>
 					</Animated.View>
 				</View>
 			)}

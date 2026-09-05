@@ -1,21 +1,19 @@
-import type { LucideIcon } from "lucide-react-native";
-import {
-	Award,
-	Building2,
-	CalendarCheck,
-	Clock,
-	Package,
-} from "lucide-react-native";
+import { useRouter } from "expo-router";
+import { TrendingUp } from "lucide-react-native";
 import { RefreshControl, ScrollView, View } from "react-native";
 import {
+	EmptyState,
 	ErrorState,
+	ListGroup,
+	ListRow,
 	LoadingState,
+	MetricRow,
 	Screen,
 	ScreenHeader,
 	SectionTitle,
-	Surface,
 } from "@/components/screen-shell";
-import { Body, Caption, H3 } from "@/components/ui/typography";
+import { Button } from "@/components/ui/button";
+import { Caption } from "@/components/ui/typography";
 import { useMyImpact } from "@/hooks/use-directory";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
@@ -26,13 +24,24 @@ import { formatDate } from "@/lib/format";
  *
  * Every figure is derived from applications, attendance and pledges rather
  * than stored — hours come from the attended events' own durations, so an
- * organization cannot inflate someone's record without changing the event
+ * organisation cannot inflate someone's record without changing the event
  * everyone else can see.
+ *
+ * Two metric rows, the loud numbers first (hours, events) and the supporting
+ * ones under them, then the application record as plain rows. No coloured
+ * tiles: the numerals are the loudest thing on the page.
  */
 export default function Impact() {
 	const { colors, spacing } = useTheme();
+	const router = useRouter();
 	const query = useMyImpact();
 	const impact = query.data;
+
+	const nothingYet =
+		!!impact &&
+		impact.eventsAttended === 0 &&
+		impact.itemsDonated === 0 &&
+		impact.applicationsSubmitted === 0;
 
 	return (
 		<Screen>
@@ -41,8 +50,8 @@ export default function Impact() {
 				title="Your impact"
 				subtitle={
 					impact?.firstVolunteeredAt
-						? `Volunteering since ${formatDate(impact.firstVolunteeredAt)}.`
-						: "Everything you contribute shows up here."
+						? `Volunteering since ${formatDate(impact.firstVolunteeredAt)}`
+						: "Everything you contribute, in numbers"
 				}
 			/>
 
@@ -53,6 +62,21 @@ export default function Impact() {
 					message={apiErrorMessage(query.error)}
 					onRetry={() => query.refetch()}
 				/>
+			) : nothingYet ? (
+				<EmptyState
+					icon={TrendingUp}
+					title="Nothing to count yet"
+					description="Apply to an event or pledge an item. Once an NGO confirms it, your hours, items and certificates add up here."
+					action={
+						<Button
+							size="sm"
+							variant="outline"
+							onPress={() => router.push("/(volunteer)")}
+						>
+							See what's needed
+						</Button>
+					}
+				/>
 			) : (
 				<ScrollView
 					showsVerticalScrollIndicator={false}
@@ -61,139 +85,55 @@ export default function Impact() {
 						<RefreshControl
 							refreshing={query.isRefetching}
 							onRefresh={() => query.refetch()}
-							tintColor={colors.primary.main as string}
+							tintColor={colors.text.quaternary as string}
 						/>
 					}
 				>
-					<View style={{ flexDirection: "row", gap: spacing[2] }}>
-						<Stat
-							icon={Clock}
-							value={impact.hoursContributed}
-							label="hours given"
-							emphasis
+					<View style={{ gap: spacing[3], marginBottom: spacing[5] }}>
+						<MetricRow
+							stats={[
+								{ label: "Hours given", value: impact.hoursContributed },
+								{ label: "Events attended", value: impact.eventsAttended },
+							]}
 						/>
-						<Stat
-							icon={CalendarCheck}
-							value={impact.eventsAttended}
-							label="events attended"
-							emphasis
-						/>
-					</View>
-
-					<View
-						style={{
-							flexDirection: "row",
-							gap: spacing[2],
-							marginTop: spacing[2],
-						}}
-					>
-						<Stat
-							icon={Building2}
-							value={impact.organizationsHelped}
-							label="NGOs helped"
-						/>
-						<Stat
-							icon={Award}
-							value={impact.certificatesEarned}
-							label="certificates"
-						/>
-						<Stat
-							icon={Package}
-							value={impact.itemsDonated}
-							label="items donated"
+						<MetricRow
+							stats={[
+								{ label: "NGOs helped", value: impact.organizationsHelped },
+								{ label: "Certificates", value: impact.certificatesEarned },
+								{ label: "Items donated", value: impact.itemsDonated },
+							]}
 						/>
 					</View>
 
-					<View style={{ marginTop: spacing[5] }}>
-						<SectionTitle>Applications</SectionTitle>
-						<Surface>
-							<Row
-								label="Submitted"
-								value={String(impact.applicationsSubmitted)}
-							/>
-							<Row
-								label="Acceptance rate"
-								value={`${impact.acceptanceRate}%`}
-							/>
-							<Row
-								label="Pledges completed"
-								value={String(impact.pledgesCompleted)}
-								last
-							/>
-						</Surface>
-					</View>
+					<SectionTitle>Applications</SectionTitle>
+					<ListGroup>
+						<ListRow
+							label="Submitted"
+							value={<Caption>{String(impact.applicationsSubmitted)}</Caption>}
+						/>
+						<ListRow
+							label="Acceptance rate"
+							hint="Of the applications NGOs have reviewed"
+							value={<Caption>{`${impact.acceptanceRate}%`}</Caption>}
+						/>
+						<ListRow
+							label="Pledges completed"
+							hint="Items handed over and confirmed"
+							value={<Caption>{String(impact.pledgesCompleted)}</Caption>}
+						/>
+					</ListGroup>
 
 					{impact.eventsAttended === 0 && (
-						<Surface style={{ marginTop: spacing[4] }}>
-							<Body weight="bold">Nothing here yet</Body>
-							<Caption color="tertiary">
-								Apply to an event — once the NGO confirms you attended, your
-								hours and certificate appear here automatically.
-							</Caption>
-						</Surface>
+						<Caption
+							color="tertiary"
+							style={{ marginTop: spacing[5], textAlign: "center" }}
+						>
+							Hours and certificates appear once an NGO marks you present at an
+							event.
+						</Caption>
 					)}
 				</ScrollView>
 			)}
 		</Screen>
-	);
-}
-
-function Stat({
-	icon: Icon,
-	value,
-	label,
-	emphasis,
-}: {
-	icon: LucideIcon;
-	value: number;
-	label: string;
-	emphasis?: boolean;
-}) {
-	const { colors, spacing } = useTheme();
-	return (
-		<Surface style={{ flex: 1 }}>
-			<Icon
-				size={18}
-				color={
-					emphasis
-						? (colors.primary.main as string)
-						: (colors.text.tertiary as string)
-				}
-			/>
-			<H3
-				style={{ marginTop: spacing[1] }}
-				color={emphasis ? (colors.primary.main as string) : undefined}
-			>
-				{value}
-			</H3>
-			<Caption color="tertiary">{label}</Caption>
-		</Surface>
-	);
-}
-
-function Row({
-	label,
-	value,
-	last,
-}: {
-	label: string;
-	value: string;
-	last?: boolean;
-}) {
-	const { colors, spacing } = useTheme();
-	return (
-		<View
-			style={{
-				flexDirection: "row",
-				justifyContent: "space-between",
-				paddingBottom: last ? 0 : spacing[2],
-				marginBottom: last ? 0 : spacing[2],
-				borderBottomWidth: last ? 0 : 1,
-				borderBottomColor: colors.border.light,
-			}}
-		>
-			<Caption color="tertiary">{label}</Caption>
-			<Caption weight="medium">{value}</Caption>
-		</View>
 	);
 }

@@ -35,8 +35,14 @@ export function PledgeSheet({
 	// `fulfilledQuantity` moves as other people pledge. Re-reading the need
 	// keeps "only N still needed" honest instead of validating against a stale
 	// number the server will then reject.
-	const fresh = usePublicNeed(listItem?.id);
-	const need = fresh.data ?? listItem;
+	// Remember the last need so the sheet can animate closed after the caller
+	// clears it; `visible` follows the caller, the content follows this.
+	const [shown, setShown] = useState<PublicNeed | null>(listItem);
+	useEffect(() => {
+		if (listItem) setShown(listItem);
+	}, [listItem]);
+	const fresh = usePublicNeed(shown?.id);
+	const need = fresh.data ?? shown;
 
 	const pledge = useCreatePledge(need?.id ?? "");
 

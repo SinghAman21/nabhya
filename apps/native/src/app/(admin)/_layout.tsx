@@ -9,7 +9,6 @@ import {
 import { View } from "react-native";
 import { type NavItem, Sidebar } from "@/components/sidebar";
 import { renderTabBar, useTabBarOptions } from "@/components/tab-bar";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { useAuthStore } from "@/store/auth-store";
@@ -120,7 +119,6 @@ export default function AdminLayout() {
 					}}
 				/>
 			</Tabs>
-			<ThemeToggle />
 		</View>
 	);
 }

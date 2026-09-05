@@ -1,6 +1,9 @@
-import { UserPlus, Users } from "lucide-react-native";
-import { useState } from "react";
+import { inviteOrgAdminSchema } from "@nabhya/shared";
+import { Users } from "lucide-react-native";
+import { useEffect, useState } from "react";
 import { FlatList, RefreshControl, View } from "react-native";
+import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
+import { InitialAvatar } from "@/components/initial-avatar";
 import {
 	EmptyState,
 	ErrorState,
@@ -12,9 +15,8 @@ import {
 import { StatusPill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Pressable } from "@/components/ui/pressable";
 import { Sheet } from "@/components/ui/sheet";
-import { Body, Caption, Label } from "@/components/ui/typography";
+import { Body, Caption } from "@/components/ui/typography";
 import {
 	useInviteAdmin,
 	useOrgTeam,
@@ -27,52 +29,34 @@ import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type { OrgTeamMember } from "@/lib/types";
 
+/**
+ * Who can act for the organisation. Tapping a member opens their sheet, where
+ * the role is edited and — for anyone but the owner — access is removed. The
+ * endpoint returns the whole team, so there is no paging here.
+ */
 export default function OrgTeam() {
 	const { colors, spacing } = useTheme();
 	const [inviting, setInviting] = useState(false);
+	const [managing, setManaging] = useState<OrgTeamMember | null>(null);
 
 	const query = useOrgTeam();
-	const remove = useRemoveAdmin();
-
-	const confirmRemove = (member: OrgTeamMember) => {
-		Alert.alert(
-			"Remove from team",
-			`${member.user.fullName ?? member.user.email} will lose access to this organization.`,
-			[
-				{ text: "Cancel", style: "cancel" },
-				{
-					text: "Remove",
-					style: "destructive",
-					onPress: () =>
-						remove.mutate(member.id, {
-							onError: (error) =>
-								Alert.alert("Could not remove", apiErrorMessage(error)),
-						}),
-				},
-			],
-		);
-	};
+	const items = query.data ?? [];
+	const openInvite = () => setInviting(true);
 
 	return (
 		<Screen>
 			<ScreenHeader
 				back
 				title="Team"
-				subtitle="People who can manage this organization."
+				subtitle={
+					items.length > 0
+						? `${items.length} ${items.length === 1 ? "person" : "people"} can manage this organisation`
+						: undefined
+				}
 				action={
-					<Pressable
-						onPress={() => setInviting(true)}
-						style={{
-							width: 44,
-							height: 44,
-							borderRadius: 22,
-							alignItems: "center",
-							justifyContent: "center",
-							backgroundColor: colors.primary.main,
-						}}
-					>
-						<UserPlus size={20} color={colors.primary.contrast as string} />
-					</Pressable>
+					<Button size="sm" onPress={openInvite}>
+						Add person
+					</Button>
 				}
 			/>
 
@@ -85,7 +69,7 @@ export default function OrgTeam() {
 				/>
 			) : (
 				<FlatList
-					data={query.data ?? []}
+					data={items}
 					keyExtractor={(item) => item.id}
 					showsVerticalScrollIndicator={false}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
@@ -94,152 +78,171 @@ export default function OrgTeam() {
 						<RefreshControl
 							refreshing={query.isRefetching}
 							onRefresh={() => query.refetch()}
-							tintColor={colors.primary.main as string}
+							tintColor={colors.text.quaternary as string}
 						/>
 					}
 					ListEmptyComponent={
 						<EmptyState
 							icon={Users}
 							title="Just you so far"
-							description="Add colleagues so they can post events and review applicants."
+							description="Add colleagues so they can post events and needs, review applicants and reply to reviews on the NGO's behalf."
+							action={<Button onPress={openInvite}>Add a colleague</Button>}
 						/>
 					}
 					renderItem={({ item }) => (
-						<MemberRow member={item} onRemove={() => confirmRemove(item)} />
+						<MemberRow member={item} onPress={() => setManaging(item)} />
 					)}
 				/>
 			)}
 
 			<InviteSheet visible={inviting} onClose={() => setInviting(false)} />
+			<MemberSheet member={managing} onClose={() => setManaging(null)} />
 		</Screen>
 	);
 }
 
-/**
- * One teammate, with their role editable in place.
- *
- * The edit is inline rather than an Alert.prompt: that only exists on iOS, so
- * on Android tapping would silently do nothing.
- */
 function MemberRow({
 	member,
-	onRemove,
+	onPress,
 }: {
 	member: OrgTeamMember;
-	onRemove: () => void;
+	onPress: () => void;
 }) {
-	const { colors, spacing } = useTheme();
-	const [editing, setEditing] = useState(false);
-	const [designation, setDesignation] = useState(member.designation ?? "");
-
-	const update = useUpdateAdmin();
-
-	const save = () => {
-		update.mutate(
-			{ id: member.id, input: { designation: designation.trim() } },
-			{
-				onSuccess: () => setEditing(false),
-				onError: (error) =>
-					Alert.alert("Could not save", apiErrorMessage(error)),
-			},
-		);
-	};
-
-	const cancel = () => {
-		setDesignation(member.designation ?? "");
-		setEditing(false);
-	};
+	const { spacing } = useTheme();
+	const name = member.user.fullName ?? member.user.email;
 
 	return (
-		<Surface>
+		<Surface onPress={onPress}>
 			<View
 				style={{ flexDirection: "row", alignItems: "center", gap: spacing[3] }}
 			>
-				<View
-					style={{
-						width: 40,
-						height: 40,
-						borderRadius: 20,
-						backgroundColor: colors.background.tertiary,
-						alignItems: "center",
-						justifyContent: "center",
-					}}
-				>
-					<Body weight="bold" color="secondary">
-						{(member.user.fullName ?? member.user.email)[0]?.toUpperCase()}
-					</Body>
-				</View>
-				<View style={{ flex: 1 }}>
+				<InitialAvatar name={member.user.fullName ?? member.user.email} />
+				<View style={{ flex: 1, minWidth: 0 }}>
 					<Body weight="bold" numberOfLines={1}>
-						{member.user.fullName ?? member.user.email}
+						{name}
 					</Body>
 					<Caption color="tertiary" numberOfLines={1}>
-						{member.designation ?? "Team member"} · joined{" "}
+						{member.designation ?? "Team member"} · since{" "}
 						{formatDate(member.joinedAt)}
 					</Caption>
 				</View>
 				{member.isOwner && <StatusPill label="Owner" tone="info" />}
 			</View>
+		</Surface>
+	);
+}
 
-			{editing ? (
-				<View style={{ marginTop: spacing[3] }}>
+/**
+ * One teammate's sheet: edit their role, or remove them.
+ *
+ * The edit is a real field rather than an Alert.prompt: that only exists on
+ * iOS, so on Android tapping would silently do nothing.
+ */
+function MemberSheet({
+	member,
+	onClose,
+}: {
+	member: OrgTeamMember | null;
+	onClose: () => void;
+}) {
+	const { spacing } = useTheme();
+	const inputStyle = useFieldInputStyle();
+	const [designation, setDesignation] = useState("");
+	const [error, setError] = useState<string | null>(null);
+
+	const update = useUpdateAdmin();
+	const remove = useRemoveAdmin();
+
+	useEffect(() => {
+		setDesignation(member?.designation ?? "");
+		setError(null);
+	}, [member]);
+
+	const save = () => {
+		if (!member) return;
+		setError(null);
+		update.mutate(
+			{ id: member.id, input: { designation: designation.trim() } },
+			{ onSuccess: onClose, onError: (e) => setError(apiErrorMessage(e)) },
+		);
+	};
+
+	const confirmRemove = () => {
+		if (!member) return;
+		const name = member.user.fullName ?? member.user.email;
+		Alert.alert(
+			"Remove from team",
+			`${name} will lose access to this organisation. They keep their own account.`,
+			[
+				{ text: "Cancel", style: "cancel" },
+				{
+					text: "Remove",
+					style: "destructive",
+					onPress: () =>
+						remove.mutate(member.id, {
+							onSuccess: onClose,
+							onError: (e) => setError(apiErrorMessage(e)),
+						}),
+				},
+			],
+		);
+	};
+
+	const dirty = (member?.designation ?? "") !== designation.trim();
+	const busy = update.isPending || remove.isPending;
+
+	return (
+		<Sheet
+			visible={!!member}
+			onClose={onClose}
+			title={member?.user.fullName ?? member?.user.email ?? ""}
+			subtitle={member?.user.email}
+			footer={
+				<View style={{ gap: spacing[2] }}>
+					<FieldError message={error} />
+					<Button
+						onPress={save}
+						loading={update.isPending}
+						disabled={busy || !dirty}
+					>
+						Save role
+					</Button>
+					{/* The owner is deliberately not removable — losing them would
+					    leave the organisation unmanageable. */}
+					{member && !member.isOwner && (
+						<Button
+							variant="outline"
+							onPress={confirmRemove}
+							loading={remove.isPending}
+							disabled={busy}
+						>
+							Remove from team
+						</Button>
+					)}
+				</View>
+			}
+		>
+			<View style={{ paddingTop: spacing[2] }}>
+				<Field
+					label="Role"
+					optional
+					hint="Shown beside their name to the rest of the team."
+				>
 					<Input
 						placeholder="e.g. Programme Manager"
 						value={designation}
 						onChangeText={setDesignation}
 						autoFocus
-						style={{
-							borderWidth: 0,
-							borderRadius: 12,
-							backgroundColor: colors.background.tertiary,
-							paddingVertical: spacing[3],
-						}}
+						style={inputStyle}
 					/>
-					<View
-						style={{
-							flexDirection: "row",
-							gap: spacing[4],
-							marginTop: spacing[2],
-						}}
-					>
-						<Pressable onPress={save} disabled={update.isPending} hitSlop={8}>
-							<Caption weight="medium" color={colors.primary.main as string}>
-								{update.isPending ? "Saving…" : "Save role"}
-							</Caption>
-						</Pressable>
-						<Pressable onPress={cancel} hitSlop={8}>
-							<Caption weight="medium" color="secondary">
-								Cancel
-							</Caption>
-						</Pressable>
-					</View>
-				</View>
-			) : (
-				<View
-					style={{
-						flexDirection: "row",
-						gap: spacing[4],
-						marginTop: spacing[3],
-					}}
-				>
-					<Pressable onPress={() => setEditing(true)} hitSlop={8}>
-						<Caption weight="medium" color={colors.primary.main as string}>
-							Change role
-						</Caption>
-					</Pressable>
-
-					{/* The owner is deliberately not removable — losing them would
-					    leave the organization unmanageable. */}
-					{!member.isOwner && (
-						<Pressable onPress={onRemove} hitSlop={8}>
-							<Caption weight="medium" color={colors.error.main as string}>
-								Remove from team
-							</Caption>
-						</Pressable>
-					)}
-				</View>
-			)}
-		</Surface>
+				</Field>
+				{member?.isOwner && (
+					<Caption color="quaternary">
+						The owner set up this organisation and cannot be removed.
+					</Caption>
+				)}
+			</View>
+		</Sheet>
 	);
 }
 
@@ -250,89 +253,83 @@ function InviteSheet({
 	visible: boolean;
 	onClose: () => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
+	const inputStyle = useFieldInputStyle();
 	const [email, setEmail] = useState("");
 	const [designation, setDesignation] = useState("");
-	const [error, setError] = useState<string | null>(null);
+	const [errors, setErrors] = useState<Record<string, string>>({});
 
 	const invite = useInviteAdmin();
 
+	const close = () => {
+		setEmail("");
+		setDesignation("");
+		setErrors({});
+		onClose();
+	};
+
 	const submit = () => {
-		if (!email.trim()) {
-			setError("Enter their email address.");
+		const parsed = inviteOrgAdminSchema.safeParse({
+			email: email.trim(),
+			designation,
+		});
+		if (!parsed.success) {
+			const fieldErrors: Record<string, string> = {};
+			for (const issue of parsed.error.issues) {
+				const key = String(issue.path[0] ?? "form");
+				if (!fieldErrors[key]) fieldErrors[key] = issue.message;
+			}
+			setErrors(fieldErrors);
 			return;
 		}
-		setError(null);
-		invite.mutate(
-			{
-				email: email.trim(),
-				designation: designation.trim() || undefined,
-			},
-			{
-				onSuccess: () => {
-					setEmail("");
-					setDesignation("");
-					onClose();
-				},
-				onError: (e) => setError(apiErrorMessage(e)),
-			},
-		);
+		setErrors({});
+		invite.mutate(parsed.data, {
+			onSuccess: close,
+			onError: (e) => setErrors({ form: apiErrorMessage(e) }),
+		});
 	};
 
 	return (
 		<Sheet
 			visible={visible}
-			onClose={onClose}
+			onClose={close}
 			title="Add to team"
+			subtitle="They need a Nabhya account already."
 			footer={
-				<Button onPress={submit} loading={invite.isPending}>
-					Add to team
-				</Button>
+				<View style={{ gap: spacing[2] }}>
+					<FieldError message={errors.form} />
+					<Button onPress={submit} loading={invite.isPending}>
+						Add to team
+					</Button>
+				</View>
 			}
 		>
-			<Caption color="tertiary" style={{ marginBottom: spacing[5] }}>
-				They need a Nabhya account already — we won't create one on their
-				behalf.
-			</Caption>
-
-			<Label style={{ marginBottom: spacing[1.5] }}>Email</Label>
-			<Input
-				placeholder="colleague@example.org"
-				value={email}
-				onChangeText={setEmail}
-				keyboardType="email-address"
-				autoCapitalize="none"
-				style={{
-					borderWidth: 0,
-					borderRadius: 12,
-					backgroundColor: colors.background.tertiary,
-					paddingVertical: spacing[3.5],
-				}}
-			/>
-
-			<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-				Role <Caption color="tertiary">(optional)</Caption>
-			</Label>
-			<Input
-				placeholder="e.g. Programme Manager"
-				value={designation}
-				onChangeText={setDesignation}
-				style={{
-					borderWidth: 0,
-					borderRadius: 12,
-					backgroundColor: colors.background.tertiary,
-					paddingVertical: spacing[3.5],
-				}}
-			/>
-
-			{error && (
-				<Caption
-					color={colors.error.main as string}
-					style={{ marginTop: spacing[3] }}
+			<View style={{ paddingTop: spacing[2] }}>
+				<Field
+					label="Email"
+					error={errors.email}
+					hint="The address they signed up with. We won't create an account for them."
 				>
-					{error}
-				</Caption>
-			)}
+					<Input
+						placeholder="colleague@example.org"
+						value={email}
+						onChangeText={setEmail}
+						keyboardType="email-address"
+						autoCapitalize="none"
+						autoCorrect={false}
+						style={inputStyle}
+					/>
+				</Field>
+
+				<Field label="Role" optional error={errors.designation}>
+					<Input
+						placeholder="e.g. Programme Manager"
+						value={designation}
+						onChangeText={setDesignation}
+						style={inputStyle}
+					/>
+				</Field>
+			</View>
 		</Sheet>
 	);
 }

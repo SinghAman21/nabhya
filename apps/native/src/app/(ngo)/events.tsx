@@ -1,10 +1,14 @@
-import type { EventStatus } from "@nabhya/shared";
-import { CalendarDays, Plus } from "lucide-react-native";
+import type { EventStatus, OrgEventQuery } from "@nabhya/shared";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import { CalendarDays } from "lucide-react-native";
 import { useState } from "react";
 import { FlatList, RefreshControl, View } from "react-native";
 import { ApplicantsSheet } from "@/components/applicants-sheet";
 import { EventFormSheet } from "@/components/event-form-sheet";
+import { LoadMoreFooter } from "@/components/load-more-footer";
 import {
+	Banner,
 	EmptyState,
 	ErrorState,
 	FilterChips,
@@ -18,14 +22,14 @@ import {
 	humanizeStatus,
 	StatusPill,
 } from "@/components/status-pill";
+import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
-import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption } from "@/components/ui/typography";
-import { useDeleteEvent, useOrgEvents } from "@/hooks/use-events";
+import { Body, Caption, Label } from "@/components/ui/typography";
+import { useDeleteEvent } from "@/hooks/use-events";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
-import { apiErrorMessage } from "@/lib/api";
+import { apiErrorMessage, orgEventsApi, queryKeys } from "@/lib/api";
 import { formatDateRange } from "@/lib/format";
 import type { OrgEventListItem } from "@/lib/types";
 
@@ -38,18 +42,43 @@ const FILTERS: Array<{ value: StatusFilter; label: string }> = [
 	{ value: "COMPLETED", label: "Past" },
 ];
 
+const PAGE_SIZE = 20;
+
+/**
+ * The org's events, page by page. Shares the `["org","events"]` prefix with
+ * `useOrgEvents` so every event mutation invalidates it too; the `paged`
+ * marker keeps its cache shape apart from the page-1 query the dashboard reads.
+ */
+function useOrgEventPages(filters: Partial<OrgEventQuery>) {
+	return useInfiniteQuery({
+		queryKey: queryKeys.orgEvents({ ...filters, paged: true }),
+		queryFn: ({ pageParam }) =>
+			orgEventsApi.list({ ...filters, page: pageParam, limit: PAGE_SIZE }),
+		initialPageParam: 1,
+		getNextPageParam: (last) =>
+			last.meta.hasMore ? last.meta.page + 1 : undefined,
+	});
+}
+
 export default function NgoEvents() {
 	const { colors, spacing } = useTheme();
+	const router = useRouter();
 	const [filter, setFilter] = useState<StatusFilter>("ALL");
 	const [formOpen, setFormOpen] = useState(false);
 	const [editing, setEditing] = useState<OrgEventListItem | null>(null);
 	const [reviewing, setReviewing] = useState<OrgEventListItem | null>(null);
 	const { data: me } = useMe();
 
-	const query = useOrgEvents(filter === "ALL" ? {} : { status: filter });
+	const query = useOrgEventPages(filter === "ALL" ? {} : { status: filter });
 	const deleteEvent = useDeleteEvent();
 
 	const isVerified = me?.organization?.verificationStatus === "VERIFIED";
+	const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+	const total = query.data?.pages[0]?.meta.total ?? items.length;
+
+	const loadMore = () => {
+		if (query.hasNextPage && !query.isFetchingNextPage) query.fetchNextPage();
+	};
 
 	const confirmDelete = (event: OrgEventListItem) => {
 		Alert.alert(
@@ -72,50 +101,37 @@ export default function NgoEvents() {
 		);
 	};
 
+	const openCreate = () => setFormOpen(true);
+
 	return (
 		<Screen>
 			<ScreenHeader
 				title="Events"
-				subtitle="Create volunteering events and review who applies."
+				subtitle={
+					total > 0 ? `${total} event${total === 1 ? "" : "s"}` : undefined
+				}
 				action={
-					<Pressable
-						onPress={() => setFormOpen(true)}
-						style={{
-							width: 44,
-							height: 44,
-							borderRadius: 22,
-							alignItems: "center",
-							justifyContent: "center",
-							backgroundColor: colors.primary.main,
-						}}
-					>
-						<Plus size={22} color={colors.primary.contrast as string} />
-					</Pressable>
+					<Button size="sm" onPress={openCreate}>
+						New event
+					</Button>
 				}
 			/>
 
 			{!isVerified && (
-				<Surface
-					style={{
-						marginBottom: spacing[4],
-						backgroundColor: colors.warning.bg,
-						borderColor: colors.warning.main,
-					}}
-				>
-					<Body weight="bold" color={colors.warning.dark as string}>
-						Verification pending
-					</Body>
-					<Caption color="secondary">
-						You can draft events now — publishing to the public page unlocks
-						once your organization is verified.
-					</Caption>
-				</Surface>
+				<View style={{ marginBottom: spacing[4] }}>
+					<Banner
+						tone="warning"
+						title="Drafts only until you're verified"
+						description="You can plan events now. Publishing them to volunteers unlocks once your documents are approved."
+						onPress={() => router.push("/(ngo)/verification")}
+					/>
+				</View>
 			)}
 
 			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
 
 			{query.isLoading ? (
-				<LoadingState label="Loading your events…" />
+				<LoadingState label="Loading your events" />
 			) : query.isError ? (
 				<ErrorState
 					message={apiErrorMessage(query.error)}
@@ -123,28 +139,51 @@ export default function NgoEvents() {
 				/>
 			) : (
 				<FlatList
-					data={query.data?.items ?? []}
+					data={items}
 					keyExtractor={(item) => item.id}
 					showsVerticalScrollIndicator={false}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
 					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
+					onEndReached={loadMore}
+					onEndReachedThreshold={0.5}
 					refreshControl={
 						<RefreshControl
-							refreshing={query.isRefetching}
+							refreshing={query.isRefetching && !query.isFetchingNextPage}
 							onRefresh={() => query.refetch()}
-							tintColor={colors.primary.main as string}
+							tintColor={colors.text.quaternary as string}
 						/>
 					}
 					ListEmptyComponent={
 						<EmptyState
 							icon={CalendarDays}
-							title="No events yet"
-							description="Create an event and volunteers will be able to find and apply to it."
-							action={
-								<Button onPress={() => setFormOpen(true)}>
-									Create your first event
-								</Button>
+							title={
+								filter === "DRAFT"
+									? "No drafts"
+									: filter === "COMPLETED"
+										? "No past events yet"
+										: filter === "PUBLISHED"
+											? "Nothing published yet"
+											: "No events yet"
 							}
+							description={
+								filter === "COMPLETED"
+									? "Events move here once they finish. You can still mark attendance and issue certificates."
+									: "Each event lists here with how many places are filled and who is waiting for a decision."
+							}
+							action={
+								filter === "COMPLETED" ? undefined : (
+									<Button onPress={openCreate}>Create an event</Button>
+								)
+							}
+						/>
+					}
+					ListFooterComponent={
+						<LoadMoreFooter
+							hasMore={!!query.hasNextPage}
+							loading={query.isFetchingNextPage}
+							onLoadMore={loadMore}
+							count={items.length}
+							noun="events"
 						/>
 					}
 					renderItem={({ item }) => (
@@ -181,6 +220,11 @@ export default function NgoEvents() {
 	);
 }
 
+/**
+ * One event. Tapping the card opens its applicants — the decision this screen
+ * exists for. The fact that matters is one line: places filled, and how many
+ * people are waiting.
+ */
 function EventRow({
 	event,
 	onReview,
@@ -196,6 +240,7 @@ function EventRow({
 	const filled = event.volunteersNeeded
 		? Math.min(event.acceptedCount / event.volunteersNeeded, 1)
 		: 0;
+	const pending = event.pendingApplications ?? 0;
 
 	return (
 		<Surface onPress={onReview}>
@@ -204,49 +249,51 @@ function EventRow({
 					flexDirection: "row",
 					alignItems: "center",
 					gap: spacing[2],
-					marginBottom: spacing[2],
+					marginBottom: spacing[2.5],
 				}}
 			>
 				<StatusPill
 					label={humanizeStatus(event.status)}
 					tone={eventStatusTone(event.status)}
 				/>
-				{event.pendingApplications > 0 && (
-					<StatusPill
-						label={`${event.pendingApplications} to review`}
-						tone="warning"
-					/>
+				{pending > 0 && (
+					<StatusPill label={`${pending} to review`} tone="warning" />
 				)}
 			</View>
 
 			<Body weight="bold" numberOfLines={1}>
 				{event.title}
 			</Body>
-			<Caption color="tertiary" style={{ marginTop: 2 }}>
+			<Caption color="tertiary" style={{ marginTop: spacing[0.5] }}>
 				{formatDateRange(event.startAt, event.endAt)}
 				{event.city ? ` · ${event.city}` : ""}
 			</Caption>
 
-			<View style={{ marginTop: spacing[3] }}>
+			<View
+				accessible
+				accessibilityRole="progressbar"
+				accessibilityLabel={`${event.acceptedCount} of ${event.volunteersNeeded} volunteers confirmed`}
+				accessibilityValue={{
+					min: 0,
+					max: event.volunteersNeeded,
+					now: event.acceptedCount,
+				}}
+				style={{
+					height: 4,
+					borderRadius: 2,
+					marginTop: spacing[3],
+					backgroundColor: colors.background.tertiary,
+					overflow: "hidden",
+				}}
+			>
 				<View
 					style={{
-						height: 6,
-						borderRadius: 3,
-						backgroundColor: colors.background.tertiary,
-						overflow: "hidden",
+						width: `${filled * 100}%`,
+						height: "100%",
+						backgroundColor:
+							filled >= 1 ? colors.success.main : colors.primary.main,
 					}}
-				>
-					<View
-						style={{
-							width: `${filled * 100}%`,
-							height: "100%",
-							backgroundColor: colors.primary.main,
-						}}
-					/>
-				</View>
-				<Caption color="secondary" style={{ marginTop: spacing[1.5] }}>
-					{event.acceptedCount} of {event.volunteersNeeded} volunteers confirmed
-				</Caption>
+				/>
 			</View>
 
 			<View
@@ -254,26 +301,40 @@ function EventRow({
 					flexDirection: "row",
 					alignItems: "center",
 					justifyContent: "space-between",
+					gap: spacing[3],
 					marginTop: spacing[3],
 					paddingTop: spacing[3],
 					borderTopWidth: 1,
-					borderTopColor: colors.border.light,
+					borderTopColor: colors.border.hairline,
 				}}
 			>
-				<Caption weight="medium" color={colors.primary.main as string}>
-					View applicants
-				</Caption>
-				<View style={{ flexDirection: "row", gap: spacing[4] }}>
-					<Pressable onPress={onEdit} hitSlop={8}>
-						<Caption weight="medium" color="secondary">
-							{event.status === "DRAFT" ? "Edit & publish" : "Edit"}
-						</Caption>
-					</Pressable>
-					<Pressable onPress={onDelete} hitSlop={8}>
-						<Caption weight="medium" color={colors.error.main as string}>
-							Remove
-						</Caption>
-					</Pressable>
+				<View style={{ flex: 1, minWidth: 0 }}>
+					<Label numberOfLines={1}>
+						{event.acceptedCount} of {event.volunteersNeeded} volunteers
+					</Label>
+					<Caption
+						weight={pending > 0 ? "medium" : "normal"}
+						color={pending > 0 ? (colors.warning.ink as string) : "quaternary"}
+						numberOfLines={1}
+					>
+						{pending > 0
+							? `${pending} applicant${pending === 1 ? "" : "s"} waiting`
+							: "Tap to see applicants"}
+					</Caption>
+				</View>
+				<View style={{ flexDirection: "row", gap: spacing[3] }}>
+					<TextAction
+						label={event.status === "DRAFT" ? "Edit & publish" : "Edit"}
+						tone={event.status === "DRAFT" ? "brand" : "default"}
+						onPress={onEdit}
+						accessibilityLabel={`Edit ${event.title}`}
+					/>
+					<TextAction
+						label="Remove"
+						tone="danger"
+						onPress={onDelete}
+						accessibilityLabel={`Remove ${event.title}`}
+					/>
 				</View>
 			</View>
 		</Surface>

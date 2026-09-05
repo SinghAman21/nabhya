@@ -6,7 +6,8 @@ import { useAuthStore } from "@/store/auth-store";
 
 /**
  * Public directory of volunteering events. Anyone can browse this without an
- * account; applying prompts a sign-in.
+ * account; applying prompts a sign-in. Signed-in people get here from inside
+ * the app, so the header offers a way back instead of a "My account" button.
  */
 export default function PublicEvents() {
 	const router = useRouter();
@@ -16,25 +17,23 @@ export default function PublicEvents() {
 		<Screen>
 			<EventFeed
 				header={
-					<ScreenHeader
-						title="Volunteer"
-						subtitle="Events from verified NGOs across India."
-						action={
-							email ? (
+					email ? (
+						<ScreenHeader back title="Events" />
+					) : (
+						<ScreenHeader
+							title="Events"
+							subtitle="From verified NGOs across India"
+							action={
 								<Button
 									size="sm"
-									variant="outline"
-									onPress={() => router.replace("/")}
+									onPress={() => router.push("/(auth)/login")}
+									accessibilityLabel="Sign in to apply to events"
 								>
-									My account
-								</Button>
-							) : (
-								<Button size="sm" onPress={() => router.push("/(auth)/login")}>
 									Sign in
 								</Button>
-							)
-						}
-					/>
+							}
+						/>
+					)
 				}
 			/>
 		</Screen>

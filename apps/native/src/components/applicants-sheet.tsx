@@ -2,6 +2,8 @@ import type { ApplicationStatus } from "@nabhya/shared";
 import { Users } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
+import { Field, useFieldInputStyle } from "@/components/form-field";
+import { InitialAvatar } from "@/components/initial-avatar";
 import {
 	EmptyState,
 	ErrorState,
@@ -14,10 +16,10 @@ import {
 	humanizeStatus,
 	StatusPill,
 } from "@/components/status-pill";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Pressable } from "@/components/ui/pressable";
 import { Sheet, SheetFlatList } from "@/components/ui/sheet";
-import { Body, Caption, Label } from "@/components/ui/typography";
+import { Body, BodySmall, Caption } from "@/components/ui/typography";
 import {
 	useIssueCertificate,
 	useMarkAttendance,
@@ -52,6 +54,7 @@ export function ApplicantsSheet({
 	onClose: () => void;
 }) {
 	const { colors, spacing } = useTheme();
+	const inputStyle = useFieldInputStyle();
 	const [filter, setFilter] = useState<StatusFilter>("PENDING");
 	const [note, setNote] = useState("");
 
@@ -60,6 +63,12 @@ export function ApplicantsSheet({
 		filter === "ALL" ? {} : { status: filter },
 	);
 	const review = useReviewApplication(eventId ?? "");
+
+	const close = () => {
+		setNote("");
+		setFilter("PENDING");
+		onClose();
+	};
 
 	const decide = (
 		applicant: EventApplicant,
@@ -78,47 +87,48 @@ export function ApplicantsSheet({
 		);
 	};
 
-	const noteField = (
-		<View style={{ paddingTop: spacing[1], paddingBottom: spacing[4] }}>
+	const header = (
+		<View style={{ paddingTop: spacing[1], paddingBottom: spacing[2] }}>
 			<Caption
+				weight="medium"
 				color={
 					remainingPlaces > 0 ? "secondary" : (colors.warning.ink as string)
 				}
 				style={{ marginBottom: spacing[3] }}
 			>
 				{remainingPlaces > 0
-					? `${remainingPlaces} place${remainingPlaces === 1 ? "" : "s"} remaining`
-					: "All places are filled"}
+					? `${remainingPlaces} place${remainingPlaces === 1 ? "" : "s"} left`
+					: "All places are filled — raise the volunteer count to accept more."}
 			</Caption>
 			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
-			<Label style={{ marginBottom: spacing[1.5] }}>
-				Note to the volunteer <Caption color="tertiary">(optional)</Caption>
-			</Label>
-			<Input
-				placeholder="Where to meet, what to bring, why they weren't selected"
-				value={note}
-				onChangeText={setNote}
-				style={{
-					borderWidth: 0,
-					borderRadius: 12,
-					backgroundColor: colors.background.tertiary,
-					paddingVertical: spacing[3],
-				}}
-			/>
+			{filter === "PENDING" && (
+				<Field
+					label="Note to the volunteer"
+					optional
+					hint="Sent with your next decision. Where to meet, what to bring, or why not this time."
+				>
+					<Input
+						placeholder="e.g. Meet at Gate 3 by 8am, wear closed shoes"
+						value={note}
+						onChangeText={setNote}
+						style={inputStyle}
+					/>
+				</Field>
+			)}
 		</View>
 	);
 
 	return (
 		<Sheet
 			visible={!!eventId}
-			onClose={onClose}
+			onClose={close}
 			title="Applicants"
 			subtitle={eventTitle}
 			scrollable={false}
 			detents={["60%", "92%"]}
 		>
 			{query.isLoading ? (
-				<LoadingState label="Loading applicants…" />
+				<LoadingState label="Loading applicants" />
 			) : query.isError ? (
 				<ErrorState
 					message={apiErrorMessage(query.error)}
@@ -128,15 +138,17 @@ export function ApplicantsSheet({
 				<SheetFlatList
 					data={query.data?.items ?? []}
 					keyExtractor={(item) => item.id}
-					ListHeaderComponent={noteField}
+					ListHeaderComponent={header}
 					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
 					ListEmptyComponent={
 						<EmptyState
 							icon={Users}
-							title="No applicants here"
+							title={
+								filter === "PENDING" ? "No one waiting" : "No applicants here"
+							}
 							description={
 								filter === "PENDING"
-									? "New applications will show up here for review."
+									? "New applications land here. You'll also see a count on the event."
 									: "Nothing matches this filter yet."
 							}
 						/>
@@ -147,6 +159,11 @@ export function ApplicantsSheet({
 							eventId={eventId ?? ""}
 							canAccept={remainingPlaces > 0}
 							busy={review.isPending}
+							deciding={
+								review.isPending && review.variables?.applicationId === item.id
+									? review.variables.input.status
+									: null
+							}
 							onDecide={(status) => decide(item, status)}
 						/>
 					)}
@@ -161,47 +178,43 @@ function ApplicantRow({
 	eventId,
 	canAccept,
 	busy,
+	deciding,
 	onDecide,
 }: {
 	applicant: EventApplicant;
 	eventId: string;
 	canAccept: boolean;
 	busy: boolean;
+	/** Which decision is in flight for *this* row, if any. */
+	deciding: "ACCEPTED" | "REJECTED" | null;
 	onDecide: (status: "ACCEPTED" | "REJECTED") => void;
 }) {
 	const { colors, spacing } = useTheme();
 	const isPending = applicant.status === "PENDING";
+	const name = applicant.volunteer.fullName ?? "Unnamed volunteer";
+	const verified = applicant.volunteer.verificationStatus === "VERIFIED";
+	const meta = [
+		applicant.volunteer.city ?? applicant.volunteer.email,
+		verified ? "ID verified" : null,
+	]
+		.filter(Boolean)
+		.join(" · ");
 
 	return (
 		<Surface>
 			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[3],
-				}}
+				style={{ flexDirection: "row", alignItems: "center", gap: spacing[3] }}
 			>
-				<View
-					style={{
-						width: 40,
-						height: 40,
-						borderRadius: 20,
-						backgroundColor: colors.primary.main,
-						alignItems: "center",
-						justifyContent: "center",
-					}}
-				>
-					<Body weight="bold" color={colors.primary.contrast as string}>
-						{(applicant.volunteer.fullName ??
-							applicant.volunteer.email)[0]?.toUpperCase()}
-					</Body>
-				</View>
-				<View style={{ flex: 1 }}>
+				<InitialAvatar name={applicant.volunteer.fullName} />
+				<View style={{ flex: 1, minWidth: 0 }}>
 					<Body weight="bold" numberOfLines={1}>
-						{applicant.volunteer.fullName ?? "Unnamed volunteer"}
+						{name}
 					</Body>
-					<Caption color="tertiary" numberOfLines={1}>
-						{applicant.volunteer.city ?? applicant.volunteer.email}
+					<Caption
+						color={verified ? (colors.success.ink as string) : "tertiary"}
+						numberOfLines={1}
+					>
+						{meta}
 					</Caption>
 				</View>
 				<StatusPill
@@ -210,23 +223,22 @@ function ApplicantRow({
 				/>
 			</View>
 
-			{applicant.volunteer.verificationStatus === "VERIFIED" && (
-				<Caption
-					color={colors.success.main as string}
-					style={{ marginTop: spacing[2] }}
-				>
-					ID verified
-				</Caption>
-			)}
-
 			{applicant.message && (
-				<Caption color="secondary" style={{ marginTop: spacing[3] }}>
-					“{applicant.message}”
-				</Caption>
+				<View
+					style={{
+						marginTop: spacing[3],
+						paddingLeft: spacing[3],
+						borderLeftWidth: 2,
+						borderLeftColor: colors.border.dark,
+					}}
+				>
+					<BodySmall color="secondary">“{applicant.message}”</BodySmall>
+				</View>
 			)}
 
 			<Caption color="quaternary" style={{ marginTop: spacing[2] }}>
 				Applied {formatRelative(applicant.appliedAt)}
+				{applicant.reviewNote ? ` · Your note: ${applicant.reviewNote}` : ""}
 			</Caption>
 
 			{applicant.status === "ACCEPTED" && (
@@ -241,37 +253,25 @@ function ApplicantRow({
 						marginTop: spacing[4],
 					}}
 				>
-					<Pressable
+					<Button
+						style={{ flex: 1 }}
 						disabled={busy || !canAccept}
+						loading={deciding === "ACCEPTED"}
 						onPress={() => onDecide("ACCEPTED")}
-						style={{
-							flex: 1,
-							alignItems: "center",
-							paddingVertical: spacing[2.5],
-							borderRadius: 12,
-							backgroundColor: colors.primary.main,
-							opacity: busy || !canAccept ? 0.5 : 1,
-						}}
+						accessibilityLabel={`Accept ${name}`}
 					>
-						<Body weight="bold" color={colors.primary.contrast as string}>
-							Accept
-						</Body>
-					</Pressable>
-					<Pressable
+						Accept
+					</Button>
+					<Button
+						variant="outline"
+						style={{ flex: 1 }}
 						disabled={busy}
+						loading={deciding === "REJECTED"}
 						onPress={() => onDecide("REJECTED")}
-						style={{
-							flex: 1,
-							alignItems: "center",
-							paddingVertical: spacing[2.5],
-							borderRadius: 12,
-							borderWidth: 1,
-							borderColor: colors.border.medium,
-							opacity: busy ? 0.5 : 1,
-						}}
+						accessibilityLabel={`Reject ${name}`}
 					>
-						<Body weight="medium">Reject</Body>
-					</Pressable>
+						Reject
+					</Button>
 				</View>
 			)}
 		</Surface>
@@ -293,6 +293,7 @@ function AttendanceControls({
 	eventId: string;
 }) {
 	const { colors, spacing } = useTheme();
+	const inputStyle = useFieldInputStyle();
 	const [note, setNote] = useState("");
 	const [showNote, setShowNote] = useState(false);
 
@@ -360,82 +361,104 @@ function AttendanceControls({
 				marginTop: spacing[3],
 				paddingTop: spacing[3],
 				borderTopWidth: 1,
-				borderTopColor: colors.border.light,
+				borderTopColor: colors.border.hairline,
+				gap: spacing[2],
 			}}
 		>
-			<View
-				style={{ flexDirection: "row", alignItems: "center", gap: spacing[4] }}
-			>
-				<Pressable onPress={toggleAttendance} disabled={busy} hitSlop={8}>
-					<Caption
-						weight="medium"
-						color={
-							attended
-								? (colors.success.main as string)
-								: (colors.primary.main as string)
-						}
-					>
-						{attended ? "✓ Attended" : "Mark attended"}
-					</Caption>
-				</Pressable>
-
-				{attended && !certificate && (
-					<Pressable
-						onPress={() => setShowNote((v) => !v)}
-						disabled={busy}
-						hitSlop={8}
-					>
-						<Caption weight="medium" color={colors.primary.main as string}>
-							Issue certificate
-						</Caption>
-					</Pressable>
-				)}
-
-				{certificate && (
-					<>
+			{certificate ? (
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						justifyContent: "space-between",
+						gap: spacing[3],
+					}}
+				>
+					<View style={{ flex: 1 }}>
 						<Caption
+							weight="medium"
 							color={
 								certificate.revokedAt
-									? (colors.error.main as string)
-									: (colors.success.main as string)
+									? (colors.error.ink as string)
+									: (colors.success.ink as string)
 							}
 						>
-							{certificate.revokedAt ? "Revoked" : `✓ ${certificate.code}`}
+							{certificate.revokedAt
+								? "Certificate revoked"
+								: `Certificate ${certificate.code}`}
 						</Caption>
-						{!certificate.revokedAt && (
-							<Pressable onPress={confirmRevoke} disabled={busy} hitSlop={8}>
-								<Caption weight="medium" color={colors.error.main as string}>
-									{revoke.isPending ? "Revoking…" : "Revoke"}
-								</Caption>
-							</Pressable>
-						)}
-					</>
-				)}
-			</View>
+						<Caption color="quaternary">Attended</Caption>
+					</View>
+					{!certificate.revokedAt && (
+						<Button
+							variant="outline"
+							size="sm"
+							onPress={confirmRevoke}
+							disabled={busy}
+							loading={revoke.isPending}
+						>
+							Revoke
+						</Button>
+					)}
+				</View>
+			) : (
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						gap: spacing[2],
+						flexWrap: "wrap",
+					}}
+				>
+					<Button
+						variant="outline"
+						size="sm"
+						onPress={toggleAttendance}
+						disabled={busy}
+						loading={attendance.isPending}
+						accessibilityState={{ checked: attended }}
+					>
+						{attended ? "Attended ✓" : "Mark attended"}
+					</Button>
+					{attended && (
+						<Button
+							size="sm"
+							onPress={() => setShowNote((v) => !v)}
+							disabled={busy}
+						>
+							Issue certificate
+						</Button>
+					)}
+					{!attended && (
+						<Caption color="quaternary" style={{ flex: 1 }}>
+							Confirm attendance after the event to issue a certificate.
+						</Caption>
+					)}
+				</View>
+			)}
 
-			{showNote && (
-				<View style={{ marginTop: spacing[3] }}>
-					<Input
-						placeholder="Optional note — e.g. hours contributed"
-						value={note}
-						onChangeText={setNote}
-						style={{
-							borderWidth: 0,
-							borderRadius: 12,
-							backgroundColor: colors.background.tertiary,
-							paddingVertical: spacing[3],
-						}}
-					/>
-					<Pressable
+			{showNote && !certificate && (
+				<View style={{ marginTop: spacing[2] }}>
+					<Field
+						label="Note on the certificate"
+						optional
+						hint="e.g. 6 hours · led the registration desk"
+						style={{ marginBottom: spacing[3] }}
+					>
+						<Input
+							placeholder="Hours contributed, role, anything worth recording"
+							value={note}
+							onChangeText={setNote}
+							style={inputStyle}
+						/>
+					</Field>
+					<Button
 						onPress={issueCertificate}
 						disabled={busy}
-						hitSlop={8}
-						style={{ marginTop: spacing[2] }}
+						loading={issue.isPending}
 					>
-						<Caption weight="bold" color={colors.primary.main as string}>
-							{issue.isPending ? "Issuing…" : "Confirm and issue"}
-						</Caption>
-					</Pressable>
+						Confirm and issue
+					</Button>
 				</View>
 			)}
 		</View>

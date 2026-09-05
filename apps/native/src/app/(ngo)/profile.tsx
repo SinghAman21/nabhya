@@ -1,107 +1,383 @@
-import type { UploadOrgDocumentInput } from "@nabhya/shared";
 import { useRouter } from "expo-router";
 import {
 	CalendarDays,
 	ChevronRight,
+	FileText,
 	Globe,
+	HandCoins,
 	HeartHandshake,
-	Mail,
-	MapPin,
-	Phone,
+	Megaphone,
 	ShieldCheck,
+	Star,
+	UserRound,
+	Users,
 } from "lucide-react-native";
-import { RefreshControl, ScrollView, View } from "react-native";
+import { RefreshControl, ScrollView, View, type ViewStyle } from "react-native";
+import { AppearanceRow } from "@/components/appearance-row";
+import { InitialAvatar } from "@/components/initial-avatar";
 import {
+	Banner,
 	ErrorState,
+	ListGroup,
+	ListRow,
 	LoadingState,
+	MetricRow,
 	Screen,
 	ScreenHeader,
+	SectionTitle,
 	Surface,
 } from "@/components/screen-shell";
-import {
-	humanizeStatus,
-	StatusPill,
-	verificationTone,
-} from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
-import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption } from "@/components/ui/typography";
+import { Caption, H3 } from "@/components/ui/typography";
 import { useSignOut } from "@/hooks/use-auth";
 import { useOrgTeam } from "@/hooks/use-directory";
 import { useMyOrgDocuments } from "@/hooks/use-documents";
 import { useMyOrganization } from "@/hooks/use-organization";
 import { useTheme } from "@/hooks/use-theme";
+import { useMedia } from "@/hooks/useMedia";
 import { apiErrorMessage } from "@/lib/api";
 
-const REQUIRED_DOCS: UploadOrgDocumentInput["documentType"][] = [
-	"NGO_REGISTRATION_CERTIFICATE",
-	"PAN_CARD",
-	"80G_CERTIFICATE",
-	"12A_CERTIFICATE",
-];
+/** The two documents a reviewer needs before an NGO can be verified. */
+const REQUIRED_DOCS = ["NGO_REGISTRATION_CERTIFICATE", "PAN_CARD"];
 
-function InfoRow({
-	icon: Icon,
-	label,
-	value,
-}: {
-	icon: typeof MapPin;
-	label: string;
-	value: string | null | undefined;
-}) {
-	const { colors, spacing } = useTheme();
-	if (!value) return null;
-	return (
-		<View
-			style={{ flexDirection: "row", alignItems: "center", gap: spacing[2.5] }}
-		>
-			<Icon size={14} color={colors.text.quaternary as string} />
-			<Caption color="secondary">{label}</Caption>
-			<Caption color="primary" style={{ flex: 1 }} numberOfLines={1}>
-				{value}
-			</Caption>
-		</View>
-	);
-}
+const STICKY_RAIL = {
+	width: 340,
+	position: "sticky",
+	top: 0,
+	alignSelf: "flex-start",
+} as unknown as ViewStyle;
 
+/**
+ * The organisation's own page, in the order a coordinator needs it:
+ *
+ * 1. Who we are — one tappable card: initials, name, type, city, causes and
+ *    the verification line. Tapping it edits the profile.
+ * 2. What needs us — the verification banner, only while it does.
+ * 3. The numbers — events, needs, team.
+ * 4. Where things are — the organisation, its audience, its money.
+ * 5. Sign out — on its own at the end.
+ *
+ * Email, phone, website and the long description belong to the edit page and
+ * the public profile; a hub that repeats them is a hub with the links pushed
+ * below the fold.
+ */
 export default function NgoProfile() {
-	const { colors, spacing, borderRadius } = useTheme();
+	const { colors, spacing } = useTheme();
 	const router = useRouter();
 	const signOut = useSignOut();
+	const { isDesktop } = useMedia();
 
 	const org = useMyOrganization();
 	const documents = useMyOrgDocuments();
 	const team = useOrgTeam();
 
+	const data = org.data;
+	const status = data?.verificationStatus;
+	const isVerified = status === "VERIFIED";
+
 	const byType = new Map(
 		(documents.data ?? []).map((doc) => [doc.documentType, doc]),
 	);
-	const uploadedCount = REQUIRED_DOCS.filter((d) => byType.has(d)).length;
-	const allRequiredDone = ["NGO_REGISTRATION_CERTIFICATE", "PAN_CARD"].every(
-		(d) => byType.has(d),
+	const requiredUploaded = REQUIRED_DOCS.filter((d) => byType.has(d)).length;
+	const rejectedDoc = (documents.data ?? []).find(
+		(doc) => doc.verificationStatus === "REJECTED",
 	);
 
-	const initials = org.data?.organizationName
-		?.split(" ")
-		.map((w) => w[0])
-		.join("")
-		.toUpperCase()
-		.slice(0, 2);
+	const location = [data?.city, data?.state].filter(Boolean).join(", ");
+	const causes = data?.categories?.map((c) => c.name).join(" · ");
+	const typeLine = [
+		data?.orgType,
+		data?.foundingYear ? `Founded ${data.foundingYear}` : null,
+	]
+		.filter(Boolean)
+		.join(" · ");
 
-	const location = [org.data?.city, org.data?.state].filter(Boolean).join(", ");
-	const categories = org.data?.categories?.map((c) => c.name).join(", ");
+	if (org.isLoading || org.isError) {
+		return (
+			<Screen>
+				<ScreenHeader title="Profile" />
+				{org.isLoading ? (
+					<LoadingState />
+				) : (
+					<ErrorState
+						message={apiErrorMessage(org.error)}
+						onRetry={() => org.refetch()}
+					/>
+				)}
+			</Screen>
+		);
+	}
+
+	/* 1. Who we are ---------------------------------------------------------- */
+	const identity = (
+		<Surface
+			onPress={() => router.push("/(ngo)/edit")}
+			style={{ marginBottom: spacing[4] }}
+		>
+			<View
+				style={{ flexDirection: "row", alignItems: "center", gap: spacing[4] }}
+			>
+				<InitialAvatar name={data?.organizationName} size={60} square />
+				<View style={{ flex: 1, minWidth: 0 }}>
+					<H3 numberOfLines={2}>{data?.organizationName ?? "Your NGO"}</H3>
+					{typeLine ? (
+						<Caption color="tertiary" numberOfLines={1}>
+							{typeLine}
+						</Caption>
+					) : null}
+					{location ? (
+						<Caption color="tertiary" numberOfLines={1}>
+							{location}
+						</Caption>
+					) : (
+						<Caption color="quaternary">Add your city</Caption>
+					)}
+					<View
+						style={{
+							flexDirection: "row",
+							alignItems: "center",
+							gap: spacing[1],
+							marginTop: spacing[1.5],
+						}}
+					>
+						<ShieldCheck
+							size={13}
+							strokeWidth={2.2}
+							color={
+								isVerified
+									? (colors.success.ink as string)
+									: (colors.text.quaternary as string)
+							}
+						/>
+						<Caption
+							weight="medium"
+							color={
+								isVerified
+									? (colors.success.ink as string)
+									: (colors.text.quaternary as string)
+							}
+						>
+							{isVerified
+								? "Verified NGO"
+								: status === "UNDER_REVIEW"
+									? "Verification under review"
+									: status === "REJECTED"
+										? "Verification not approved"
+										: "Not verified yet"}
+						</Caption>
+					</View>
+				</View>
+				<ChevronRight size={18} color={colors.text.quaternary as string} />
+			</View>
+			{causes ? (
+				<Caption
+					color="secondary"
+					numberOfLines={2}
+					style={{
+						marginTop: spacing[3],
+						paddingTop: spacing[3],
+						borderTopWidth: 1,
+						borderTopColor: colors.border.hairline,
+					}}
+				>
+					{causes}
+				</Caption>
+			) : null}
+		</Surface>
+	);
+
+	/* 2. What needs us --------------------------------------------------------- */
+	const verification =
+		isVerified || documents.isLoading ? null : (
+			<View style={{ marginBottom: spacing[6] }}>
+				<Banner
+					tone={
+						status === "REJECTED" || rejectedDoc
+							? "error"
+							: status === "UNDER_REVIEW"
+								? "info"
+								: "warning"
+					}
+					title={
+						status === "REJECTED" || rejectedDoc
+							? "Verification needs another look"
+							: status === "UNDER_REVIEW"
+								? "Verification under review"
+								: requiredUploaded === REQUIRED_DOCS.length
+									? "Documents submitted"
+									: "Upload your documents"
+					}
+					description={
+						status === "REJECTED" && data?.rejectionReason
+							? data.rejectionReason
+							: rejectedDoc?.remarks
+								? rejectedDoc.remarks
+								: status === "UNDER_REVIEW"
+									? "A reviewer is checking them. Usually a few days."
+									: `${requiredUploaded} of ${REQUIRED_DOCS.length} required documents uploaded. Events and needs stay private until you're verified.`
+					}
+					onPress={() => router.push("/(ngo)/verification")}
+				/>
+			</View>
+		);
+
+	/* 3. The numbers ------------------------------------------------------------ */
+	const numbers = (
+		<View style={{ marginBottom: spacing[6] }}>
+			<MetricRow
+				stats={[
+					{ label: "Events", value: data?.stats?.events?.total ?? 0 },
+					{ label: "Open needs", value: data?.stats?.needs?.open ?? 0 },
+					{ label: "Team", value: team.data?.length ?? 0 },
+				]}
+			/>
+		</View>
+	);
+
+	/* 4. Where things are --------------------------------------------------------- */
+	const organisation = (
+		<View style={{ marginBottom: spacing[6] }}>
+			<SectionTitle>Organisation</SectionTitle>
+			<ListGroup>
+				<ListRow
+					icon={UserRound}
+					label="Edit profile"
+					onPress={() => router.push("/(ngo)/edit")}
+				/>
+				<ListRow
+					icon={ShieldCheck}
+					label="Verification"
+					value={
+						<Caption color="tertiary">
+							{isVerified
+								? "Verified"
+								: status === "UNDER_REVIEW"
+									? "Under review"
+									: status === "REJECTED" || rejectedDoc
+										? "Action needed"
+										: `${requiredUploaded} of ${REQUIRED_DOCS.length} uploaded`}
+						</Caption>
+					}
+					onPress={() => router.push("/(ngo)/verification")}
+				/>
+				<ListRow
+					icon={Users}
+					label="Team"
+					value={
+						<Caption color="tertiary">
+							{team.data ? `${team.data.length}` : ""}
+						</Caption>
+					}
+					onPress={() => router.push("/(ngo)/team")}
+				/>
+				{data?.id && (
+					<ListRow
+						icon={Globe}
+						label="Public profile"
+						hint="What volunteers and donors see"
+						onPress={() => router.push(`/ngos/${data.id}` as never)}
+					/>
+				)}
+				<AppearanceRow />
+			</ListGroup>
+		</View>
+	);
+
+	const programme = (
+		<View style={{ marginBottom: spacing[6] }}>
+			<SectionTitle>Programme</SectionTitle>
+			<ListGroup>
+				<ListRow
+					icon={CalendarDays}
+					label="Events"
+					value={
+						<Caption color="tertiary">
+							{data?.stats?.events?.published ?? 0} published
+						</Caption>
+					}
+					onPress={() => router.push("/(ngo)/events")}
+				/>
+				<ListRow
+					icon={HeartHandshake}
+					label="Needs"
+					value={
+						<Caption color="tertiary">
+							{data?.stats?.needs?.open ?? 0} open
+						</Caption>
+					}
+					onPress={() => router.push("/(ngo)/needs")}
+				/>
+				<ListRow
+					icon={Megaphone}
+					label="Updates"
+					onPress={() => router.push("/(ngo)/announcements")}
+				/>
+				<ListRow
+					icon={Star}
+					label="Reviews"
+					onPress={() => router.push("/(ngo)/reviews")}
+				/>
+			</ListGroup>
+		</View>
+	);
+
+	const money = (
+		<View style={{ marginBottom: spacing[8] }}>
+			<SectionTitle>Money</SectionTitle>
+			<ListGroup>
+				<ListRow
+					icon={HandCoins}
+					label="Donations"
+					onPress={() => router.push("/(ngo)/donations")}
+				/>
+				<ListRow
+					icon={FileText}
+					label="Reports"
+					hint="Annual reports and audited statements"
+					onPress={() => router.push("/(ngo)/reports")}
+				/>
+			</ListGroup>
+		</View>
+	);
+
+	/* 5. Sign out ----------------------------------------------------------------- */
+	const signOutButton = (
+		<View style={{ gap: spacing[3], alignItems: "center" }}>
+			<Button
+				variant="outline"
+				onPress={() => signOut.mutate()}
+				loading={signOut.isPending}
+				accessibilityLabel="Sign out"
+				style={{ alignSelf: "stretch" }}
+			>
+				Sign out
+			</Button>
+			{data?.email && (
+				<Caption color="quaternary" numberOfLines={1}>
+					{data.email}
+				</Caption>
+			)}
+		</View>
+	);
 
 	return (
 		<Screen>
-			<ScreenHeader title="Profile" subtitle="Your organization at a glance." />
+			<ScreenHeader title="Profile" />
 
-			{org.isLoading ? (
-				<LoadingState />
-			) : org.isError ? (
-				<ErrorState
-					message={apiErrorMessage(org.error)}
-					onRetry={() => org.refetch()}
-				/>
+			{isDesktop ? (
+				<View style={{ flexDirection: "row", gap: spacing[6] }}>
+					<View style={STICKY_RAIL}>
+						{identity}
+						{verification}
+						{signOutButton}
+					</View>
+					<View style={{ flex: 1 }}>
+						{numbers}
+						{organisation}
+						{programme}
+						{money}
+					</View>
+				</View>
 			) : (
 				<ScrollView
 					showsVerticalScrollIndicator={false}
@@ -114,363 +390,19 @@ export default function NgoProfile() {
 								documents.refetch();
 								team.refetch();
 							}}
-							tintColor={colors.primary.main as string}
+							tintColor={colors.text.quaternary as string}
 						/>
 					}
 				>
-					{/* ── Identity card ─────────────────────────────────────── */}
-					<Surface style={{ marginBottom: spacing[3] }}>
-						<View style={{ alignItems: "center", marginBottom: spacing[4] }}>
-							<View
-								style={{
-									width: 64,
-									height: 64,
-									borderRadius: 20,
-									backgroundColor: colors.primary.main,
-									alignItems: "center",
-									justifyContent: "center",
-									marginBottom: spacing[3],
-								}}
-							>
-								<Body
-									weight="bold"
-									color={colors.primary.contrast as string}
-									style={{ fontSize: 24 }}
-								>
-									{initials ?? "N"}
-								</Body>
-							</View>
-							<Body weight="bold" style={{ fontSize: 18, textAlign: "center" }}>
-								{org.data?.organizationName}
-							</Body>
-							{org.data?.orgType && (
-								<Caption color="tertiary" style={{ marginTop: spacing[0.5] }}>
-									{org.data.orgType}
-									{org.data?.foundingYear
-										? ` · Founded ${org.data.foundingYear}`
-										: ""}
-								</Caption>
-							)}
-							{location && (
-								<View
-									style={{
-										flexDirection: "row",
-										alignItems: "center",
-										gap: spacing[1],
-										marginTop: spacing[1.5],
-									}}
-								>
-									<MapPin size={12} color={colors.text.quaternary as string} />
-									<Caption color="quaternary">{location}</Caption>
-								</View>
-							)}
-							<View style={{ marginTop: spacing[2.5] }}>
-								<StatusPill
-									label={humanizeStatus(org.data?.verificationStatus)}
-									tone={verificationTone(org.data?.verificationStatus)}
-								/>
-							</View>
-						</View>
-
-						{categories && (
-							<View
-								style={{
-									flexDirection: "row",
-									flexWrap: "wrap",
-									gap: spacing[1.5],
-									justifyContent: "center",
-									marginBottom: spacing[4],
-								}}
-							>
-								{org.data?.categories?.map((cat) => (
-									<View
-										key={cat.id}
-										style={{
-											paddingHorizontal: spacing[2.5],
-											paddingVertical: spacing[1],
-											borderRadius: 999,
-											backgroundColor: `${colors.primary.main}10`,
-										}}
-									>
-										<Caption
-											weight="medium"
-											color={colors.primary.main as string}
-											style={{ fontSize: 11 }}
-										>
-											{cat.name}
-										</Caption>
-									</View>
-								))}
-							</View>
-						)}
-
-						{org.data?.rejectionReason && (
-							<View
-								style={{
-									padding: spacing[3],
-									borderRadius: 12,
-									backgroundColor: colors.error.bg,
-									marginBottom: spacing[3],
-								}}
-							>
-								<Caption weight="bold" color={colors.error.main as string}>
-									Verification rejected
-								</Caption>
-								<Caption color="secondary">{org.data.rejectionReason}</Caption>
-							</View>
-						)}
-
-						<View style={{ gap: spacing[2], marginBottom: spacing[4] }}>
-							<InfoRow icon={Mail} label="Email" value={org.data?.email} />
-							<InfoRow icon={Phone} label="Phone" value={org.data?.phone} />
-							<InfoRow icon={Globe} label="Website" value={org.data?.website} />
-						</View>
-
-						{org.data?.description && (
-							<View
-								style={{
-									paddingTop: spacing[3],
-									borderTopWidth: 1,
-									borderTopColor: colors.border.light,
-									marginBottom: spacing[4],
-								}}
-							>
-								<Caption
-									weight="bold"
-									color="tertiary"
-									style={{
-										letterSpacing: 1,
-										textTransform: "uppercase",
-										marginBottom: spacing[2],
-									}}
-								>
-									About
-								</Caption>
-								<Caption color="secondary" style={{ lineHeight: 20 }}>
-									{org.data.description}
-								</Caption>
-							</View>
-						)}
-
-						<Button
-							variant="outline"
-							onPress={() => router.push("/(ngo)/edit" as never)}
-							className=""
-						>
-							{/* <Pencil size={16} color={colors.text.secondary as string} /> */}
-							Edit profile
-						</Button>
-					</Surface>
-
-					{/* ── Verification ──────────────────────────────────────── */}
-					<Pressable
-						onPress={() => router.push("/(ngo)/verification" as never)}
-						style={({ pressed }) => ({
-							flexDirection: "row",
-							alignItems: "center",
-							gap: spacing[3],
-							backgroundColor: pressed
-								? colors.background.tertiary
-								: colors.background.primary,
-							borderRadius: borderRadius.lg,
-							borderWidth: 1,
-							borderColor: colors.border.light,
-							padding: spacing[4],
-							marginBottom: spacing[3],
-						})}
-					>
-						<View
-							style={{
-								width: 44,
-								height: 44,
-								borderRadius: 12,
-								backgroundColor: allRequiredDone
-									? `${colors.success.main}15`
-									: `${colors.primary.main}12`,
-								alignItems: "center",
-								justifyContent: "center",
-							}}
-						>
-							<ShieldCheck
-								size={22}
-								color={
-									(allRequiredDone
-										? colors.success.main
-										: colors.primary.main) as string
-								}
-							/>
-						</View>
-						<View style={{ flex: 1 }}>
-							<Body weight="semibold">Verification</Body>
-							<Caption color="tertiary">
-								{allRequiredDone
-									? "All documents submitted"
-									: `${uploadedCount} of 4 documents uploaded`}
-							</Caption>
-						</View>
-						<View
-							style={{
-								minWidth: 28,
-								height: 28,
-								borderRadius: 14,
-								backgroundColor: allRequiredDone
-									? (colors.success.main as string)
-									: (colors.primary.main as string),
-								alignItems: "center",
-								justifyContent: "center",
-							}}
-						>
-							<Caption weight="bold" color="#fff" style={{ fontSize: 12 }}>
-								{uploadedCount}
-							</Caption>
-						</View>
-					</Pressable>
-
-					{/* ── Quick stats ───────────────────────────────────────── */}
-					<Surface style={{ marginBottom: spacing[3] }}>
-						<View style={{ flexDirection: "row", gap: spacing[3] }}>
-							<View style={{ flex: 1, alignItems: "center" }}>
-								<CalendarDays size={18} color={colors.primary.main as string} />
-								<Body weight="bold" style={{ marginTop: spacing[1] }}>
-									{org.data?.stats?.events?.total ?? 0}
-								</Body>
-								<Caption color="tertiary" style={{ fontSize: 11 }}>
-									Events
-								</Caption>
-							</View>
-							<View
-								style={{
-									width: 1,
-									backgroundColor: colors.border.light,
-								}}
-							/>
-							<View style={{ flex: 1, alignItems: "center" }}>
-								<HeartHandshake
-									size={18}
-									color={colors.primary.main as string}
-								/>
-								<Body weight="bold" style={{ marginTop: spacing[1] }}>
-									{org.data?.stats?.needs?.total ?? 0}
-								</Body>
-								<Caption color="tertiary" style={{ fontSize: 11 }}>
-									Needs
-								</Caption>
-							</View>
-							<View
-								style={{
-									width: 1,
-									backgroundColor: colors.border.light,
-								}}
-							/>
-							<View style={{ flex: 1, alignItems: "center" }}>
-								<MapPin size={18} color={colors.primary.main as string} />
-								<Body weight="bold" style={{ marginTop: spacing[1] }}>
-									{team.data?.length ?? 0}
-								</Body>
-								<Caption color="tertiary" style={{ fontSize: 11 }}>
-									Team
-								</Caption>
-							</View>
-						</View>
-					</Surface>
-
-					{/* ── Quick links ──────────────────────────────────────── */}
-					<Surface padded={false} style={{ marginBottom: spacing[5] }}>
-						<QuickLink
-							icon={CalendarDays}
-							label="Events"
-							sublabel={`${org.data?.stats?.events?.published ?? 0} published`}
-							first
-							onPress={() => router.push("/(ngo)/events" as never)}
-						/>
-						<View
-							style={{
-								height: 1,
-								backgroundColor: colors.border.light,
-								marginLeft: 52,
-							}}
-						/>
-						<QuickLink
-							icon={HeartHandshake}
-							label="Needs"
-							sublabel={`${org.data?.stats?.needs?.open ?? 0} open`}
-							onPress={() => router.push("/(ngo)/needs" as never)}
-						/>
-						<View
-							style={{
-								height: 1,
-								backgroundColor: colors.border.light,
-								marginLeft: 52,
-							}}
-						/>
-						<QuickLink
-							icon={Globe}
-							label="Public profile"
-							sublabel="What volunteers see"
-							onPress={() => router.push(`/ngos/${org.data?.id}` as never)}
-						/>
-					</Surface>
-
-					<Button
-						variant="outline"
-						onPress={() => signOut.mutate()}
-						loading={signOut.isPending}
-					>
-						Sign out
-					</Button>
+					{identity}
+					{verification}
+					{numbers}
+					{organisation}
+					{programme}
+					{money}
+					{signOutButton}
 				</ScrollView>
 			)}
 		</Screen>
-	);
-}
-
-function QuickLink({
-	icon: Icon,
-	label,
-	sublabel,
-	onPress,
-	first,
-}: {
-	icon: typeof CalendarDays;
-	label: string;
-	sublabel?: string;
-	onPress: () => void;
-	first?: boolean;
-}) {
-	const { colors, spacing, borderRadius } = useTheme();
-	return (
-		<Pressable
-			onPress={onPress}
-			style={({ pressed }) => ({
-				flexDirection: "row",
-				alignItems: "center",
-				gap: spacing[3],
-				paddingHorizontal: spacing[4],
-				paddingVertical: spacing[3.5],
-				backgroundColor: pressed
-					? (colors.background.tertiary as string)
-					: "transparent",
-				borderTopLeftRadius: first ? borderRadius.lg : 0,
-				borderTopRightRadius: first ? borderRadius.lg : 0,
-			})}
-		>
-			<View
-				style={{
-					width: 36,
-					height: 36,
-					borderRadius: 10,
-					backgroundColor: `${colors.primary.main}10`,
-					alignItems: "center",
-					justifyContent: "center",
-				}}
-			>
-				<Icon size={18} color={colors.primary.main as string} />
-			</View>
-			<View style={{ flex: 1 }}>
-				<Body weight="medium">{label}</Body>
-				{sublabel && <Caption color="tertiary">{sublabel}</Caption>}
-			</View>
-			<ChevronRight size={18} color={colors.text.quaternary as string} />
-		</Pressable>
 	);
 }

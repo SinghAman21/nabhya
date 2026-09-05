@@ -1,22 +1,35 @@
 import type { UploadPurpose } from "@nabhya/shared";
 import { Check, FileText, Upload } from "lucide-react-native";
 import { ActivityIndicator, View } from "react-native";
+import { FieldError } from "@/components/form-field";
+import { Surface } from "@/components/screen-shell";
 import {
 	humanizeStatus,
 	StatusPill,
 	verificationTone,
 } from "@/components/status-pill";
+import { Button } from "@/components/ui/button";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption } from "@/components/ui/typography";
 import { useOpenDocument } from "@/hooks/use-documents";
 import { useTheme } from "@/hooks/use-theme";
 import { useFileUpload } from "@/hooks/use-upload";
+import { focusable } from "@/lib/focus";
+import { formatRelative } from "@/lib/format";
 import type { AdminOrgDocument } from "@/lib/types";
 
 /**
- * One document slot: shows what's already submitted and its review state, or a
- * dashed target to upload into. Picking a file uploads it straight to storage
- * and reports the resulting object key back to the parent.
+ * One document slot in four states.
+ *
+ * - **empty** — a dashed target; tapping picks a file and uploads it.
+ * - **uploading** — the same target, busy, with the picker disabled.
+ * - **uploaded** — a surface with the file, when it went up, and its review
+ *   state as a pill (pending, under review, verified).
+ * - **rejected** — the surface again, with the reviewer's remark in the error
+ *   tint and one primary action: upload a new copy.
+ *
+ * Picking a file uploads it straight to storage and reports the resulting
+ * object key back to the parent, which attaches it to the record.
  */
 export function DocumentUploadTile({
 	title,
@@ -26,6 +39,7 @@ export function DocumentUploadTile({
 	existing,
 	onUploaded,
 	saving,
+	required,
 }: {
 	title: string;
 	hint: string;
@@ -33,7 +47,10 @@ export function DocumentUploadTile({
 	organizationDocumentType?: string;
 	existing?: AdminOrgDocument;
 	onUploaded: (key: string) => void;
+	/** The parent is attaching the key to the record — keep the tile busy. */
 	saving?: boolean;
+	/** Draws "Required" / "Optional" under the title. */
+	required?: boolean;
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
 	const { pickAndUpload, isUploading, error } = useFileUpload(
@@ -43,24 +60,21 @@ export function DocumentUploadTile({
 	const openDocument = useOpenDocument();
 
 	const busy = isUploading || saving;
+	const requirement =
+		required === undefined ? null : required ? "Required" : "Optional";
 
 	const pick = async () => {
 		const picked = await pickAndUpload();
 		if (picked) onUploaded(picked.key);
 	};
 
+	/* Uploaded / rejected --------------------------------------------------- */
 	if (existing) {
+		const rejected = existing.verificationStatus === "REJECTED";
+		const verified = existing.verificationStatus === "VERIFIED";
+
 		return (
-			<View
-				style={{
-					borderWidth: 1,
-					borderColor: colors.border.light,
-					backgroundColor: colors.background.primary,
-					borderRadius: borderRadius.lg,
-					padding: spacing[4],
-					marginBottom: spacing[3],
-				}}
-			>
+			<Surface>
 				<View
 					style={{
 						flexDirection: "row",
@@ -70,29 +84,61 @@ export function DocumentUploadTile({
 				>
 					<View
 						style={{
-							width: 36,
-							height: 36,
-							borderRadius: 18,
+							width: 40,
+							height: 40,
+							borderRadius: 12,
 							alignItems: "center",
 							justifyContent: "center",
-							backgroundColor: colors.background.tertiary,
+							backgroundColor: verified
+								? colors.success.bg
+								: colors.background.subtle,
 						}}
 					>
-						<FileText size={18} color={colors.text.secondary as string} />
+						{verified ? (
+							<Check size={18} color={colors.success.ink} strokeWidth={2.4} />
+						) : (
+							<FileText
+								size={18}
+								color={colors.text.secondary as string}
+								strokeWidth={1.75}
+							/>
+						)}
 					</View>
-					<View style={{ flex: 1 }}>
+					<View style={{ flex: 1, minWidth: 0 }}>
 						<Body weight="medium" numberOfLines={1}>
 							{title}
 						</Body>
-						<Caption color="tertiary">Submitted</Caption>
+						<Caption color="tertiary" numberOfLines={1}>
+							{[requirement, `Uploaded ${formatRelative(existing.uploadedAt)}`]
+								.filter(Boolean)
+								.join(" · ")}
+						</Caption>
 					</View>
 					<StatusPill
-						label={humanizeStatus(existing.verificationStatus)}
+						label={humanizeStatus(existing.verificationStatus ?? "PENDING")}
 						tone={verificationTone(existing.verificationStatus)}
 					/>
 				</View>
 
-				{existing.remarks && (
+				{rejected && (
+					<View
+						style={{
+							marginTop: spacing[3],
+							padding: spacing[3],
+							borderRadius: borderRadius.md,
+							backgroundColor: colors.error.bg,
+						}}
+					>
+						<Caption weight="bold" color={colors.error.ink}>
+							Reviewer's note
+						</Caption>
+						<Caption color="secondary" style={{ marginTop: spacing[0.5] }}>
+							{existing.remarks ??
+								"This copy could not be accepted. Upload a clearer or more recent one."}
+						</Caption>
+					</View>
+				)}
+				{!rejected && existing.remarks && (
 					<Caption color="secondary" style={{ marginTop: spacing[2] }}>
 						“{existing.remarks}”
 					</Caption>
@@ -101,96 +147,117 @@ export function DocumentUploadTile({
 				<View
 					style={{
 						flexDirection: "row",
-						gap: spacing[4],
+						alignItems: "center",
+						gap: spacing[2],
 						marginTop: spacing[3],
 					}}
 				>
-					<Pressable
+					{rejected ? (
+						<Button
+							size="sm"
+							onPress={pick}
+							disabled={busy}
+							loading={!!busy}
+							style={{ flex: 1 }}
+						>
+							Upload a new copy
+						</Button>
+					) : (
+						<Button
+							variant="outline"
+							size="sm"
+							onPress={pick}
+							disabled={busy}
+							loading={!!busy}
+							accessibilityLabel={`Replace ${title}`}
+						>
+							Replace
+						</Button>
+					)}
+					<Button
+						variant="ghost"
+						size="sm"
 						onPress={() => openDocument.mutate(existing.documentKey)}
-						hitSlop={8}
+						disabled={openDocument.isPending}
+						loading={openDocument.isPending}
+						accessibilityLabel={`View ${title}`}
 					>
-						<Caption weight="medium" color={colors.primary.main as string}>
-							{openDocument.isPending ? "Opening…" : "View"}
-						</Caption>
-					</Pressable>
-					<Pressable onPress={pick} disabled={busy} hitSlop={8}>
-						<Caption weight="medium" color="secondary">
-							{busy ? "Uploading…" : "Replace"}
-						</Caption>
-					</Pressable>
+						View
+					</Button>
 				</View>
 
-				{error && (
-					<Caption
-						color={colors.error.main as string}
-						style={{ marginTop: spacing[2] }}
-					>
-						{error}
-					</Caption>
-				)}
-			</View>
+				<FieldError message={error} />
+			</Surface>
 		);
 	}
 
+	/* Empty / uploading ----------------------------------------------------- */
 	return (
 		<Pressable
 			onPress={pick}
 			disabled={busy}
+			accessibilityRole="button"
+			accessibilityLabel={`Upload ${title}`}
+			accessibilityHint={hint}
+			accessibilityState={{ disabled: !!busy, busy: !!busy }}
+			{...focusable}
 			style={({ pressed }) => ({
-				borderWidth: 2,
-				borderColor: pressed ? colors.primary.main : colors.border.medium,
+				borderWidth: 1.5,
 				borderStyle: "dashed",
-				borderRadius: borderRadius.lg,
-				padding: spacing[6],
-				alignItems: "center",
-				marginBottom: spacing[3],
-				opacity: busy ? 0.6 : 1,
+				borderColor: pressed ? colors.text.primary : colors.border.dark,
+				borderRadius: borderRadius.xl,
+				padding: spacing[4],
+				backgroundColor: pressed ? colors.background.subtle : "transparent",
+				opacity: busy ? 0.7 : 1,
 			})}
 		>
-			<Body weight="medium" style={{ marginBottom: spacing[1] }}>
-				{title}
-			</Body>
-			<Caption color="tertiary" style={{ textAlign: "center" }}>
-				{hint}
-			</Caption>
-
 			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[2],
-					marginTop: spacing[3],
-					paddingHorizontal: spacing[4],
-					paddingVertical: spacing[2],
-					borderRadius: borderRadius.sm,
-					backgroundColor: colors.background.tertiary,
-				}}
+				style={{ flexDirection: "row", alignItems: "center", gap: spacing[3] }}
 			>
-				{busy ? (
-					<ActivityIndicator
-						size="small"
-						color={colors.text.secondary as string}
-					/>
-				) : (
-					<Upload size={14} color={colors.text.secondary as string} />
+				<View
+					style={{
+						width: 40,
+						height: 40,
+						borderRadius: 12,
+						alignItems: "center",
+						justifyContent: "center",
+						backgroundColor: colors.background.subtle,
+					}}
+				>
+					{busy ? (
+						<ActivityIndicator
+							size="small"
+							color={colors.text.secondary as string}
+						/>
+					) : (
+						<Upload
+							size={18}
+							color={colors.text.secondary as string}
+							strokeWidth={1.75}
+						/>
+					)}
+				</View>
+				<View style={{ flex: 1, minWidth: 0 }}>
+					<Body weight="medium" numberOfLines={1}>
+						{title}
+					</Body>
+					<Caption color="tertiary" numberOfLines={2}>
+						{busy ? "Uploading…" : hint}
+					</Caption>
+				</View>
+				{requirement && (
+					<Caption
+						weight="medium"
+						color={required ? "secondary" : "quaternary"}
+					>
+						{requirement}
+					</Caption>
 				)}
-				<Caption color="secondary" weight="medium">
-					{busy ? "Uploading…" : "Choose file"}
-				</Caption>
 			</View>
-
-			<Caption color="quaternary" style={{ marginTop: spacing[2] }}>
+			<Caption color="quaternary" style={{ marginTop: spacing[3] }}>
 				PDF, JPG, PNG or WebP · up to 10 MB
 			</Caption>
-
-			{error && (
-				<Caption
-					color={colors.error.main as string}
-					style={{ marginTop: spacing[2], textAlign: "center" }}
-				>
-					{error}
-				</Caption>
-			)}
+			<FieldError message={error} />
 		</Pressable>
 	);
 }
@@ -207,8 +274,8 @@ export function UploadedBadge({ label }: { label: string }) {
 				marginTop: spacing[2],
 			}}
 		>
-			<Check size={14} color={colors.success.main as string} />
-			<Caption color={colors.success.main as string}>{label}</Caption>
+			<Check size={14} color={colors.success.ink} strokeWidth={2.4} />
+			<Caption color={colors.success.ink}>{label}</Caption>
 		</View>
 	);
 }

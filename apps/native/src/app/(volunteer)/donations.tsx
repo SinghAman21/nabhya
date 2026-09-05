@@ -1,11 +1,14 @@
 import { formatMinor } from "@nabhya/shared";
+import { useRouter } from "expo-router";
 import { HandCoins, Package } from "lucide-react-native";
 import { useState } from "react";
-import { FlatList, RefreshControl, View } from "react-native";
+import { View } from "react-native";
+import { PAGE_SIZE, PagedList, usePagedQuery } from "@/components/paged-list";
 import {
 	EmptyState,
 	ErrorState,
 	FilterChips,
+	ListGroup,
 	LoadingState,
 	Screen,
 	ScreenHeader,
@@ -16,14 +19,14 @@ import {
 	pledgeTone,
 	StatusPill,
 } from "@/components/status-pill";
-import { Pressable } from "@/components/ui/pressable";
+import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
-import { Body, Caption } from "@/components/ui/typography";
-import { useDonationReceipt, useMyDonations } from "@/hooks/use-engagement";
-import { useMyPledges } from "@/hooks/use-needs";
+import { Body, Caption, H3, H5 } from "@/components/ui/typography";
+import { useDonationReceipt } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
-import { apiErrorMessage } from "@/lib/api";
+import { apiErrorMessage, donationsApi, needsApi, queryKeys } from "@/lib/api";
 import { formatDateTime, formatRelative } from "@/lib/format";
+import type { MyDonation } from "@/lib/types";
 
 type Tab = "items" | "money";
 
@@ -37,17 +40,15 @@ const TABS: Array<{ value: Tab; label: string }> = [
  *
  * The two are rendered by separate components rather than one list with a
  * union type: their shapes share almost nothing, and forcing them together
- * needs casts that hide real mistakes.
+ * needs casts that hide real mistakes. Reached from Profile, so it gets a back
+ * button rather than a tab title.
  */
 export default function Donations() {
 	const [tab, setTab] = useState<Tab>("items");
 
 	return (
 		<Screen>
-			<ScreenHeader
-				title="My donations"
-				subtitle="Items you've offered, and money you've given."
-			/>
+			<ScreenHeader back title="Your giving" />
 
 			<FilterChips options={TABS} value={tab} onChange={setTab} />
 
@@ -58,168 +59,194 @@ export default function Donations() {
 
 function ItemPledges() {
 	const { colors, spacing } = useTheme();
-	const query = useMyPledges();
+	const router = useRouter();
 
-	if (query.isLoading) return <LoadingState label="Loading your pledges…" />;
-	if (query.isError) {
-		return (
-			<ErrorState
-				message={apiErrorMessage(query.error)}
-				onRetry={() => query.refetch()}
-			/>
-		);
-	}
+	const { query, items, loadMore } = usePagedQuery({
+		queryKey: queryKeys.myPledges({ limit: PAGE_SIZE }),
+		fetchPage: (page) => needsApi.myPledges({ page, limit: PAGE_SIZE }),
+	});
 
 	return (
-		<FlatList
-			data={query.data?.items ?? []}
+		<PagedList
+			query={query}
+			items={items}
+			loadMore={loadMore}
+			loadingLabel="Loading your pledges"
 			keyExtractor={(item) => item.id}
-			showsVerticalScrollIndicator={false}
-			contentContainerStyle={{ paddingBottom: spacing[10] }}
-			ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
-			refreshControl={
-				<RefreshControl
-					refreshing={query.isRefetching}
-					onRefresh={() => query.refetch()}
-					tintColor={colors.primary.main as string}
-				/>
-			}
-			ListEmptyComponent={
+			empty={
 				<EmptyState
 					icon={Package}
 					title="Nothing pledged yet"
-					description="Head to Discover to see what NGOs need right now."
+					description="When an NGO asks for blankets, books or anything else, you can pledge them from Home. Your pledges are tracked here."
+					action={
+						<Button
+							size="sm"
+							variant="outline"
+							onPress={() => router.push("/(volunteer)")}
+						>
+							See what's needed
+						</Button>
+					}
 				/>
 			}
-			renderItem={({ item }) => (
-				<Surface>
-					<View
-						style={{
-							flexDirection: "row",
-							alignItems: "center",
-							justifyContent: "space-between",
-							gap: spacing[3],
-							marginBottom: spacing[2],
-						}}
-					>
-						<Caption color="secondary" numberOfLines={1} style={{ flex: 1 }}>
-							{item.organization?.organizationName}
-						</Caption>
-						<StatusPill
-							label={humanizeStatus(item.status)}
-							tone={pledgeTone(item.status)}
-						/>
-					</View>
+			renderItem={(item) => {
+				const amount = item.quantity
+					? `${item.quantity}${item.need?.unit ? ` ${item.need.unit}` : ""}`
+					: null;
+				const next =
+					item.status === "PENDING"
+						? "Waiting for the NGO to review"
+						: item.status === "ACCEPTED"
+							? "Accepted — arrange the handover with the NGO"
+							: null;
 
-					<Body weight="bold" numberOfLines={2}>
-						{item.need?.title}
-					</Body>
-					<Caption color="tertiary" style={{ marginTop: 4 }}>
-						{item.quantity
-							? `${item.quantity}${item.need?.unit ? ` ${item.need.unit}` : ""} · `
-							: ""}
-						{formatRelative(item.createdAt)}
-					</Caption>
-
-					{item.reviewNote && (
-						<Caption color="secondary" style={{ marginTop: spacing[2] }}>
-							“{item.reviewNote}”
-						</Caption>
-					)}
-				</Surface>
-			)}
-		/>
-	);
-}
-
-function MoneyDonations() {
-	const { colors, spacing } = useTheme();
-	const [receiptId, setReceiptId] = useState<string | null>(null);
-	const query = useMyDonations();
-
-	if (query.isLoading) return <LoadingState label="Loading donations…" />;
-	if (query.isError) {
-		return (
-			<ErrorState
-				message={apiErrorMessage(query.error)}
-				onRetry={() => query.refetch()}
-			/>
-		);
-	}
-
-	return (
-		<>
-			<FlatList
-				data={query.data?.items ?? []}
-				keyExtractor={(item) => item.id}
-				showsVerticalScrollIndicator={false}
-				contentContainerStyle={{ paddingBottom: spacing[10] }}
-				ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
-				refreshControl={
-					<RefreshControl
-						refreshing={query.isRefetching}
-						onRefresh={() => query.refetch()}
-						tintColor={colors.primary.main as string}
-					/>
-				}
-				ListEmptyComponent={
-					<EmptyState
-						icon={HandCoins}
-						title="No donations yet"
-						description="Donations you make appear here with their receipt number."
-					/>
-				}
-				renderItem={({ item }) => (
+				return (
 					<Surface>
 						<View
 							style={{
 								flexDirection: "row",
 								alignItems: "center",
 								justifyContent: "space-between",
+								gap: spacing[3],
+								marginBottom: spacing[1],
 							}}
 						>
-							<Body weight="bold">
-								{formatMinor(item.amountMinor, item.currency)}
-							</Body>
+							<Caption color="tertiary" numberOfLines={1} style={{ flex: 1 }}>
+								{item.organization?.organizationName}
+							</Caption>
 							<StatusPill
 								label={humanizeStatus(item.status)}
-								tone={
-									item.status === "COMPLETED"
-										? "success"
-										: item.status === "FAILED"
-											? "error"
-											: "warning"
-								}
+								tone={pledgeTone(item.status)}
 							/>
 						</View>
 
-						<Caption color="tertiary" style={{ marginTop: 2 }}>
-							{item.organization.organizationName}
-						</Caption>
-						<Caption color="quaternary" style={{ marginTop: spacing[2] }}>
-							{item.receiptNumber ? `${item.receiptNumber} · ` : ""}
-							{formatRelative(item.completedAt ?? item.createdAt)}
+						<H5 numberOfLines={2}>{item.need?.title}</H5>
+						<Caption color="tertiary" style={{ marginTop: spacing[0.5] }}>
+							{amount ? `${amount} · ` : ""}
+							{formatRelative(item.createdAt)}
 						</Caption>
 
-						{/* Only completed payments have a receipt — the server refuses
-						    one for anything still pending. */}
-						{item.status === "COMPLETED" && (
-							<Pressable
-								onPress={() => setReceiptId(item.id)}
-								hitSlop={8}
-								style={{ marginTop: spacing[3] }}
+						{next && (
+							<Caption
+								color={colors.warning.ink}
+								style={{ marginTop: spacing[2] }}
 							>
-								<Caption weight="medium" color={colors.primary.main as string}>
-									View receipt
-								</Caption>
-							</Pressable>
+								{next}
+							</Caption>
+						)}
+
+						{item.reviewNote && (
+							<Caption color="secondary" style={{ marginTop: spacing[2] }}>
+								“{item.reviewNote}”
+							</Caption>
 						)}
 					</Surface>
+				);
+			}}
+		/>
+	);
+}
+
+function MoneyDonations() {
+	const router = useRouter();
+	const [receiptId, setReceiptId] = useState<string | null>(null);
+
+	const { query, items, loadMore } = usePagedQuery({
+		queryKey: queryKeys.myDonations({ limit: PAGE_SIZE }),
+		fetchPage: (page) => donationsApi.listMine({ page, limit: PAGE_SIZE }),
+	});
+
+	return (
+		<>
+			<PagedList
+				query={query}
+				items={items}
+				loadMore={loadMore}
+				loadingLabel="Loading your donations"
+				keyExtractor={(item) => item.id}
+				empty={
+					<EmptyState
+						icon={HandCoins}
+						title="No donations yet"
+						description="Donate to any verified NGO from its page. Each completed donation appears here with a receipt."
+						action={
+							<Button
+								size="sm"
+								variant="outline"
+								onPress={() => router.push("/ngos")}
+							>
+								Browse NGOs
+							</Button>
+						}
+					/>
+				}
+				renderItem={(item) => (
+					<DonationCard item={item} onReceipt={() => setReceiptId(item.id)} />
 				)}
 			/>
 
 			<ReceiptSheet id={receiptId} onClose={() => setReceiptId(null)} />
 		</>
+	);
+}
+
+function DonationCard({
+	item,
+	onReceipt,
+}: {
+	item: MyDonation;
+	onReceipt: () => void;
+}) {
+	const { colors, spacing } = useTheme();
+	const tone =
+		item.status === "COMPLETED"
+			? "success"
+			: item.status === "FAILED"
+				? "error"
+				: "warning";
+
+	return (
+		<Surface>
+			<View
+				style={{
+					flexDirection: "row",
+					alignItems: "center",
+					justifyContent: "space-between",
+					gap: spacing[3],
+				}}
+			>
+				<H3>{formatMinor(item.amountMinor, item.currency)}</H3>
+				<StatusPill label={humanizeStatus(item.status)} tone={tone} />
+			</View>
+
+			<Body color="secondary" style={{ marginTop: spacing[1] }}>
+				{item.organization.organizationName}
+			</Body>
+			<Caption color="quaternary" style={{ marginTop: spacing[0.5] }}>
+				{item.receiptNumber ? `Receipt ${item.receiptNumber} · ` : ""}
+				{formatRelative(item.completedAt ?? item.createdAt)}
+			</Caption>
+
+			{item.status === "PENDING" && (
+				<Caption color={colors.warning.ink} style={{ marginTop: spacing[2] }}>
+					Waiting for the payment to be confirmed
+				</Caption>
+			)}
+
+			{/* Only completed payments have a receipt — the server refuses one for
+			    anything still pending. */}
+			{item.status === "COMPLETED" && (
+				<Button
+					size="sm"
+					variant="outline"
+					onPress={onReceipt}
+					accessibilityLabel={`View receipt for ${formatMinor(item.amountMinor, item.currency)} to ${item.organization.organizationName}`}
+					style={{ alignSelf: "flex-start", marginTop: spacing[3] }}
+				>
+					View receipt
+				</Button>
+			)}
+		</Surface>
 	);
 }
 
@@ -236,7 +263,16 @@ function ReceiptSheet({
 	const receipt = query.data;
 
 	return (
-		<Sheet visible={!!id} onClose={onClose} title="Receipt">
+		<Sheet
+			visible={!!id}
+			onClose={onClose}
+			title="Receipt"
+			footer={
+				<Button variant="outline" onPress={onClose}>
+					Done
+				</Button>
+			}
+		>
 			<View style={{ paddingTop: spacing[1], paddingBottom: spacing[2] }}>
 				{query.isLoading ? (
 					<LoadingState />
@@ -246,62 +282,55 @@ function ReceiptSheet({
 						onRetry={() => query.refetch()}
 					/>
 				) : (
-					<Surface>
-						<Caption color="tertiary">Receipt number</Caption>
-						<Body weight="bold" style={{ marginBottom: spacing[4] }}>
-							{receipt.receiptNumber ?? "—"}
-						</Body>
-
-						<ReceiptRow
-							label="Amount"
-							value={formatMinor(receipt.amountMinor, receipt.currency)}
-						/>
-						<ReceiptRow
-							label="To"
-							value={[receipt.organizationName, receipt.organizationCity]
-								.filter(Boolean)
-								.join(", ")}
-						/>
-						<ReceiptRow label="From" value={receipt.donorName ?? "—"} />
-						<ReceiptRow
-							label="Date"
-							value={
-								receipt.completedAt ? formatDateTime(receipt.completedAt) : "—"
-							}
-							last
-						/>
-					</Surface>
+					<>
+						<View style={{ marginBottom: spacing[4] }}>
+							<Caption color="tertiary">Receipt number</Caption>
+							<H3>{receipt.receiptNumber ?? "—"}</H3>
+						</View>
+						<ListGroup>
+							<ReceiptRow
+								label="Amount"
+								value={formatMinor(receipt.amountMinor, receipt.currency)}
+							/>
+							<ReceiptRow
+								label="To"
+								value={[receipt.organizationName, receipt.organizationCity]
+									.filter(Boolean)
+									.join(", ")}
+							/>
+							<ReceiptRow label="From" value={receipt.donorName ?? "—"} />
+							<ReceiptRow
+								label="Date"
+								value={
+									receipt.completedAt
+										? formatDateTime(receipt.completedAt)
+										: "—"
+								}
+							/>
+						</ListGroup>
+					</>
 				)}
 			</View>
 		</Sheet>
 	);
 }
 
-function ReceiptRow({
-	label,
-	value,
-	last,
-}: {
-	label: string;
-	value: string;
-	last?: boolean;
-}) {
-	const { colors, spacing } = useTheme();
+function ReceiptRow({ label, value }: { label: string; value: string }) {
+	const { spacing } = useTheme();
 	return (
 		<View
 			style={{
 				flexDirection: "row",
 				justifyContent: "space-between",
 				gap: spacing[4],
-				paddingVertical: spacing[2.5],
-				borderBottomWidth: last ? 0 : 1,
-				borderBottomColor: colors.border.light,
+				paddingHorizontal: spacing[4],
+				paddingVertical: spacing[3],
 			}}
 		>
 			<Caption color="tertiary">{label}</Caption>
-			<Caption weight="medium" style={{ flex: 1, textAlign: "right" }}>
+			<Body weight="medium" style={{ flex: 1, textAlign: "right" }}>
 				{value}
-			</Caption>
+			</Body>
 		</View>
 	);
 }

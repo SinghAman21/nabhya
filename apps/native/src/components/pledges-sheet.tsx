@@ -2,6 +2,8 @@ import type { PledgeStatus } from "@nabhya/shared";
 import { Package } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
+import { Field, useFieldInputStyle } from "@/components/form-field";
+import { InitialAvatar } from "@/components/initial-avatar";
 import {
 	EmptyState,
 	ErrorState,
@@ -14,10 +16,10 @@ import {
 	pledgeTone,
 	StatusPill,
 } from "@/components/status-pill";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Pressable } from "@/components/ui/pressable";
 import { Sheet, SheetFlatList } from "@/components/ui/sheet";
-import { Body, Caption, Label } from "@/components/ui/typography";
+import { Body, BodySmall, Caption } from "@/components/ui/typography";
 import { useNeedPledges, useReviewPledge } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
@@ -26,11 +28,12 @@ import { formatProgress, formatRelative } from "@/lib/format";
 import type { NeedPledge, OrgNeedListItem } from "@/lib/types";
 
 type StatusFilter = "ALL" | PledgeStatus;
+type Decision = "ACCEPTED" | "REJECTED" | "COMPLETED";
 
 const FILTERS: Array<{ value: StatusFilter; label: string }> = [
 	{ value: "PENDING", label: "Pending" },
 	{ value: "ACCEPTED", label: "Accepted" },
-	{ value: "COMPLETED", label: "Completed" },
+	{ value: "COMPLETED", label: "Received" },
 	{ value: "ALL", label: "All" },
 ];
 
@@ -47,7 +50,8 @@ export function PledgesSheet({
 	need: OrgNeedListItem | null;
 	onClose: () => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
+	const inputStyle = useFieldInputStyle();
 	const [filter, setFilter] = useState<StatusFilter>("PENDING");
 	const [note, setNote] = useState("");
 
@@ -60,13 +64,11 @@ export function PledgesSheet({
 
 	const close = () => {
 		setNote("");
+		setFilter("PENDING");
 		onClose();
 	};
 
-	const decide = (
-		pledge: NeedPledge,
-		status: "ACCEPTED" | "REJECTED" | "COMPLETED",
-	) => {
+	const decide = (pledge: NeedPledge, status: Decision) => {
 		review.mutate(
 			{
 				pledgeId: pledge.id,
@@ -80,28 +82,33 @@ export function PledgesSheet({
 		);
 	};
 
-	const noteField = (
-		<View style={{ paddingTop: spacing[1], paddingBottom: spacing[4] }}>
+	const header = (
+		<View style={{ paddingTop: spacing[1], paddingBottom: spacing[2] }}>
 			{need && (
-				<Caption color="secondary" style={{ marginBottom: spacing[3] }}>
+				<Caption
+					weight="medium"
+					color="secondary"
+					style={{ marginBottom: spacing[3] }}
+				>
 					{formatProgress(need.fulfilledQuantity, need.quantity, need.unit)}
+					{need.status !== "OPEN" ? ` · ${humanizeStatus(need.status)}` : ""}
 				</Caption>
 			)}
 			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
-			<Label style={{ marginBottom: spacing[1.5] }}>
-				Note to the volunteer <Caption color="tertiary">(optional)</Caption>
-			</Label>
-			<Input
-				placeholder="Pickup address, timing, anything they need to know"
-				value={note}
-				onChangeText={setNote}
-				style={{
-					borderWidth: 0,
-					borderRadius: 12,
-					backgroundColor: colors.background.tertiary,
-					paddingVertical: spacing[3],
-				}}
-			/>
+			{(filter === "PENDING" || filter === "ACCEPTED") && (
+				<Field
+					label="Note to the volunteer"
+					optional
+					hint="Sent with your next decision — pickup address, timing, a thank-you."
+				>
+					<Input
+						placeholder="e.g. Drop off at our Andheri office, Mon–Fri 10–5"
+						value={note}
+						onChangeText={setNote}
+						style={inputStyle}
+					/>
+				</Field>
+			)}
 		</View>
 	);
 
@@ -115,7 +122,7 @@ export function PledgesSheet({
 			detents={["60%", "92%"]}
 		>
 			{query.isLoading ? (
-				<LoadingState label="Loading responses…" />
+				<LoadingState label="Loading responses" />
 			) : query.isError ? (
 				<ErrorState
 					message={apiErrorMessage(query.error)}
@@ -125,15 +132,17 @@ export function PledgesSheet({
 				<SheetFlatList
 					data={items}
 					keyExtractor={(item) => item.id}
-					ListHeaderComponent={noteField}
+					ListHeaderComponent={header}
 					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
 					ListEmptyComponent={
 						<EmptyState
 							icon={Package}
-							title="No responses here"
+							title={
+								filter === "PENDING" ? "No one waiting" : "No responses here"
+							}
 							description={
 								filter === "PENDING"
-									? "New offers will appear here for review."
+									? "When a volunteer offers to help with this post, it shows up here for your decision."
 									: "Nothing matches this filter yet."
 							}
 						/>
@@ -143,6 +152,11 @@ export function PledgesSheet({
 							pledge={item}
 							unit={need?.unit ?? null}
 							busy={review.isPending}
+							deciding={
+								review.isPending && review.variables?.pledgeId === item.id
+									? review.variables.input.status
+									: null
+							}
 							onDecide={(status) => decide(item, status)}
 						/>
 					)}
@@ -156,44 +170,48 @@ function PledgeRow({
 	pledge,
 	unit,
 	busy,
+	deciding,
 	onDecide,
 }: {
 	pledge: NeedPledge;
 	unit: string | null;
 	busy: boolean;
-	onDecide: (status: "ACCEPTED" | "REJECTED" | "COMPLETED") => void;
+	deciding: Decision | null;
+	onDecide: (status: Decision) => void;
 }) {
 	const { colors, spacing } = useTheme();
+	const name = pledge.user.fullName ?? "Unnamed volunteer";
+	const verified = pledge.user.verificationStatus === "VERIFIED";
+	const meta = [
+		pledge.user.city ?? pledge.user.email,
+		verified ? "ID verified" : null,
+	]
+		.filter(Boolean)
+		.join(" · ");
 
 	return (
 		<Surface>
 			<View
 				style={{ flexDirection: "row", alignItems: "center", gap: spacing[3] }}
 			>
-				<View
-					style={{
-						width: 40,
-						height: 40,
-						borderRadius: 20,
-						backgroundColor: colors.primary.main,
-						alignItems: "center",
-						justifyContent: "center",
-					}}
-				>
-					<Body weight="bold" color={colors.primary.contrast as string}>
-						{(pledge.user.fullName ?? pledge.user.email)[0]?.toUpperCase()}
-					</Body>
-				</View>
-				<View style={{ flex: 1 }}>
+				<InitialAvatar name={pledge.user.fullName} />
+				<View style={{ flex: 1, minWidth: 0 }}>
 					<Body weight="bold" numberOfLines={1}>
-						{pledge.user.fullName ?? "Unnamed volunteer"}
+						{name}
 					</Body>
-					<Caption color="tertiary" numberOfLines={1}>
-						{pledge.user.city ?? pledge.user.email}
+					<Caption
+						color={verified ? (colors.success.ink as string) : "tertiary"}
+						numberOfLines={1}
+					>
+						{meta}
 					</Caption>
 				</View>
 				<StatusPill
-					label={humanizeStatus(pledge.status)}
+					label={
+						pledge.status === "COMPLETED"
+							? "Received"
+							: humanizeStatus(pledge.status)
+					}
 					tone={pledgeTone(pledge.status)}
 				/>
 			</View>
@@ -205,90 +223,65 @@ function PledgeRow({
 				</Body>
 			)}
 
-			{pledge.user.verificationStatus === "VERIFIED" && (
-				<Caption
-					color={colors.success.main as string}
-					style={{ marginTop: spacing[1] }}
-				>
-					ID verified
-				</Caption>
-			)}
-
 			{pledge.message && (
-				<Caption color="secondary" style={{ marginTop: spacing[2] }}>
-					“{pledge.message}”
-				</Caption>
+				<View
+					style={{
+						marginTop: spacing[2],
+						paddingLeft: spacing[3],
+						borderLeftWidth: 2,
+						borderLeftColor: colors.border.dark,
+					}}
+				>
+					<BodySmall color="secondary">“{pledge.message}”</BodySmall>
+				</View>
 			)}
 
 			<Caption color="quaternary" style={{ marginTop: spacing[2] }}>
 				{formatRelative(pledge.createdAt)}
+				{pledge.reviewNote ? ` · Your note: ${pledge.reviewNote}` : ""}
 			</Caption>
 
-			<View
-				style={{ flexDirection: "row", gap: spacing[2], marginTop: spacing[4] }}
-			>
-				{pledge.status === "PENDING" && (
-					<>
-						<Action
-							label="Accept"
-							primary
-							disabled={busy}
-							onPress={() => onDecide("ACCEPTED")}
-						/>
-						<Action
-							label="Reject"
-							disabled={busy}
-							onPress={() => onDecide("REJECTED")}
-						/>
-					</>
-				)}
-				{pledge.status === "ACCEPTED" && (
-					<Action
-						label="Mark received"
-						primary
+			{pledge.status === "PENDING" && (
+				<View
+					style={{
+						flexDirection: "row",
+						gap: spacing[2],
+						marginTop: spacing[4],
+					}}
+				>
+					<Button
+						style={{ flex: 1 }}
 						disabled={busy}
+						loading={deciding === "ACCEPTED"}
+						onPress={() => onDecide("ACCEPTED")}
+						accessibilityLabel={`Accept offer from ${name}`}
+					>
+						Accept
+					</Button>
+					<Button
+						variant="outline"
+						style={{ flex: 1 }}
+						disabled={busy}
+						loading={deciding === "REJECTED"}
+						onPress={() => onDecide("REJECTED")}
+						accessibilityLabel={`Decline offer from ${name}`}
+					>
+						Decline
+					</Button>
+				</View>
+			)}
+			{pledge.status === "ACCEPTED" && (
+				<View style={{ marginTop: spacing[4] }}>
+					<Button
+						disabled={busy}
+						loading={deciding === "COMPLETED"}
 						onPress={() => onDecide("COMPLETED")}
-					/>
-				)}
-			</View>
+						accessibilityLabel={`Mark ${name}'s items as received`}
+					>
+						Mark received
+					</Button>
+				</View>
+			)}
 		</Surface>
-	);
-}
-
-function Action({
-	label,
-	primary,
-	disabled,
-	onPress,
-}: {
-	label: string;
-	primary?: boolean;
-	disabled?: boolean;
-	onPress: () => void;
-}) {
-	const { colors, spacing } = useTheme();
-
-	return (
-		<Pressable
-			disabled={disabled}
-			onPress={onPress}
-			style={{
-				flex: 1,
-				alignItems: "center",
-				paddingVertical: spacing[2.5],
-				borderRadius: 12,
-				backgroundColor: primary ? colors.primary.main : "transparent",
-				borderWidth: primary ? 0 : 1,
-				borderColor: colors.border.medium,
-				opacity: disabled ? 0.5 : 1,
-			}}
-		>
-			<Body
-				weight={primary ? "bold" : "medium"}
-				color={primary ? (colors.primary.contrast as string) : "primary"}
-			>
-				{label}
-			</Body>
-		</Pressable>
 	);
 }

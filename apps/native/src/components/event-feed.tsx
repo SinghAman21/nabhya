@@ -1,31 +1,17 @@
 import { useRouter } from "expo-router";
-import {
-	CalendarDays,
-	ChevronRight,
-	MapPin,
-	Search,
-} from "lucide-react-native";
+import { CalendarDays, MapPin, Search, Users } from "lucide-react-native";
 import { useState } from "react";
-import {
-	FlatList,
-	Platform,
-	RefreshControl,
-	ScrollView,
-	View,
-} from "react-native";
-import {
-	EmptyState,
-	ErrorState,
-	FilterChips,
-	LoadingState,
-} from "@/components/screen-shell";
+import { View } from "react-native";
+import { PAGE_SIZE, PagedList, usePagedQuery } from "@/components/paged-list";
+import { EmptyState, FilterChips, Surface } from "@/components/screen-shell";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption } from "@/components/ui/typography";
-import { usePublicEvents } from "@/hooks/use-events";
+import { Caption, H5, Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
+import { useDebounced } from "@/hooks/useDebounced";
 import { useMedia } from "@/hooks/useMedia";
-import { apiErrorMessage } from "@/lib/api";
+import { eventsApi, queryKeys } from "@/lib/api";
+import { focusWithin } from "@/lib/focus";
 import { formatDateRange } from "@/lib/format";
 import type { PublicEvent } from "@/lib/types";
 
@@ -37,6 +23,13 @@ const WHEN_FILTERS: Array<{ value: When; label: string }> = [
 	{ value: "all", label: "All" },
 ];
 
+/**
+ * The browsable list of public events: search, an Upcoming / Past / All lens,
+ * and a paged list of cards. Three columns on desktop, one on a phone.
+ *
+ * The search field and chips sit above the list rather than inside it, so a
+ * keystroke that empties the results does not unmount the field mid-word.
+ */
 export function EventFeed({
 	header,
 	contentPaddingTop,
@@ -44,134 +37,120 @@ export function EventFeed({
 	header?: React.ReactNode;
 	contentPaddingTop?: number;
 }) {
-	const { colors, spacing } = useTheme();
+	const { colors, spacing, borderRadius } = useTheme();
 	const { isDesktop } = useMedia();
 	const router = useRouter();
 	const [search, setSearch] = useState("");
 	const [when, setWhen] = useState<When>("upcoming");
+	const debouncedSearch = useDebounced(search.trim());
 
-	const query = usePublicEvents({ search: search.trim(), when });
-	const events = query.data?.items ?? [];
+	const filters = {
+		when,
+		...(debouncedSearch ? { search: debouncedSearch } : {}),
+	};
+	const { query, items, loadMore } = usePagedQuery({
+		queryKey: queryKeys.publicEvents({ ...filters, limit: PAGE_SIZE }),
+		fetchPage: (page) =>
+			eventsApi.listPublic({ ...filters, page, limit: PAGE_SIZE }),
+	});
 
 	return (
 		<View style={{ flex: 1, paddingTop: contentPaddingTop }}>
 			{header}
 
 			<View
+				{...focusWithin}
 				style={{
 					flexDirection: "row",
 					alignItems: "center",
 					gap: spacing[2],
-					backgroundColor: colors.background.tertiary,
-					borderRadius: 12,
+					backgroundColor: colors.background.subtle,
+					borderRadius: borderRadius.lg,
 					paddingHorizontal: spacing[3.5],
-					marginBottom: spacing[4],
+					marginBottom: spacing[3],
 				}}
 			>
 				<Search size={18} color={colors.text.quaternary as string} />
 				<Input
-					placeholder="Search events, causes or NGOs"
+					placeholder="Search events or NGOs"
 					value={search}
 					onChangeText={setSearch}
 					autoCapitalize="none"
+					autoCorrect={false}
+					returnKeyType="search"
+					accessibilityLabel="Search events"
 					style={{
 						flex: 1,
 						backgroundColor: "transparent",
 						borderWidth: 0,
 						paddingHorizontal: 0,
-						paddingVertical: spacing[3.5],
+						paddingVertical: spacing[3],
 					}}
 				/>
 			</View>
 
 			<FilterChips options={WHEN_FILTERS} value={when} onChange={setWhen} />
 
-			{query.isLoading ? (
-				<LoadingState label="Finding events…" />
-			) : query.isError ? (
-				<ErrorState
-					message={apiErrorMessage(query.error)}
-					onRetry={() => query.refetch()}
-				/>
-			) : events.length === 0 ? (
-				<EmptyState
-					icon={CalendarDays}
-					title={search ? "No matching events" : "No events yet"}
-					description={
-						search
-							? "Try a different search term or widen the date range."
-							: "Verified NGOs will post volunteering events here soon."
-					}
-				/>
-			) : isDesktop ? (
-				<DesktopEventGrid
-					events={events}
-					onPress={(event) => router.push(`/events/${event.id}`)}
-				/>
-			) : (
-				<FlatList
-					data={events}
-					keyExtractor={(item) => item.id}
-					showsVerticalScrollIndicator={false}
-					contentContainerStyle={{ paddingBottom: spacing[10] }}
-					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
-					refreshControl={
-						<RefreshControl
-							refreshing={query.isRefetching}
-							onRefresh={() => query.refetch()}
-							tintColor={colors.primary.main as string}
-						/>
-					}
-					renderItem={({ item }) => (
-						<EventCard
-							event={item}
-							onPress={() => router.push(`/events/${item.id}`)}
-						/>
-					)}
-				/>
-			)}
+			<PagedList
+				query={query}
+				items={items}
+				loadMore={loadMore}
+				loadingLabel="Finding events"
+				keyExtractor={(item) => item.id}
+				numColumns={isDesktop ? 3 : 1}
+				empty={
+					<EmptyState
+						icon={CalendarDays}
+						title={
+							debouncedSearch
+								? "No events match"
+								: when === "past"
+									? "No past events"
+									: "No events yet"
+						}
+						description={
+							debouncedSearch
+								? "Try another word, or clear the search to see everything."
+								: when === "upcoming"
+									? "When a verified NGO publishes an event, it appears here."
+									: "Finished events will show up here."
+						}
+						action={
+							debouncedSearch ? (
+								<Button
+									size="sm"
+									variant="outline"
+									onPress={() => setSearch("")}
+								>
+									Clear search
+								</Button>
+							) : when !== "all" ? (
+								<Button
+									size="sm"
+									variant="outline"
+									onPress={() => setWhen("all")}
+								>
+									Show all events
+								</Button>
+							) : undefined
+						}
+					/>
+				}
+				renderItem={(item) => (
+					<EventCard
+						event={item}
+						onPress={() => router.push(`/events/${item.id}`)}
+					/>
+				)}
+			/>
 		</View>
 	);
 }
 
-function DesktopEventGrid({
-	events,
-	onPress,
-}: {
-	events: PublicEvent[];
-	onPress: (event: PublicEvent) => void;
-}) {
-	const { spacing } = useTheme();
-
-	return (
-		<ScrollView
-			showsVerticalScrollIndicator={false}
-			contentContainerStyle={{ paddingBottom: spacing[10] }}
-		>
-			<View
-				style={{
-					flexDirection: "row",
-					flexWrap: "wrap",
-					marginHorizontal: -spacing[2],
-				}}
-			>
-				{events.map((event) => (
-					<View
-						key={event.id}
-						style={{
-							width: "33.333%",
-							paddingHorizontal: spacing[2],
-							marginBottom: spacing[4],
-						}}
-					>
-						<EventCard event={event} onPress={() => onPress(event)} />
-					</View>
-				))}
-			</View>
-		</ScrollView>
-	);
-}
-
+/**
+ * One event. Who is running it, what it is, when and where, and how many
+ * places are left — the number a volunteer is actually deciding on.
+ */
 export function EventCard({
 	event,
 	onPress,
@@ -179,146 +158,95 @@ export function EventCard({
 	event: PublicEvent;
 	onPress: () => void;
 }) {
-	const { colors, spacing, borderRadius } = useTheme();
-	const isWeb = Platform.OS === "web";
+	const { colors, spacing } = useTheme();
 	const remaining = Math.max(event.volunteersNeeded - event.acceptedCount, 0);
 	const orgInitial =
 		event.organization.organizationName?.charAt(0).toUpperCase() ?? "E";
+	const place = event.city ?? "Online";
 
 	return (
-		<Pressable
-			onPress={onPress}
-			style={({ pressed, hovered }) => ({
-				backgroundColor: colors.background.primary,
-				borderRadius: borderRadius.lg,
-				borderWidth: 1,
-				borderColor: pressed ? colors.primary.main : colors.border.light,
-				overflow: "hidden",
-				...(isWeb && {
-					transition: "box-shadow 0.2s, border-color 0.15s",
-					boxShadow: hovered
-						? "0 4px 12px rgba(0,0,0,0.08)"
-						: "0 1px 3px rgba(0,0,0,0.04)",
-					cursor: "pointer",
-				}),
-			})}
-		>
-			<View style={{ padding: spacing[4] }}>
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						gap: spacing[2.5],
-						marginBottom: spacing[3],
-					}}
-				>
-					<View
-						style={{
-							width: 36,
-							height: 36,
-							borderRadius: 10,
-							backgroundColor: `${colors.primary.main}12`,
-							alignItems: "center",
-							justifyContent: "center",
-						}}
-					>
-						<Caption
-							weight="bold"
-							style={{
-								fontSize: 15,
-								color: colors.primary.main as string,
-							}}
-						>
-							{orgInitial}
-						</Caption>
-					</View>
-					<View style={{ flex: 1 }}>
-						<Body weight="semibold" numberOfLines={1}>
-							{event.organization.organizationName}
-						</Body>
-						<Caption color="tertiary" numberOfLines={1}>
-							{event.city ?? "Online"}
-						</Caption>
-					</View>
-				</View>
-
-				<Body
-					weight="bold"
-					numberOfLines={2}
-					style={{ fontSize: 16, marginBottom: spacing[1] }}
-				>
-					{event.title}
-				</Body>
-				<Caption
-					color="tertiary"
-					numberOfLines={isWeb ? 2 : 3}
-					style={{ lineHeight: 19 }}
-				>
-					{event.description}
-				</Caption>
-
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						gap: spacing[3],
-						marginTop: spacing[3],
-					}}
-				>
-					<View
-						style={{
-							flexDirection: "row",
-							alignItems: "center",
-							gap: spacing[1.5],
-						}}
-					>
-						<CalendarDays size={12} color={colors.text.quaternary as string} />
-						<Caption color="quaternary" style={{ fontSize: 10.5 }}>
-							{formatDateRange(event.startAt, event.endAt)}
-						</Caption>
-					</View>
-					{event.city && (
-						<View
-							style={{
-								flexDirection: "row",
-								alignItems: "center",
-								gap: spacing[1.5],
-							}}
-						>
-							<MapPin size={12} color={colors.text.quaternary as string} />
-							<Caption color="quaternary" style={{ fontSize: 10.5 }}>
-								{event.city}
-							</Caption>
-						</View>
-					)}
-				</View>
-			</View>
-
+		<Surface onPress={onPress}>
 			<View
 				style={{
 					flexDirection: "row",
 					alignItems: "center",
-					justifyContent: "space-between",
-					paddingVertical: spacing[2.5],
-					paddingHorizontal: spacing[4],
-					borderTopWidth: 1,
-					borderTopColor: colors.border.light,
+					gap: spacing[2.5],
+					marginBottom: spacing[3],
 				}}
 			>
-				<Caption
-					weight="semibold"
+				<View
 					style={{
-						fontSize: 12,
-						color:
-							remaining > 0
-								? (colors.success.main as string)
-								: (colors.text.tertiary as string),
+						width: 32,
+						height: 32,
+						borderRadius: 16,
+						backgroundColor: colors.primary.tint,
+						alignItems: "center",
+						justifyContent: "center",
 					}}
 				>
-					{remaining > 0 ? `${remaining} volunteer spots` : "Event full"}
+					<Caption weight="bold" color={colors.primary.ink}>
+						{orgInitial}
+					</Caption>
+				</View>
+				<Caption color="secondary" numberOfLines={1} style={{ flex: 1 }}>
+					{event.organization.organizationName}
 				</Caption>
-				<ChevronRight size={14} color={colors.text.quaternary as string} />
 			</View>
-		</Pressable>
+
+			<H5 numberOfLines={2}>{event.title}</H5>
+			<Caption
+				color="tertiary"
+				numberOfLines={2}
+				style={{ marginTop: spacing[1] }}
+			>
+				{event.description}
+			</Caption>
+
+			<View style={{ gap: spacing[1.5], marginTop: spacing[3] }}>
+				<Fact
+					icon={CalendarDays}
+					text={formatDateRange(event.startAt, event.endAt)}
+				/>
+				<Fact icon={MapPin} text={place} />
+				<Fact
+					icon={Users}
+					text={
+						remaining > 0 ? `${remaining} places left` : "All places filled"
+					}
+					tone={remaining > 0 ? "default" : "muted"}
+				/>
+			</View>
+		</Surface>
+	);
+}
+
+function Fact({
+	icon: Icon,
+	text,
+	tone = "default",
+}: {
+	icon: typeof CalendarDays;
+	text: string;
+	tone?: "default" | "muted";
+}) {
+	const { colors, spacing } = useTheme();
+	return (
+		<View
+			style={{ flexDirection: "row", alignItems: "center", gap: spacing[2] }}
+		>
+			<Icon
+				size={14}
+				color={colors.text.quaternary as string}
+				strokeWidth={1.9}
+			/>
+			<Label
+				weight={tone === "muted" ? "normal" : "medium"}
+				color={tone === "muted" ? "quaternary" : "secondary"}
+				numberOfLines={1}
+				style={{ flex: 1 }}
+			>
+				{text}
+			</Label>
+		</View>
 	);
 }

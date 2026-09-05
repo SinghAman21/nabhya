@@ -16,6 +16,8 @@ import { focusable } from "@/lib/focus";
 import { formatRelative } from "@/lib/format";
 import { useAuthStore } from "@/store/auth-store";
 
+type PressState = { pressed: boolean; focused?: boolean; hovered?: boolean };
+
 /**
  * Inbox entry point with an unread badge.
  *
@@ -24,6 +26,10 @@ import { useAuthStore } from "@/store/auth-store";
  * navigating a 1400px window away from what you were reading to show a column
  * of twelve rows is a mobile pattern wearing a desktop layout, and a sheet is
  * worse still: it dims the whole page to show a glance-sized list.
+ *
+ * The badge is ink on the brand tint, not white on orange: the count is text,
+ * and `primary.main` is a fill that fails contrast the moment anything is
+ * written on it.
  */
 export function NotificationBell() {
 	const { colors, borderRadius, elevation, isDark } = useTheme();
@@ -47,16 +53,13 @@ export function NotificationBell() {
 			onPress={() =>
 				isDesktop ? setOpen((o) => !o) : router.push("/notifications")
 			}
-			hitSlop={10}
+			hitSlop={6}
 			accessibilityRole="button"
 			accessibilityLabel={label}
 			{...(isDesktop ? { accessibilityState: { expanded: open } } : {})}
 			{...focusable}
 			style={(state) => {
-				const { pressed, hovered } = state as {
-					pressed: boolean;
-					hovered?: boolean;
-				};
+				const { pressed, hovered } = state as PressState;
 				return {
 					width: 40,
 					height: 40,
@@ -78,24 +81,24 @@ export function NotificationBell() {
 
 			{unread > 0 && (
 				<View
+					accessibilityElementsHidden
+					importantForAccessibility="no-hide-descendants"
 					style={{
 						position: "absolute",
-						top: 5,
-						right: 3,
-						minWidth: 17,
-						height: 17,
+						top: 2,
+						right: 0,
+						minWidth: 18,
+						height: 18,
 						borderRadius: 9,
 						paddingHorizontal: 4,
 						alignItems: "center",
 						justifyContent: "center",
-						backgroundColor: colors.primary.main,
+						backgroundColor: colors.primary.tint,
+						borderWidth: 2,
+						borderColor: colors.background.card,
 					}}
 				>
-					<Caption
-						weight="bold"
-						color={colors.primary.contrast as string}
-						style={{ fontSize: 10, lineHeight: 13 }}
-					>
+					<Caption weight="bold" color={colors.primary.ink}>
 						{unread > 9 ? "9+" : unread}
 					</Caption>
 				</View>
@@ -112,6 +115,7 @@ export function NotificationBell() {
 			{/* Click-away. Sits behind the panel and covers the window. */}
 			<Pressable
 				onPress={() => setOpen(false)}
+				accessibilityRole="button"
 				accessibilityLabel="Close notifications"
 				style={{
 					position: "absolute",
@@ -124,6 +128,7 @@ export function NotificationBell() {
 			/>
 
 			<View
+				accessibilityRole="menu"
 				style={{
 					position: "absolute",
 					top: 46,
@@ -166,18 +171,34 @@ function NotificationPanel({ onSeeAll }: { onSeeAll: () => void }) {
 					alignItems: "center",
 					justifyContent: "space-between",
 					paddingHorizontal: spacing[4],
-					paddingVertical: spacing[3],
+					paddingVertical: spacing[2],
+					minHeight: 48,
 					borderBottomWidth: 1,
 					borderBottomColor: colors.border.hairline,
 				}}
 			>
-				<Label weight="semibold">Notifications</Label>
+				<Label weight="semibold" accessibilityRole="header">
+					Notifications
+				</Label>
 				{anyUnread && (
 					<Pressable
 						onPress={() => markRead.mutate({})}
+						disabled={markRead.isPending}
 						accessibilityRole="button"
+						accessibilityLabel="Mark all notifications read"
+						accessibilityState={{ disabled: markRead.isPending }}
 						hitSlop={6}
 						{...focusable}
+						style={({ pressed }) => ({
+							minHeight: 32,
+							justifyContent: "center",
+							paddingHorizontal: spacing[2],
+							borderRadius: 8,
+							opacity: markRead.isPending ? 0.5 : 1,
+							backgroundColor: pressed
+								? colors.background.subtle
+								: "transparent",
+						})}
 					>
 						<Caption weight="medium" color={colors.primary.ink}>
 							Mark all read
@@ -188,6 +209,12 @@ function NotificationPanel({ onSeeAll }: { onSeeAll: () => void }) {
 
 			{query.isLoading ? (
 				<LoadingState />
+			) : query.isError ? (
+				<EmptyState
+					icon={Bell}
+					title="Couldn't load notifications"
+					description="Check your connection and try again."
+				/>
 			) : items.length === 0 ? (
 				<EmptyState icon={Bell} title="Nothing yet" />
 			) : (
@@ -209,11 +236,12 @@ function NotificationPanel({ onSeeAll }: { onSeeAll: () => void }) {
 								value={
 									item.readAt ? null : (
 										<View
+											accessibilityLabel="Unread"
 											style={{
 												width: 7,
 												height: 7,
 												borderRadius: 4,
-												backgroundColor: colors.primary.main,
+												backgroundColor: colors.text.primary,
 											}}
 										/>
 									)
@@ -226,16 +254,15 @@ function NotificationPanel({ onSeeAll }: { onSeeAll: () => void }) {
 
 			<Pressable
 				onPress={onSeeAll}
-				accessibilityRole="button"
+				accessibilityRole="link"
+				accessibilityLabel="See all notifications"
 				{...focusable}
 				style={(state) => {
-					const { pressed, hovered } = state as {
-						pressed: boolean;
-						hovered?: boolean;
-					};
+					const { pressed, hovered } = state as PressState;
 					return {
 						alignItems: "center",
-						paddingVertical: spacing[3],
+						justifyContent: "center",
+						minHeight: 44,
 						borderTopWidth: 1,
 						borderTopColor: colors.border.hairline,
 						backgroundColor:

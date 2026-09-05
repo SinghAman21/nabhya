@@ -2,30 +2,41 @@ import { ORG_DOCUMENT_LABELS } from "@nabhya/shared";
 import { useState } from "react";
 import { View } from "react-native";
 import { DocumentReviewRow } from "@/components/admin/document-review-row";
-import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
+import { FactGroup, ReasonField } from "@/components/admin/sheet-parts";
 import {
+	Banner,
+	ErrorState,
+	LoadingState,
+	SectionTitle,
+	Surface,
+} from "@/components/screen-shell";
+import {
+	eventStatusTone,
 	humanizeStatus,
 	StatusPill,
 	verificationTone,
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Sheet } from "@/components/ui/sheet";
-import { Caption, Label } from "@/components/ui/typography";
+import { Body, Caption } from "@/components/ui/typography";
 import {
 	useAdminOrganization,
 	useReviewOrganization,
 	useSetOrganizationStatus,
 } from "@/hooks/use-admin";
-import { useOpenDocument } from "@/hooks/use-documents";
 import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 
 /**
- * Full NGO dossier with the moderation actions attached — documents, activity
- * counts and recent events, so a decision can be made without leaving here.
+ * Full NGO dossier with the moderation actions attached.
+ *
+ * Read top to bottom the way a reviewer works: state, then the facts they
+ * check against the documents, then the documents themselves, then the
+ * decision — always in the same order (approve, under review, reject,
+ * suspend) so the hand learns where each button is. The reason box sits
+ * directly above the buttons that need it, and complains there, inline.
  */
 export function OrgDetailSheet({
 	organizationId,
@@ -34,12 +45,12 @@ export function OrgDetailSheet({
 	organizationId: string | null;
 	onClose: () => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const [reason, setReason] = useState("");
+	const [reasonError, setReasonError] = useState<string | null>(null);
 
 	const query = useAdminOrganization(organizationId ?? undefined);
 	const review = useReviewOrganization();
-	const _openDocument = useOpenDocument();
 	const setStatus = useSetOrganizationStatus();
 
 	const org = query.data;
@@ -47,24 +58,31 @@ export function OrgDetailSheet({
 
 	const close = () => {
 		setReason("");
+		setReasonError(null);
 		onClose();
+	};
+
+	const changeReason = (text: string) => {
+		setReason(text);
+		if (reasonError && text.trim()) setReasonError(null);
 	};
 
 	const decide = (
 		verificationStatus: "UNDER_REVIEW" | "VERIFIED" | "REJECTED",
 	) => {
 		if (!organizationId) return;
-		if (verificationStatus === "REJECTED" && !reason.trim()) {
-			Alert.alert(
-				"Reason required",
-				"Tell the organization why they were rejected so they can fix it.",
+		const text = reason.trim();
+		if (verificationStatus === "REJECTED" && !text) {
+			setReasonError(
+				"Tell the organization what is missing or wrong so they can fix it.",
 			);
 			return;
 		}
+		setReasonError(null);
 		review.mutate(
 			{
 				id: organizationId,
-				input: { verificationStatus, reason: reason.trim() || undefined },
+				input: { verificationStatus, reason: text || undefined },
 			},
 			{
 				onSuccess: () => setReason(""),
@@ -77,17 +95,16 @@ export function OrgDetailSheet({
 	const toggleSuspension = () => {
 		if (!organizationId || !org) return;
 		const suspending = org.status !== "SUSPENDED";
+		const text = reason.trim();
 
-		if (suspending && !reason.trim()) {
-			Alert.alert(
-				"Reason required",
-				"Add a reason before suspending this organization.",
-			);
+		if (suspending && !text) {
+			setReasonError("Add a reason before suspending this organization.");
 			return;
 		}
+		setReasonError(null);
 
 		Alert.alert(
-			suspending ? "Suspend organization" : "Reinstate organization",
+			suspending ? "Suspend organization?" : "Reinstate organization?",
 			suspending
 				? "Their published events will be cancelled and open needs closed."
 				: "They will be able to publish again.",
@@ -102,7 +119,7 @@ export function OrgDetailSheet({
 								id: organizationId,
 								input: {
 									status: suspending ? "SUSPENDED" : "ACTIVE",
-									reason: reason.trim() || undefined,
+									reason: text || undefined,
 								},
 							},
 							{
@@ -116,12 +133,18 @@ export function OrgDetailSheet({
 		);
 	};
 
+	const suspended = org?.status === "SUSPENDED";
+
 	return (
 		<Sheet
 			visible={!!organizationId}
 			onClose={close}
 			title={org?.organizationName ?? "Organization"}
-			subtitle={org?.registrationNumber ?? undefined}
+			subtitle={
+				org?.registrationNumber
+					? `Reg. ${org.registrationNumber}`
+					: (org?.email ?? undefined)
+			}
 		>
 			{query.isLoading ? (
 				<LoadingState />
@@ -135,6 +158,7 @@ export function OrgDetailSheet({
 					<View
 						style={{
 							flexDirection: "row",
+							flexWrap: "wrap",
 							gap: spacing[2],
 							marginBottom: spacing[5],
 						}}
@@ -143,214 +167,226 @@ export function OrgDetailSheet({
 							label={humanizeStatus(org.verificationStatus)}
 							tone={verificationTone(org.verificationStatus)}
 						/>
-						{org.status === "SUSPENDED" && (
-							<StatusPill label="Suspended" tone="error" />
-						)}
+						{suspended && <StatusPill label="Suspended" tone="error" />}
 					</View>
 
 					{org.rejectionReason && (
-						<Surface
-							style={{
-								marginBottom: spacing[5],
-								backgroundColor: colors.error.bg,
-								borderColor: colors.error.border,
-							}}
-						>
-							<Caption weight="bold" color={colors.error.main as string}>
-								Rejection reason
-							</Caption>
-							<Caption color="secondary">{org.rejectionReason}</Caption>
-						</Surface>
+						<View style={{ marginBottom: spacing[5] }}>
+							<Banner
+								tone="error"
+								title="Rejected"
+								description={org.rejectionReason}
+							/>
+						</View>
 					)}
 
-					<SectionTitle>Details</SectionTitle>
-					<Surface style={{ marginBottom: spacing[5] }}>
-						<InfoRow label="Type" value={humanizeStatus(org.orgType)} />
-						<InfoRow label="Registration" value={org.registrationNumber} />
-						<InfoRow label="Email" value={org.email} />
-						<InfoRow label="Phone" value={org.phone} />
-						<InfoRow
-							label="Location"
-							value={[org.city, org.state, org.pincode]
-								.filter(Boolean)
-								.join(", ")}
+					<Section title="Organization">
+						<FactGroup
+							facts={[
+								{ label: "Type", value: humanizeStatus(org.orgType) },
+								{ label: "Registration", value: org.registrationNumber },
+								{ label: "Email", value: org.email },
+								{ label: "Phone", value: org.phone },
+								{ label: "Website", value: org.website },
+								{
+									label: "Location",
+									value: [org.address, org.city, org.state, org.pincode]
+										.filter(Boolean)
+										.join(", "),
+								},
+								{
+									label: "Team size",
+									value: org.teamSize ? String(org.teamSize) : null,
+								},
+								{
+									label: "Founded",
+									value: org.foundingYear ? String(org.foundingYear) : null,
+								},
+								{ label: "Registered", value: formatDate(org.createdAt) },
+							]}
 						/>
-						<InfoRow
-							label="Team size"
-							value={org.teamSize ? String(org.teamSize) : null}
-						/>
-						<InfoRow
-							label="Founded"
-							value={org.foundingYear ? String(org.foundingYear) : null}
-						/>
-						<InfoRow
-							label="Registered"
-							value={formatDate(org.createdAt)}
-							last
-						/>
-					</Surface>
+					</Section>
 
-					<SectionTitle>Owner</SectionTitle>
-					<Surface style={{ marginBottom: spacing[5] }}>
-						<InfoRow label="Name" value={org.owner.fullName} />
-						<InfoRow label="Email" value={org.owner.email} />
-						<InfoRow label="Phone" value={org.owner.phone} />
-						<InfoRow
-							label="ID status"
-							value={humanizeStatus(org.owner.verificationStatus)}
-							last
-						/>
-					</Surface>
+					{(org.description || org.mission) && (
+						<Section title="About">
+							<Surface>
+								{org.description && (
+									<Body color="secondary">{org.description}</Body>
+								)}
+								{org.mission && (
+									<Caption
+										color="tertiary"
+										style={{ marginTop: org.description ? spacing[2] : 0 }}
+									>
+										Mission: {org.mission}
+									</Caption>
+								)}
+							</Surface>
+						</Section>
+					)}
 
-					<SectionTitle>Activity</SectionTitle>
-					<Surface style={{ marginBottom: spacing[5] }}>
-						<InfoRow
-							label="Events"
-							value={`${org.stats.events.total} total · ${org.stats.events.published} published`}
+					<Section title="Owner">
+						<FactGroup
+							facts={[
+								{ label: "Name", value: org.owner.fullName },
+								{ label: "Email", value: org.owner.email },
+								{ label: "Phone", value: org.owner.phone },
+								{
+									label: "ID status",
+									value: humanizeStatus(org.owner.verificationStatus),
+								},
+							]}
 						/>
-						<InfoRow
-							label="Needs"
-							value={`${org.stats.needs.total} total · ${org.stats.needs.open} open`}
-							last
-						/>
-					</Surface>
+					</Section>
 
-					<SectionTitle>Documents ({org.documents.length})</SectionTitle>
-					<View style={{ gap: spacing[2], marginBottom: spacing[5] }}>
-						{org.documents.length === 0 && (
+					<Section title="Activity">
+						<FactGroup
+							facts={[
+								{
+									label: "Events",
+									value: `${org.stats.events.total} total · ${org.stats.events.published} published`,
+								},
+								{
+									label: "Needs",
+									value: `${org.stats.needs.total} total · ${org.stats.needs.open} open`,
+								},
+							]}
+						/>
+						{org.recentEvents.length > 0 && (
+							<View style={{ gap: spacing[2], marginTop: spacing[2] }}>
+								{org.recentEvents.slice(0, 3).map((event) => (
+									<Surface key={event.id}>
+										<View
+											style={{
+												flexDirection: "row",
+												alignItems: "center",
+												gap: spacing[2],
+											}}
+										>
+											<Body
+												weight="medium"
+												style={{ flex: 1 }}
+												numberOfLines={1}
+											>
+												{event.title}
+											</Body>
+											<StatusPill
+												label={humanizeStatus(event.status)}
+												tone={eventStatusTone(event.status)}
+											/>
+										</View>
+										<Caption color="tertiary" style={{ marginTop: spacing[1] }}>
+											{formatDate(event.startAt)} · {event.acceptedCount} of{" "}
+											{event.volunteersNeeded} volunteers
+										</Caption>
+									</Surface>
+								))}
+							</View>
+						)}
+					</Section>
+
+					<Section
+						title={`Documents${org.documents.length ? ` (${org.documents.length})` : ""}`}
+					>
+						{org.documents.length === 0 ? (
 							<Surface>
 								<Caption color="tertiary">
-									No documents uploaded yet — the NGO must submit these before
-									it can be verified.
+									Nothing uploaded yet. The NGO must submit its registration
+									documents before it can be verified.
 								</Caption>
 							</Surface>
+						) : (
+							<View style={{ gap: spacing[2] }}>
+								{org.documents.map((document) => (
+									<DocumentReviewRow
+										key={document.id}
+										document={document}
+										kind="organization"
+										label={
+											ORG_DOCUMENT_LABELS[document.documentType] ??
+											humanizeStatus(document.documentType)
+										}
+									/>
+								))}
+							</View>
 						)}
-						{org.documents.map((document) => (
-							<DocumentReviewRow
-								key={document.id}
-								document={document}
-								kind="organization"
-								label={
-									ORG_DOCUMENT_LABELS[document.documentType] ??
-									humanizeStatus(document.documentType)
-								}
-							/>
-						))}
-					</View>
+					</Section>
 
 					<SectionTitle>Decision</SectionTitle>
-					<Label style={{ marginBottom: spacing[1.5] }}>
-						Reason{" "}
-						<Caption color="tertiary">(required to reject or suspend)</Caption>
-					</Label>
-					<Input
-						placeholder="Explain what's missing or wrong"
+					<ReasonField
 						value={reason}
-						onChangeText={setReason}
-						multiline
-						style={{
-							borderWidth: 0,
-							borderRadius: 12,
-							backgroundColor: colors.background.tertiary,
-							paddingVertical: spacing[3.5],
-							minHeight: 88,
-							textAlignVertical: "top",
-							marginBottom: spacing[4],
-						}}
+						onChangeText={changeReason}
+						placeholder="Explain what's missing or wrong"
+						requiredFor="reject or suspend"
+						error={reasonError}
 					/>
 
-					{org.verificationStatus !== "VERIFIED" && (
+					<View style={{ gap: spacing[2], paddingBottom: spacing[2] }}>
+						{org.verificationStatus !== "VERIFIED" && (
+							<Button
+								onPress={() => decide("VERIFIED")}
+								disabled={busy}
+								loading={
+									review.isPending &&
+									review.variables?.input.verificationStatus === "VERIFIED"
+								}
+							>
+								Approve organization
+							</Button>
+						)}
+						{org.verificationStatus === "PENDING" && (
+							<Button
+								variant="outline"
+								onPress={() => decide("UNDER_REVIEW")}
+								disabled={busy}
+								loading={
+									review.isPending &&
+									review.variables?.input.verificationStatus === "UNDER_REVIEW"
+								}
+							>
+								Mark under review
+							</Button>
+						)}
+						{org.verificationStatus !== "REJECTED" && (
+							<Button
+								variant="outline"
+								onPress={() => decide("REJECTED")}
+								disabled={busy}
+								loading={
+									review.isPending &&
+									review.variables?.input.verificationStatus === "REJECTED"
+								}
+							>
+								Reject
+							</Button>
+						)}
 						<Button
-							onPress={() => decide("VERIFIED")}
+							variant={suspended ? "outline" : "destructive"}
+							onPress={toggleSuspension}
 							disabled={busy}
-							style={{ marginBottom: spacing[2] }}
+							loading={setStatus.isPending}
 						>
-							Approve organization
+							{suspended ? "Reinstate organization" : "Suspend organization"}
 						</Button>
-					)}
-					{org.verificationStatus === "PENDING" && (
-						<Button
-							variant="outline"
-							onPress={() => decide("UNDER_REVIEW")}
-							disabled={busy}
-							style={{ marginBottom: spacing[2] }}
-						>
-							Mark under review
-						</Button>
-					)}
-					{org.verificationStatus !== "REJECTED" && (
-						<Button
-							variant="outline"
-							onPress={() => decide("REJECTED")}
-							disabled={busy}
-							style={{ marginBottom: spacing[2] }}
-						>
-							Reject
-						</Button>
-					)}
-					<Button
-						variant={org.status === "SUSPENDED" ? "outline" : "destructive"}
-						onPress={toggleSuspension}
-						disabled={busy}
-					>
-						{org.status === "SUSPENDED"
-							? "Reinstate organization"
-							: "Suspend organization"}
-					</Button>
+					</View>
 				</>
 			)}
 		</Sheet>
 	);
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function Section({
+	title,
+	children,
+}: {
+	title: string;
+	children: React.ReactNode;
+}) {
 	const { spacing } = useTheme();
 	return (
-		<Caption
-			weight="bold"
-			color="tertiary"
-			style={{
-				letterSpacing: 1,
-				textTransform: "uppercase",
-				marginBottom: spacing[2],
-			}}
-		>
+		<View style={{ marginBottom: spacing[5] }}>
+			<SectionTitle>{title}</SectionTitle>
 			{children}
-		</Caption>
-	);
-}
-
-function InfoRow({
-	label,
-	value,
-	last,
-}: {
-	label: string;
-	value?: string | null;
-	last?: boolean;
-}) {
-	const { colors, spacing } = useTheme();
-
-	return (
-		<View
-			style={{
-				flexDirection: "row",
-				justifyContent: "space-between",
-				gap: spacing[4],
-				paddingBottom: last ? 0 : spacing[2],
-				marginBottom: last ? 0 : spacing[2],
-				borderBottomWidth: last ? 0 : 1,
-				borderBottomColor: colors.border.light,
-			}}
-		>
-			<Caption color="tertiary">{label}</Caption>
-			<Caption
-				weight="medium"
-				color={value ? "primary" : "quaternary"}
-				style={{ flex: 1, textAlign: "right" }}
-			>
-				{value || "—"}
-			</Caption>
 		</View>
 	);
 }

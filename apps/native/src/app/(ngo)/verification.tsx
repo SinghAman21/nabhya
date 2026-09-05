@@ -1,110 +1,119 @@
 import type { UploadOrgDocumentInput } from "@nabhya/shared";
 import { ORG_DOCUMENT_LABELS } from "@nabhya/shared";
-import { ShieldCheck } from "lucide-react-native";
 import { RefreshControl, ScrollView, View } from "react-native";
 import { DocumentUploadTile } from "@/components/document-upload-tile";
 import {
+	Banner,
 	ErrorState,
 	LoadingState,
 	Screen,
 	ScreenHeader,
-	Surface,
+	SectionTitle,
 } from "@/components/screen-shell";
-import { Body, Caption } from "@/components/ui/typography";
+import { StepIndicator } from "@/components/step-indicator";
+import { Caption } from "@/components/ui/typography";
 import { useMyOrgDocuments, useUploadOrgDocument } from "@/hooks/use-documents";
+import { useMyOrganization } from "@/hooks/use-organization";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 
-const REQUIRED_DOCS: UploadOrgDocumentInput["documentType"][] = [
-	"NGO_REGISTRATION_CERTIFICATE",
-	"PAN_CARD",
-	"80G_CERTIFICATE",
-	"12A_CERTIFICATE",
+type DocType = UploadOrgDocumentInput["documentType"];
+
+const REQUIRED: Array<{ type: DocType; hint: string }> = [
+	{
+		type: "NGO_REGISTRATION_CERTIFICATE",
+		hint: "Trust deed, society registration or Section 8 incorporation certificate.",
+	},
+	{
+		type: "PAN_CARD",
+		hint: "The organisation's PAN card, not a trustee's.",
+	},
 ];
 
-const DOC_HINTS: Record<string, string> = {
-	NGO_REGISTRATION_CERTIFICATE:
-		"Official registration document from the relevant authority",
-	PAN_CARD: "Organization PAN card",
-	"80G_CERTIFICATE": "80G tax exemption certificate (if applicable)",
-	"12A_CERTIFICATE": "12A trust registration certificate (if applicable)",
-};
+const OPTIONAL: Array<{ type: DocType; hint: string }> = [
+	{
+		type: "80G_CERTIFICATE",
+		hint: "Lets donors claim tax relief. Shown as a badge on your profile.",
+	},
+	{
+		type: "12A_CERTIFICATE",
+		hint: "Income-tax registration for the trust. Speeds up review.",
+	},
+];
 
+const STEPS = ["Documents", "Review", "Verified"];
+
+/**
+ * Verification, as a three-step journey the NGO can see itself on: upload the
+ * required documents, wait for review, become verified. The step indicator is
+ * derived from the organisation's status and the document set, so it moves on
+ * its own as the reviewer works.
+ */
 export default function NgoVerification() {
 	const { colors, spacing } = useTheme();
 
+	const org = useMyOrganization();
 	const documents = useMyOrgDocuments();
 	const upload = useUploadOrgDocument();
 
 	const byType = new Map(
 		(documents.data ?? []).map((doc) => [doc.documentType, doc]),
 	);
-	const uploadedCount = REQUIRED_DOCS.filter((d) => byType.has(d)).length;
-	const allDone = uploadedCount === REQUIRED_DOCS.length;
+	const requiredUploaded = REQUIRED.filter((d) => byType.has(d.type)).length;
+	const allRequired = requiredUploaded === REQUIRED.length;
+	const rejected = (documents.data ?? []).filter(
+		(doc) => doc.verificationStatus === "REJECTED",
+	);
 
-	const handleUploaded = (documentType: string, key: string) => {
-		upload.mutate({
-			documentType: documentType as UploadOrgDocumentInput["documentType"],
-			documentKey: key,
-		});
+	const status = org.data?.verificationStatus;
+	const isVerified = status === "VERIFIED";
+	const currentStep = isVerified ? 2 : allRequired ? 1 : 0;
+
+	const handleUploaded = (documentType: DocType, key: string) => {
+		upload.mutate({ documentType, documentKey: key });
 	};
+
+	const banner = isVerified ? (
+		<Banner
+			tone="success"
+			title="Your NGO is verified"
+			description="Events, needs and updates are public. Keep documents current if a reviewer asks for a newer copy."
+		/>
+	) : status === "REJECTED" || rejected.length > 0 ? (
+		<Banner
+			tone="error"
+			title="Verification needs another look"
+			description={
+				org.data?.rejectionReason ??
+				"A reviewer left notes on the documents below. Upload a corrected copy of each to reopen review."
+			}
+		/>
+	) : allRequired ? (
+		<Banner
+			tone="info"
+			title="Under review"
+			description="A reviewer is checking your documents — usually a few days. You'll be notified either way. Adding the optional documents below can speed things up."
+		/>
+	) : (
+		<Banner
+			tone="warning"
+			title={`${requiredUploaded} of ${REQUIRED.length} required documents uploaded`}
+			description="Review starts as soon as both are in. Until you're verified, events and needs stay private."
+		/>
+	);
+
+	const isSaving = (type: DocType) =>
+		upload.isPending && upload.variables?.documentType === type;
 
 	return (
 		<Screen>
-			<ScreenHeader back title="Verification" />
-			<Caption
-				color="tertiary"
-				style={{ marginTop: -spacing[2], marginBottom: spacing[5] }}
-			>
-				Submit the documents below for verification. NGOs must upload at least
-				their registration certificate and PAN card to be eligible for
-				verification.
-			</Caption>
+			<ScreenHeader
+				back
+				title="Verification"
+				subtitle="Reviewed by the Nabhya team"
+			/>
 
-			{/* ── Progress summary ─────────────────────────────────────── */}
-			<Surface style={{ marginBottom: spacing[5] }}>
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						gap: spacing[3],
-					}}
-				>
-					<View
-						style={{
-							width: 44,
-							height: 44,
-							borderRadius: 12,
-							backgroundColor: allDone
-								? `${colors.success.main}15`
-								: `${colors.primary.main}12`,
-							alignItems: "center",
-							justifyContent: "center",
-						}}
-					>
-						<ShieldCheck
-							size={22}
-							color={
-								(allDone ? colors.success.main : colors.primary.main) as string
-							}
-						/>
-					</View>
-					<View style={{ flex: 1 }}>
-						<Body weight="semibold">
-							{allDone
-								? "All documents submitted"
-								: `${uploadedCount} of ${REQUIRED_DOCS.length} uploaded`}
-						</Body>
-						<Caption color="tertiary">
-							{allDone
-								? "Waiting for superadmin review"
-								: "Some documents are still missing"}
-						</Caption>
-					</View>
-				</View>
-			</Surface>
-
-			{documents.isLoading ? (
+			{documents.isLoading || org.isLoading ? (
 				<LoadingState />
 			) : documents.isError ? (
 				<ErrorState
@@ -117,23 +126,73 @@ export default function NgoVerification() {
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
 					refreshControl={
 						<RefreshControl
-							refreshing={documents.isRefetching}
-							onRefresh={() => documents.refetch()}
-							tintColor={colors.primary.main as string}
+							refreshing={documents.isRefetching || org.isRefetching}
+							onRefresh={() => {
+								documents.refetch();
+								org.refetch();
+							}}
+							tintColor={colors.text.quaternary as string}
 						/>
 					}
 				>
-					{REQUIRED_DOCS.map((docType) => (
-						<DocumentUploadTile
-							key={docType}
-							title={ORG_DOCUMENT_LABELS[docType] ?? docType}
-							hint={DOC_HINTS[docType]}
-							purpose="ORG_DOCUMENT"
-							existing={byType.get(docType)}
-							onUploaded={async (key) => handleUploaded(docType, key)}
-							saving={upload.isPending}
-						/>
-					))}
+					{/* StepIndicator carries its own gutters and top padding; pull it
+					    back into the screen's gutters so it lines up with the cards. */}
+					<View
+						style={{ marginHorizontal: -spacing[6], marginTop: -spacing[6] }}
+					>
+						<StepIndicator steps={STEPS} currentStep={currentStep} />
+					</View>
+
+					<View style={{ marginBottom: spacing[6] }}>{banner}</View>
+
+					{upload.isError && (
+						<View style={{ marginBottom: spacing[5] }}>
+							<Banner
+								tone="error"
+								title="Could not attach the document"
+								description={apiErrorMessage(upload.error)}
+							/>
+						</View>
+					)}
+
+					<SectionTitle>Required</SectionTitle>
+					<View style={{ gap: spacing[3], marginBottom: spacing[6] }}>
+						{REQUIRED.map((doc) => (
+							<DocumentUploadTile
+								key={doc.type}
+								title={ORG_DOCUMENT_LABELS[doc.type] ?? doc.type}
+								hint={doc.hint}
+								purpose="ORG_DOCUMENT"
+								organizationDocumentType={doc.type}
+								existing={byType.get(doc.type)}
+								onUploaded={(key) => handleUploaded(doc.type, key)}
+								saving={isSaving(doc.type)}
+								required
+							/>
+						))}
+					</View>
+
+					<SectionTitle>Optional</SectionTitle>
+					<View style={{ gap: spacing[3] }}>
+						{OPTIONAL.map((doc) => (
+							<DocumentUploadTile
+								key={doc.type}
+								title={ORG_DOCUMENT_LABELS[doc.type] ?? doc.type}
+								hint={doc.hint}
+								purpose="ORG_DOCUMENT"
+								organizationDocumentType={doc.type}
+								existing={byType.get(doc.type)}
+								onUploaded={(key) => handleUploaded(doc.type, key)}
+								saving={isSaving(doc.type)}
+								required={false}
+							/>
+						))}
+					</View>
+
+					<Caption color="quaternary" style={{ marginTop: spacing[6] }}>
+						Documents are private to you and the reviewer. They are never shown
+						on your public profile.
+					</Caption>
 				</ScrollView>
 			)}
 		</Screen>

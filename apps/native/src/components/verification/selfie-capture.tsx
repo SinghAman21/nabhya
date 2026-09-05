@@ -9,9 +9,10 @@ import { useRef, useState } from "react";
 import { View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption } from "@/components/ui/typography";
+import { Caption, H5 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { useImageUpload } from "@/hooks/use-upload";
+import { focusable } from "@/lib/focus";
 
 export interface SelfieCaptureValue {
 	primaryKey: string;
@@ -45,7 +46,7 @@ export function SelfieCapture({
 	onChange: (value: SelfieCaptureValue | null) => void;
 	disabled?: boolean;
 }) {
-	const { colors, spacing, borderRadius, withOpacity } = useTheme();
+	const { colors, spacing, borderRadius } = useTheme();
 	const { uploadImage, isUploading, error } = useImageUpload("USER_DOCUMENT");
 	const [permission, requestPermission] = useCameraPermissions();
 	const cameraRef = useRef<CameraView>(null);
@@ -100,19 +101,37 @@ export function SelfieCapture({
 		}
 	};
 
+	const heading = (
+		<View>
+			<H5>Verification selfie</H5>
+			<Caption color="tertiary" style={{ marginTop: spacing[0.5] }}>
+				Confirms you're a real person. Seen only by reviewers.
+			</Caption>
+		</View>
+	);
+
 	if (!permission) {
-		return <Caption color="tertiary">Checking camera…</Caption>;
+		return (
+			<View style={{ gap: spacing[3] }}>
+				{heading}
+				<Caption color="tertiary">Checking camera…</Caption>
+			</View>
+		);
 	}
 
 	if (!permission.granted) {
 		return (
 			<View style={{ gap: spacing[3] }}>
-				<Body weight="bold">2 · Verification selfie</Body>
-				<Caption color="tertiary">
-					We use your front camera for a quick selfie to confirm you're a real
-					person. The photos are private and seen only by our reviewers.
+				{heading}
+				<Caption color="secondary">
+					We need your front camera for two quick photos: one looking straight
+					ahead, one doing a small action so a reviewer can tell it's live.
 				</Caption>
-				<Button variant="outline" onPress={() => requestPermission()}>
+				<Button
+					variant="outline"
+					onPress={() => requestPermission()}
+					accessibilityLabel="Enable camera for selfie"
+				>
 					Enable camera
 				</Button>
 			</View>
@@ -122,53 +141,69 @@ export function SelfieCapture({
 	if (step === "done" && neutralPreview) {
 		return (
 			<View style={{ gap: spacing[3] }}>
-				<Body weight="bold">2 · Verification selfie</Body>
-				<Image
-					source={{ uri: neutralPreview }}
-					style={{
-						width: 140,
-						height: 180,
-						borderRadius: borderRadius.lg,
-						backgroundColor: colors.background.tertiary,
-					}}
-					contentFit="cover"
-				/>
-				<Caption color={colors.success.main as string} weight="medium">
-					Selfie captured
-				</Caption>
-				<Pressable
-					onPress={reset}
-					disabled={busy}
-					hitSlop={8}
+				{heading}
+				<View
 					style={{
 						flexDirection: "row",
 						alignItems: "center",
-						gap: spacing[2],
+						gap: spacing[4],
 					}}
 				>
-					<RotateCcw size={14} color={colors.text.secondary as string} />
-					<Caption weight="medium" color="secondary">
-						Retake
-					</Caption>
-				</Pressable>
+					<Image
+						source={{ uri: neutralPreview }}
+						accessibilityLabel="Your selfie"
+						style={{
+							width: 96,
+							height: 124,
+							borderRadius: borderRadius.lg,
+							backgroundColor: colors.background.tertiary,
+						}}
+						contentFit="cover"
+					/>
+					<View style={{ flex: 1, gap: spacing[2] }}>
+						<Caption weight="medium" color={colors.success.ink}>
+							Selfie captured
+						</Caption>
+						<Pressable
+							onPress={reset}
+							disabled={busy}
+							hitSlop={8}
+							accessibilityRole="button"
+							accessibilityLabel="Retake selfie"
+							accessibilityState={{ disabled: !!busy }}
+							{...focusable}
+							style={{
+								flexDirection: "row",
+								alignItems: "center",
+								gap: spacing[1.5],
+								minHeight: 32,
+							}}
+						>
+							<RotateCcw size={14} color={colors.text.secondary as string} />
+							<Caption weight="medium" color="secondary">
+								Retake
+							</Caption>
+						</Pressable>
+					</View>
+				</View>
 			</View>
 		);
 	}
 
 	const instruction =
 		step === "neutral"
-			? "Center your face in the frame and look straight at the camera."
+			? "Centre your face in the frame and look straight at the camera."
 			: `Now ${CHALLENGE_PROMPT[challenge]}, then capture again.`;
 
 	return (
 		<View style={{ gap: spacing[3] }}>
-			<Body weight="bold">2 · Verification selfie</Body>
-			<Caption color="tertiary">{instruction}</Caption>
+			{heading}
 
 			<View
 				style={{
 					width: "100%",
-					height: 360,
+					aspectRatio: 3 / 4,
+					maxHeight: 400,
 					borderRadius: borderRadius.lg,
 					overflow: "hidden",
 					backgroundColor: colors.neutral[900] as string,
@@ -185,38 +220,42 @@ export function SelfieCapture({
 			<View
 				style={{ flexDirection: "row", alignItems: "center", gap: spacing[2] }}
 			>
-				<View
-					style={{
-						width: 8,
-						height: 8,
-						borderRadius: 4,
-						backgroundColor:
-							step === "neutral"
-								? colors.primary.main
-								: withOpacity(colors.primary.main as string, 0.3),
-					}}
-				/>
-				<View
-					style={{
-						width: 8,
-						height: 8,
-						borderRadius: 4,
-						backgroundColor:
-							step === "action"
-								? colors.primary.main
-								: withOpacity(colors.primary.main as string, 0.3),
-					}}
-				/>
-				<Caption color="quaternary">
-					{step === "neutral" ? "Step 1 of 2" : "Step 2 of 2"}
+				<StepDot active={step === "neutral"} />
+				<StepDot active={step === "action"} />
+				<Caption weight="medium" color="secondary" style={{ flex: 1 }}>
+					{step === "neutral" ? "Photo 1 of 2" : "Photo 2 of 2"}
 				</Caption>
 			</View>
+			<Caption color="secondary">{instruction}</Caption>
 
-			<Button onPress={capture} disabled={!isReady || busy} loading={busy}>
-				{step === "neutral" ? "Capture" : "Capture challenge"}
+			<Button
+				onPress={capture}
+				disabled={!isReady || busy}
+				loading={busy}
+				accessibilityLabel={
+					step === "neutral" ? "Take first photo" : "Take challenge photo"
+				}
+			>
+				{step === "neutral" ? "Take photo" : "Take challenge photo"}
 			</Button>
 
-			{error && <Caption color={colors.error.main as string}>{error}</Caption>}
+			{error && <Caption color={colors.error.ink}>{error}</Caption>}
 		</View>
+	);
+}
+
+function StepDot({ active }: { active: boolean }) {
+	const { colors } = useTheme();
+	return (
+		<View
+			style={{
+				width: 8,
+				height: 8,
+				borderRadius: 4,
+				backgroundColor: active
+					? (colors.text.primary as string)
+					: colors.border.dark,
+			}}
+		/>
 	);
 }

@@ -1,20 +1,27 @@
 import type { DocumentQueueQuery } from "@nabhya/shared";
 import { ORG_DOCUMENT_LABELS, USER_DOCUMENT_LABELS } from "@nabhya/shared";
+import { useLocalSearchParams } from "expo-router";
 import { FileCheck2 } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FlatList, RefreshControl, View } from "react-native";
 import { DocumentReviewRow } from "@/components/admin/document-review-row";
+import {
+	AdminScreen,
+	ListFooter,
+	ResultCount,
+} from "@/components/admin/list-chrome";
 import {
 	EmptyState,
 	ErrorState,
 	FilterChips,
 	LoadingState,
-	Screen,
 	ScreenHeader,
 } from "@/components/screen-shell";
 import { humanizeStatus } from "@/components/status-pill";
-import { Caption } from "@/components/ui/typography";
-import { useOrgDocumentQueue, useUserDocumentQueue } from "@/hooks/use-admin";
+import {
+	useOrgDocumentQueuePaged,
+	useUserDocumentQueuePaged,
+} from "@/hooks/use-admin-lists";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 
@@ -36,23 +43,37 @@ const STATUSES: Array<{ value: Status; label: string }> = [
  * The verification queue — every document waiting on a superadmin, across all
  * organizations at once.
  *
- * The dossier screens answer "is this NGO legitimate?"; this answers "what is
+ * The dossier sheets answer "is this NGO legitimate?"; this answers "what is
  * waiting on me?", which is the question that decides how fast an NGO gets
  * verified. Reviewing from here is the same action, so it reuses the dossier's
- * review row rather than reimplementing approve/reject.
+ * review row rather than reimplementing approve/reject. The Overview links in
+ * with `?kind=` so "Identity documents" lands on the identity tab.
  */
 export default function AdminQueue() {
-	const [kind, setKind] = useState<Kind>("organization");
+	const params = useLocalSearchParams<{ kind?: string }>();
+	const [kind, setKind] = useState<Kind>(
+		params.kind === "user" ? "user" : "organization",
+	);
 	const [status, setStatus] = useState<Status>("PENDING");
+	const { spacing } = useTheme();
+
+	// A second tap on the Overview's other queue row while this tab is already
+	// mounted must still switch tabs.
+	useEffect(() => {
+		if (params.kind === "user" || params.kind === "organization") {
+			setKind(params.kind);
+		}
+	}, [params.kind]);
 
 	return (
-		<Screen>
+		<AdminScreen>
 			<ScreenHeader
-				title="Verification queue"
-				subtitle="Documents waiting on a decision, newest upload first."
+				title="Queue"
+				subtitle="Documents waiting on a decision, newest upload first"
 			/>
 
-			<FilterChips options={KINDS} value={kind} onChange={setKind} />
+			<FilterChips options={KINDS} value={kind} onChange={setKind} inline />
+			<View style={{ height: spacing[2] }} />
 			<FilterChips options={STATUSES} value={status} onChange={setStatus} />
 
 			{kind === "organization" ? (
@@ -60,15 +81,15 @@ export default function AdminQueue() {
 			) : (
 				<UserDocumentQueue status={status} />
 			)}
-		</Screen>
+		</AdminScreen>
 	);
 }
 
 function OrgDocumentQueue({ status }: { status: Status }) {
 	const { colors, spacing } = useTheme();
-	const query = useOrgDocumentQueue({ status });
+	const query = useOrgDocumentQueuePaged({ status });
 
-	if (query.isLoading) return <LoadingState />;
+	if (query.isLoading) return <LoadingState label="Loading the queue" />;
 	if (query.isError) {
 		return (
 			<ErrorState
@@ -80,28 +101,41 @@ function OrgDocumentQueue({ status }: { status: Status }) {
 
 	return (
 		<FlatList
-			data={query.data?.items ?? []}
+			data={query.items}
 			keyExtractor={(item) => item.id}
 			showsVerticalScrollIndicator={false}
 			contentContainerStyle={{ paddingBottom: spacing[10] }}
 			ItemSeparatorComponent={() => <View style={{ height: spacing[2] }} />}
+			onEndReached={() => {
+				if (query.hasNextPage && !query.isFetchingNextPage)
+					query.fetchNextPage();
+			}}
+			onEndReachedThreshold={0.6}
 			refreshControl={
 				<RefreshControl
-					refreshing={query.isRefetching}
+					refreshing={query.isRefetching && !query.isFetchingNextPage}
 					onRefresh={() => query.refetch()}
-					tintColor={colors.primary.main as string}
+					tintColor={colors.text.quaternary as string}
 				/>
 			}
-			ListHeaderComponent={<QueueCount total={query.data?.meta.total ?? 0} />}
+			ListHeaderComponent={<ResultCount total={query.total} noun="document" />}
 			ListEmptyComponent={
 				<EmptyState
 					icon={FileCheck2}
-					title="Nothing here"
+					title={status === "PENDING" ? "Queue is clear" : "Nothing here"}
 					description={
 						status === "PENDING"
 							? "Every NGO document has been reviewed."
-							: `No ${humanizeStatus(status).toLowerCase()} documents.`
+							: `No ${humanizeStatus(status).toLowerCase()} NGO documents.`
 					}
+				/>
+			}
+			ListFooterComponent={
+				<ListFooter
+					count={query.items.length}
+					hasMore={!!query.hasNextPage}
+					fetching={query.isFetchingNextPage}
+					onLoadMore={() => query.fetchNextPage()}
 				/>
 			}
 			renderItem={({ item }) => (
@@ -121,9 +155,9 @@ function OrgDocumentQueue({ status }: { status: Status }) {
 
 function UserDocumentQueue({ status }: { status: Status }) {
 	const { colors, spacing } = useTheme();
-	const query = useUserDocumentQueue({ status });
+	const query = useUserDocumentQueuePaged({ status });
 
-	if (query.isLoading) return <LoadingState />;
+	if (query.isLoading) return <LoadingState label="Loading the queue" />;
 	if (query.isError) {
 		return (
 			<ErrorState
@@ -135,28 +169,41 @@ function UserDocumentQueue({ status }: { status: Status }) {
 
 	return (
 		<FlatList
-			data={query.data?.items ?? []}
+			data={query.items}
 			keyExtractor={(item) => item.id}
 			showsVerticalScrollIndicator={false}
 			contentContainerStyle={{ paddingBottom: spacing[10] }}
 			ItemSeparatorComponent={() => <View style={{ height: spacing[2] }} />}
+			onEndReached={() => {
+				if (query.hasNextPage && !query.isFetchingNextPage)
+					query.fetchNextPage();
+			}}
+			onEndReachedThreshold={0.6}
 			refreshControl={
 				<RefreshControl
-					refreshing={query.isRefetching}
+					refreshing={query.isRefetching && !query.isFetchingNextPage}
 					onRefresh={() => query.refetch()}
-					tintColor={colors.primary.main as string}
+					tintColor={colors.text.quaternary as string}
 				/>
 			}
-			ListHeaderComponent={<QueueCount total={query.data?.meta.total ?? 0} />}
+			ListHeaderComponent={<ResultCount total={query.total} noun="document" />}
 			ListEmptyComponent={
 				<EmptyState
 					icon={FileCheck2}
-					title="Nothing here"
+					title={status === "PENDING" ? "Queue is clear" : "Nothing here"}
 					description={
 						status === "PENDING"
 							? "Every identity document has been reviewed."
-							: `No ${humanizeStatus(status).toLowerCase()} documents.`
+							: `No ${humanizeStatus(status).toLowerCase()} identity documents.`
 					}
+				/>
+			}
+			ListFooterComponent={
+				<ListFooter
+					count={query.items.length}
+					hasMore={!!query.hasNextPage}
+					fetching={query.isFetchingNextPage}
+					onLoadMore={() => query.fetchNextPage()}
 				/>
 			}
 			renderItem={({ item }) => (
@@ -171,16 +218,5 @@ function UserDocumentQueue({ status }: { status: Status }) {
 				/>
 			)}
 		/>
-	);
-}
-
-function QueueCount({ total }: { total: number }) {
-	const { spacing } = useTheme();
-	if (total === 0) return null;
-
-	return (
-		<Caption color="tertiary" style={{ marginBottom: spacing[3] }}>
-			{total} document{total === 1 ? "" : "s"}
-		</Caption>
 	);
 }

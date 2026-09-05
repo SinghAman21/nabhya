@@ -1,120 +1,134 @@
 import { useRouter } from "expo-router";
 import { Bookmark } from "lucide-react-native";
-import { FlatList, RefreshControl, View } from "react-native";
-import {
-	EmptyState,
-	ErrorState,
-	LoadingState,
-	Screen,
-	ScreenHeader,
-	Surface,
-} from "@/components/screen-shell";
+import { View } from "react-native";
+import { PAGE_SIZE, PagedList, usePagedQuery } from "@/components/paged-list";
+import { EmptyState, Screen, ScreenHeader } from "@/components/screen-shell";
+import { Button } from "@/components/ui/button";
 import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption } from "@/components/ui/typography";
-import { useBookmarks, useToggleBookmark } from "@/hooks/use-engagement";
+import { Body, Caption, Label } from "@/components/ui/typography";
+import { useToggleBookmark } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
-import { apiErrorMessage } from "@/lib/api";
+import { Alert } from "@/lib/alert";
+import { apiErrorMessage, engagementApi, queryKeys } from "@/lib/api";
+import { focusable } from "@/lib/focus";
+import type { BookmarkListItem } from "@/lib/types";
 
+/**
+ * NGOs the volunteer has saved. One grouped list: tap a row to open the NGO,
+ * "Remove" on the right to drop it. Paged, since a keen volunteer can save
+ * more than one screen of them.
+ */
 export default function Bookmarks() {
 	const { colors, spacing } = useTheme();
-	const _router = useRouter();
-
-	const query = useBookmarks();
+	const router = useRouter();
 	const toggle = useToggleBookmark();
+
+	const { query, items, loadMore } = usePagedQuery({
+		queryKey: queryKeys.bookmarks({ limit: PAGE_SIZE }),
+		fetchPage: (page) =>
+			engagementApi.listBookmarks({ page, limit: PAGE_SIZE }),
+	});
+
+	const remove = (item: BookmarkListItem) => {
+		toggle.mutate(item.organization.id, {
+			onError: (error) =>
+				Alert.alert("Could not remove", apiErrorMessage(error)),
+		});
+	};
 
 	return (
 		<Screen>
 			<ScreenHeader
 				back
 				title="Saved NGOs"
-				subtitle="Organizations you're keeping an eye on."
+				subtitle="Find them again in one tap."
 			/>
 
-			{query.isLoading ? (
-				<LoadingState />
-			) : query.isError ? (
-				<ErrorState
-					message={apiErrorMessage(query.error)}
-					onRetry={() => query.refetch()}
-				/>
-			) : (
-				<FlatList
-					data={query.data?.items ?? []}
-					keyExtractor={(item) => item.id}
-					showsVerticalScrollIndicator={false}
-					contentContainerStyle={{ paddingBottom: spacing[10] }}
-					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
-					refreshControl={
-						<RefreshControl
-							refreshing={query.isRefetching}
-							onRefresh={() => query.refetch()}
-							tintColor={colors.primary.main as string}
-						/>
-					}
-					ListEmptyComponent={
-						<EmptyState
-							icon={Bookmark}
-							title="Nothing saved yet"
-							description="Save an NGO to find it again quickly."
-						/>
-					}
-					renderItem={({ item }) => (
-						<Surface>
-							<View
-								style={{
-									flexDirection: "row",
-									alignItems: "center",
-									gap: spacing[3],
-								}}
+			<PagedList
+				query={query}
+				items={items}
+				loadMore={loadMore}
+				grouped
+				keyExtractor={(item) => item.id}
+				empty={
+					<EmptyState
+						icon={Bookmark}
+						title="No saved NGOs yet"
+						description="Tap the bookmark on any NGO's page and it will be kept here."
+						action={
+							<Button
+								size="sm"
+								variant="outline"
+								onPress={() => router.push("/ngos")}
 							>
-								<View
-									style={{
-										width: 40,
-										height: 40,
-										borderRadius: 20,
-										backgroundColor: colors.background.tertiary,
-										alignItems: "center",
-										justifyContent: "center",
-									}}
-								>
-									<Body weight="bold" color="secondary">
-										{item.organization.organizationName[0]?.toUpperCase()}
-									</Body>
-								</View>
-								<View style={{ flex: 1 }}>
-									<Body weight="bold" numberOfLines={1}>
-										{item.organization.organizationName}
-									</Body>
-									<Caption color="tertiary" numberOfLines={1}>
-										{[item.organization.city, item.organization.state]
-											.filter(Boolean)
-											.join(", ")}
-									</Caption>
-								</View>
-								<Pressable
-									onPress={() => toggle.mutate(item.organization.id)}
-									disabled={toggle.isPending}
-									hitSlop={8}
-								>
-									<Caption weight="medium" color={colors.error.ink as string}>
-										Remove
-									</Caption>
-								</Pressable>
-							</View>
-
-							{item.organization.description && (
-								<Caption
-									color="secondary"
-									numberOfLines={2}
-									style={{ marginTop: spacing[2] }}
-								>
-									{item.organization.description}
-								</Caption>
-							)}
-						</Surface>
-					)}
-				/>
-			)}
+								Browse NGOs
+							</Button>
+						}
+					/>
+				}
+				renderItem={(item) => (
+					<Pressable
+						onPress={() => router.push(`/ngos/${item.organization.id}`)}
+						accessibilityRole="button"
+						accessibilityLabel={item.organization.organizationName}
+						{...focusable}
+						style={(state) => {
+							const { pressed, hovered } = state as {
+								pressed: boolean;
+								hovered?: boolean;
+							};
+							return {
+								flexDirection: "row",
+								alignItems: "center",
+								gap: spacing[3],
+								paddingHorizontal: spacing[4],
+								paddingVertical: spacing[3],
+								minHeight: 64,
+								backgroundColor:
+									pressed || hovered ? colors.background.subtle : "transparent",
+							};
+						}}
+					>
+						<View
+							style={{
+								width: 40,
+								height: 40,
+								borderRadius: 20,
+								backgroundColor: colors.primary.tint,
+								alignItems: "center",
+								justifyContent: "center",
+							}}
+						>
+							<Label weight="bold" color={colors.primary.ink}>
+								{item.organization.organizationName[0]?.toUpperCase()}
+							</Label>
+						</View>
+						<View style={{ flex: 1, minWidth: 0 }}>
+							<Body weight="medium" numberOfLines={1}>
+								{item.organization.organizationName}
+							</Body>
+							<Caption color="tertiary" numberOfLines={1}>
+								{[item.organization.city, item.organization.state]
+									.filter(Boolean)
+									.join(", ") || "Location not set"}
+							</Caption>
+						</View>
+						<Pressable
+							onPress={() => remove(item)}
+							disabled={toggle.isPending}
+							hitSlop={10}
+							accessibilityRole="button"
+							accessibilityLabel={`Remove ${item.organization.organizationName} from saved`}
+							accessibilityState={{ disabled: toggle.isPending }}
+							{...focusable}
+						>
+							<Caption weight="medium" color="tertiary">
+								Remove
+							</Caption>
+						</Pressable>
+					</Pressable>
+				)}
+			/>
 		</Screen>
 	);
 }

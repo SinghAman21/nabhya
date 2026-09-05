@@ -156,7 +156,9 @@ no categories (falls back to city + urgency, fine), and moving `Trending` off a
 
 ---
 
-## Step 1 — The list pattern (19 screens) ⬅ next
+## Step 1 — The list pattern (19 screens) ✅ done (Sept 2026 polish pass)
+
+Every list screen now pages for real (`usePagedQuery`/`PagedList` in `components/paged-list.tsx`, `LoadMoreFooter`, admin `use-admin-lists.ts`), has EmptyState/LoadingState/ErrorState with retry and pull-to-refresh, uses ListGroup/Surface rows with StatusPill, and pushed pages use `ScreenHeader back`. New shared pieces: `form-field.tsx` (Field/FieldError), `choice-chips.tsx`, `initial-avatar.tsx`, `text-action.tsx`, `appearance-row.tsx` (theme setting; the floating ThemeToggle is gone), admin `list-chrome.tsx` / `sheet-parts.tsx` / `audit-row.tsx`. Detail pages (event, NGO) pin the primary action in a bottom bar; the NGO page wires DonateSheet (Razorpay via dev client).
 
 Biggest multiplier in the codebase. Build one composition, prove it on one
 screen, then sweep the rest.

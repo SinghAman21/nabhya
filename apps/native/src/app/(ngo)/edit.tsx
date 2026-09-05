@@ -2,23 +2,25 @@ import type { UpdateOrganizationInput } from "@nabhya/shared";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
+import { MultiChoiceChips } from "@/components/choice-chips";
+import { Field, useFieldInputStyle } from "@/components/form-field";
 import {
+	Banner,
 	ErrorState,
 	LoadingState,
 	Screen,
 	ScreenHeader,
+	SectionTitle,
 } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Pressable } from "@/components/ui/pressable";
-import { Caption, Label } from "@/components/ui/typography";
+import { Caption } from "@/components/ui/typography";
 import {
 	useMyOrganization,
 	useUpdateMyOrganization,
 } from "@/hooks/use-organization";
 import { useCategories } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
-import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 
 interface Form {
@@ -57,9 +59,19 @@ const EMPTY: Form = {
 	categoryIds: [],
 };
 
+const MAX_CAUSES = 5;
+
+/**
+ * The public profile, editable. Grouped the way a reader meets it — who you
+ * are, what you work on, how to reach you, where you are — with one primary
+ * action pinned in the header so it is never below the fold.
+ */
 export default function EditOrganization() {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const router = useRouter();
+	const inputStyle = useFieldInputStyle();
+	const textAreaStyle = useFieldInputStyle(88);
+	const addressStyle = useFieldInputStyle(80);
 
 	const org = useMyOrganization();
 	const categories = useCategories();
@@ -99,18 +111,11 @@ export default function EditOrganization() {
 			...f,
 			categoryIds: f.categoryIds.includes(id)
 				? f.categoryIds.filter((c) => c !== id)
-				: f.categoryIds.length >= 5
+				: f.categoryIds.length >= MAX_CAUSES
 					? f.categoryIds
 					: [...f.categoryIds, id],
 		}));
 	};
-
-	const inputStyle = {
-		borderWidth: 0,
-		borderRadius: 12,
-		backgroundColor: colors.background.tertiary,
-		paddingVertical: spacing[3.5],
-	} as const;
 
 	const save = () => {
 		// Blank optional fields are sent as undefined so they clear rather than
@@ -136,8 +141,8 @@ export default function EditOrganization() {
 		setError(null);
 		update.mutate(payload, {
 			onSuccess: () => {
-				Alert.alert("Saved", "Your organization profile has been updated.");
-				router.back();
+				if (router.canGoBack()) router.back();
+				else router.replace("/(ngo)/profile");
 			},
 			onError: (e) => setError(apiErrorMessage(e)),
 		});
@@ -148,7 +153,16 @@ export default function EditOrganization() {
 			<ScreenHeader
 				back
 				title="Edit profile"
-				subtitle="This is what volunteers and donors see."
+				action={
+					<Button
+						size="sm"
+						onPress={save}
+						loading={update.isPending}
+						disabled={org.isLoading || org.isError}
+					>
+						Save
+					</Button>
+				}
 			/>
 
 			{org.isLoading ? (
@@ -165,90 +179,86 @@ export default function EditOrganization() {
 					keyboardShouldPersistTaps="handled"
 					automaticallyAdjustKeyboardInsets
 				>
-					<Field label="Organization name">
+					{error && (
+						<View style={{ marginBottom: spacing[5] }}>
+							<Banner tone="error" title="Could not save" description={error} />
+						</View>
+					)}
+
+					<SectionTitle>About</SectionTitle>
+					<Field label="Organisation name">
 						<Input
 							value={form.organizationName}
 							onChangeText={(v) => set("organizationName", v)}
+							autoCapitalize="words"
 							style={inputStyle}
 						/>
 					</Field>
-
-					<Field label="Registration number">
+					<Field
+						label="Registration number"
+						hint="As printed on your registration certificate. A reviewer checks it against the upload."
+					>
 						<Input
 							value={form.registrationNumber}
 							onChangeText={(v) => set("registrationNumber", v)}
 							autoCapitalize="characters"
+							autoCorrect={false}
 							style={inputStyle}
 						/>
 					</Field>
-
-					<Field label="Short description">
+					<Field
+						label="Short description"
+						hint="One or two lines. This is the first thing a volunteer reads."
+					>
 						<Input
 							value={form.description}
 							onChangeText={(v) => set("description", v)}
 							multiline
-							placeholder="One or two lines about what you do"
-							style={{ ...inputStyle, minHeight: 88, textAlignVertical: "top" }}
+							placeholder="e.g. We run evening classes for 300 children in Dharavi."
+							style={textAreaStyle}
 						/>
 					</Field>
-
-					<Field label="Mission">
+					<Field label="Mission" optional>
 						<Input
 							value={form.mission}
 							onChangeText={(v) => set("mission", v)}
 							multiline
-							style={{ ...inputStyle, minHeight: 88, textAlignVertical: "top" }}
+							placeholder="What you set out to change"
+							style={textAreaStyle}
 						/>
 					</Field>
-
-					<Field label="Vision">
+					<Field label="Vision" optional>
 						<Input
 							value={form.vision}
 							onChangeText={(v) => set("vision", v)}
 							multiline
-							style={{ ...inputStyle, minHeight: 88, textAlignVertical: "top" }}
+							placeholder="What the world looks like when you succeed"
+							style={textAreaStyle}
 						/>
 					</Field>
 
-					<Label style={{ marginBottom: spacing[2] }}>
-						Causes <Caption color="tertiary">(up to 5)</Caption>
-					</Label>
-					<View
-						style={{
-							flexDirection: "row",
-							flexWrap: "wrap",
-							gap: spacing[2],
-							marginBottom: spacing[5],
-						}}
+					<SectionTitle>Causes</SectionTitle>
+					<Field
+						label="What you work on"
+						hint={`Up to ${MAX_CAUSES}. Volunteers filter the feed by these.`}
 					>
-						{(categories.data ?? []).map((category) => {
-							const active = form.categoryIds.includes(category.id);
-							return (
-								<Pressable
-									key={category.id}
-									onPress={() => toggleCategory(category.id)}
-									style={{
-										paddingHorizontal: spacing[3.5],
-										paddingVertical: spacing[2],
-										borderRadius: 999,
-										backgroundColor: active
-											? colors.primary.main
-											: colors.background.tertiary,
-									}}
-								>
-									<Caption
-										weight={active ? "bold" : "medium"}
-										color={
-											active ? (colors.primary.contrast as string) : "secondary"
-										}
-									>
-										{category.name}
-									</Caption>
-								</Pressable>
-							);
-						})}
-					</View>
+						{categories.isLoading ? (
+							<Caption color="quaternary">Loading causes…</Caption>
+						) : (
+							<MultiChoiceChips
+								label="Causes"
+								options={(categories.data ?? []).map((category) => ({
+									value: category.id,
+									label: category.name,
+								}))}
+								values={form.categoryIds}
+								onToggle={toggleCategory}
+								max={MAX_CAUSES}
+							/>
+						)}
+					</Field>
 
+					<SectionTitle>Contact</SectionTitle>
 					<Field label="Phone">
 						<Input
 							value={form.phone}
@@ -257,92 +267,86 @@ export default function EditOrganization() {
 							style={inputStyle}
 						/>
 					</Field>
-
 					<Field label="Email">
 						<Input
 							value={form.email}
 							onChangeText={(v) => set("email", v)}
 							keyboardType="email-address"
 							autoCapitalize="none"
+							autoCorrect={false}
 							style={inputStyle}
 						/>
 					</Field>
-
-					<Field label="Website">
+					<Field label="Website" optional>
 						<Input
 							value={form.website}
 							onChangeText={(v) => set("website", v)}
 							keyboardType="url"
 							autoCapitalize="none"
+							autoCorrect={false}
 							placeholder="https://yourngo.org"
 							style={inputStyle}
 						/>
 					</Field>
 
+					<SectionTitle>Location</SectionTitle>
 					<Field label="Address">
 						<Input
 							value={form.address}
 							onChangeText={(v) => set("address", v)}
 							multiline
-							style={{ ...inputStyle, minHeight: 80, textAlignVertical: "top" }}
+							placeholder="Street, building, landmark"
+							style={addressStyle}
+						/>
+					</Field>
+					<View style={{ flexDirection: "row", gap: spacing[3] }}>
+						<Field label="City" style={{ flex: 1 }}>
+							<Input
+								value={form.city}
+								onChangeText={(v) => set("city", v)}
+								style={inputStyle}
+							/>
+						</Field>
+						<Field label="State" style={{ flex: 1 }}>
+							<Input
+								value={form.state}
+								onChangeText={(v) => set("state", v)}
+								style={inputStyle}
+							/>
+						</Field>
+					</View>
+					<Field label="Pincode">
+						<Input
+							value={form.pincode}
+							onChangeText={(v) => set("pincode", v.replace(/\D/g, ""))}
+							keyboardType="number-pad"
+							maxLength={10}
+							style={[inputStyle, { maxWidth: 160 }]}
 						/>
 					</Field>
 
+					<SectionTitle>Organisation</SectionTitle>
 					<View style={{ flexDirection: "row", gap: spacing[3] }}>
-						<View style={{ flex: 1 }}>
-							<Field label="City">
-								<Input
-									value={form.city}
-									onChangeText={(v) => set("city", v)}
-									style={inputStyle}
-								/>
-							</Field>
-						</View>
-						<View style={{ flex: 1 }}>
-							<Field label="State">
-								<Input
-									value={form.state}
-									onChangeText={(v) => set("state", v)}
-									style={inputStyle}
-								/>
-							</Field>
-						</View>
+						<Field label="Team size" optional style={{ flex: 1 }}>
+							<Input
+								value={form.teamSize}
+								onChangeText={(v) => set("teamSize", v.replace(/\D/g, ""))}
+								keyboardType="number-pad"
+								placeholder="e.g. 25"
+								style={inputStyle}
+							/>
+						</Field>
+						<Field label="Founded" optional style={{ flex: 1 }}>
+							<Input
+								value={form.foundingYear}
+								onChangeText={(v) => set("foundingYear", v.replace(/\D/g, ""))}
+								keyboardType="number-pad"
+								maxLength={4}
+								placeholder="e.g. 2015"
+								style={inputStyle}
+							/>
+						</Field>
 					</View>
-
-					<View style={{ flexDirection: "row", gap: spacing[3] }}>
-						<View style={{ flex: 1 }}>
-							<Field label="Team size">
-								<Input
-									value={form.teamSize}
-									onChangeText={(v) => set("teamSize", v.replace(/\D/g, ""))}
-									keyboardType="number-pad"
-									style={inputStyle}
-								/>
-							</Field>
-						</View>
-						<View style={{ flex: 1 }}>
-							<Field label="Founded">
-								<Input
-									value={form.foundingYear}
-									onChangeText={(v) =>
-										set("foundingYear", v.replace(/\D/g, ""))
-									}
-									keyboardType="number-pad"
-									maxLength={4}
-									style={inputStyle}
-								/>
-							</Field>
-						</View>
-					</View>
-
-					{error && (
-						<Caption
-							color={colors.error.main as string}
-							style={{ marginBottom: spacing[3] }}
-						>
-							{error}
-						</Caption>
-					)}
 
 					<Button onPress={save} loading={update.isPending}>
 						Save changes
@@ -350,21 +354,5 @@ export default function EditOrganization() {
 				</ScrollView>
 			)}
 		</Screen>
-	);
-}
-
-function Field({
-	label,
-	children,
-}: {
-	label: string;
-	children: React.ReactNode;
-}) {
-	const { spacing } = useTheme();
-	return (
-		<View style={{ marginBottom: spacing[4] }}>
-			<Label style={{ marginBottom: spacing[1.5] }}>{label}</Label>
-			{children}
-		</View>
 	);
 }

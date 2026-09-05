@@ -1,22 +1,14 @@
 import { useRouter } from "expo-router";
 import { Bell } from "lucide-react-native";
-import { FlatList, RefreshControl, View } from "react-native";
-import {
-	EmptyState,
-	ErrorState,
-	LoadingState,
-	Screen,
-	ScreenHeader,
-	Surface,
-} from "@/components/screen-shell";
+import { View } from "react-native";
+import { PAGE_SIZE, PagedList, usePagedQuery } from "@/components/paged-list";
+import { EmptyState, Screen, ScreenHeader } from "@/components/screen-shell";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption } from "@/components/ui/typography";
-import {
-	useMarkNotificationsRead,
-	useNotifications,
-} from "@/hooks/use-engagement";
+import { useMarkNotificationsRead } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
-import { apiErrorMessage } from "@/lib/api";
+import { notificationsApi, queryKeys } from "@/lib/api";
+import { focusable } from "@/lib/focus";
 import { formatRelative } from "@/lib/format";
 import type { NotificationItem } from "@/lib/types";
 
@@ -34,15 +26,21 @@ function destinationFor(item: NotificationItem): string | null {
 	}
 }
 
+/**
+ * The full inbox. One grouped list, newest first, unread rows carry a dot in
+ * the gutter and a bold title. Tapping marks the row read and opens whatever it
+ * is about, when it is about something the app can show.
+ */
 export default function Notifications() {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
-
-	const query = useNotifications();
 	const markRead = useMarkNotificationsRead();
 
-	const items = query.data?.items ?? [];
-	const unread = query.data?.unreadCount ?? 0;
+	const { query, items, first, loadMore } = usePagedQuery({
+		queryKey: queryKeys.notifications({ limit: PAGE_SIZE }),
+		fetchPage: (page) => notificationsApi.list({ page, limit: PAGE_SIZE }),
+	});
+	const unread = first?.unreadCount ?? 0;
 
 	const open = (item: NotificationItem) => {
 		if (!item.readAt) markRead.mutate({ ids: [item.id] });
@@ -55,14 +53,17 @@ export default function Notifications() {
 			<ScreenHeader
 				back
 				title="Notifications"
+				{...(unread > 0 ? { subtitle: `${unread} unread` } : {})}
 				action={
 					unread > 0 ? (
 						<Pressable
 							onPress={() => markRead.mutate({})}
 							hitSlop={8}
 							accessibilityRole="button"
+							accessibilityLabel="Mark all notifications as read"
+							{...focusable}
 						>
-							<Caption weight="medium" color={colors.primary.ink as string}>
+							<Caption weight="medium" color={colors.primary.ink}>
 								Mark all read
 							</Caption>
 						</Pressable>
@@ -70,79 +71,83 @@ export default function Notifications() {
 				}
 			/>
 
-			{query.isLoading ? (
-				<LoadingState />
-			) : query.isError ? (
-				<ErrorState
-					message={apiErrorMessage(query.error)}
-					onRetry={() => query.refetch()}
-				/>
-			) : (
-				<FlatList
-					data={items}
-					keyExtractor={(item) => item.id}
-					showsVerticalScrollIndicator={false}
-					contentContainerStyle={{ paddingBottom: spacing[10] }}
-					ItemSeparatorComponent={() => <View style={{ height: spacing[2] }} />}
-					refreshControl={
-						<RefreshControl
-							refreshing={query.isRefetching}
-							onRefresh={() => query.refetch()}
-							tintColor={colors.primary.main as string}
-						/>
-					}
-					ListEmptyComponent={
-						<EmptyState
-							icon={Bell}
-							title="Nothing yet"
-							description="Updates about your applications, pledges and certificates land here."
-						/>
-					}
-					renderItem={({ item }) => (
-						<Surface
+			<PagedList
+				query={query}
+				items={items}
+				loadMore={loadMore}
+				grouped
+				keyExtractor={(item) => item.id}
+				empty={
+					<EmptyState
+						icon={Bell}
+						title="You're all caught up"
+						description="When an NGO reviews your application or pledge, or issues a certificate, it will show up here."
+					/>
+				}
+				renderItem={(item) => {
+					const destination = destinationFor(item);
+					return (
+						<Pressable
 							onPress={() => open(item)}
-							style={
-								item.readAt
-									? undefined
-									: { backgroundColor: colors.primary.tint }
-							}
-						>
-							<View
-								style={{
+							accessibilityRole="button"
+							accessibilityLabel={`${item.title}${item.body ? `. ${item.body}` : ""}${item.readAt ? "" : ". Unread"}`}
+							{...focusable}
+							style={(state) => {
+								const { pressed, hovered } = state as {
+									pressed: boolean;
+									hovered?: boolean;
+								};
+								return {
 									flexDirection: "row",
 									alignItems: "flex-start",
 									gap: spacing[3],
-								}}
-							>
+									paddingHorizontal: spacing[4],
+									paddingVertical: spacing[3.5],
+									backgroundColor:
+										pressed || hovered
+											? colors.background.subtle
+											: "transparent",
+								};
+							}}
+						>
+							{/* Unread dot lives in the gutter so titles share a baseline. */}
+							<View style={{ width: 7, paddingTop: 8 }}>
 								{!item.readAt && (
 									<View
 										style={{
-											width: 8,
-											height: 8,
+											width: 7,
+											height: 7,
 											borderRadius: 4,
-											marginTop: 6,
 											backgroundColor: colors.primary.main,
 										}}
 									/>
 								)}
-								<View style={{ flex: 1 }}>
-									<Body weight={item.readAt ? "medium" : "bold"}>
-										{item.title}
-									</Body>
-									{item.body && (
-										<Caption color="secondary" style={{ marginTop: 2 }}>
-											{item.body}
-										</Caption>
-									)}
-									<Caption color="quaternary" style={{ marginTop: spacing[2] }}>
-										{formatRelative(item.createdAt)}
-									</Caption>
-								</View>
 							</View>
-						</Surface>
-					)}
-				/>
-			)}
+							<View style={{ flex: 1, minWidth: 0 }}>
+								<Body
+									weight={item.readAt ? "medium" : "bold"}
+									numberOfLines={2}
+								>
+									{item.title}
+								</Body>
+								{item.body && (
+									<Caption
+										color="secondary"
+										numberOfLines={3}
+										style={{ marginTop: spacing[0.5] }}
+									>
+										{item.body}
+									</Caption>
+								)}
+								<Caption color="quaternary" style={{ marginTop: spacing[1.5] }}>
+									{formatRelative(item.createdAt)}
+									{destination ? " · Tap to open" : ""}
+								</Caption>
+							</View>
+						</Pressable>
+					);
+				}}
+			/>
 		</Screen>
 	);
 }

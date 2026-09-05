@@ -45,6 +45,9 @@ defines.
   Supabase Auth session or clear the TanStack Query cache, so on a shared device the
   next person to sign in briefly sees the previous user's cached data. The hook
   does both.
+- Feed rows arrive as one generic server shape; `lib/feed-adapter.ts` is the only
+  place that knows its `content` keys. Screens read `FeedItem` (`kind` union) and
+  call `useFeed` / `useFeedReaction` / `useToggleFollow` — never the raw endpoints.
 - Uploads: ask `POST /api/uploads/intent` for a pre-signed ticket, PUT the bytes
   with **plain `fetch`, not the axios instance** — an Authorization header would
   break the signature — then submit the returned object key. Reads go through

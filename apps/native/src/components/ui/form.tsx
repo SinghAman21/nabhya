@@ -49,7 +49,7 @@ export function FormField({
 					/>
 					{error?.message && (
 						<Caption
-							color={colors.error.main as string}
+							color={colors.error.ink as string}
 							style={{ marginTop: spacing[1.5], marginLeft: spacing[0.5] }}
 						>
 							{error.message}

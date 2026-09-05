@@ -1,15 +1,32 @@
 import { formatFinancialYear } from "@nabhya/shared";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Award, Bookmark, Clock, FileText, Users } from "lucide-react-native";
+import {
+	Bookmark,
+	FileText,
+	MessageSquare,
+	Newspaper,
+	Star,
+} from "lucide-react-native";
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BackButton } from "@/components/back-button";
+import { DonateSheet } from "@/components/donate-sheet";
+import {
+	LoadMoreButton,
+	PAGE_SIZE,
+	usePagedQuery,
+} from "@/components/paged-list";
 import { ReviewSheet } from "@/components/review-sheet";
 import {
+	EmptyState,
 	ErrorState,
 	FilterChips,
+	ListGroup,
+	ListRow,
 	LoadingState,
+	MetricRow,
+	SectionTitle,
 	Surface,
 } from "@/components/screen-shell";
 import {
@@ -19,9 +36,8 @@ import {
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption, H2, H3 } from "@/components/ui/typography";
+import { Body, Caption, H2, H3, Label } from "@/components/ui/typography";
 import {
-	useAnnouncements,
 	useFinancialReports,
 	useOrganization,
 	useOrganizationImpact,
@@ -30,13 +46,19 @@ import { useOpenDocument } from "@/hooks/use-documents";
 import {
 	useBookmarks,
 	useDeleteMyReview,
-	useReviews,
 	useToggleBookmark,
 } from "@/hooks/use-engagement";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
+import { useMedia } from "@/hooks/useMedia";
 import { Alert } from "@/lib/alert";
-import { apiErrorMessage } from "@/lib/api";
+import {
+	apiErrorMessage,
+	engagementApi,
+	publishingApi,
+	queryKeys,
+} from "@/lib/api";
+import { focusable } from "@/lib/focus";
 import { formatDate, formatRelative } from "@/lib/format";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -49,34 +71,52 @@ const TABS: Array<{ value: Tab; label: string }> = [
 	{ value: "transparency", label: "Transparency" },
 ];
 
+/**
+ * An NGO's public page. Name and standing first, its record in numbers, then
+ * the tabs. Save lives in the header beside back; the one action a visitor is
+ * likely to take — donate — is pinned to the bottom.
+ */
 export default function NgoProfilePage() {
 	const { id } = useLocalSearchParams<{ id: string }>();
 	const { colors, spacing } = useTheme();
+	const { isDesktop } = useMedia();
 	const insets = useSafeAreaInsets();
 	const router = useRouter();
 	const [tab, setTab] = useState<Tab>("about");
 	const [reviewOpen, setReviewOpen] = useState(false);
+	const [donateOpen, setDonateOpen] = useState(false);
 
 	const email = useAuthStore((s) => s.email);
 	const org = useOrganization(id);
 	const impact = useOrganizationImpact(id);
 	const toggleBookmark = useToggleBookmark();
-	// The detail payload carries no follow flag; the caller's bookmark list is
+	// The detail payload carries no saved flag; the caller's bookmark list is
 	// short and already cached, so read it from there.
 	const bookmarks = useBookmarks({ limit: 100 });
 	const bookmarked =
 		!!email &&
 		(bookmarks.data?.items ?? []).some((row) => row.organization.id === id);
 
-	const onBookmark = () => {
+	const requireSignIn = (next: () => void) => {
 		if (!email) {
 			router.push("/(auth)/login");
 			return;
 		}
-		toggleBookmark.mutate(id, {
-			onError: (error) => Alert.alert("Could not save", apiErrorMessage(error)),
-		});
+		next();
 	};
+
+	const onBookmark = () =>
+		requireSignIn(() =>
+			toggleBookmark.mutate(id, {
+				onError: (error) =>
+					Alert.alert("Could not save", apiErrorMessage(error)),
+			}),
+		);
+
+	const gutter = spacing[5];
+	const desktopWidth = isDesktop
+		? ({ maxWidth: 720, width: "100%", alignSelf: "center" } as const)
+		: undefined;
 
 	return (
 		<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
@@ -85,18 +125,26 @@ export default function NgoProfilePage() {
 					flexDirection: "row",
 					alignItems: "center",
 					justifyContent: "space-between",
-					paddingHorizontal: spacing[6],
+					minHeight: 40,
+					paddingHorizontal: gutter,
 					paddingTop: insets.top + spacing[2],
 					paddingBottom: spacing[2],
 				}}
 			>
-				<BackButton />
+				<BackButton fallbackHref="/ngos" />
 				<Pressable
 					onPress={onBookmark}
 					hitSlop={8}
+					disabled={toggleBookmark.isPending}
 					accessibilityRole="button"
-					accessibilityLabel={bookmarked ? "Unfollow" : "Follow"}
-					accessibilityState={{ selected: bookmarked }}
+					accessibilityLabel={
+						bookmarked ? "Remove from saved" : "Save this NGO"
+					}
+					accessibilityState={{
+						selected: bookmarked,
+						disabled: toggleBookmark.isPending,
+					}}
+					{...focusable}
 					style={({ pressed }) => ({
 						width: 40,
 						height: 40,
@@ -124,78 +172,90 @@ export default function NgoProfilePage() {
 					onRetry={() => org.refetch()}
 				/>
 			) : (
-				<ScrollView
-					showsVerticalScrollIndicator={false}
-					contentContainerStyle={{
-						paddingHorizontal: spacing[6],
-						paddingBottom: spacing[12],
-					}}
-				>
-					<H2 style={{ marginBottom: spacing[2] }}>
-						{org.data.organizationName}
-					</H2>
-					<View
-						style={{
-							flexDirection: "row",
-							flexWrap: "wrap",
-							gap: spacing[2],
-							marginBottom: spacing[3],
+				<>
+					<ScrollView
+						showsVerticalScrollIndicator={false}
+						contentContainerStyle={{
+							paddingHorizontal: gutter,
+							paddingTop: spacing[2],
+							paddingBottom: spacing[8],
+							...desktopWidth,
 						}}
 					>
-						<StatusPill
-							label={humanizeStatus(org.data.verificationStatus)}
-							tone={verificationTone(org.data.verificationStatus)}
-						/>
-						{org.data.categories?.map((category) => (
-							<StatusPill key={category.id} label={category.name} tone="info" />
-						))}
-					</View>
-					<Caption color="tertiary" style={{ marginBottom: spacing[5] }}>
-						{[org.data.city, org.data.state].filter(Boolean).join(", ")}
-						{org.data.foundingYear ? ` · since ${org.data.foundingYear}` : ""}
-					</Caption>
-
-					{/* Impact is the headline: what this NGO has actually done. */}
-					{impact.data && (
+						<H2 accessibilityRole="header" style={{ marginBottom: spacing[2] }}>
+							{org.data.organizationName}
+						</H2>
 						<View
 							style={{
 								flexDirection: "row",
+								flexWrap: "wrap",
 								gap: spacing[2],
-								marginBottom: spacing[5],
+								marginBottom: spacing[2],
 							}}
 						>
-							<ImpactTile
-								icon={Users}
-								value={impact.data.volunteersEngaged}
-								label="volunteers"
+							<StatusPill
+								label={humanizeStatus(org.data.verificationStatus)}
+								tone={verificationTone(org.data.verificationStatus)}
 							/>
-							<ImpactTile
-								icon={Clock}
-								value={impact.data.volunteerHours}
-								label="hours given"
-							/>
-							<ImpactTile
-								icon={Award}
-								value={impact.data.eventsHosted}
-								label="events"
-							/>
+							{org.data.categories?.map((category) => (
+								<StatusPill key={category.id} label={category.name} />
+							))}
 						</View>
-					)}
+						<Caption color="tertiary" style={{ marginBottom: spacing[5] }}>
+							{[org.data.city, org.data.state].filter(Boolean).join(", ") ||
+								"Location not set"}
+							{org.data.foundingYear ? ` · Since ${org.data.foundingYear}` : ""}
+						</Caption>
 
-					<FilterChips options={TABS} value={tab} onChange={setTab} />
+						{/* Impact is the headline: what this NGO has actually done. */}
+						{impact.data && (
+							<View style={{ marginBottom: spacing[5] }}>
+								<MetricRow
+									stats={[
+										{
+											label: "Volunteers",
+											value: impact.data.volunteersEngaged,
+										},
+										{ label: "Hours given", value: impact.data.volunteerHours },
+										{ label: "Events", value: impact.data.eventsHosted },
+									]}
+								/>
+							</View>
+						)}
 
-					{tab === "about" && <AboutTab organization={org.data} />}
-					{tab === "updates" && <UpdatesTab organizationId={id} />}
-					{tab === "reviews" && (
-						<ReviewsTab
-							organizationId={id}
-							onWrite={() =>
-								email ? setReviewOpen(true) : router.push("/(auth)/login")
-							}
-						/>
-					)}
-					{tab === "transparency" && <TransparencyTab organizationId={id} />}
-				</ScrollView>
+						<FilterChips options={TABS} value={tab} onChange={setTab} />
+
+						{tab === "about" && <AboutTab organization={org.data} />}
+						{tab === "updates" && <UpdatesTab organizationId={id} />}
+						{tab === "reviews" && (
+							<ReviewsTab
+								organizationId={id}
+								onWrite={() => requireSignIn(() => setReviewOpen(true))}
+							/>
+						)}
+						{tab === "transparency" && <TransparencyTab organizationId={id} />}
+					</ScrollView>
+
+					<View
+						style={{
+							paddingHorizontal: gutter,
+							paddingTop: spacing[3],
+							paddingBottom: insets.bottom + spacing[3],
+							borderTopWidth: 1,
+							borderTopColor: colors.border.hairline,
+							backgroundColor: colors.background.card,
+						}}
+					>
+						<View style={desktopWidth}>
+							<Button
+								onPress={() => requireSignIn(() => setDonateOpen(true))}
+								accessibilityLabel={`Donate to ${org.data.organizationName}`}
+							>
+								{email ? "Donate" : "Sign in to donate"}
+							</Button>
+						</View>
+					</View>
+				</>
 			)}
 
 			<ReviewSheet
@@ -204,28 +264,19 @@ export default function NgoProfilePage() {
 				visible={reviewOpen}
 				onClose={() => setReviewOpen(false)}
 			/>
+			<DonateSheet
+				organizationId={id}
+				organizationName={org.data?.organizationName ?? ""}
+				visible={donateOpen}
+				onClose={() => setDonateOpen(false)}
+			/>
 		</View>
 	);
 }
 
-function ImpactTile({
-	icon: Icon,
-	value,
-	label,
-}: {
-	icon: typeof Users;
-	value: number;
-	label: string;
-}) {
-	const { colors, spacing } = useTheme();
-	return (
-		<Surface style={{ flex: 1 }}>
-			<Icon size={16} color={colors.text.tertiary as string} />
-			<H3 style={{ marginTop: spacing[1] }}>{value}</H3>
-			<Caption color="tertiary">{label}</Caption>
-		</Surface>
-	);
-}
+/* -------------------------------------------------------------------------- */
+/* About                                                                      */
+/* -------------------------------------------------------------------------- */
 
 function AboutTab({
 	organization,
@@ -233,73 +284,130 @@ function AboutTab({
 	organization: NonNullable<ReturnType<typeof useOrganization>["data"]>;
 }) {
 	const { spacing } = useTheme();
+	const facts = [
+		{ label: "Type", value: humanizeStatus(organization.orgType) },
+		{ label: "Registration", value: organization.registrationNumber },
+		{
+			label: "Team size",
+			value: organization.teamSize ? String(organization.teamSize) : null,
+		},
+		{ label: "Website", value: organization.website },
+		{ label: "Address", value: organization.address },
+	].filter((fact) => fact.value);
+
 	return (
 		<View>
 			{organization.description && (
-				<Body color="secondary" style={{ marginBottom: spacing[4] }}>
+				<Body color="secondary" style={{ marginBottom: spacing[5] }}>
 					{organization.description}
 				</Body>
 			)}
 			{organization.mission && (
+				<View style={{ marginBottom: spacing[5] }}>
+					<SectionTitle>Mission</SectionTitle>
+					<Body color="secondary">{organization.mission}</Body>
+				</View>
+			)}
+			{facts.length > 0 && (
 				<>
-					<Body weight="bold" style={{ marginBottom: spacing[1] }}>
-						Mission
-					</Body>
-					<Body color="secondary" style={{ marginBottom: spacing[4] }}>
-						{organization.mission}
-					</Body>
+					<SectionTitle>Details</SectionTitle>
+					<ListGroup>
+						{facts.map((fact) => (
+							<ListRow
+								key={fact.label}
+								label={fact.label}
+								value={
+									<Caption
+										color="secondary"
+										numberOfLines={2}
+										style={{ maxWidth: "60%", textAlign: "right" }}
+									>
+										{fact.value}
+									</Caption>
+								}
+							/>
+						))}
+					</ListGroup>
 				</>
 			)}
-			<Surface>
-				<Row label="Type" value={humanizeStatus(organization.orgType)} />
-				<Row label="Registration" value={organization.registrationNumber} />
-				<Row
-					label="Team size"
-					value={organization.teamSize ? String(organization.teamSize) : null}
-				/>
-				<Row label="Website" value={organization.website} last />
-			</Surface>
 		</View>
 	);
 }
 
+/* -------------------------------------------------------------------------- */
+/* Updates                                                                    */
+/* -------------------------------------------------------------------------- */
+
 function UpdatesTab({ organizationId }: { organizationId: string }) {
 	const { spacing } = useTheme();
-	const query = useAnnouncements(organizationId);
+	const { query, items, loadMore } = usePagedQuery({
+		queryKey: queryKeys.announcements(organizationId, { limit: PAGE_SIZE }),
+		fetchPage: (page) =>
+			publishingApi.listAnnouncements(organizationId, {
+				page,
+				limit: PAGE_SIZE,
+			}),
+	});
 
 	if (query.isLoading) return <LoadingState />;
-	const items = query.data?.items ?? [];
+	if (query.isError && items.length === 0) {
+		return (
+			<ErrorState
+				message={apiErrorMessage(query.error)}
+				onRetry={() => query.refetch()}
+			/>
+		);
+	}
 
 	if (items.length === 0) {
 		return (
-			<Caption color="tertiary" style={{ paddingVertical: spacing[6] }}>
-				This organization hasn't posted any updates yet.
-			</Caption>
+			<EmptyState
+				icon={Newspaper}
+				title="No updates yet"
+				description="When this NGO posts news about its work, it appears here."
+			/>
 		);
 	}
 
 	return (
-		<View style={{ gap: spacing[3] }}>
-			{items.map((item) => (
-				<Surface key={item.id}>
-					{item.isPinned && <StatusPill label="Pinned" tone="info" />}
-					<Body
-						weight="bold"
-						style={{ marginTop: item.isPinned ? spacing[2] : 0 }}
+		<View>
+			<ListGroup>
+				{items.map((item) => (
+					<View
+						key={item.id}
+						style={{
+							paddingHorizontal: spacing[4],
+							paddingVertical: spacing[4],
+						}}
 					>
-						{item.title}
-					</Body>
-					<Caption color="secondary" style={{ marginTop: spacing[1] }}>
-						{item.body}
-					</Caption>
-					<Caption color="quaternary" style={{ marginTop: spacing[2] }}>
-						{formatRelative(item.publishedAt ?? item.createdAt)}
-					</Caption>
-				</Surface>
-			))}
+						<View
+							style={{
+								flexDirection: "row",
+								alignItems: "center",
+								gap: spacing[2],
+								marginBottom: spacing[1],
+							}}
+						>
+							<Label weight="semibold" numberOfLines={2} style={{ flex: 1 }}>
+								{item.title}
+							</Label>
+							{item.isPinned && <StatusPill label="Pinned" tone="info" />}
+						</View>
+						<Caption color="secondary">{item.body}</Caption>
+						<Caption color="quaternary" style={{ marginTop: spacing[2] }}>
+							{formatRelative(item.publishedAt ?? item.createdAt)}
+						</Caption>
+					</View>
+				))}
+			</ListGroup>
+			<LoadMoreButton query={query} loadMore={loadMore} />
 		</View>
 	);
 }
+
+/* -------------------------------------------------------------------------- */
+/* Reviews                                                                    */
+/* -------------------------------------------------------------------------- */
 
 function ReviewsTab({
 	organizationId,
@@ -310,219 +418,255 @@ function ReviewsTab({
 }) {
 	const { colors, spacing } = useTheme();
 	const email = useAuthStore((s) => s.email);
-	const query = useReviews(organizationId);
 	const me = useMe(!!email);
 	const remove = useDeleteMyReview(organizationId);
 
+	const { query, items, first, loadMore } = usePagedQuery({
+		queryKey: queryKeys.reviews(organizationId, { limit: PAGE_SIZE }),
+		fetchPage: (page) =>
+			engagementApi.listReviews(organizationId, { page, limit: PAGE_SIZE }),
+	});
+	const summary = first?.summary;
+
 	// One review per person, so "mine" is whichever row carries my user id.
 	const myUserId = me.data?.id;
+	const hasMine = !!myUserId && items.some((r) => r.user.id === myUserId);
 
 	const confirmDelete = () => {
-		Alert.alert("Delete review", "Your review will be removed for everyone.", [
-			{ text: "Cancel", style: "cancel" },
-			{
-				text: "Delete",
-				style: "destructive",
-				onPress: () =>
-					remove.mutate(undefined, {
-						onError: (error) =>
-							Alert.alert("Could not delete", apiErrorMessage(error)),
-					}),
-			},
-		]);
+		Alert.alert(
+			"Delete your review?",
+			"It will be removed for everyone. You can write a new one later.",
+			[
+				{ text: "Keep it", style: "cancel" },
+				{
+					text: "Delete",
+					style: "destructive",
+					onPress: () =>
+						remove.mutate(undefined, {
+							onError: (error) =>
+								Alert.alert("Could not delete", apiErrorMessage(error)),
+						}),
+				},
+			],
+		);
 	};
 
 	if (query.isLoading) return <LoadingState />;
-
-	const summary = query.data?.summary;
-	const items = query.data?.items ?? [];
+	if (query.isError && items.length === 0) {
+		return (
+			<ErrorState
+				message={apiErrorMessage(query.error)}
+				onRetry={() => query.refetch()}
+			/>
+		);
+	}
 
 	return (
 		<View>
-			<Surface style={{ marginBottom: spacing[4] }}>
+			<Surface style={{ marginBottom: spacing[3] }}>
 				<View
 					style={{
 						flexDirection: "row",
 						alignItems: "center",
 						justifyContent: "space-between",
+						gap: spacing[3],
 					}}
 				>
 					<View>
-						<H3>{summary?.average ? summary.average.toFixed(1) : "—"}</H3>
+						<View
+							style={{
+								flexDirection: "row",
+								alignItems: "center",
+								gap: spacing[1.5],
+							}}
+						>
+							<H3>{summary?.count ? summary.average.toFixed(1) : "—"}</H3>
+							<Star
+								size={16}
+								color={colors.warning.ink}
+								fill={colors.warning.ink}
+							/>
+						</View>
 						<Caption color="tertiary">
 							{summary?.count ?? 0} review{summary?.count === 1 ? "" : "s"}
 						</Caption>
 					</View>
 					<Button size="sm" variant="outline" onPress={onWrite}>
-						Write a review
+						{hasMine ? "Edit your review" : "Write a review"}
 					</Button>
 				</View>
 			</Surface>
 
 			{items.length === 0 ? (
-				<Caption color="tertiary" style={{ paddingVertical: spacing[4] }}>
-					No reviews yet — be the first.
-				</Caption>
+				<EmptyState
+					icon={MessageSquare}
+					title="No reviews yet"
+					description="Volunteered with this NGO? Be the first to say how it went."
+				/>
 			) : (
-				<View style={{ gap: spacing[3] }}>
-					{items.map((review) => (
-						<Surface key={review.id}>
-							<View
-								style={{
-									flexDirection: "row",
-									alignItems: "center",
-									justifyContent: "space-between",
-								}}
-							>
-								<Body weight="bold" numberOfLines={1} style={{ flex: 1 }}>
-									{review.user.fullName ?? "Volunteer"}
-								</Body>
-								<Caption color={colors.warning.main as string}>
-									{"★".repeat(review.rating)}
-									{"☆".repeat(5 - review.rating)}
-								</Caption>
-							</View>
-							{review.body && (
-								<Caption color="secondary" style={{ marginTop: spacing[2] }}>
-									{review.body}
-								</Caption>
-							)}
-							{review.reply && (
+				<>
+					<ListGroup>
+						{items.map((review) => {
+							const mine = review.user.id === myUserId;
+							return (
 								<View
+									key={review.id}
 									style={{
-										marginTop: spacing[3],
-										paddingLeft: spacing[3],
-										borderLeftWidth: 2,
-										borderLeftColor: colors.border.medium,
+										paddingHorizontal: spacing[4],
+										paddingVertical: spacing[4],
 									}}
 								>
-									<Caption weight="medium" color="tertiary">
-										Response from the NGO
-									</Caption>
-									<Caption color="secondary">{review.reply}</Caption>
-								</View>
-							)}
-
-							{review.user.id === myUserId && (
-								<View
-									style={{
-										flexDirection: "row",
-										gap: spacing[4],
-										marginTop: spacing[3],
-									}}
-								>
-									<Pressable onPress={onWrite} hitSlop={8}>
-										<Caption
-											weight="medium"
-											color={colors.primary.main as string}
-										>
-											Edit
-										</Caption>
-									</Pressable>
-									<Pressable
-										onPress={confirmDelete}
-										disabled={remove.isPending}
-										hitSlop={8}
+									<View
+										style={{
+											flexDirection: "row",
+											alignItems: "center",
+											justifyContent: "space-between",
+											gap: spacing[3],
+										}}
 									>
-										<Caption
-											weight="medium"
-											color={colors.error.main as string}
+										<Label
+											weight="semibold"
+											numberOfLines={1}
+											style={{ flex: 1 }}
 										>
-											{remove.isPending ? "Deleting…" : "Delete"}
+											{mine ? "You" : (review.user.fullName ?? "Volunteer")}
+										</Label>
+										<Stars rating={review.rating} />
+									</View>
+									{review.body && (
+										<Caption
+											color="secondary"
+											style={{ marginTop: spacing[1.5] }}
+										>
+											{review.body}
 										</Caption>
-									</Pressable>
+									)}
+									<Caption
+										color="quaternary"
+										style={{ marginTop: spacing[1.5] }}
+									>
+										{formatRelative(review.createdAt)}
+									</Caption>
+									{review.reply && (
+										<View
+											style={{
+												marginTop: spacing[3],
+												padding: spacing[3],
+												borderRadius: 12,
+												backgroundColor: colors.background.subtle,
+											}}
+										>
+											<Caption weight="medium" color="tertiary">
+												Reply from the NGO
+											</Caption>
+											<Caption
+												color="secondary"
+												style={{ marginTop: spacing[0.5] }}
+											>
+												{review.reply}
+											</Caption>
+										</View>
+									)}
+
+									{mine && (
+										<View
+											style={{
+												flexDirection: "row",
+												gap: spacing[2],
+												marginTop: spacing[3],
+											}}
+										>
+											<Button size="sm" variant="outline" onPress={onWrite}>
+												Edit
+											</Button>
+											<Button
+												size="sm"
+												variant="ghost"
+												onPress={confirmDelete}
+												loading={remove.isPending}
+												accessibilityLabel="Delete your review"
+											>
+												Delete
+											</Button>
+										</View>
+									)}
 								</View>
-							)}
-						</Surface>
-					))}
-				</View>
+							);
+						})}
+					</ListGroup>
+					<LoadMoreButton query={query} loadMore={loadMore} />
+				</>
 			)}
 		</View>
 	);
 }
 
-function TransparencyTab({ organizationId }: { organizationId: string }) {
-	const { colors, spacing } = useTheme();
-	const query = useFinancialReports(organizationId);
-	const openDocument = useOpenDocument();
-
-	if (query.isLoading) return <LoadingState />;
-	const reports = query.data ?? [];
-
-	if (reports.length === 0) {
-		return (
-			<Caption color="tertiary" style={{ paddingVertical: spacing[6] }}>
-				This organization hasn't published any financial reports yet.
-			</Caption>
-		);
-	}
-
+function Stars({ rating }: { rating: number }) {
+	const { colors } = useTheme();
 	return (
-		<View style={{ gap: spacing[3] }}>
-			{reports.map((report) => (
-				<Surface key={report.id}>
-					<View
-						style={{
-							flexDirection: "row",
-							alignItems: "center",
-							gap: spacing[3],
-						}}
-					>
-						<FileText size={18} color={colors.text.secondary as string} />
-						<View style={{ flex: 1 }}>
-							<Body weight="medium" numberOfLines={1}>
-								{report.title}
-							</Body>
-							<Caption color="tertiary">
-								{formatFinancialYear(report.financialYear)} ·{" "}
-								{formatDate(report.createdAt)}
-							</Caption>
-						</View>
-					</View>
-					<Pressable
-						onPress={() => openDocument.mutate(report.documentKey)}
-						style={{ marginTop: spacing[2] }}
-					>
-						<Caption weight="medium" color={colors.primary.main as string}>
-							{openDocument.isPending ? "Opening…" : "Open document"}
-						</Caption>
-					</Pressable>
-				</Surface>
+		<View
+			accessible
+			accessibilityRole="text"
+			accessibilityLabel={`${rating} out of 5 stars`}
+			style={{ flexDirection: "row", gap: 2 }}
+		>
+			{[1, 2, 3, 4, 5].map((n) => (
+				<Star
+					key={n}
+					size={13}
+					color={n <= rating ? colors.warning.ink : colors.border.dark}
+					fill={n <= rating ? colors.warning.ink : "transparent"}
+				/>
 			))}
 		</View>
 	);
 }
 
-function Row({
-	label,
-	value,
-	last,
-}: {
-	label: string;
-	value?: string | null;
-	last?: boolean;
-}) {
-	const { colors, spacing } = useTheme();
+/* -------------------------------------------------------------------------- */
+/* Transparency                                                               */
+/* -------------------------------------------------------------------------- */
+
+function TransparencyTab({ organizationId }: { organizationId: string }) {
+	const query = useFinancialReports(organizationId);
+	const openDocument = useOpenDocument();
+
+	if (query.isLoading) return <LoadingState />;
+	if (query.isError) {
+		return (
+			<ErrorState
+				message={apiErrorMessage(query.error)}
+				onRetry={() => query.refetch()}
+			/>
+		);
+	}
+	const reports = query.data ?? [];
+
+	if (reports.length === 0) {
+		return (
+			<EmptyState
+				icon={FileText}
+				title="No financial reports yet"
+				description="NGOs can publish annual reports here so donors can see where money goes."
+			/>
+		);
+	}
+
+	const open = (key: string) =>
+		openDocument.mutate(key, {
+			onError: (error) => Alert.alert("Could not open", apiErrorMessage(error)),
+		});
+
 	return (
-		<View
-			style={{
-				flexDirection: "row",
-				justifyContent: "space-between",
-				gap: spacing[4],
-				paddingBottom: last ? 0 : spacing[2],
-				marginBottom: last ? 0 : spacing[2],
-				borderBottomWidth: last ? 0 : 1,
-				borderBottomColor: colors.border.light,
-			}}
-		>
-			<Caption color="tertiary">{label}</Caption>
-			<Caption
-				weight="medium"
-				color={value ? "primary" : "quaternary"}
-				style={{ flex: 1, textAlign: "right" }}
-			>
-				{value || "—"}
-			</Caption>
-		</View>
+		<ListGroup>
+			{reports.map((report) => (
+				<ListRow
+					key={report.id}
+					icon={FileText}
+					label={report.title}
+					hint={`${formatFinancialYear(report.financialYear)} · ${formatDate(report.createdAt)}`}
+					onPress={() => open(report.documentKey)}
+				/>
+			))}
+		</ListGroup>
 	);
 }

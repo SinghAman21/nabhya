@@ -13,7 +13,6 @@ import {
 import { View } from "react-native";
 import { type NavItem, Sidebar } from "@/components/sidebar";
 import { renderTabBar, useTabBarOptions } from "@/components/tab-bar";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { useMyOrganization } from "@/hooks/use-organization";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
@@ -132,7 +131,6 @@ export default function NgoLayout() {
 					}}
 				/>
 			</Tabs>
-			<ThemeToggle />
 		</View>
 	);
 }
