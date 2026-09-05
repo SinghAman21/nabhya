@@ -66,7 +66,7 @@ export default function OnboardingFlow() {
 				website: orgProfile.website || undefined,
 			},
 			{
-				onSuccess: () => router.replace("/success"),
+				onSuccess: () => router.replace("/"),
 				onError: (error) =>
 					Alert.alert(
 						"Could not finish setup",

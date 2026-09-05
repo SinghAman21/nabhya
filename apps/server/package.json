@@ -12,15 +12,17 @@
 		"test:coverage": "vitest run --coverage"
 	},
 	"dependencies": {
+		"@aws-sdk/client-s3": "^3.1127.0",
+		"@aws-sdk/s3-request-presigner": "^3.1127.0",
 		"@nabhya/db": "workspace:*",
 		"@nabhya/env": "workspace:*",
 		"@nabhya/shared": "workspace:*",
-		"@supabase/supabase-js": "^2.58.0",
 		"@nestjs/common": "^11.0.0",
 		"@nestjs/core": "^11.0.0",
 		"@nestjs/platform-express": "^11.0.0",
 		"@nestjs/swagger": "^11.4.4",
 		"@nestjs/throttler": "^6.5.0",
+		"@supabase/supabase-js": "^2.58.0",
 		"drizzle-orm": "^0.45.1",
 		"jose": "^5.9.6",
 		"pdf-lib": "^1.17.1",

@@ -133,6 +133,7 @@ describe("RazorpayPaymentProvider.createCheckout", () => {
 			amountMinor: 12_345, // not a multiple of 100 — Dodo would reject this
 			currency: "INR",
 			organizationName: "Test NGO",
+			returnUrl: "https://example.com/return",
 		});
 
 		expect(result).toEqual({
@@ -160,6 +161,7 @@ describe("RazorpayPaymentProvider.createCheckout", () => {
 				amountMinor: 100_000,
 				currency: "INR",
 				organizationName: "Test NGO",
+				returnUrl: "https://example.com/return",
 			}),
 		).rejects.toBeInstanceOf(BadRequestException);
 	});

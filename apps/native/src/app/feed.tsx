@@ -33,7 +33,11 @@ export default function FeedScreen() {
 	});
 	const publish = useMutation({
 		mutationFn: async () => {
-			const input: CreateFeedPostInput = { text: text.trim(), mediaKeys: [] };
+			const input: CreateFeedPostInput = {
+				text: text.trim(),
+				tag: "POST",
+				mediaKeys: [],
+			};
 			if (media.length > 0) {
 				const uploads = await feedApi.createMediaIntents({
 					files: media.map((asset) => ({

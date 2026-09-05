@@ -14,7 +14,10 @@ export interface CheckoutRequest {
 export interface CheckoutResult {
 	/** Provider's handle for the session, stored for reconciliation. */
 	providerCheckoutId: string;
-	checkoutUrl: string;
+	checkoutUrl?: string;
+	amountMinor?: number;
+	currency?: string;
+	publicKeyId?: string;
 }
 
 export type PaymentEventKind = "SUCCEEDED" | "FAILED" | "REFUNDED" | "IGNORED";

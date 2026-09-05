@@ -7,6 +7,7 @@ export const uploadPurposeSchema = z.enum([
 	"ORG_COVER",
 	"AVATAR",
 	"EVENT_COVER",
+	"FINANCIAL_REPORT",
 ]);
 
 export type UploadPurpose = z.infer<typeof uploadPurposeSchema>;

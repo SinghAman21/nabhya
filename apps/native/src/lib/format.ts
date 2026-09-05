@@ -63,17 +63,17 @@ export function formatRelative(
 	const hour = 60 * minute;
 	const day = 24 * hour;
 
-	const units: Array<[number, Intl.RelativeTimeFormatUnit]> = [
+	const units: Array<[number, "day" | "hour" | "minute"]> = [
 		[day, "day"],
 		[hour, "hour"],
 		[minute, "minute"],
 	];
 
-	const formatter = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-
 	for (const [ms, unit] of units) {
 		if (absMs >= ms) {
-			return formatter.format(Math.round(diffMs / ms), unit);
+			const amount = Math.round(absMs / ms);
+			const label = amount === 1 ? unit : `${unit}s`;
+			return diffMs < 0 ? `${amount} ${label} ago` : `in ${amount} ${label}`;
 		}
 	}
 	return "just now";

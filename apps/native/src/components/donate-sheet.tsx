@@ -3,7 +3,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react-native";
 import { useState } from "react";
 import { Alert, Modal, Pressable, ScrollView, View } from "react-native";
-import RazorpayCheckout from "react-native-razorpay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Body, Caption, H2, Label } from "@/components/ui/typography";
@@ -88,7 +87,17 @@ export function DonateSheet({
 					razorpayKeyId,
 				}) => {
 					onClose();
+						if (!orderId || !razorpayKeyId) {
+							Alert.alert(
+								"Payment unavailable",
+								"This payment provider does not support native checkout.",
+							);
+							return;
+						}
 					try {
+						const { default: RazorpayCheckout } = await import(
+							"react-native-razorpay"
+						);
 						// Fields present because we always pass order_id: razorpay_payment_id,
 						// razorpay_order_id, razorpay_signature. This is fast client-side
 						// feedback only — never proof the donation is COMPLETED.

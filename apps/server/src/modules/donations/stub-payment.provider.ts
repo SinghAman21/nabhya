@@ -31,16 +31,32 @@ export class StubPaymentProvider implements PaymentProvider {
 	parseWebhook(rawBody: string): PaymentEvent {
 		const event = JSON.parse(rawBody) as {
 			type?: string;
+			event?: string;
 			referenceId?: string;
 			paymentId?: string;
 			amountMinor?: number;
+			payload?: {
+				payment?: {
+					entity?: {
+						id?: string;
+						amount?: number;
+						notes?: { referenceId?: string };
+					};
+				};
+			};
 		};
+		const entity = event.payload?.payment?.entity;
 
 		return {
-			kind: event.type === "payment.failed" ? "FAILED" : "SUCCEEDED",
-			referenceId: event.referenceId ?? null,
-			providerPaymentId: event.paymentId ?? `stub_${randomUUID()}`,
-			amountMinor: event.amountMinor ?? null,
+			kind:
+				event.type === "payment.failed" || event.event === "payment.failed"
+					? "FAILED"
+					: "SUCCEEDED",
+			referenceId:
+				event.referenceId ?? entity?.notes?.referenceId ?? null,
+			providerPaymentId:
+				event.paymentId ?? entity?.id ?? `stub_${randomUUID()}`,
+			amountMinor: event.amountMinor ?? entity?.amount ?? null,
 		};
 	}
 }

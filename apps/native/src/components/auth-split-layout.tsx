@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useWindowDimensions, View } from "react-native";
+import { ScrollView, useWindowDimensions, View } from "react-native";
 import { Body, Caption, H1 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 
@@ -124,12 +124,13 @@ export function AuthSplitLayout({
 				</View>
 			</View>
 
-			<View
-				style={{
-					flex: 1,
-					padding: spacing[6],
+			<ScrollView
+				contentContainerStyle={{
+					flexGrow: 1,
 					justifyContent: "center",
+					padding: spacing[6],
 				}}
+				keyboardShouldPersistTaps="handled"
 			>
 				{children}
 				{alternateLink && (
@@ -145,7 +146,7 @@ export function AuthSplitLayout({
 						{alternateLink}
 					</View>
 				)}
-			</View>
+			</ScrollView>
 		</View>
 	);
 }

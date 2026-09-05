@@ -63,7 +63,6 @@ export default function RootLayout() {
 						<Stack.Screen name="edit-profile" />
 						<Stack.Screen name="feed" />
 						<Stack.Screen name="verify-identity" />
-						<Stack.Screen name="success" />
 					</Stack>
 					<PortalHost />
 				</View>

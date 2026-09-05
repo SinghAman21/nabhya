@@ -8,6 +8,7 @@ const PREFIXES: Record<StoragePurpose, string> = {
 	ORG_COVER: "org-covers",
 	AVATAR: "avatars",
 	EVENT_COVER: "event-covers",
+	FINANCIAL_REPORT: "financial-reports",
 	CERTIFICATE: "certificates",
 };
 

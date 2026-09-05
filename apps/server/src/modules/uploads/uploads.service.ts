@@ -1,6 +1,7 @@
+import { randomUUID } from "node:crypto";
 import type { db as dbType } from "@nabhya/db";
 import { organizations } from "@nabhya/db/schema";
-import type { UploadIntentInput } from "@nabhya/shared";
+import type { CreateFeedMediaIntentsInput, UploadIntentInput } from "@nabhya/shared";
 import {
 	BadRequestException,
 	ForbiddenException,
@@ -26,6 +27,7 @@ const ORG_SCOPED: StoragePurpose[] = [
 	"ORG_LOGO",
 	"ORG_COVER",
 	"EVENT_COVER",
+	"FINANCIAL_REPORT",
 ];
 
 @Injectable()
@@ -76,6 +78,55 @@ export class UploadsService {
 			await this.storage.delete(key);
 			throw new BadRequestException("Files must be under 10 MB.");
 		}
+	}
+
+	createEmptyFeedMediaFolder(): string {
+		const timestamp = Date.now().toString().padStart(12, "0").slice(-12);
+		return `${timestamp}-${randomUUID().replace(/-/g, "").slice(0, 6)}`;
+	}
+
+	async createFeedMediaIntents(
+		user: AuthUser,
+		files: CreateFeedMediaIntentsInput["files"],
+	) {
+		const mediaFolder = this.createEmptyFeedMediaFolder();
+		const tickets = await Promise.all(
+			files.map(async (file) => {
+				const safeName = file.fileName
+					.toLowerCase()
+					.replace(/[^a-z0-9._-]+/g, "-")
+					.slice(-80) || "file";
+				const key = `feed-media/${user.id}/${mediaFolder}/${randomUUID()}-${safeName}`;
+				return this.storage.createUploadTicket({
+					key,
+					contentType: file.contentType,
+				});
+			}),
+		);
+		return { mediaFolder, tickets };
+	}
+
+	async assertFeedMediaKeys(
+		user: AuthUser,
+		mediaFolder: string,
+		keys: string[],
+	): Promise<void> {
+		if (!/^\d{12}-[a-z0-9]{6}$/.test(mediaFolder))
+			throw new BadRequestException("Malformed feed media folder");
+		const prefix = `feed-media/${user.id}/${mediaFolder}/`;
+		if (keys.some((key) => !key.startsWith(prefix)))
+			throw new ForbiddenException("You cannot use these media files.");
+		await Promise.all(
+			keys.map(async (key) => {
+				const object = await this.storage.head(key);
+				if (!object)
+					throw new BadRequestException("That feed media was not uploaded.");
+				if (object.size > 25 * 1024 * 1024) {
+					await this.storage.delete(key);
+					throw new BadRequestException("Feed media must be under 25 MB.");
+				}
+			}),
+		);
 	}
 
 	/**

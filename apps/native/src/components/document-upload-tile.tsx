@@ -21,7 +21,6 @@ export function DocumentUploadTile({
 	title,
 	hint,
 	purpose,
-	organizationDocumentType,
 	existing,
 	onUploaded,
 	saving,
@@ -29,16 +28,12 @@ export function DocumentUploadTile({
 	title: string;
 	hint: string;
 	purpose: UploadPurpose;
-	organizationDocumentType?: string;
 	existing?: AdminOrgDocument;
 	onUploaded: (key: string) => void;
 	saving?: boolean;
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
-	const { pickAndUpload, isUploading, error } = useFileUpload(
-		purpose,
-		organizationDocumentType,
-	);
+	const { pickAndUpload, isUploading, error } = useFileUpload(purpose);
 	const openDocument = useOpenDocument();
 
 	const busy = isUploading || saving;

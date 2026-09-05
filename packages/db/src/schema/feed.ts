@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
 	decimal,
 	index,
@@ -8,6 +8,7 @@ import {
 	text,
 	timestamp,
 	unique,
+	uniqueIndex,
 	uuid,
 	varchar,
 } from "drizzle-orm/pg-core";
@@ -91,6 +92,68 @@ export const postsMediaRelations = relations(postsMedia, ({ one }) => ({
 		fields: [postsMedia.postId],
 		references: [posts.id],
 	}),
+}));
+
+export const postInteractionTypeEnum = pgEnum("post_interaction_type", [
+	"LIKE",
+	"SAVE",
+	"SHARE",
+	"IMPRESSION",
+]);
+
+export const postInteractions = pgTable(
+	"post_interactions",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		tag: postTagEnum("tag").notNull(),
+		postId: uuid("post_id").notNull(),
+		interactionType: postInteractionTypeEnum("interaction_type").notNull(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(table) => [
+		uniqueIndex("post_interactions_user_post_like_save_unique")
+			.on(table.userId, table.postId, table.interactionType)
+			.where(sql`${table.interactionType} in ('LIKE', 'SAVE')`),
+		index("post_interactions_post_tag_created_idx").on(
+			table.postId,
+			table.tag,
+			table.createdAt,
+		),
+		index("post_interactions_user_created_idx").on(
+			table.userId,
+			table.createdAt,
+		),
+	],
+);
+
+export const postComments = pgTable(
+	"post_comments",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		tag: postTagEnum("tag").notNull(),
+		postId: uuid("post_id").notNull(),
+		body: text("body").notNull(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(table) => [
+		index("post_comments_post_tag_created_idx").on(
+			table.postId,
+			table.tag,
+			table.createdAt,
+		),
+		index("post_comments_user_idx").on(table.userId),
+	],
+);
+
+export const postCommentsRelations = relations(postComments, ({ one }) => ({
+	user: one(users, { fields: [postComments.userId], references: [users.id] }),
 }));
 
 // Backward-compatible exports for code that still imports the old symbol names.

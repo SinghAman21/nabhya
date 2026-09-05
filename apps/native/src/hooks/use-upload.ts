@@ -34,7 +34,6 @@ export interface PickedUpload {
  */
 export function useFileUpload(
 	purpose: UploadPurpose,
-	organizationDocumentType?: string,
 ) {
 	const [isUploading, setUploading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -72,7 +71,6 @@ export function useFileUpload(
 		try {
 			const intent: UploadIntentInput = {
 				purpose,
-				organizationDocumentType,
 				fileName: asset.name,
 				contentType,
 				// A zero size means the picker couldn't determine it; send 1 so the

@@ -107,6 +107,8 @@ export class DonationsService {
 		return {
 			donationId: donation.id,
 			checkoutUrl: checkout.checkoutUrl,
+			orderId: checkout.providerCheckoutId,
+			razorpayKeyId: checkout.publicKeyId,
 			amountMinor: donation.amountMinor,
 			currency: donation.currency,
 		};
