@@ -17,7 +17,7 @@ import {
 import { StatusPill } from "@/components/status-pill";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useCertificatePdf, useMyCertificates } from "@/hooks/use-engagement";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import type { MyCertificate } from "@/lib/types";

@@ -1,6 +1,6 @@
 import { View } from "react-native";
 import { Body } from "@/components/ui/typography";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 
 interface StepIndicatorProps {
 	steps: string[];

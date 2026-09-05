@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, type ViewStyle } from "react-native";
 import { Body } from "@/components/ui/typography";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 
 const variantStyles = {
 	default: {

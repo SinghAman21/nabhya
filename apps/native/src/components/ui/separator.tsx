@@ -1,5 +1,5 @@
 import { View, type ViewProps } from "react-native";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 
 interface SeparatorProps extends ViewProps {
 	orientation?: "horizontal" | "vertical";

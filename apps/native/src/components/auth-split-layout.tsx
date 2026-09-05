@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useWindowDimensions, View } from "react-native";
 import { Body, Caption, H1 } from "@/components/ui/typography";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 
 const BREAKPOINT = 768;
 const BRAND_BG = "#0A0A0A";

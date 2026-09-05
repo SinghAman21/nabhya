@@ -28,7 +28,7 @@ import { Body, Caption } from "@/components/ui/typography";
 import { useSignOut } from "@/hooks/use-auth";
 import { useMyOrgDocuments, useUploadOrgDocument } from "@/hooks/use-documents";
 import { useMyOrganization } from "@/hooks/use-organization";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 
 /** Reached from here rather than the tab bar, which only has room for four. */

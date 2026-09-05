@@ -8,8 +8,8 @@ import {
 } from "@/components/status-pill";
 import { Body, Caption } from "@/components/ui/typography";
 import { useOpenDocument } from "@/hooks/use-documents";
+import { useTheme } from "@/hooks/use-theme";
 import { useFileUpload } from "@/hooks/use-upload";
-import { useTheme } from "@/hooks/useTheme";
 import type { AdminOrgDocument } from "@/lib/types";
 
 /**

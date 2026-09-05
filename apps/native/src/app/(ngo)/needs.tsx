@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Body, Caption } from "@/components/ui/typography";
 import { useDeleteNeed, useOrgNeeds } from "@/hooks/use-needs";
 import { useMe } from "@/hooks/use-profile";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatProgress, formatRelative } from "@/lib/format";
 import type { OrgNeedListItem } from "@/lib/types";

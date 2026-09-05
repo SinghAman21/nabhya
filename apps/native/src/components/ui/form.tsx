@@ -4,7 +4,7 @@ import { View } from "react-native";
 import { Input, type InputProps } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Caption } from "@/components/ui/typography";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 
 // ── useZodForm ──────────────────────────────────────────────────────
 

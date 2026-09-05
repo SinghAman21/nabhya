@@ -13,7 +13,7 @@ import { StatusPill } from "@/components/status-pill";
 import { Input } from "@/components/ui/input";
 import { Body, Caption } from "@/components/ui/typography";
 import { usePublicEvents } from "@/hooks/use-events";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDateRange } from "@/lib/format";
 import type { PublicEvent } from "@/lib/types";

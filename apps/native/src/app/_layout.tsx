@@ -5,7 +5,7 @@ import { useFonts } from "expo-font";
 import { SplashScreen, Stack } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
-import { ThemeProvider } from "@/hooks/useAppTheme";
+import { ThemeProvider } from "@/hooks/use-app-theme";
 import { queryClient } from "@/lib/api";
 import { storage } from "@/lib/storage";
 import { useAuthStore } from "@/store/auth-store";

@@ -27,7 +27,7 @@ import {
 	useMyAnnouncements,
 	useUpdateAnnouncement,
 } from "@/hooks/use-directory";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatRelative } from "@/lib/format";
 import type { Announcement } from "@/lib/types";

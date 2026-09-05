@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Body, Caption, H2, Label } from "@/components/ui/typography";
 import { useUpsertReview } from "@/hooks/use-engagement";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 
 /**

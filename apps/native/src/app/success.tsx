@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Body, Caption, H2, Mono } from "@/components/ui/typography";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiClient } from "@/lib/api";
 import { USERS } from "@/lib/api/endpoints";
 import { useAuthStore } from "@/store/auth-store";

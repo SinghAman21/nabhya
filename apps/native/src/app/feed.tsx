@@ -12,7 +12,7 @@ import {
 } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
 import { Body, Caption } from "@/components/ui/typography";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage, feedApi, queryKeys } from "@/lib/api";
 
 interface FeedPost {

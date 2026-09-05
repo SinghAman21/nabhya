@@ -12,7 +12,7 @@ import {
 	useMarkNotificationsRead,
 	useNotifications,
 } from "@/hooks/use-engagement";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatRelative } from "@/lib/format";
 import type { NotificationItem } from "@/lib/types";

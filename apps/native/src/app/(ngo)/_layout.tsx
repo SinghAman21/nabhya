@@ -8,7 +8,7 @@ import {
 } from "lucide-react-native";
 import { View } from "react-native";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "@/hooks/use-theme";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function NgoLayout() {

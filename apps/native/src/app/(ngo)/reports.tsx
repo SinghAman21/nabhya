@@ -28,8 +28,8 @@ import {
 } from "@/hooks/use-directory";
 import { useOpenDocument } from "@/hooks/use-documents";
 import { useMe } from "@/hooks/use-profile";
+import { useTheme } from "@/hooks/use-theme";
 import { useFileUpload } from "@/hooks/use-upload";
-import { useTheme } from "@/hooks/useTheme";
 import { apiErrorMessage } from "@/lib/api";
 import type { FinancialReport } from "@/lib/types";
 
