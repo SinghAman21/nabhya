@@ -17,6 +17,12 @@ export const env = createEnv({
 			.default("development"),
 		SUPABASE_AUTH_JWKS_URL: z.string().url(),
 
+		// Supabase Storage is the current bucket backend for uploads when the app
+		// is pointed at a real project. The server uses the service-role key only
+		// to mint short-lived signed URLs; clients never receive it.
+		SUPABASE_URL: z.string().url().optional(),
+		SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+
 		// Cloudflare R2 (S3-compatible). All optional: when unset the server
 		// falls back to an in-memory stub so the app still boots and every
 		// upload path stays exercisable without credentials. The stub refuses

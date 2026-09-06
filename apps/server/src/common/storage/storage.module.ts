@@ -3,10 +3,20 @@ import { Global, Logger, Module } from "@nestjs/common";
 import { R2StorageProvider } from "./r2-storage.provider";
 import { STORAGE_TOKEN, type StorageProvider } from "./storage.types";
 import { StubStorageProvider } from "./stub-storage.provider";
+import { SupabaseStorageProvider } from "./supabase-storage.provider";
 
 const logger = new Logger("StorageModule");
 
 function createProvider(): StorageProvider {
+	const supabaseConfigured = env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY;
+	if (supabaseConfigured) {
+		logger.log("Object storage: Supabase Storage (feed_media, ngo_verification)");
+		return new SupabaseStorageProvider({
+			url: env.SUPABASE_URL as string,
+			serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY as string,
+		});
+	}
+
 	const configured =
 		env.R2_ACCOUNT_ID &&
 		env.R2_ACCESS_KEY_ID &&
@@ -27,14 +37,14 @@ function createProvider(): StorageProvider {
 	// documents that vanish — fail loudly at boot instead.
 	if (env.NODE_ENV === "production") {
 		throw new Error(
-			"Object storage is not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, " +
-				"R2_SECRET_ACCESS_KEY and R2_BUCKET before starting in production.",
+			"Object storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY " +
+				"or the R2_* variables before starting in production.",
 		);
 	}
 
 	logger.warn(
-		"Object storage: in-memory stub (no R2 credentials). Uploads are simulated " +
-			"and discarded — set the R2_* variables in .env for real storage.",
+		"Object storage: in-memory stub (no Supabase or R2 credentials). Uploads are simulated " +
+			"and discarded — set the storage variables in .env for real storage.",
 	);
 	return new StubStorageProvider();
 }

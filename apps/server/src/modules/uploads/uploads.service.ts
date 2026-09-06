@@ -15,7 +15,10 @@ import {
 import { eq } from "drizzle-orm";
 import { DB_TOKEN } from "../../common/database";
 import {
+	buildFeedMediaKey,
 	buildStorageKey,
+	FEED_MEDIA_BUCKET,
+	FEED_MEDIA_PREFIX,
 	MAX_UPLOAD_BYTES,
 	parseStorageKey,
 	STORAGE_TOKEN,
@@ -95,12 +98,11 @@ export class UploadsService {
 		const mediaFolder = this.createEmptyFeedMediaFolder();
 		const tickets = await Promise.all(
 			files.map(async (file) => {
-				const safeName =
-					file.fileName
-						.toLowerCase()
-						.replace(/[^a-z0-9._-]+/g, "-")
-						.slice(-80) || "file";
-				const key = `feed-media/${user.id}/${mediaFolder}/${randomUUID()}-${safeName}`;
+				const key = buildFeedMediaKey({
+					ownerId: user.id,
+					mediaFolder,
+					fileName: file.fileName,
+				});
 				return this.storage.createUploadTicket({
 					key,
 					contentType: file.contentType,
@@ -117,7 +119,7 @@ export class UploadsService {
 	): Promise<void> {
 		if (!/^\d{12}-[a-z0-9]{6}$/.test(mediaFolder))
 			throw new BadRequestException("Malformed feed media folder");
-		const prefix = `feed-media/${user.id}/${mediaFolder}/`;
+		const prefix = `${FEED_MEDIA_BUCKET}/${FEED_MEDIA_PREFIX}/${user.id}/${mediaFolder}/`;
 		if (keys.some((key) => !key.startsWith(prefix)))
 			throw new ForbiddenException("You cannot use these media files.");
 		await Promise.all(

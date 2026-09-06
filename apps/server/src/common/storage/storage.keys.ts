@@ -1,15 +1,33 @@
 import { randomUUID } from "node:crypto";
 import type { StoragePurpose } from "./storage.types";
 
-const PREFIXES: Record<StoragePurpose, string> = {
-	ORG_DOCUMENT: "org-documents",
-	USER_DOCUMENT: "user-documents",
-	ORG_LOGO: "org-logos",
-	ORG_COVER: "org-covers",
-	AVATAR: "avatars",
-	EVENT_COVER: "event-covers",
-	FINANCIAL_REPORT: "financial-reports",
-	CERTIFICATE: "certificates",
+export const NGO_VERIFICATION_BUCKET = "ngo_verification";
+export const FEED_MEDIA_BUCKET = "feed_media";
+export const FEED_MEDIA_PREFIX = "feed-media";
+
+interface PurposeTarget {
+	bucket: string;
+	prefix: string;
+}
+
+const PURPOSE_TARGETS: Record<StoragePurpose, PurposeTarget> = {
+	ORG_DOCUMENT: {
+		bucket: NGO_VERIFICATION_BUCKET,
+		prefix: "org-documents",
+	},
+	USER_DOCUMENT: {
+		bucket: NGO_VERIFICATION_BUCKET,
+		prefix: "user-documents",
+	},
+	ORG_LOGO: { bucket: FEED_MEDIA_BUCKET, prefix: "org-logos" },
+	ORG_COVER: { bucket: FEED_MEDIA_BUCKET, prefix: "org-covers" },
+	AVATAR: { bucket: FEED_MEDIA_BUCKET, prefix: "avatars" },
+	EVENT_COVER: { bucket: FEED_MEDIA_BUCKET, prefix: "event-covers" },
+	FINANCIAL_REPORT: {
+		bucket: FEED_MEDIA_BUCKET,
+		prefix: "financial-reports",
+	},
+	CERTIFICATE: { bucket: FEED_MEDIA_BUCKET, prefix: "certificates" },
 };
 
 /**
@@ -33,8 +51,8 @@ function safeFileName(fileName: string): string {
 }
 
 /**
- * Builds the object key. `ownerId` scopes the object to the organization or
- * user it belongs to, which is what makes ownership checkable on download:
+ * Builds a bucketed object key. `ownerId` scopes the object to the organization
+ * or user it belongs to, which is what makes ownership checkable on download:
  * a key always encodes who it belongs to, so we never have to trust the client.
  */
 export function buildStorageKey(input: {
@@ -42,20 +60,29 @@ export function buildStorageKey(input: {
 	ownerId: string;
 	fileName: string;
 }): string {
-	const prefix = PREFIXES[input.purpose];
-	return `${prefix}/${input.ownerId}/${randomUUID()}-${safeFileName(input.fileName)}`;
+	const target = PURPOSE_TARGETS[input.purpose];
+	return `${target.bucket}/${target.prefix}/${input.ownerId}/${randomUUID()}-${safeFileName(input.fileName)}`;
+}
+
+/** Builds a key for feed media uploads in the shared `feed_media` bucket. */
+export function buildFeedMediaKey(input: {
+	ownerId: string;
+	mediaFolder: string;
+	fileName: string;
+}): string {
+	return `${FEED_MEDIA_BUCKET}/${FEED_MEDIA_PREFIX}/${input.ownerId}/${input.mediaFolder}/${randomUUID()}-${safeFileName(input.fileName)}`;
 }
 
 /** Reads back the owner segment so downloads can be authorised. */
 export function parseStorageKey(
 	key: string,
 ): { purpose: StoragePurpose; ownerId: string } | null {
-	const [prefix, ownerId] = key.split("/");
-	if (!prefix || !ownerId) return null;
+	const [bucket, prefix, ownerId] = key.split("/");
+	if (!bucket || !prefix || !ownerId) return null;
 
-	const purpose = (Object.keys(PREFIXES) as StoragePurpose[]).find(
-		(candidate) => PREFIXES[candidate] === prefix,
-	);
+	const purpose = (Object.entries(PURPOSE_TARGETS) as Array<
+		[StoragePurpose, PurposeTarget]
+	>).find(([, target]) => target.bucket === bucket && target.prefix === prefix)?.[0];
 	if (!purpose) return null;
 
 	return { purpose, ownerId };

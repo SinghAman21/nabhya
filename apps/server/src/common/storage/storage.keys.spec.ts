@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { buildStorageKey, parseStorageKey } from "./storage.keys";
+import { buildFeedMediaKey, buildStorageKey, parseStorageKey } from "./storage.keys";
 
 describe("storage keys", () => {
-	it("puts each purpose under its own prefix, scoped to the owner", () => {
+	it("puts each purpose under its own bucket and prefix, scoped to the owner", () => {
 		const key = buildStorageKey({
 			purpose: "ORG_DOCUMENT",
 			ownerId: "org-123",
 			fileName: "pan.pdf",
 		});
 
-		expect(key.startsWith("org-documents/org-123/")).toBe(true);
+		expect(key.startsWith("ngo_verification/org-documents/org-123/")).toBe(true);
 		expect(key.endsWith("-pan.pdf")).toBe(true);
 	});
 
@@ -35,8 +35,8 @@ describe("storage keys", () => {
 
 		// What actually matters: the name cannot introduce a new path segment,
 		// so it can never escape the owner's prefix.
-		expect(key.startsWith("org-documents/org-1/")).toBe(true);
-		expect(key.split("/")).toHaveLength(3);
+		expect(key.startsWith("ngo_verification/org-documents/org-1/")).toBe(true);
+		expect(key.split("/")).toHaveLength(4);
 		expect(key).not.toContain("..");
 	});
 
@@ -48,6 +48,17 @@ describe("storage keys", () => {
 		} as const;
 
 		expect(buildStorageKey(input)).not.toBe(buildStorageKey(input));
+	});
+
+	it("builds feed media keys in the feed_media bucket", () => {
+		const key = buildFeedMediaKey({
+			ownerId: "user-1",
+			mediaFolder: "123456789012-abcdef",
+			fileName: "hero.png",
+		});
+
+		expect(key.startsWith("feed_media/feed-media/user-1/123456789012-abcdef/")).toBe(true);
+		expect(key.endsWith("-hero.png")).toBe(true);
 	});
 
 	it("falls back to a safe name when the input sanitises to nothing", () => {
