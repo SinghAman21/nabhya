@@ -70,6 +70,7 @@ export const lightColors = {
 		overlay: "#E5E5E5",
 		/** Raised surface: cards, grouped lists, sheets. */
 		card: "#FFFFFF",
+		sheet: "#FFFFFF",
 		/** Inset surface: chips, icon wells, quiet fills inside a card. */
 		subtle: "#F4F4F2",
 	},
@@ -167,6 +168,7 @@ export const darkColors = {
 		/** Lifted off the page rather than cut into it — dark mode has no shadows. */
 		card: "#191919",
 		subtle: "#232323",
+		sheet: "#111111",
 	},
 	text: {
 		primary: "#F5F5F5",
