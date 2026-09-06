@@ -10,7 +10,9 @@ const logger = new Logger("StorageModule");
 function createProvider(): StorageProvider {
 	const supabaseConfigured = env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY;
 	if (supabaseConfigured) {
-		logger.log("Object storage: Supabase Storage (feed_media, ngo_verification)");
+		logger.log(
+			"Object storage: Supabase Storage (feed_media, ngo_verification)",
+		);
 		return new SupabaseStorageProvider({
 			url: env.SUPABASE_URL as string,
 			serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY as string,
