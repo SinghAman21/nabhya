@@ -41,9 +41,9 @@ export const pledgeStatusEnum = pgEnum("pledge_status", [
 	"CANCELLED",
 ]);
 
-// ─── OrganizationNeed Table ──────────────────────────────────────────────────
-export const organizationNeeds = pgTable(
-	"organization_needs",
+// ─── Needs Table ─────────────────────────────────────────────────────────────
+export const needs = pgTable(
+	"needs",
 	{
 		id: uuid("id").primaryKey().defaultRandom(),
 		organizationId: uuid("organization_id")
@@ -74,10 +74,10 @@ export const organizationNeeds = pgTable(
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},
 	(table) => [
-		index("organization_needs_organization_idx").on(table.organizationId),
+		index("needs_organization_idx").on(table.organizationId),
 		// Drives the public needs feed.
-		index("organization_needs_status_type_idx").on(table.status, table.type),
-		index("organization_needs_city_idx").on(table.city),
+		index("needs_status_type_idx").on(table.status, table.type),
+		index("needs_city_idx").on(table.city),
 	],
 );
 
@@ -93,7 +93,7 @@ export const needPledges = pgTable(
 		id: uuid("id").primaryKey().defaultRandom(),
 		needId: uuid("need_id")
 			.notNull()
-			.references(() => organizationNeeds.id, { onDelete: "cascade" }),
+			.references(() => needs.id, { onDelete: "cascade" }),
 		userId: uuid("user_id")
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
@@ -121,25 +121,22 @@ export const needPledges = pgTable(
 );
 
 // ─── Relations ───────────────────────────────────────────────────────────────
-export const organizationNeedsRelations = relations(
-	organizationNeeds,
-	({ one, many }) => ({
-		organization: one(organizations, {
-			fields: [organizationNeeds.organizationId],
-			references: [organizations.id],
-		}),
-		creator: one(users, {
-			fields: [organizationNeeds.createdBy],
-			references: [users.id],
-		}),
-		pledges: many(needPledges),
+export const needsRelations = relations(needs, ({ one, many }) => ({
+	organization: one(organizations, {
+		fields: [needs.organizationId],
+		references: [organizations.id],
 	}),
-);
+	creator: one(users, {
+		fields: [needs.createdBy],
+		references: [users.id],
+	}),
+	pledges: many(needPledges),
+}));
 
 export const needPledgesRelations = relations(needPledges, ({ one }) => ({
-	need: one(organizationNeeds, {
+	need: one(needs, {
 		fields: [needPledges.needId],
-		references: [organizationNeeds.id],
+		references: [needs.id],
 	}),
 	user: one(users, {
 		fields: [needPledges.userId],

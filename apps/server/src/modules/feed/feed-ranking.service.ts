@@ -3,10 +3,10 @@ import {
 	announcements,
 	eventApplications,
 	events,
+	follows,
 	needPledges,
+	needs,
 	organizationCategories,
-	organizationFollows,
-	organizationNeeds,
 	organizations,
 	postComments,
 	postInteractions,
@@ -104,9 +104,9 @@ export class FeedRankingService {
 		const following = new Set(
 			(
 				await this.db
-					.select({ id: organizationFollows.organizationId })
-					.from(organizationFollows)
-					.where(eq(organizationFollows.userId, user.id))
+					.select({ id: follows.organizationId })
+					.from(follows)
+					.where(eq(follows.userId, user.id))
 			).map((row) => row.id),
 		);
 		const selected = candidates
@@ -150,24 +150,21 @@ export class FeedRankingService {
 					.limit(SOURCE_LIMIT),
 				this.db
 					.select({
-						need: organizationNeeds,
+						need: needs,
 						org: organizations,
 						author: users,
 					})
-					.from(organizationNeeds)
-					.innerJoin(
-						organizations,
-						eq(organizationNeeds.organizationId, organizations.id),
-					)
-					.leftJoin(users, eq(organizationNeeds.createdBy, users.id))
+					.from(needs)
+					.innerJoin(organizations, eq(needs.organizationId, organizations.id))
+					.leftJoin(users, eq(needs.createdBy, users.id))
 					.where(
 						and(
 							visibleOrg,
-							eq(organizationNeeds.status, "OPEN"),
-							sql`(${organizationNeeds.expiresAt} is null or ${organizationNeeds.expiresAt} >= ${now})`,
+							eq(needs.status, "OPEN"),
+							sql`(${needs.expiresAt} is null or ${needs.expiresAt} >= ${now})`,
 						),
 					)
-					.orderBy(desc(organizationNeeds.createdAt))
+					.orderBy(desc(needs.createdAt))
 					.limit(SOURCE_LIMIT),
 				this.db
 					.select({
@@ -317,7 +314,7 @@ export class FeedRankingService {
 			commentRows,
 			applications,
 			pledges,
-			follows,
+			followingRows,
 		] = await Promise.all([
 			organizationIds.length
 				? this.db
@@ -358,9 +355,9 @@ export class FeedRankingService {
 				.groupBy(needPledges.needId),
 			viewerId
 				? this.db
-						.select({ organizationId: organizationFollows.organizationId })
-						.from(organizationFollows)
-						.where(eq(organizationFollows.userId, viewerId))
+						.select({ organizationId: follows.organizationId })
+						.from(follows)
+						.where(eq(follows.userId, viewerId))
 				: [],
 		]);
 		const categoryByOrg = Map.groupBy(
@@ -374,7 +371,7 @@ export class FeedRankingService {
 			applications.map((row) => [row.id, row.count]),
 		);
 		const pledgeCounts = new Map(pledges.map((row) => [row.id, row.count]));
-		const followsSet = new Set(follows.map((row) => row.organizationId));
+		const followsSet = new Set(followingRows.map((row) => row.organizationId));
 		for (const candidate of candidates) {
 			candidate.categoryIds = (
 				categoryByOrg.get(candidate.organizationId ?? "") ?? []
@@ -440,9 +437,9 @@ export class FeedRankingService {
 				.from(userCategories)
 				.where(eq(userCategories.userId, userId)),
 			this.db
-				.select({ organizationId: organizationFollows.organizationId })
-				.from(organizationFollows)
-				.where(eq(organizationFollows.userId, userId)),
+				.select({ organizationId: follows.organizationId })
+				.from(follows)
+				.where(eq(follows.userId, userId)),
 			this.db
 				.select({
 					tag: postInteractions.tag,

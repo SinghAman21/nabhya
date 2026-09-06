@@ -79,9 +79,9 @@ export function useToggleBookmark() {
 }
 
 /**
- * Follow or unfollow an NGO. The server keeps follows and bookmarks apart;
+ * Follow or unfollow an account. The server keeps follows and bookmarks apart;
  * the feed's "Follow" pill is this one, because the Following lens reads
- * `organization_follows`.
+ * `follows`.
  */
 export function useToggleFollow() {
 	const queryClient = useQueryClient();

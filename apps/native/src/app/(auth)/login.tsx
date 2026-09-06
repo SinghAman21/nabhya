@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { AuthSplitLayout } from "@/components/auth-split-layout";
+import { GoogleSignInButton } from "@/components/google-signin-button";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form";
 import { Pressable } from "@/components/ui/pressable";
@@ -117,6 +118,8 @@ export default function Login() {
 			>
 				Sign in
 			</Button>
+
+			<GoogleSignInButton />
 		</AuthSplitLayout>
 	);
 }

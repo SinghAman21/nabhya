@@ -121,7 +121,7 @@ describe("RazorpayPaymentProvider.createCheckout", () => {
 		vi.unstubAllGlobals();
 	});
 
-	it("does not restrict amounts to whole rupees, unlike Dodo's product-cart model", async () => {
+	it("does not restrict amounts to whole rupees", async () => {
 		const fetchMock = vi.fn().mockResolvedValue({
 			ok: true,
 			json: async () => ({ id: "order_1", amount: 12_345, currency: "INR" }),
@@ -130,7 +130,7 @@ describe("RazorpayPaymentProvider.createCheckout", () => {
 
 		const result = await makeProvider().createCheckout({
 			referenceId: "donation-1",
-			amountMinor: 12_345, // not a multiple of 100 — Dodo would reject this
+			amountMinor: 12_345, // not a multiple of 100 — arbitrary paise is fine
 			currency: "INR",
 			organizationName: "Test NGO",
 			returnUrl: "https://example.com/return",

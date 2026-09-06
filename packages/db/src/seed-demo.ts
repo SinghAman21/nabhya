@@ -2,7 +2,7 @@ import { eq, inArray, like } from "drizzle-orm";
 import { db } from "./index";
 import { categories, organizationCategories } from "./schema/categories";
 import { events } from "./schema/events";
-import { organizationNeeds } from "./schema/needs";
+import { needs } from "./schema/needs";
 import { organizations } from "./schema/organizations";
 import { announcements } from "./schema/publishing";
 import { roles, userRoles, users } from "./schema/users";
@@ -515,7 +515,7 @@ async function main() {
 		}
 
 		for (const n of ngo.needs) {
-			await db.insert(organizationNeeds).values({
+			await db.insert(needs).values({
 				organizationId: org.id,
 				type: n.type,
 				title: n.title,

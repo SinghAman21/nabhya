@@ -32,6 +32,7 @@ export class FeedService {
 	) {}
 
 	async createMediaIntents(user: AuthUser, input: CreateFeedMediaIntentsInput) {
+		await this.organizationsService.requireVerifiedOrganization(user.id);
 		return this.uploads.createFeedMediaIntents(user, input.files);
 	}
 
@@ -39,9 +40,8 @@ export class FeedService {
 		const mediaFolder =
 			input.mediaFolder ?? this.uploads.createEmptyFeedMediaFolder();
 		await this.uploads.assertFeedMediaKeys(user, mediaFolder, input.mediaKeys);
-		const organization = user.roles.includes("organisation")
-			? await this.organizationsService.requireOwnedOrganization(user.id)
-			: null;
+		const organization =
+			await this.organizationsService.requireVerifiedOrganization(user.id);
 		const post = await this.db.transaction(async (tx) => {
 			const created = takeFirstOrThrow(
 				await tx

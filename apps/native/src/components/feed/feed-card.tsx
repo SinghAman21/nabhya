@@ -19,6 +19,7 @@ import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H5, Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { formatDateRange, formatProgress, formatRelative } from "@/lib/format";
+import { splitPostText } from "@/lib/post-text";
 import type {
 	FeedEventItem,
 	FeedItem,
@@ -452,8 +453,10 @@ function PostBody({
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
 	const { width } = useWindowDimensions();
-	const media = item.post.media.filter((m) => m.type === "IMAGE").slice(0, 4);
-	const long = item.post.text.length > 220;
+	const post = item.post;
+	const media = post.media.filter((m) => m.type === "IMAGE").slice(0, 4);
+	const body = splitPostText(post.text);
+	const long = post.text.length > 220;
 	// Card width minus page gutters and card padding, capped for desktop.
 	const inner = Math.min(width, 720) - spacing[5] * 2 - spacing[4] * 2;
 	const gap = spacing[1.5];
@@ -461,8 +464,9 @@ function PostBody({
 
 	return (
 		<View style={{ gap: spacing[3] }}>
-			{item.post.text ? (
-				<Body numberOfLines={expanded ? undefined : 6}>{item.post.text}</Body>
+			{body.title ? <H5 numberOfLines={2}>{body.title}</H5> : null}
+			{body.description ? (
+				<Body numberOfLines={expanded ? undefined : 6}>{body.description}</Body>
 			) : null}
 			{long && (
 				<Pressable
@@ -501,6 +505,7 @@ function PostBody({
 
 function NeedFacts({ item }: { item: FeedNeedItem }) {
 	const { colors, spacing } = useTheme();
+	const [now] = useState(() => Date.now());
 	const { need } = item;
 
 	const target = need.quantity ?? 0;
@@ -509,7 +514,7 @@ function NeedFacts({ item }: { item: FeedNeedItem }) {
 	const remaining = Math.max(0, target - done);
 
 	const expiresAt = need.expiresAt ? new Date(need.expiresAt) : null;
-	const msLeft = expiresAt ? expiresAt.getTime() - Date.now() : null;
+	const msLeft = expiresAt ? expiresAt.getTime() - now : null;
 	const closingSoon = msLeft !== null && msLeft > 0 && msLeft < 3 * DAY_MS;
 
 	if (target === 0 && !expiresAt) return null;

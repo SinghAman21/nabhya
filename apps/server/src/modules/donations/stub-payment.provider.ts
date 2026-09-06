@@ -8,7 +8,7 @@ import type {
 } from "./payment.types";
 
 /**
- * Stand-in used when Dodo credentials are absent.
+ * Stand-in used when Razorpay credentials are absent.
  *
  * Keeps the whole donation flow exercisable locally — a checkout is issued and
  * the webhook path can be driven by POSTing a plain JSON body — without any

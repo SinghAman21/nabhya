@@ -7,8 +7,8 @@ import {
 	Megaphone,
 	Search,
 } from "lucide-react-native";
-import { useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, View } from "react-native";
+import { useState } from "react";
+import { FlatList, View } from "react-native";
 import { BackButton } from "@/components/back-button";
 import { FeedCard, toPublicNeed } from "@/components/feed/feed-card";
 import { SearchField } from "@/components/feed/search-field";
@@ -25,9 +25,9 @@ import {
 } from "@/components/screen-shell";
 import { Pressable } from "@/components/ui/pressable";
 import { Caption } from "@/components/ui/typography";
-import { useOrganizations } from "@/hooks/use-directory";
 import { useToggleFollow } from "@/hooks/use-engagement";
-import { useFeed, useFeedReaction } from "@/hooks/use-feed";
+import { useFeedReaction } from "@/hooks/use-feed";
+import { useSearch } from "@/hooks/use-search";
 import { useTheme } from "@/hooks/use-theme";
 import { useDebounced } from "@/hooks/useDebounced";
 import { apiErrorMessage } from "@/lib/api";
@@ -48,7 +48,7 @@ import type { FeedItem, FeedKind, FeedNeedItem } from "@/lib/types";
 
 type Scope = "all" | "ngos" | FeedKind;
 
-const SCOPES: Array<{ value: Scope; label: string }> = [
+const SCOPES: { value: Scope; label: string }[] = [
 	{ value: "all", label: "All" },
 	{ value: "ngos", label: "NGOs" },
 	{ value: "need", label: "Needs" },
@@ -78,38 +78,21 @@ export default function SearchScreen() {
 
 	const term = useDebounced(query.trim());
 	const active = term.length > 0;
-	const wantOrgs = active && (scope === "all" || scope === "ngos");
-	const wantPosts = active && scope !== "ngos";
-
-	const orgs = useOrganizations(
-		wantOrgs ? { search: term, limit: scope === "ngos" ? 25 : 5 } : {},
-	);
-	const feed = useFeed(
-		{
-			tab: "for_you",
-			search: term,
-			...(scope === "all" || scope === "ngos" ? {} : { kind: scope }),
-		},
-		wantPosts,
-	);
+	const result = useSearch(term, scope, active);
 	const toggleFollow = useToggleFollow();
 	const like = useFeedReaction("like");
 	const save = useFeedReaction("save");
 
-	const items = useMemo(
-		() =>
-			wantPosts ? (feed.data?.pages.flatMap((page) => page.items) ?? []) : [],
-		[wantPosts, feed.data],
-	);
-	const orgItems = wantOrgs ? (orgs.data?.items ?? []) : [];
-	const loading = (wantPosts && feed.isLoading) || (wantOrgs && orgs.isLoading);
-	const error = wantPosts && feed.isError ? feed.error : null;
+	const orgItems = active ? (result.data?.organizations.items ?? []) : [];
+	const feedItems = active ? (result.data?.feed.items ?? []) : [];
+	const loading = active && result.isLoading;
+	const error = active && result.isError ? result.error : null;
 	const nothing =
-		active && !loading && !error && items.length === 0 && orgItems.length === 0;
-
-	const loadMore = () => {
-		if (feed.hasNextPage && !feed.isFetchingNextPage) feed.fetchNextPage();
-	};
+		active &&
+		!loading &&
+		!error &&
+		orgItems.length === 0 &&
+		feedItems.length === 0;
 
 	/* ---- Before typing: teach what search can do ------------------------- */
 	const guide = (
@@ -182,7 +165,7 @@ export default function SearchScreen() {
 	const resultsHeader = (
 		<View style={{ paddingTop: spacing[3] }}>
 			<FilterChips options={SCOPES} value={scope} onChange={setScope} />
-			{orgItems.length > 0 && (
+			{orgItems.length > 0 && (scope === "all" || scope === "ngos") && (
 				<View style={{ marginBottom: spacing[5] }}>
 					<SectionTitle>NGOs</SectionTitle>
 					<ListGroup>
@@ -201,7 +184,7 @@ export default function SearchScreen() {
 					</ListGroup>
 				</View>
 			)}
-			{items.length > 0 && scope === "all" && (
+			{feedItems.length > 0 && scope === "all" && (
 				<SectionTitle>Posts across India</SectionTitle>
 			)}
 		</View>
@@ -212,7 +195,7 @@ export default function SearchScreen() {
 	) : error ? (
 		<ErrorState
 			message={apiErrorMessage(error)}
-			onRetry={() => feed.refetch()}
+			onRetry={() => result.refetch()}
 		/>
 	) : nothing ? (
 		<EmptyState
@@ -224,13 +207,9 @@ export default function SearchScreen() {
 					: "Try the All tab — it may be listed as something else."
 			}
 		/>
-	) : feed.isFetchingNextPage ? (
-		<View style={{ paddingVertical: spacing[6], alignItems: "center" }}>
-			<ActivityIndicator color={colors.text.quaternary as string} />
-		</View>
-	) : items.length > 0 && !feed.hasNextPage ? (
+	) : active && feedItems.length > 0 ? (
 		<View style={{ paddingVertical: spacing[8], alignItems: "center" }}>
-			<Caption color="quaternary">That's everything</Caption>
+			<Caption color="quaternary">That&apos;s everything</Caption>
 		</View>
 	) : null;
 
@@ -259,7 +238,7 @@ export default function SearchScreen() {
 			</View>
 
 			<FlatList
-				data={items}
+				data={feedItems}
 				keyExtractor={(item: FeedItem) => `${item.kind}:${item.id}`}
 				renderItem={({ item }) => (
 					<FeedCard
@@ -279,8 +258,6 @@ export default function SearchScreen() {
 				ListHeaderComponent={active ? resultsHeader : guide}
 				ListFooterComponent={footer}
 				ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
-				onEndReached={loadMore}
-				onEndReachedThreshold={0.6}
 				keyboardShouldPersistTaps="handled"
 				keyboardDismissMode="on-drag"
 				showsVerticalScrollIndicator={false}

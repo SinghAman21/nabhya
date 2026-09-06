@@ -235,8 +235,8 @@ export default function NgoDashboard() {
 				/>
 				<ListRow
 					icon={PenLine}
-					label="Share an update"
-					hint="Post to every volunteer's feed"
+					label="Feed"
+					hint="See other NGOs' posts"
 					onPress={() => router.push("/feed")}
 				/>
 				<ListRow

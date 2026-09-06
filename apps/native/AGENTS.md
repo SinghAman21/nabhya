@@ -16,6 +16,12 @@ contributor needs a custom dev client: `npx expo prebuild` then
 `npx expo run:android` / `run:ios` once, then `expo start --dev-client` for the
 regular dev loop.
 
+Web is the one exception: `donate-sheet.tsx` loads Razorpay's own
+Checkout.js from their CDN on `Platform.OS === "web"` instead of the native
+module, wrapped behind the same Promise-based `.open()` interface — so
+donations work in the Expo web preview even though nothing else there needs
+a dev client.
+
 ## Routing
 
 - Gate is `src/app/index.tsx`: no email → `/(auth)/login`, no role → `/role-select`,

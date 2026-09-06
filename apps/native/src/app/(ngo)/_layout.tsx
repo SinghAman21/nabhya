@@ -6,6 +6,7 @@ import {
 	HeartHandshake,
 	House,
 	Megaphone,
+	Newspaper,
 	Star,
 	User,
 	Users,
@@ -25,6 +26,12 @@ const NGO_NAV_ITEMS: NavItem[] = [
 		href: "/(ngo)/needs",
 		icon: HeartHandshake,
 		section: "Programmes",
+	},
+	{
+		label: "Feed",
+		href: "/feed",
+		icon: Newspaper,
+		section: "Audience",
 	},
 	{
 		label: "Events",

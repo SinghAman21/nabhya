@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption, Label } from "@/components/ui/typography";
-import { useCreatePledge, usePublicNeed } from "@/hooks/use-needs";
+import { useCreatePledge } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/use-theme";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
@@ -26,36 +26,25 @@ export function PledgeSheet({
 	need: PublicNeed | null;
 	onClose: () => void;
 }) {
+	const need = listItem;
+
+	if (!need) return null;
+
+	return <PledgeSheetContent key={need.id} need={need} onClose={onClose} />;
+}
+
+function PledgeSheetContent({
+	need,
+	onClose,
+}: {
+	need: PublicNeed;
+	onClose: () => void;
+}) {
 	const { colors, spacing, borderRadius } = useTheme();
 	const [quantity, setQuantity] = useState("");
 	const [message, setMessage] = useState("");
 	const [error, setError] = useState<string | null>(null);
-
-	// The row that opened this sheet may have been loaded minutes ago, and
-	// `fulfilledQuantity` moves as other people pledge. Re-reading the need
-	// keeps "only N still needed" honest instead of validating against a stale
-	// number the server will then reject.
-	// Remember the last need so the sheet can animate closed after the caller
-	// clears it; `visible` follows the caller, the content follows this.
-	const [shown, setShown] = useState<PublicNeed | null>(listItem);
-	useEffect(() => {
-		if (listItem) setShown(listItem);
-	}, [listItem]);
-	const fresh = usePublicNeed(shown?.id);
-	const need = fresh.data ?? shown;
-
-	const pledge = useCreatePledge(need?.id ?? "");
-
-	// Reset between different needs so one post's draft never leaks into another.
-	useEffect(() => {
-		if (listItem) {
-			setQuantity("");
-			setMessage("");
-			setError(null);
-		}
-	}, [listItem]);
-
-	if (!need) return null;
+	const pledge = useCreatePledge(need.id);
 
 	const isWant = need.type === "WANT";
 	const remaining =
@@ -100,11 +89,9 @@ export function PledgeSheet({
 		);
 	};
 
-	// Visibility tracks the caller's selection rather than `need`: a cached
-	// detail response must not keep the sheet open after it is dismissed.
 	return (
 		<Sheet
-			visible={!!listItem}
+			visible={!!need}
 			onClose={onClose}
 			title={isWant ? "Offer to help" : "Claim this"}
 			subtitle={need.organization.organizationName}

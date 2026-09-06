@@ -98,7 +98,7 @@ describe("AdminService", () => {
 			});
 
 			const storedEvents = await db.query.events.findMany({});
-			const storedNeeds = await db.query.organizationNeeds.findMany({});
+			const storedNeeds = await db.query.needs.findMany({});
 			expect(storedEvents[0]?.status).toBe("CANCELLED");
 			expect(storedNeeds[0]?.status).toBe("CLOSED");
 

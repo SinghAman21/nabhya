@@ -75,6 +75,10 @@ export const CATEGORIES = {
 	LIST: `${API_PREFIX}/categories`,
 } as const;
 
+export const SEARCH = {
+	LIST: `${API_PREFIX}/search`,
+} as const;
+
 export const FEED = {
 	LIST: `${API_PREFIX}/feed`,
 	FOR_YOU: `${API_PREFIX}/feed/for-you`,

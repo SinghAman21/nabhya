@@ -6,6 +6,7 @@ import type {
 	NeedType,
 	NeedUrgency,
 	NotificationType,
+	Paginated,
 	PledgeStatus,
 	Role,
 } from "@nabhya/shared";
@@ -367,14 +368,14 @@ export interface AdminOrgDetail {
 		events: { total: number; published: number };
 		needs: { total: number; open: number };
 	};
-	recentEvents: Array<{
+	recentEvents: {
 		id: string;
 		title: string;
 		status: EventStatus;
 		startAt: string;
 		volunteersNeeded: number;
 		acceptedCount: number;
-	}>;
+	}[];
 }
 
 export interface AdminUserListItem {
@@ -411,7 +412,7 @@ export interface AdminUserDetail {
 	createdAt: string;
 	roles: Role[];
 	documents: AdminOrgDocument[];
-	applications: Array<{
+	applications: {
 		id: string;
 		status: ApplicationStatus;
 		appliedAt: string;
@@ -424,15 +425,15 @@ export interface AdminUserDetail {
 			status: EventStatus;
 		};
 		organization: { id: string; organizationName: string };
-	}>;
-	pledges: Array<{
+	}[];
+	pledges: {
 		id: string;
 		status: PledgeStatus;
 		quantity: number | null;
 		createdAt: string;
 		need: { id: string; title: string; type: NeedType; unit: string | null };
 		organization: { id: string; organizationName: string };
-	}>;
+	}[];
 	organization: {
 		id: string;
 		organizationName: string;
@@ -577,6 +578,11 @@ export interface PublicOrganization {
 	owner?: { id: string; fullName: string | null; email: string };
 }
 
+export interface SearchResults {
+	organizations: Paginated<PublicOrganization>;
+	feed: Paginated<FeedItem>;
+}
+
 export interface NearbyOrganization {
 	id: string;
 	organizationName: string;
@@ -700,7 +706,7 @@ export interface FeedPostRecord {
 	text: string;
 	createdAt: string;
 	author: { id: string; fullName: string | null };
-	media: Array<{ id: string; type: "IMAGE" | "VIDEO"; url: string }>;
+	media: { id: string; type: "IMAGE" | "VIDEO"; url: string }[];
 }
 
 /** The client's view of a feed row: what the card reads. */

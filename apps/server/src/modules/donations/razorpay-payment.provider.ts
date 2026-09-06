@@ -20,8 +20,8 @@ export interface RazorpayConfig {
  *
  * Two things worth knowing:
  *
- * 1. Razorpay's Orders API takes an arbitrary integer amount in paise — unlike
- *    Dodo, there is no whole-rupee restriction here.
+ * 1. Razorpay's Orders API takes an arbitrary integer amount in paise — no
+ *    whole-rupee restriction.
  * 2. A new order must be created per payment attempt; reusing an order id after
  *    a failed attempt is rejected by Razorpay.
  */
@@ -141,12 +141,11 @@ export class RazorpayPaymentProvider implements PaymentProvider {
 
 	/**
 	 * Razorpay webhooks: HMAC-SHA256(rawBody, webhookSecret), hex digest, in the
-	 * `X-Razorpay-Signature` header. Unlike Dodo's Standard Webhooks scheme,
-	 * Razorpay does not include a timestamp in the signature — there is no
-	 * replay-window check possible here. Idempotency is instead enforced entirely
-	 * downstream, by the PENDING-only guard and the unique index on
-	 * `provider_payment_id` in DonationsService — this is deliberate, not an
-	 * oversight.
+	 * `X-Razorpay-Signature` header. Razorpay does not include a timestamp in
+	 * the signature — there is no replay-window check possible here. Idempotency
+	 * is instead enforced entirely downstream, by the PENDING-only guard and the
+	 * unique index on `provider_payment_id` in DonationsService — this is
+	 * deliberate, not an oversight.
 	 */
 	private verifySignature(rawBody: string, headers: Record<string, string>) {
 		const signature = headers["x-razorpay-signature"];

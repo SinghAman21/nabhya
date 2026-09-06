@@ -18,6 +18,7 @@ import { NotificationsModule } from "../modules/notifications/notifications.modu
 import { OnboardingModule } from "../modules/onboarding/onboarding.module";
 import { OrganizationsModule } from "../modules/organizations/organizations.module";
 import { PublishingModule } from "../modules/publishing/publishing.module";
+import { SearchModule } from "../modules/search/search.module";
 import { UploadsModule } from "../modules/uploads/uploads.module";
 import { UsersModule } from "../modules/users/users.module";
 import { AppController } from "./app.controller";
@@ -40,6 +41,7 @@ import { AppController } from "./app.controller";
 		EngagementModule,
 		CertificatesModule,
 		PublishingModule,
+		SearchModule,
 		DonationsModule,
 		AdminModule,
 	],

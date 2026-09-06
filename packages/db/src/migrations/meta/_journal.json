@@ -71,6 +71,20 @@
 			"when": 1788701200000,
 			"tag": "0009_posts_base_names",
 			"breakpoints": true
+		},
+		{
+			"idx": 10,
+			"version": "7",
+			"when": 1788701300000,
+			"tag": "0010_needs_rename",
+			"breakpoints": true
+		},
+		{
+			"idx": 11,
+			"version": "7",
+			"when": 1788701400000,
+			"tag": "0011_follows_rename",
+			"breakpoints": true
 		}
 	]
 }

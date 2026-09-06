@@ -66,6 +66,7 @@ import type {
 	PublicEvent,
 	PublicEventDetail,
 	PublicNeed,
+	SearchResults,
 } from "@/lib/types";
 import {
 	ADMIN,
@@ -77,6 +78,7 @@ import {
 	ORG_EVENTS,
 	ORG_NEEDS,
 	ORGANIZATIONS,
+	SEARCH,
 	UPLOADS,
 	USERS,
 } from "./endpoints";
@@ -103,6 +105,15 @@ export const onboardingApi = {
 
 export const categoriesApi = {
 	list: () => http.get<Category[]>(CATEGORIES.LIST),
+};
+
+export const searchApi = {
+	search: (query: {
+		search: string;
+		scope?: "all" | "ngos" | "need" | "event" | "story" | "post";
+		page?: number;
+		limit?: number;
+	}) => http.get<SearchResults>(SEARCH.LIST, query),
 };
 
 export const organizationsApi = {

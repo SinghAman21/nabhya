@@ -116,7 +116,7 @@ test suite builds its database from them, so drift fails tests.
 - `categories.ts` — `categories`, `organization_categories`, `user_categories`
 - `events.ts` — `events` (denormalised `accepted_count`), `event_applications`
   (unique on `(event_id, volunteer_id)`, `attended_at` gates certificates)
-- `needs.ts` — `organization_needs` (`WANT` / `OFFER`, denormalised
+- `needs.ts` — `needs` (`WANT` / `OFFER`, denormalised
   `fulfilled_quantity`), `need_pledges`
 - `certificates.ts` — `certificates` (unique per application, public `code`,
   `pdf_key`, revocation fields)

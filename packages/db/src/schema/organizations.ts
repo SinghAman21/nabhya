@@ -14,7 +14,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { organizationCategories } from "./categories";
 import { events } from "./events";
-import { organizationNeeds } from "./needs";
+import { needs } from "./needs";
 import { users } from "./users";
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
@@ -140,7 +140,7 @@ export const organizationsRelations = relations(
 		admins: many(organizationAdmins),
 		documents: many(organizationDocuments),
 		events: many(events),
-		needs: many(organizationNeeds),
+		needs: many(needs),
 		organizationCategories: many(organizationCategories),
 	}),
 );

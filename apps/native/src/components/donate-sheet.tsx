@@ -19,15 +19,108 @@ import { useAuthStore } from "@/store/auth-store";
  *
  * The amount is captured in rupees but sent as paise — integers only, so no
  * float rounding ever reaches the ledger.
- *
- * Checkout happens in-app via Razorpay's native SDK: the server creates an
- * order and hands back its id plus the public key, and this sheet opens
- * Razorpay's own checkout UI directly — nothing here ever touches card
- * details. A successful checkout only tells the client the payment went
- * through; the donation row itself only ever flips to COMPLETED once the
- * server's webhook verifies it, so this sheet never assumes success beyond
- * showing a "confirming" message and letting the donor check their history.
  */
+interface RazorpayCheckout {
+	open: (options: Record<string, unknown>) => Promise<unknown>;
+}
+
+interface RazorpayWebInstance {
+	open: () => void;
+	on: (event: string, handler: (response: unknown) => void) => void;
+}
+interface RazorpayWebConstructor {
+	new (options: Record<string, unknown>): RazorpayWebInstance;
+}
+
+/**
+ * Razorpay's web Checkout.js isn't an npm package — it's loaded from their CDN
+ * and attaches `window.Razorpay` once it runs. Injected at most once per
+ * session; a second `open()` call reuses the same script tag.
+ */
+let razorpayWebScript: Promise<void> | null = null;
+function loadRazorpayWebScript(): Promise<void> {
+	if (razorpayWebScript) return razorpayWebScript;
+	razorpayWebScript = new Promise((resolve, reject) => {
+		const existing = document.getElementById("razorpay-checkout-js");
+		if (existing) {
+			resolve();
+			return;
+		}
+		const script = document.createElement("script");
+		script.id = "razorpay-checkout-js";
+		script.src = "https://checkout.razorpay.com/v1/checkout.js";
+		script.async = true;
+		script.onload = () => resolve();
+		script.onerror = () =>
+			reject(new Error("Failed to load Razorpay checkout"));
+		document.body.appendChild(script);
+	});
+	return razorpayWebScript;
+}
+
+/**
+ * Razorpay ships a native module on iOS/Android (exists only in a dev client
+ * or a store build — never Expo Go) and a separate, script-loaded Checkout.js
+ * on web. Both are wrapped behind the same Promise-based `.open()` so the
+ * caller never has to branch on platform.
+ */
+async function loadRazorpay(): Promise<RazorpayCheckout | null> {
+	if (Platform.OS === "web") {
+		try {
+			await loadRazorpayWebScript();
+		} catch {
+			return null;
+		}
+		const RazorpayWeb = (
+			window as unknown as { Razorpay?: RazorpayWebConstructor }
+		).Razorpay;
+		if (!RazorpayWeb) return null;
+
+		return {
+			open: (options) =>
+				new Promise((resolve, reject) => {
+					let settled = false;
+					const instance = new RazorpayWeb({
+						...options,
+						handler: (response: unknown) => {
+							settled = true;
+							resolve(response);
+						},
+						modal: {
+							ondismiss: () => {
+								if (settled) return;
+								settled = true;
+								reject({ description: "Payment cancelled" });
+							},
+						},
+					});
+					instance.on("payment.failed", (response: unknown) => {
+						if (settled) return;
+						settled = true;
+						const description =
+							typeof response === "object" &&
+							response !== null &&
+							"error" in response
+								? ((response as { error?: { description?: string } }).error
+										?.description ?? null)
+								: null;
+						reject({ description: description ?? "Payment failed" });
+					});
+					instance.open();
+				}),
+		};
+	}
+
+	try {
+		const mod = require("react-native-razorpay") as {
+			default?: RazorpayCheckout;
+		};
+		return mod.default ?? null;
+	} catch {
+		return null;
+	}
+}
+
 export function DonateSheet({
 	organizationId,
 	organizationName,
@@ -92,6 +185,13 @@ export function DonateSheet({
 						Alert.alert(
 							"Payment unavailable",
 							"This payment provider does not support native checkout.",
+					const checkout = await loadRazorpay();
+					if (!checkout) {
+						Alert.alert(
+							"Couldn't open checkout",
+							Platform.OS === "web"
+								? "Razorpay's checkout script didn't load. Check your connection and try again."
+								: "Donations open Razorpay's secure checkout, which is not available in this preview — use the dev client build instead.",
 						);
 						return;
 					}

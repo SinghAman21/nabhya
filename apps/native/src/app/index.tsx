@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
-import { useEffect } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Platform, View } from "react-native";
 import { useOnboardingStatus } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { authService } from "@/lib/api/auth";
@@ -13,11 +13,35 @@ import { useAuthStore } from "@/store/auth-store";
  */
 export default function Index() {
 	const email = useAuthStore((s) => s.email);
+	const setUser = useAuthStore((s) => s.setUser);
 	const syncFromStatus = useAuthStore((s) => s.syncFromStatus);
 	const { colors } = useTheme();
 	const router = useRouter();
+	const [webSessionChecked, setWebSessionChecked] = useState(
+		Platform.OS !== "web",
+	);
 
-	const { data: status, isLoading, isError } = useOnboardingStatus(!!email);
+	// Web has no persisted Zustand session to fall back on after a Google
+	// redirect lands back on this origin — Supabase parsed the session out of
+	// the URL itself, so pick it up here before deciding there's no one signed in.
+	useEffect(() => {
+		if (Platform.OS !== "web" || email) {
+			setWebSessionChecked(true);
+			return;
+		}
+		authService
+			.getCurrentSession()
+			.then((result) => {
+				if (result?.user) setUser(result.user);
+			})
+			.finally(() => setWebSessionChecked(true));
+	}, [email, setUser]);
+
+	const {
+		data: status,
+		isLoading,
+		isError,
+	} = useOnboardingStatus(!!email && webSessionChecked);
 
 	// Supabase access tokens are short-lived (an hour) while the refresh token
 	// in storage is long-lived — mint a fresh one on boot so a reload never
@@ -31,6 +55,8 @@ export default function Index() {
 	}, [status, syncFromStatus]);
 
 	useEffect(() => {
+		if (!webSessionChecked) return;
+
 		if (!email) {
 			router.replace("/(auth)/login");
 			return;
@@ -61,7 +87,7 @@ export default function Index() {
 				status.isOnboarded ? "/(volunteer)" : "/(onboarding)/volunteer",
 			);
 		}
-	}, [email, status, isError, router]);
+	}, [email, status, isError, router, webSessionChecked]);
 
 	return (
 		<View
