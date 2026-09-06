@@ -37,9 +37,9 @@ export const bookmarks = pgTable(
 	],
 );
 
-// ─── Organization follows ───────────────────────────────────────────────────
-export const organizationFollows = pgTable(
-	"organization_follows",
+// ─── Follows ────────────────────────────────────────────────────────────────
+export const follows = pgTable(
+	"follows",
 	{
 		id: uuid("id").primaryKey().defaultRandom(),
 		userId: uuid("user_id")
@@ -51,11 +51,11 @@ export const organizationFollows = pgTable(
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 	},
 	(table) => [
-		uniqueIndex("organization_follows_user_organization_unique").on(
+		uniqueIndex("follows_user_organization_unique").on(
 			table.userId,
 			table.organizationId,
 		),
-		index("organization_follows_organization_idx").on(table.organizationId),
+		index("follows_organization_idx").on(table.organizationId),
 	],
 );
 
@@ -145,19 +145,16 @@ export const bookmarksRelations = relations(bookmarks, ({ one }) => ({
 	}),
 }));
 
-export const organizationFollowsRelations = relations(
-	organizationFollows,
-	({ one }) => ({
-		user: one(users, {
-			fields: [organizationFollows.userId],
-			references: [users.id],
-		}),
-		organization: one(organizations, {
-			fields: [organizationFollows.organizationId],
-			references: [organizations.id],
-		}),
+export const followsRelations = relations(follows, ({ one }) => ({
+	user: one(users, {
+		fields: [follows.userId],
+		references: [users.id],
 	}),
-);
+	organization: one(organizations, {
+		fields: [follows.organizationId],
+		references: [organizations.id],
+	}),
+}));
 
 export const reviewsRelations = relations(reviews, ({ one }) => ({
 	user: one(users, { fields: [reviews.userId], references: [users.id] }),

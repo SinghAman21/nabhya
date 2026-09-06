@@ -3,10 +3,10 @@ import {
 	announcements,
 	eventApplications,
 	events,
+	follows,
 	needPledges,
 	needs,
 	organizationCategories,
-	organizationFollows,
 	organizations,
 	postComments,
 	postInteractions,
@@ -104,9 +104,9 @@ export class FeedRankingService {
 		const following = new Set(
 			(
 				await this.db
-					.select({ id: organizationFollows.organizationId })
-					.from(organizationFollows)
-					.where(eq(organizationFollows.userId, user.id))
+					.select({ id: follows.organizationId })
+					.from(follows)
+					.where(eq(follows.userId, user.id))
 			).map((row) => row.id),
 		);
 		const selected = candidates
@@ -314,7 +314,7 @@ export class FeedRankingService {
 			commentRows,
 			applications,
 			pledges,
-			follows,
+			followingRows,
 		] = await Promise.all([
 			organizationIds.length
 				? this.db
@@ -355,9 +355,9 @@ export class FeedRankingService {
 				.groupBy(needPledges.needId),
 			viewerId
 				? this.db
-						.select({ organizationId: organizationFollows.organizationId })
-						.from(organizationFollows)
-						.where(eq(organizationFollows.userId, viewerId))
+						.select({ organizationId: follows.organizationId })
+						.from(follows)
+						.where(eq(follows.userId, viewerId))
 				: [],
 		]);
 		const categoryByOrg = Map.groupBy(
@@ -371,7 +371,7 @@ export class FeedRankingService {
 			applications.map((row) => [row.id, row.count]),
 		);
 		const pledgeCounts = new Map(pledges.map((row) => [row.id, row.count]));
-		const followsSet = new Set(follows.map((row) => row.organizationId));
+		const followsSet = new Set(followingRows.map((row) => row.organizationId));
 		for (const candidate of candidates) {
 			candidate.categoryIds = (
 				categoryByOrg.get(candidate.organizationId ?? "") ?? []
@@ -437,9 +437,9 @@ export class FeedRankingService {
 				.from(userCategories)
 				.where(eq(userCategories.userId, userId)),
 			this.db
-				.select({ organizationId: organizationFollows.organizationId })
-				.from(organizationFollows)
-				.where(eq(organizationFollows.userId, userId)),
+				.select({ organizationId: follows.organizationId })
+				.from(follows)
+				.where(eq(follows.userId, userId)),
 			this.db
 				.select({
 					tag: postInteractions.tag,
