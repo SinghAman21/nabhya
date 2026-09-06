@@ -161,7 +161,7 @@ function NativeSheet({
 						paddingBottom: spacing[3],
 						borderTopWidth: 1,
 						borderTopColor: colors.border.hairline,
-						backgroundColor: colors.background.card,
+						backgroundColor: colors.background.sheet,
 					}}
 				>
 					{footer}
@@ -211,7 +211,9 @@ function NativeSheet({
 					handleComponent={renderHandle}
 					footerComponent={footer ? renderFooter : undefined}
 					backgroundStyle={{
-						backgroundColor: colors.background.card,
+						backgroundColor: colors.background.sheet,
+						// backgroundColor: "#111111",
+
 						borderRadius: borderRadius["2xl"],
 					}}
 				>
@@ -264,7 +266,7 @@ function WebSheet({
 				maxHeight: height * 0.9,
 				// A list sheet has no natural height: open it tall from the start.
 				...(detents ? { height: height * 0.85 } : {}),
-				backgroundColor: colors.background.card,
+				backgroundColor: colors.background.sheet,
 				borderTopLeftRadius: borderRadius["2xl"],
 				borderTopRightRadius: borderRadius["2xl"],
 				...(isDesktop
@@ -382,7 +384,7 @@ function SheetHeader({
 			style={{
 				borderTopLeftRadius: borderRadius["2xl"],
 				borderTopRightRadius: borderRadius["2xl"],
-				backgroundColor: colors.background.card,
+				backgroundColor: colors.background.sheet,
 				borderBottomWidth: 1,
 				borderBottomColor: divided ? colors.border.hairline : "transparent",
 			}}

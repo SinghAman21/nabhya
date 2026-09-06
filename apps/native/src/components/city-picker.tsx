@@ -123,9 +123,9 @@ export function CityPicker({
 						paddingLeft: spacing[2.5],
 						paddingRight: spacing[2],
 						borderRadius: 999,
-						backgroundColor: pressed
-							? colors.background.tertiary
-							: colors.background.subtle,
+						// backgroundColor: pressed
+						// 	? colors.background.tertiary
+						// 	: colors.background.subtle,
 					})}
 				>
 					<MapPin

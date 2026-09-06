@@ -226,7 +226,7 @@ export default function SearchScreen() {
 					borderBottomColor: colors.border.hairline,
 				}}
 			>
-				<BackButton />
+				<BackButton style={{ backgroundColor: "none", width: 24 }} />
 				<View style={{ flex: 1 }}>
 					<SearchField
 						value={query}

@@ -32,7 +32,8 @@ import {
 	Screen,
 } from "@/components/screen-shell";
 import { Pressable } from "@/components/ui/pressable";
-import { Caption, H3, Label } from "@/components/ui/typography";
+import { Caption, H2, H3, Label } from "@/components/ui/typography";
+import { typography } from "@/constants/design-system";
 import { useToggleFollow } from "@/hooks/use-engagement";
 import { useFeed, useFeedReaction } from "@/hooks/use-feed";
 import { useCategories, useMe } from "@/hooks/use-profile";
@@ -143,7 +144,12 @@ export default function Home() {
 					minHeight: 44,
 				}}
 			>
-				<H3 accessibilityRole="header">Home</H3>
+				<H2
+					style={{ fontFamily: typography.fontFamily.display }}
+					accessibilityRole="header"
+				>
+					Home
+				</H2>
 				<View
 					style={{
 						flexDirection: "row",
@@ -160,14 +166,14 @@ export default function Home() {
 							hitSlop={8}
 							{...focusable}
 							style={({ pressed }) => ({
-								width: 40,
-								height: 40,
+								width: 38,
+								height: 38,
 								borderRadius: 999,
 								alignItems: "center",
 								justifyContent: "center",
-								backgroundColor: pressed
-									? colors.background.tertiary
-									: colors.background.subtle,
+								// backgroundColor: pressed
+								//   ? colors.background.tertiary
+								//   : colors.background.subtle,
 							})}
 						>
 							<Search
