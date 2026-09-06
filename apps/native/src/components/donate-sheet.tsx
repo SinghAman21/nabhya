@@ -1,7 +1,7 @@
 import { DONATION_PRESETS_MINOR, formatMinor } from "@nabhya/shared";
 import { Check } from "lucide-react-native";
 import { useState } from "react";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pressable } from "@/components/ui/pressable";
@@ -24,12 +24,93 @@ interface RazorpayCheckout {
 	open: (options: Record<string, unknown>) => Promise<unknown>;
 }
 
+interface RazorpayWebInstance {
+	open: () => void;
+	on: (event: string, handler: (response: unknown) => void) => void;
+}
+interface RazorpayWebConstructor {
+	new (options: Record<string, unknown>): RazorpayWebInstance;
+}
+
 /**
- * Razorpay ships a native module, so it exists only in a dev client or a store
- * build. Loading it lazily keeps Expo Go and web booting; there the donor is
- * told to use the app build instead.
+ * Razorpay's web Checkout.js isn't an npm package — it's loaded from their CDN
+ * and attaches `window.Razorpay` once it runs. Injected at most once per
+ * session; a second `open()` call reuses the same script tag.
  */
-function loadRazorpay(): RazorpayCheckout | null {
+let razorpayWebScript: Promise<void> | null = null;
+function loadRazorpayWebScript(): Promise<void> {
+	if (razorpayWebScript) return razorpayWebScript;
+	razorpayWebScript = new Promise((resolve, reject) => {
+		const existing = document.getElementById("razorpay-checkout-js");
+		if (existing) {
+			resolve();
+			return;
+		}
+		const script = document.createElement("script");
+		script.id = "razorpay-checkout-js";
+		script.src = "https://checkout.razorpay.com/v1/checkout.js";
+		script.async = true;
+		script.onload = () => resolve();
+		script.onerror = () =>
+			reject(new Error("Failed to load Razorpay checkout"));
+		document.body.appendChild(script);
+	});
+	return razorpayWebScript;
+}
+
+/**
+ * Razorpay ships a native module on iOS/Android (exists only in a dev client
+ * or a store build — never Expo Go) and a separate, script-loaded Checkout.js
+ * on web. Both are wrapped behind the same Promise-based `.open()` so the
+ * caller never has to branch on platform.
+ */
+async function loadRazorpay(): Promise<RazorpayCheckout | null> {
+	if (Platform.OS === "web") {
+		try {
+			await loadRazorpayWebScript();
+		} catch {
+			return null;
+		}
+		const RazorpayWeb = (
+			window as unknown as { Razorpay?: RazorpayWebConstructor }
+		).Razorpay;
+		if (!RazorpayWeb) return null;
+
+		return {
+			open: (options) =>
+				new Promise((resolve, reject) => {
+					let settled = false;
+					const instance = new RazorpayWeb({
+						...options,
+						handler: (response: unknown) => {
+							settled = true;
+							resolve(response);
+						},
+						modal: {
+							ondismiss: () => {
+								if (settled) return;
+								settled = true;
+								reject({ description: "Payment cancelled" });
+							},
+						},
+					});
+					instance.on("payment.failed", (response: unknown) => {
+						if (settled) return;
+						settled = true;
+						const description =
+							typeof response === "object" &&
+							response !== null &&
+							"error" in response
+								? ((response as { error?: { description?: string } }).error
+										?.description ?? null)
+								: null;
+						reject({ description: description ?? "Payment failed" });
+					});
+					instance.open();
+				}),
+		};
+	}
+
 	try {
 		const mod = require("react-native-razorpay") as {
 			default?: RazorpayCheckout;
@@ -99,11 +180,13 @@ export function DonateSheet({
 					razorpayKeyId,
 				}) => {
 					onClose();
-					const checkout = loadRazorpay();
+					const checkout = await loadRazorpay();
 					if (!checkout) {
 						Alert.alert(
-							"Payments need the app build",
-							"Donations open Razorpay's secure checkout, which is not available in this preview.",
+							"Couldn't open checkout",
+							Platform.OS === "web"
+								? "Razorpay's checkout script didn't load. Check your connection and try again."
+								: "Donations open Razorpay's secure checkout, which is not available in this preview — use the dev client build instead.",
 						);
 						return;
 					}
