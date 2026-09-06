@@ -24,7 +24,7 @@ import { focusable } from "@/lib/focus";
  * shared `Sheet`. An absolutely-positioned dropdown was clipped by the sticky
  * header and by every card below it.
  *
- * Known data problem: `organization_needs.city` is free text, so "Mumbai",
+ * Known data problem: `needs.city` is free text, so "Mumbai",
  * "mumbai" and "Bombay" are three cities to the query. The list below is a
  * stopgap; the real fix is a canonical city table, or at least a normalising
  * write path.

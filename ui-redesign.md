@@ -101,7 +101,7 @@ better answer, since people know where they can actually turn up. `city` is a re
 filter on both the needs and events queries. `feed-store` keeps a `cityTouched`
 flag so the default applies until the user chooses and their choice then stands.
 
-*Data problem this exposes:* `organization_needs.city` is free text, so "Mumbai",
+*Data problem this exposes:* `needs.city` is free text, so "Mumbai",
 "mumbai" and "Bombay" are three cities to the query. The metro list in
 `city-picker.tsx` is a stopgap; the fix is a canonical city table or a normalising
 write path.

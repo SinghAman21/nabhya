@@ -203,7 +203,7 @@ export class NeedsService {
 					// "id" binds to need_pledges.id and the count is always zero.
 					pendingPledges: sql<number>`(
 						select count(*)::int from need_pledges np
-						where np.need_id = organization_needs.id and np.status = 'PENDING'
+						where np.need_id = needs.id and np.status = 'PENDING'
 					)`,
 				})
 				.from(needs)

@@ -4,8 +4,8 @@ import {
 	eventApplications,
 	events,
 	needPledges,
+	needs,
 	organizationDocuments,
-	organizationNeeds,
 	organizations,
 	roles,
 	userDocuments,
@@ -112,11 +112,11 @@ export class AdminService {
 		const [needStats] = await this.db
 			.select({
 				total: sql<number>`count(*)::int`,
-				open: countWhere(eq(organizationNeeds.status, "OPEN")),
-				wants: countWhere(eq(organizationNeeds.type, "WANT")),
-				offers: countWhere(eq(organizationNeeds.type, "OFFER")),
+				open: countWhere(eq(needs.status, "OPEN")),
+				wants: countWhere(eq(needs.type, "WANT")),
+				offers: countWhere(eq(needs.type, "OFFER")),
 			})
-			.from(organizationNeeds);
+			.from(needs);
 
 		const [applicationStats] = await this.db
 			.select({
@@ -226,7 +226,7 @@ export class AdminService {
 						where e.organization_id = organizations.id
 					)`,
 					needCount: sql<number>`(
-						select count(*)::int from organization_needs n
+						select count(*)::int from needs n
 						where n.organization_id = organizations.id
 					)`,
 				})
@@ -282,10 +282,10 @@ export class AdminService {
 				this.db
 					.select({
 						total: sql<number>`count(*)::int`,
-						open: sql<number>`count(*) filter (where ${organizationNeeds.status} = 'OPEN')::int`,
+						open: sql<number>`count(*) filter (where ${needs.status} = 'OPEN')::int`,
 					})
-					.from(organizationNeeds)
-					.where(eq(organizationNeeds.organizationId, organizationId)),
+					.from(needs)
+					.where(eq(needs.organizationId, organizationId)),
 				this.db.query.events.findMany({
 					where: eq(events.organizationId, organizationId),
 					orderBy: desc(events.createdAt),
@@ -394,12 +394,12 @@ export class AdminService {
 					);
 
 				await tx
-					.update(organizationNeeds)
+					.update(needs)
 					.set({ status: "CLOSED", updatedAt: new Date() })
 					.where(
 						and(
-							eq(organizationNeeds.organizationId, organizationId),
-							eq(organizationNeeds.status, "OPEN"),
+							eq(needs.organizationId, organizationId),
+							eq(needs.status, "OPEN"),
 						),
 					);
 			}
@@ -547,10 +547,10 @@ export class AdminService {
 						quantity: needPledges.quantity,
 						createdAt: needPledges.createdAt,
 						need: {
-							id: organizationNeeds.id,
-							title: organizationNeeds.title,
-							type: organizationNeeds.type,
-							unit: organizationNeeds.unit,
+							id: needs.id,
+							title: needs.title,
+							type: needs.type,
+							unit: needs.unit,
 						},
 						organization: {
 							id: organizations.id,
@@ -558,14 +558,8 @@ export class AdminService {
 						},
 					})
 					.from(needPledges)
-					.innerJoin(
-						organizationNeeds,
-						eq(needPledges.needId, organizationNeeds.id),
-					)
-					.innerJoin(
-						organizations,
-						eq(organizationNeeds.organizationId, organizations.id),
-					)
+					.innerJoin(needs, eq(needPledges.needId, needs.id))
+					.innerJoin(organizations, eq(needs.organizationId, organizations.id))
 					.where(eq(needPledges.userId, userId))
 					.orderBy(desc(needPledges.createdAt))
 					.limit(50),

@@ -4,7 +4,7 @@ import {
 	eventApplications,
 	events,
 	needPledges,
-	organizationNeeds,
+	needs,
 	organizations,
 } from "@nabhya/db/schema";
 import type { OrganizationImpact, VolunteerImpact } from "@nabhya/shared";
@@ -126,12 +126,12 @@ export class ImpactService {
 		const [giving] = await this.db
 			.select({
 				needsFulfilled: sql<number>`count(*) filter (
-					where ${organizationNeeds.status} = 'FULFILLED')::int`,
+					where ${needs.status} = 'FULFILLED')::int`,
 				itemsReceived: sql<number>`coalesce(
-					sum(${organizationNeeds.fulfilledQuantity}), 0)::int`,
+					sum(${needs.fulfilledQuantity}), 0)::int`,
 			})
-			.from(organizationNeeds)
-			.where(eq(organizationNeeds.organizationId, organizationId));
+			.from(needs)
+			.where(eq(needs.organizationId, organizationId));
 
 		const [certs] = await this.db
 			.select({ value: sql<number>`count(*)::int` })

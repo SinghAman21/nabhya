@@ -62,7 +62,7 @@ Guard order (all global `APP_GUARD`s in `app.module.ts`):
 - Public list endpoints inner-join `organizations` and filter
   `VERIFIED` + `ACTIVE` so unverified/suspended NGOs can never surface. Keep this
   invariant when adding any public query.
-- Counter mutations (`events.accepted_count`, `organization_needs.fulfilled_quantity`)
+- Counter mutations (`events.accepted_count`, `needs.fulfilled_quantity`)
   happen inside a transaction with `SELECT … FOR UPDATE` on the parent row. Never
   update these counters outside that pattern.
 - `@Global()` modules — `DatabaseModule` (`DB_TOKEN`), `StorageModule`

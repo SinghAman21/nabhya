@@ -2,7 +2,7 @@ import {
 	eventApplications,
 	events,
 	needPledges,
-	organizationNeeds,
+	needs,
 	organizations,
 	roles,
 	userDocuments,
@@ -191,7 +191,7 @@ export async function createNeed(
 	} = {},
 ) {
 	const [need] = await db
-		.insert(organizationNeeds)
+		.insert(needs)
 		.values({
 			organizationId,
 			type: options.type ?? "WANT",

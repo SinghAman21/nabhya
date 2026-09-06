@@ -4,9 +4,9 @@ import {
 	eventApplications,
 	events,
 	needPledges,
+	needs,
 	organizationCategories,
 	organizationFollows,
-	organizationNeeds,
 	organizations,
 	postComments,
 	postInteractions,
@@ -150,24 +150,21 @@ export class FeedRankingService {
 					.limit(SOURCE_LIMIT),
 				this.db
 					.select({
-						need: organizationNeeds,
+						need: needs,
 						org: organizations,
 						author: users,
 					})
-					.from(organizationNeeds)
-					.innerJoin(
-						organizations,
-						eq(organizationNeeds.organizationId, organizations.id),
-					)
-					.leftJoin(users, eq(organizationNeeds.createdBy, users.id))
+					.from(needs)
+					.innerJoin(organizations, eq(needs.organizationId, organizations.id))
+					.leftJoin(users, eq(needs.createdBy, users.id))
 					.where(
 						and(
 							visibleOrg,
-							eq(organizationNeeds.status, "OPEN"),
-							sql`(${organizationNeeds.expiresAt} is null or ${organizationNeeds.expiresAt} >= ${now})`,
+							eq(needs.status, "OPEN"),
+							sql`(${needs.expiresAt} is null or ${needs.expiresAt} >= ${now})`,
 						),
 					)
-					.orderBy(desc(organizationNeeds.createdAt))
+					.orderBy(desc(needs.createdAt))
 					.limit(SOURCE_LIMIT),
 				this.db
 					.select({

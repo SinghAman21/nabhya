@@ -1,4 +1,4 @@
-import { organizationNeeds } from "@nabhya/db/schema";
+import { needs } from "@nabhya/db/schema";
 import {
 	BadRequestException,
 	ConflictException,
@@ -129,8 +129,8 @@ describe("NeedsService", () => {
 				status: "ACCEPTED",
 			});
 
-			const after = await db.query.organizationNeeds.findFirst({
-				where: eq(organizationNeeds.id, need.id),
+			const after = await db.query.needs.findFirst({
+				where: eq(needs.id, need.id),
 			});
 			expect(after?.fulfilledQuantity).toBe(30);
 			expect(after?.status).toBe("OPEN");
@@ -149,8 +149,8 @@ describe("NeedsService", () => {
 				status: "ACCEPTED",
 			});
 
-			const after = await db.query.organizationNeeds.findFirst({
-				where: eq(organizationNeeds.id, need.id),
+			const after = await db.query.needs.findFirst({
+				where: eq(needs.id, need.id),
 			});
 			expect(after?.fulfilledQuantity).toBe(50);
 			expect(after?.status).toBe("FULFILLED");
@@ -172,8 +172,8 @@ describe("NeedsService", () => {
 				status: "REJECTED",
 			});
 
-			const after = await db.query.organizationNeeds.findFirst({
-				where: eq(organizationNeeds.id, need.id),
+			const after = await db.query.needs.findFirst({
+				where: eq(needs.id, need.id),
 			});
 			expect(after?.fulfilledQuantity).toBe(0);
 		});
@@ -193,16 +193,16 @@ describe("NeedsService", () => {
 				status: "ACCEPTED",
 			});
 			await db
-				.update(organizationNeeds)
+				.update(needs)
 				.set({ status: "CLOSED" })
-				.where(eq(organizationNeeds.id, need.id));
+				.where(eq(needs.id, need.id));
 
 			await service.reviewPledge(owner.id, need.id, pledge.id, {
 				status: "REJECTED",
 			});
 
-			const after = await db.query.organizationNeeds.findFirst({
-				where: eq(organizationNeeds.id, need.id),
+			const after = await db.query.needs.findFirst({
+				where: eq(needs.id, need.id),
 			});
 			expect(after?.fulfilledQuantity).toBe(0);
 			expect(after?.status).toBe("CLOSED");
@@ -226,8 +226,8 @@ describe("NeedsService", () => {
 				status: "COMPLETED",
 			});
 
-			const after = await db.query.organizationNeeds.findFirst({
-				where: eq(organizationNeeds.id, need.id),
+			const after = await db.query.needs.findFirst({
+				where: eq(needs.id, need.id),
 			});
 			expect(after?.fulfilledQuantity).toBe(25);
 		});
