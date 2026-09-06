@@ -1,9 +1,5 @@
 import type { db as dbType } from "@nabhya/db";
-import {
-	needPledges,
-	organizationNeeds,
-	organizations,
-} from "@nabhya/db/schema";
+import { needPledges, needs, organizations } from "@nabhya/db/schema";
 import type {
 	CreateNeedInput,
 	CreatePledgeInput,
@@ -40,19 +36,19 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsService } from "../organizations/organizations.service";
 
 const publicNeedColumns = {
-	id: organizationNeeds.id,
-	type: organizationNeeds.type,
-	title: organizationNeeds.title,
-	description: organizationNeeds.description,
-	quantity: organizationNeeds.quantity,
-	unit: organizationNeeds.unit,
-	fulfilledQuantity: organizationNeeds.fulfilledQuantity,
-	urgency: organizationNeeds.urgency,
-	status: organizationNeeds.status,
-	city: organizationNeeds.city,
-	state: organizationNeeds.state,
-	expiresAt: organizationNeeds.expiresAt,
-	createdAt: organizationNeeds.createdAt,
+	id: needs.id,
+	type: needs.type,
+	title: needs.title,
+	description: needs.description,
+	quantity: needs.quantity,
+	unit: needs.unit,
+	fulfilledQuantity: needs.fulfilledQuantity,
+	urgency: needs.urgency,
+	status: needs.status,
+	city: needs.city,
+	state: needs.state,
+	expiresAt: needs.expiresAt,
+	createdAt: needs.createdAt,
 	organization: {
 		id: organizations.id,
 		organizationName: organizations.organizationName,
@@ -77,35 +73,33 @@ export class NeedsService {
 
 	async listPublic(query: PublicNeedQuery) {
 		const conditions: SQL[] = [
-			eq(organizationNeeds.status, "OPEN"),
+			eq(needs.status, "OPEN"),
 			eq(organizations.verificationStatus, "VERIFIED"),
 			eq(organizations.status, "ACTIVE"),
 		];
 
 		// An expired post stays in the org's own list but drops off the feed.
 		const notExpired = or(
-			isNull(organizationNeeds.expiresAt),
-			gt(organizationNeeds.expiresAt, new Date()),
+			isNull(needs.expiresAt),
+			gt(needs.expiresAt, new Date()),
 		);
 		if (notExpired) conditions.push(notExpired);
 
-		if (query.type) conditions.push(eq(organizationNeeds.type, query.type));
+		if (query.type) conditions.push(eq(needs.type, query.type));
 		if (query.urgency) {
-			conditions.push(eq(organizationNeeds.urgency, query.urgency));
+			conditions.push(eq(needs.urgency, query.urgency));
 		}
 		if (query.city) {
-			conditions.push(ilike(organizationNeeds.city, `%${query.city}%`));
+			conditions.push(ilike(needs.city, `%${query.city}%`));
 		}
 		if (query.organizationId) {
-			conditions.push(
-				eq(organizationNeeds.organizationId, query.organizationId),
-			);
+			conditions.push(eq(needs.organizationId, query.organizationId));
 		}
 		if (query.search) {
 			const term = `%${query.search}%`;
 			const match = or(
-				ilike(organizationNeeds.title, term),
-				ilike(organizationNeeds.description, term),
+				ilike(needs.title, term),
+				ilike(needs.description, term),
 				ilike(organizations.organizationName, term),
 			);
 			if (match) conditions.push(match);
@@ -117,27 +111,21 @@ export class NeedsService {
 		const [items, [totals]] = await Promise.all([
 			this.db
 				.select(publicNeedColumns)
-				.from(organizationNeeds)
-				.innerJoin(
-					organizations,
-					eq(organizationNeeds.organizationId, organizations.id),
-				)
+				.from(needs)
+				.innerJoin(organizations, eq(needs.organizationId, organizations.id))
 				.where(where)
 				// Urgent posts first, then most recent.
 				.orderBy(
-					sql`case ${organizationNeeds.urgency}
+					sql`case ${needs.urgency}
 						when 'HIGH' then 0 when 'MEDIUM' then 1 else 2 end`,
-					desc(organizationNeeds.createdAt),
+					desc(needs.createdAt),
 				)
 				.limit(limit)
 				.offset(offset),
 			this.db
 				.select({ value: count() })
-				.from(organizationNeeds)
-				.innerJoin(
-					organizations,
-					eq(organizationNeeds.organizationId, organizations.id),
-				)
+				.from(needs)
+				.innerJoin(organizations, eq(needs.organizationId, organizations.id))
 				.where(where),
 		]);
 
@@ -147,14 +135,11 @@ export class NeedsService {
 	async getPublicById(needId: string, viewerId?: string) {
 		const [need] = await this.db
 			.select(publicNeedColumns)
-			.from(organizationNeeds)
-			.innerJoin(
-				organizations,
-				eq(organizationNeeds.organizationId, organizations.id),
-			)
+			.from(needs)
+			.innerJoin(organizations, eq(needs.organizationId, organizations.id))
 			.where(
 				and(
-					eq(organizationNeeds.id, needId),
+					eq(needs.id, needId),
 					eq(organizations.verificationStatus, "VERIFIED"),
 					eq(organizations.status, "ACTIVE"),
 				),
@@ -190,12 +175,10 @@ export class NeedsService {
 		const organization =
 			await this.organizationsService.requireOwnedOrganization(userId);
 
-		const conditions: SQL[] = [
-			eq(organizationNeeds.organizationId, organization.id),
-		];
-		if (query.type) conditions.push(eq(organizationNeeds.type, query.type));
+		const conditions: SQL[] = [eq(needs.organizationId, organization.id)];
+		if (query.type) conditions.push(eq(needs.type, query.type));
 		if (query.status) {
-			conditions.push(eq(organizationNeeds.status, query.status));
+			conditions.push(eq(needs.status, query.status));
 		}
 
 		const where = and(...conditions);
@@ -204,18 +187,18 @@ export class NeedsService {
 		const [items, [totals]] = await Promise.all([
 			this.db
 				.select({
-					id: organizationNeeds.id,
-					type: organizationNeeds.type,
-					title: organizationNeeds.title,
-					description: organizationNeeds.description,
-					quantity: organizationNeeds.quantity,
-					unit: organizationNeeds.unit,
-					fulfilledQuantity: organizationNeeds.fulfilledQuantity,
-					urgency: organizationNeeds.urgency,
-					status: organizationNeeds.status,
-					city: organizationNeeds.city,
-					expiresAt: organizationNeeds.expiresAt,
-					createdAt: organizationNeeds.createdAt,
+					id: needs.id,
+					type: needs.type,
+					title: needs.title,
+					description: needs.description,
+					quantity: needs.quantity,
+					unit: needs.unit,
+					fulfilledQuantity: needs.fulfilledQuantity,
+					urgency: needs.urgency,
+					status: needs.status,
+					city: needs.city,
+					expiresAt: needs.expiresAt,
+					createdAt: needs.createdAt,
 					// Table-qualified: see the note in EventsService — an unqualified
 					// "id" binds to need_pledges.id and the count is always zero.
 					pendingPledges: sql<number>`(
@@ -223,12 +206,12 @@ export class NeedsService {
 						where np.need_id = organization_needs.id and np.status = 'PENDING'
 					)`,
 				})
-				.from(organizationNeeds)
+				.from(needs)
 				.where(where)
-				.orderBy(desc(organizationNeeds.createdAt))
+				.orderBy(desc(needs.createdAt))
 				.limit(limit)
 				.offset(offset),
-			this.db.select({ value: count() }).from(organizationNeeds).where(where),
+			this.db.select({ value: count() }).from(needs).where(where),
 		]);
 
 		return paginate(items, totals?.value ?? 0, query);
@@ -239,7 +222,7 @@ export class NeedsService {
 			await this.organizationsService.requireVerifiedOrganization(userId);
 
 		const inserted = await this.db
-			.insert(organizationNeeds)
+			.insert(needs)
 			.values({
 				organizationId: organization.id,
 				type: input.type,
@@ -281,14 +264,14 @@ export class NeedsService {
 		}
 
 		const [updated] = await this.db
-			.update(organizationNeeds)
+			.update(needs)
 			.set({
 				...Object.fromEntries(
 					Object.entries(input).filter(([, v]) => v !== undefined),
 				),
 				updatedAt: new Date(),
 			})
-			.where(eq(organizationNeeds.id, needId))
+			.where(eq(needs.id, needId))
 			.returning();
 
 		void this.audit.record({
@@ -322,9 +305,9 @@ export class NeedsService {
 
 		if ((committed?.value ?? 0) > 0) {
 			const [closed] = await this.db
-				.update(organizationNeeds)
+				.update(needs)
 				.set({ status: "CLOSED", updatedAt: new Date() })
-				.where(eq(organizationNeeds.id, needId))
+				.where(eq(needs.id, needId))
 				.returning();
 
 			void this.audit.record({
@@ -337,9 +320,7 @@ export class NeedsService {
 			return { deleted: false, need: closed };
 		}
 
-		await this.db
-			.delete(organizationNeeds)
-			.where(eq(organizationNeeds.id, needId));
+		await this.db.delete(needs).where(eq(needs.id, needId));
 
 		void this.audit.record({
 			performedBy: userId,
@@ -357,21 +338,18 @@ export class NeedsService {
 	async pledge(userId: string, needId: string, input: CreatePledgeInput) {
 		const [need] = await this.db
 			.select({
-				id: organizationNeeds.id,
-				status: organizationNeeds.status,
-				expiresAt: organizationNeeds.expiresAt,
-				organizationId: organizationNeeds.organizationId,
-				quantity: organizationNeeds.quantity,
-				unit: organizationNeeds.unit,
+				id: needs.id,
+				status: needs.status,
+				expiresAt: needs.expiresAt,
+				organizationId: needs.organizationId,
+				quantity: needs.quantity,
+				unit: needs.unit,
 			})
-			.from(organizationNeeds)
-			.innerJoin(
-				organizations,
-				eq(organizationNeeds.organizationId, organizations.id),
-			)
+			.from(needs)
+			.innerJoin(organizations, eq(needs.organizationId, organizations.id))
 			.where(
 				and(
-					eq(organizationNeeds.id, needId),
+					eq(needs.id, needId),
 					eq(organizations.verificationStatus, "VERIFIED"),
 					eq(organizations.status, "ACTIVE"),
 				),
@@ -464,11 +442,11 @@ export class NeedsService {
 					reviewNote: needPledges.reviewNote,
 					createdAt: needPledges.createdAt,
 					need: {
-						id: organizationNeeds.id,
-						type: organizationNeeds.type,
-						title: organizationNeeds.title,
-						unit: organizationNeeds.unit,
-						status: organizationNeeds.status,
+						id: needs.id,
+						type: needs.type,
+						title: needs.title,
+						unit: needs.unit,
+						status: needs.status,
 					},
 					organization: {
 						id: organizations.id,
@@ -477,14 +455,8 @@ export class NeedsService {
 					},
 				})
 				.from(needPledges)
-				.innerJoin(
-					organizationNeeds,
-					eq(needPledges.needId, organizationNeeds.id),
-				)
-				.innerJoin(
-					organizations,
-					eq(organizationNeeds.organizationId, organizations.id),
-				)
+				.innerJoin(needs, eq(needPledges.needId, needs.id))
+				.innerJoin(organizations, eq(needs.organizationId, organizations.id))
 				.where(where)
 				.orderBy(desc(needPledges.createdAt))
 				.limit(limit)
@@ -546,13 +518,13 @@ export class NeedsService {
 			const lockedNeed = takeFirstOrThrow(
 				await tx
 					.select({
-						id: organizationNeeds.id,
-						quantity: organizationNeeds.quantity,
-						fulfilledQuantity: organizationNeeds.fulfilledQuantity,
-						status: organizationNeeds.status,
+						id: needs.id,
+						quantity: needs.quantity,
+						fulfilledQuantity: needs.fulfilledQuantity,
+						status: needs.status,
 					})
-					.from(organizationNeeds)
-					.where(eq(organizationNeeds.id, needId))
+					.from(needs)
+					.where(eq(needs.id, needId))
 					.for("update"),
 				"lock need for pledge review",
 			);
@@ -612,13 +584,13 @@ export class NeedsService {
 						: "OPEN";
 
 				await tx
-					.update(organizationNeeds)
+					.update(needs)
 					.set({
 						fulfilledQuantity: fulfilled,
 						status: nextStatus,
 						updatedAt: new Date(),
 					})
-					.where(eq(organizationNeeds.id, needId));
+					.where(eq(needs.id, needId));
 			}
 
 			return takeFirstOrThrow(updatedRows, "review need pledge");
@@ -655,8 +627,8 @@ export class NeedsService {
 		const organization =
 			await this.organizationsService.requireOwnedOrganization(userId);
 
-		const need = await this.db.query.organizationNeeds.findFirst({
-			where: eq(organizationNeeds.id, needId),
+		const need = await this.db.query.needs.findFirst({
+			where: eq(needs.id, needId),
 		});
 
 		if (!need) {
