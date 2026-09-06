@@ -166,7 +166,6 @@ export default function NgoVerification() {
 								existing={byType.get(doc.type)}
 								onUploaded={(key) => handleUploaded(doc.type, key)}
 								saving={isSaving(doc.type)}
-								required
 							/>
 						))}
 					</View>
@@ -182,7 +181,6 @@ export default function NgoVerification() {
 								existing={byType.get(doc.type)}
 								onUploaded={(key) => handleUploaded(doc.type, key)}
 								saving={isSaving(doc.type)}
-								required={false}
 							/>
 						))}
 					</View>
