@@ -22,6 +22,7 @@ export const queryKeys = {
 	myPledges: (params?: unknown) => ["needs", "me", "pledges", params] as const,
 
 	orgNeeds: (params?: unknown) => ["org", "needs", params] as const,
+	search: (params?: unknown) => ["search", params] as const,
 	orgNeedPledges: (id: string, params?: unknown) =>
 		["org", "needs", id, "pledges", params] as const,
 
