@@ -357,7 +357,8 @@ export class CertificatesService {
 				volunteerEmail: users.email,
 				organizationName: organizations.organizationName,
 				eventTitle: events.title,
-				eventDate: events.startAt,
+				eventStartAt: events.startAt,
+				eventEndAt: events.endAt,
 			})
 			.from(certificates)
 			.innerJoin(users, eq(certificates.volunteerId, users.id))
@@ -378,6 +379,19 @@ export class CertificatesService {
 				year: "numeric",
 			}).format(value);
 
+		const formatTime = (value: Date) =>
+			new Intl.DateTimeFormat("en-IN", {
+				hour: "numeric",
+				minute: "2-digit",
+				hour12: true,
+			}).format(value);
+
+		const durationHours = Math.max(
+			(row.eventEndAt.getTime() - row.eventStartAt.getTime()) / 3_600_000,
+			0,
+		);
+		const hoursText = formatHours(durationHours);
+
 		const pdf = await renderCertificatePdf({
 			code: row.code,
 			// Falls back to the email local part when a volunteer never set a name.
@@ -385,7 +399,9 @@ export class CertificatesService {
 				row.volunteerName ?? row.volunteerEmail.split("@")[0] ?? "Volunteer",
 			organizationName: row.organizationName,
 			eventTitle: row.eventTitle,
-			eventDate: formatDate(row.eventDate),
+			eventDate: formatDate(row.eventStartAt),
+			eventTimeRange: `${formatTime(row.eventStartAt)} to ${formatTime(row.eventEndAt)}`,
+			hoursText,
 			issuedAt: formatDate(row.issuedAt),
 			note: row.note,
 			verifyUrl: `${env.CORS_ORIGIN.split(",")[0]}/certificates/${row.code}`,
@@ -429,4 +445,9 @@ function randomSegment(length: number): string {
 		out += CODE_ALPHABET[(bytes[i] as number) % CODE_ALPHABET.length];
 	}
 	return out;
+}
+
+function formatHours(value: number): string {
+	const rounded = Math.round(value * 10) / 10;
+	return Number.isInteger(rounded) ? `${rounded}` : rounded.toFixed(1);
 }
