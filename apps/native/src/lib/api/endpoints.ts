@@ -41,6 +41,7 @@ export const NEEDS = {
 	MY_PLEDGES: `${API_PREFIX}/needs/me/pledges`,
 	detail: (id: string) => `${API_PREFIX}/needs/${id}`,
 	pledge: (id: string) => `${API_PREFIX}/needs/${id}/pledges`,
+	withdrawPledge: (id: string) => `${API_PREFIX}/needs/${id}/pledges/me`,
 } as const;
 
 export const ORG_NEEDS = {

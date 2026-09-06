@@ -76,6 +76,8 @@ export class R2StorageProvider implements StorageProvider {
 	}
 
 	createDownloadUrl(key: string, expiresInSeconds = DOWNLOAD_URL_TTL_SECONDS) {
+		if (key.startsWith("http://") || key.startsWith("https://"))
+			return Promise.resolve(key);
 		return getSignedUrl(
 			this.client,
 			new GetObjectCommand({ Bucket: this.bucket, Key: key }),

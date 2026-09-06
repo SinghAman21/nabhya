@@ -10,13 +10,13 @@ import {
 	MapPin,
 	MessageCircle,
 	Pin,
+	Play,
 	Share2,
 	Users,
 } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Share, useWindowDimensions, View } from "react-native";
 import { FeedCommentsSheet } from "@/components/feed/feed-comments-sheet";
-import { Surface } from "@/components/screen-shell";
 import { StatusPill } from "@/components/status-pill";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H5, Label } from "@/components/ui/typography";
@@ -82,11 +82,12 @@ export function FeedCard({
 }: { item: FeedItem } & FeedCardActions) {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
+	const { width } = useWindowDimensions();
+	const compactActions = width < 380;
 	const [expanded, setExpanded] = useState(false);
 	const [commentsOpen, setCommentsOpen] = useState(false);
 	const email = useAuthStore((state) => state.email);
 	const recordShare = useRecordFeedInteraction("share");
-	const recordImpression = useRecordFeedInteraction("impression");
 
 	const org = item.organization;
 	const closed = item.kind === "need" && item.need.status !== "OPEN";
@@ -109,10 +110,6 @@ export function FeedCard({
 			// Web without the share API, or the user dismissed the sheet.
 		}
 	};
-
-	useEffect(() => {
-		if (email) recordImpression.mutate({ item });
-	}, [email, item.id, item.kind, recordImpression.mutate]);
 
 	const primary = (() => {
 		switch (item.kind) {
@@ -154,7 +151,10 @@ export function FeedCard({
 
 	return (
 		<>
-			<Surface padded={false} style={{ overflow: "hidden" }}>
+			{/* Tile, not a card: full-bleed, square corners, no shadow. The
+			    list owns the separation (gap + hairlines), so rows reclaim
+			    the old card gutter + outer page gutter as content width. */}
+			<View style={{ backgroundColor: colors.background.card }}>
 				<View style={{ padding: spacing[4], gap: spacing[3] }}>
 					<PosterHeader
 						item={item}
@@ -236,6 +236,7 @@ export function FeedCard({
 						count={item.engagement.likes}
 						label={liked ? "Unlike" : "Like"}
 						activeColor={colors.error.main as string}
+						compact={compactActions}
 						onPress={onToggleLike ? () => onToggleLike(item, liked) : undefined}
 					/>
 					<Reaction
@@ -243,17 +244,24 @@ export function FeedCard({
 						active={saved}
 						label={saved ? "Unsave" : "Save"}
 						activeColor={colors.text.primary as string}
+						compact={compactActions}
 						onPress={onToggleSave ? () => onToggleSave(item, saved) : undefined}
 					/>
 					<Reaction
 						icon={MessageCircle}
 						count={item.engagement.comments}
 						label={`Comments on ${headline}`}
+						compact={compactActions}
 						onPress={() => setCommentsOpen(true)}
 					/>
-					<Reaction icon={Share2} label={`Share ${headline}`} onPress={share} />
+					<Reaction
+						icon={Share2}
+						label={`Share ${headline}`}
+						onPress={share}
+						compact={compactActions}
+					/>
 				</View>
-			</Surface>
+			</View>
 			{commentsOpen && (
 				<FeedCommentsSheet item={item} onClose={() => setCommentsOpen(false)} />
 			)}
@@ -272,6 +280,7 @@ function Reaction({
 	label,
 	activeColor,
 	onPress,
+	compact = false,
 }: {
 	icon: typeof Heart;
 	active?: boolean;
@@ -279,6 +288,7 @@ function Reaction({
 	label: string;
 	activeColor?: string;
 	onPress?: () => void;
+	compact?: boolean;
 }) {
 	const { colors, spacing } = useTheme();
 	const color = active
@@ -297,8 +307,8 @@ function Reaction({
 				}
 				hitSlop={4}
 				style={({ pressed }) => ({
-					minWidth: 52,
-					paddingHorizontal: spacing[2.5],
+					minWidth: compact ? 44 : 52,
+					paddingHorizontal: compact ? spacing[1.5] : spacing[2.5],
 					flexDirection: "row",
 					alignItems: "center",
 					justifyContent: "center",
@@ -499,8 +509,9 @@ function PostBody({
 	const media = post.media.slice(0, 4);
 	const body = splitPostText(post.text);
 	const long = post.text.length > 220;
-	// Card width minus page gutters and card padding, capped for desktop.
-	const inner = Math.min(width, 720) - spacing[5] * 2 - spacing[4] * 2;
+	// Tile content width: full-bleed row minus only the tile's own inner
+	// padding (no page gutter, no card inset any more).
+	const inner = Math.min(width, 720) - spacing[4] * 2;
 	const gap = spacing[1.5];
 	const tile = media.length > 1 ? (inner - gap) / 2 : inner;
 
@@ -568,6 +579,39 @@ function FeedMediaImage({ uri }: { uri: string }) {
 }
 
 function FeedVideo({
+	uri,
+	width,
+	height,
+}: {
+	uri: string;
+	width: number;
+	height: number;
+}) {
+	const { borderRadius } = useTheme();
+	const [active, setActive] = useState(false);
+	if (!active) {
+		return (
+			<Pressable
+				onPress={() => setActive(true)}
+				accessibilityRole="button"
+				accessibilityLabel="Play feed video"
+				style={{
+					width,
+					height,
+					borderRadius: borderRadius.md,
+					backgroundColor: "#111111",
+					alignItems: "center",
+					justifyContent: "center",
+				}}
+			>
+				<Play size={22} color="#FFFFFF" fill="#FFFFFF" />
+			</Pressable>
+		);
+	}
+	return <FeedVideoPlayer uri={uri} width={width} height={height} />;
+}
+
+function FeedVideoPlayer({
 	uri,
 	width,
 	height,

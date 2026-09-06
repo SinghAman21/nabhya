@@ -44,6 +44,7 @@ export class StubStorageProvider implements StorageProvider {
 	}
 
 	async createDownloadUrl(key: string): Promise<string> {
+		if (key.startsWith("http://") || key.startsWith("https://")) return key;
 		return `https://storage.invalid/stub-download/${encodeURIComponent(key)}`;
 	}
 

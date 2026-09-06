@@ -198,7 +198,7 @@ export class FeedRankingService {
 					id: post.id,
 					type: post.tag,
 					organizationId: post.organizationId,
-					organization: org ? orgSummary(org) : null,
+					organization: org ? await orgSummary(org, this.storage) : null,
 					author: userSummary(author),
 					createdAt: post.createdAt,
 					city: post.city ?? org?.city ?? null,
@@ -227,7 +227,7 @@ export class FeedRankingService {
 					id: event.id,
 					type: "EVENT" as const,
 					organizationId: event.organizationId,
-					organization: orgSummary(org),
+					organization: await orgSummary(org, this.storage),
 					author: author ? userSummary(author) : null,
 					createdAt: event.createdAt,
 					city: event.city ?? org.city,
@@ -252,37 +252,39 @@ export class FeedRankingService {
 					},
 				})),
 			)),
-			...needRows.map(({ need, org, author }) => ({
-				id: need.id,
-				type: "NEED" as const,
-				organizationId: need.organizationId,
-				organization: orgSummary(org),
-				author: author ? userSummary(author) : null,
-				createdAt: need.createdAt,
-				city: need.city ?? org.city,
-				state: need.state ?? org.state,
-				latitude: numberOrNull(org.latitude),
-				longitude: numberOrNull(org.longitude),
-				urgency: need.urgency,
-				categoryIds: [],
-				engagement: emptyEngagement(),
-				viewer: null,
-				content: {
-					type: need.type,
-					title: need.title,
-					description: need.description,
-					quantity: need.quantity,
-					unit: need.unit,
-					fulfilledQuantity: need.fulfilledQuantity,
-					expiresAt: need.expiresAt,
-				},
-			})),
+			...(await Promise.all(
+				needRows.map(async ({ need, org, author }) => ({
+					id: need.id,
+					type: "NEED" as const,
+					organizationId: need.organizationId,
+					organization: await orgSummary(org, this.storage),
+					author: author ? userSummary(author) : null,
+					createdAt: need.createdAt,
+					city: need.city ?? org.city,
+					state: need.state ?? org.state,
+					latitude: numberOrNull(org.latitude),
+					longitude: numberOrNull(org.longitude),
+					urgency: need.urgency,
+					categoryIds: [],
+					engagement: emptyEngagement(),
+					viewer: null,
+					content: {
+						type: need.type,
+						title: need.title,
+						description: need.description,
+						quantity: need.quantity,
+						unit: need.unit,
+						fulfilledQuantity: need.fulfilledQuantity,
+						expiresAt: need.expiresAt,
+					},
+				})),
+			)),
 			...(await Promise.all(
 				announcementRows.map(async ({ announcement, org, author }) => ({
 					id: announcement.id,
 					type: "ANNOUNCEMENT" as const,
 					organizationId: announcement.organizationId,
-					organization: orgSummary(org),
+					organization: await orgSummary(org, this.storage),
 					author: author ? userSummary(author) : null,
 					createdAt: announcement.publishedAt ?? announcement.createdAt,
 					city: org.city,
@@ -631,7 +633,12 @@ function applyFilters(candidates: Candidate[], query: FeedFilterQuery) {
 			const type = candidate.type === "URGENT" ? "POST" : candidate.type;
 			if (type !== query.kind && candidate.type !== query.kind) return false;
 		}
-		if (query.categoryId && !candidate.categoryIds.includes(query.categoryId))
+		if (
+			query.categoryIds &&
+			!query.categoryIds.some((categoryId) =>
+				candidate.categoryIds.includes(categoryId),
+			)
+		)
 			return false;
 		if (city && !(candidate.city ?? "").toLowerCase().includes(city))
 			return false;
@@ -692,8 +699,15 @@ function emptyEngagement() {
 		pledges: 0,
 	};
 }
-function orgSummary(org: typeof organizations.$inferSelect) {
-	return { id: org.id, name: org.organizationName, logo: org.logo };
+async function orgSummary(
+	org: typeof organizations.$inferSelect,
+	storage: StorageProvider,
+) {
+	return {
+		id: org.id,
+		name: org.organizationName,
+		logo: org.logo ? await storage.createDownloadUrl(org.logo) : null,
+	};
 }
 function userSummary(user: typeof users.$inferSelect) {
 	return {

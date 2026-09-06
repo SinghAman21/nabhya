@@ -1,7 +1,9 @@
 import { eq, inArray, like } from "drizzle-orm";
 import { db } from "./index";
 import { categories, organizationCategories } from "./schema/categories";
+import { donations } from "./schema/donations";
 import { events } from "./schema/events";
+import { posts, postsMedia } from "./schema/feed";
 import { needs } from "./schema/needs";
 import { organizations } from "./schema/organizations";
 import { announcements } from "./schema/publishing";
@@ -20,6 +22,16 @@ import { roles, userRoles, users } from "./schema/users";
  */
 
 const DAY = 86_400_000;
+const DEMO_IMAGES = [
+	"https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=1200&q=80",
+	"https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?auto=format&fit=crop&w=1200&q=80",
+	"https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?auto=format&fit=crop&w=1200&q=80",
+	"https://images.unsplash.com/photo-1542810634-71277d95dcbb?auto=format&fit=crop&w=1200&q=80",
+	"https://images.unsplash.com/photo-1559027615-cd4628902d4a?auto=format&fit=crop&w=1200&q=80",
+	"https://images.unsplash.com/photo-1593113646773-028c64a8f1b8?auto=format&fit=crop&w=1200&q=80",
+];
+const DEMO_VIDEO =
+	"https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
 const inDays = (n: number, hour = 9) => {
 	const d = new Date(Date.now() + n * DAY);
 	d.setHours(hour, 0, 0, 0);
@@ -48,9 +60,16 @@ type Event = {
 	volunteersNeeded: number;
 	accepted?: number;
 	deadlineDaysBefore?: number;
+	coverImage?: string;
 };
 
-type Story = { title: string; body: string; pinned?: boolean; daysAgo: number };
+type Story = {
+	title: string;
+	body: string;
+	pinned?: boolean;
+	daysAgo: number;
+	coverImage?: string;
+};
 
 type Ngo = {
 	name: string;
@@ -66,6 +85,13 @@ type Ngo = {
 	events: Event[];
 	stories: Story[];
 };
+
+const DEMO_POST_TEXT = [
+	"A small team, a long day, and a lot of neighbours showing up. Here is what moved forward this week.",
+	"Behind every number in our impact report is a person who gave time, materials, or a little encouragement.",
+	"We are opening the doors this weekend. Bring a friend, comfortable shoes, and the willingness to learn.",
+	"Today's field notes: the work is practical, local, and much more hopeful when done together.",
+];
 
 const NGOS: Ngo[] = [
 	{
@@ -444,12 +470,13 @@ async function main() {
 		.from(organizations)
 		.where(like(organizations.registrationNumber, "DEMO-%"));
 	if (stale.length > 0) {
-		await db.delete(organizations).where(
-			inArray(
-				organizations.id,
-				stale.map((o) => o.id),
-			),
-		);
+		const staleIds = stale.map((organization) => organization.id);
+		// Donations deliberately restrict organization deletion, so clear only
+		// demo donations before removing the demo organizations.
+		await db
+			.delete(donations)
+			.where(inArray(donations.organizationId, staleIds));
+		await db.delete(organizations).where(inArray(organizations.id, staleIds));
 	}
 	await db.delete(users).where(like(users.email, "%@demo.nabhya.org"));
 
@@ -465,6 +492,8 @@ async function main() {
 	let needCount = 0;
 	let eventCount = 0;
 	let storyCount = 0;
+	let postCount = 0;
+	let mediaCount = 0;
 
 	for (const [index, ngo] of NGOS.entries()) {
 		const slug = ngo.name.toLowerCase().replace(/[^a-z]+/g, "-");
@@ -535,7 +564,28 @@ async function main() {
 			needCount++;
 		}
 
-		for (const e of ngo.events) {
+		const eventFixtures: Event[] = [
+			...ngo.events,
+			...Array.from({ length: 3 }, (_, extraIndex) => ({
+				title:
+					[
+						"Volunteer orientation and open house",
+						"Community field visit",
+						"Saturday impact workshop",
+					][extraIndex] ?? "Community volunteer day",
+				description:
+					"Spend a few useful hours with the team, meet other volunteers, and see the work up close. Everyone is welcome; we will provide a short briefing on arrival.",
+				venue: `${ngo.name} Community Centre`,
+				inDays: 20 + index * 2 + extraIndex * 9,
+				hours: 3 + (extraIndex % 3),
+				volunteersNeeded: 18 + extraIndex * 7,
+				accepted: extraIndex * 3,
+				deadlineDaysBefore: 2,
+				coverImage: DEMO_IMAGES[(index + extraIndex + 2) % DEMO_IMAGES.length],
+			})),
+		];
+
+		for (const [eventIndex, e] of eventFixtures.entries()) {
 			const startAt = inDays(e.inDays);
 			const endAt = new Date(startAt.getTime() + (e.hours ?? 3) * 3_600_000);
 			await db.insert(events).values({
@@ -544,6 +594,9 @@ async function main() {
 				description: e.description,
 				venue: e.venue,
 				address: `${e.venue}, ${ngo.city}`,
+				coverImage:
+					e.coverImage ??
+					DEMO_IMAGES[(index + eventIndex) % DEMO_IMAGES.length],
 				city: ngo.city,
 				state: ngo.state,
 				startAt,
@@ -566,6 +619,9 @@ async function main() {
 				organizationId: org.id,
 				title: s.title,
 				body: s.body,
+				coverImageKey:
+					s.coverImage ??
+					DEMO_IMAGES[(index + storyCount) % DEMO_IMAGES.length],
 				status: "PUBLISHED",
 				isPinned: s.pinned ?? false,
 				publishedAt: daysAgo(s.daysAgo),
@@ -575,12 +631,60 @@ async function main() {
 			});
 			storyCount++;
 		}
+
+		for (const [postIndex, text] of DEMO_POST_TEXT.entries()) {
+			const [post] = await db
+				.insert(posts)
+				.values({
+					authorUserId: owner.id,
+					organizationId: org.id,
+					tag: postIndex === 1 ? "URGENT" : "POST",
+					city: ngo.city,
+					state: ngo.state,
+					mediaFolder: `demo-${String(index + 1).padStart(2, "0")}-${postIndex + 1}-${Date.now()}`,
+					text: `${ngo.name}: ${text}`,
+					createdAt: daysAgo(postIndex + index + 1),
+				})
+				.returning();
+			if (!post) throw new Error("post insert failed");
+
+			const mediaKeys =
+				postIndex === 0
+					? [DEMO_IMAGES[index % DEMO_IMAGES.length]]
+					: postIndex === 1
+						? [DEMO_IMAGES[(index + 1) % DEMO_IMAGES.length], DEMO_VIDEO]
+						: postIndex === 2
+							? [
+									DEMO_IMAGES[(index + 2) % DEMO_IMAGES.length],
+									DEMO_IMAGES[(index + 3) % DEMO_IMAGES.length],
+									DEMO_IMAGES[(index + 4) % DEMO_IMAGES.length],
+								]
+							: [DEMO_VIDEO, DEMO_IMAGES[(index + 5) % DEMO_IMAGES.length]];
+			await db.insert(postsMedia).values(
+				mediaKeys.map((objectKey, sortOrder) => {
+					const mediaKey = objectKey ?? (DEMO_IMAGES[0] as string);
+					return {
+						postId: post.id,
+						objectKey: `${mediaKey}${mediaKey.includes("?") ? `&demo=${index}-${postIndex}-${sortOrder}` : `?demo=${index}-${postIndex}-${sortOrder}`}`,
+						mediaType: mediaKey.includes(".mp4")
+							? ("VIDEO" as const)
+							: ("IMAGE" as const),
+						mimeType: mediaKey.includes(".mp4") ? "video/mp4" : "image/jpeg",
+						sortOrder,
+					};
+				}),
+			);
+			postCount++;
+			mediaCount += mediaKeys.length;
+		}
 	}
 
 	console.log(`  NGOs     → ${NGOS.length}`);
 	console.log(`  needs    → ${needCount}`);
 	console.log(`  events   → ${eventCount}`);
 	console.log(`  stories  → ${storyCount}`);
+	console.log(`  posts    → ${postCount}`);
+	console.log(`  media    → ${mediaCount} (images + videos)`);
 	console.log("Demo seed complete.");
 	process.exit(0);
 }

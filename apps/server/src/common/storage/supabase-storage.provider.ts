@@ -60,6 +60,7 @@ export class SupabaseStorageProvider implements StorageProvider {
 		key: string,
 		expiresInSeconds = DOWNLOAD_URL_TTL_SECONDS,
 	) {
+		if (key.startsWith("http://") || key.startsWith("https://")) return key;
 		const { bucket, path } = splitKey(key);
 		const { data, error } = await this.client.storage
 			.from(bucket)

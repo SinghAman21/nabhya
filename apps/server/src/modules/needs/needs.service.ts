@@ -428,6 +428,26 @@ export class NeedsService {
 		return pledge;
 	}
 
+	async withdrawPledge(userId: string, needId: string) {
+		const pledge = await this.db.query.needPledges.findFirst({
+			where: and(
+				eq(needPledges.needId, needId),
+				eq(needPledges.userId, userId),
+			),
+		});
+		if (!pledge) throw new NotFoundException("Pledge not found.");
+		if (pledge.status !== "PENDING") {
+			throw new BadRequestException("Only a pending pledge can be withdrawn.");
+		}
+
+		const [cancelled] = await this.db
+			.update(needPledges)
+			.set({ status: "CANCELLED", updatedAt: new Date() })
+			.where(eq(needPledges.id, pledge.id))
+			.returning({ id: needPledges.id, status: needPledges.status });
+		return cancelled;
+	}
+
 	async listMyPledges(userId: string, query: PaginationQuery) {
 		const where = eq(needPledges.userId, userId);
 		const { limit, offset } = toOffset(query);

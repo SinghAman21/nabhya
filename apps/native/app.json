@@ -41,6 +41,12 @@
 			"expo-font",
 			"expo-image",
 			[
+				"expo-location",
+				{
+					"locationWhenInUsePermission": "Nabhya uses your location to show nearby volunteer opportunities."
+				}
+			],
+			[
 				"expo-camera",
 				{
 					"cameraPermission": "Nabhya uses the camera so you can capture your government ID and a verification selfie.",

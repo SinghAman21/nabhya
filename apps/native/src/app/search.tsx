@@ -1,3 +1,4 @@
+import { FlashList } from "@shopify/flash-list";
 import { useRouter } from "expo-router";
 import {
 	Bookmark,
@@ -7,8 +8,8 @@ import {
 	Megaphone,
 	Search,
 } from "lucide-react-native";
-import { useState } from "react";
-import { FlatList, View } from "react-native";
+import { useRef, useState } from "react";
+import { View, type ViewToken } from "react-native";
 import { BackButton } from "@/components/back-button";
 import { FeedCard, toPublicNeed } from "@/components/feed/feed-card";
 import { SearchField } from "@/components/feed/search-field";
@@ -26,7 +27,7 @@ import {
 import { Pressable } from "@/components/ui/pressable";
 import { Caption } from "@/components/ui/typography";
 import { useToggleFollow } from "@/hooks/use-engagement";
-import { useFeedReaction } from "@/hooks/use-feed";
+import { useFeedReaction, useRecordFeedInteraction } from "@/hooks/use-feed";
 import { useSearch } from "@/hooks/use-search";
 import { useTheme } from "@/hooks/use-theme";
 import { useDebounced } from "@/hooks/useDebounced";
@@ -82,6 +83,20 @@ export default function SearchScreen() {
 	const toggleFollow = useToggleFollow();
 	const like = useFeedReaction("like");
 	const save = useFeedReaction("save");
+	const impression = useRecordFeedInteraction("impression");
+	const seen = useRef(new Set<string>());
+	const onViewableItemsChanged = useRef(
+		({ viewableItems }: { viewableItems: ViewToken[] }) => {
+			for (const token of viewableItems) {
+				const item = token.item as FeedItem | undefined;
+				if (!item) continue;
+				const key = `${item.kind}:${item.id}`;
+				if (seen.current.has(key)) continue;
+				seen.current.add(key);
+				impression.mutate({ item });
+			}
+		},
+	).current;
 
 	const orgItems = active ? (result.data?.organizations.items ?? []) : [];
 	const feedItems = active ? (result.data?.feed.items ?? []) : [];
@@ -237,7 +252,7 @@ export default function SearchScreen() {
 				</View>
 			</View>
 
-			<FlatList
+			<FlashList
 				data={feedItems}
 				keyExtractor={(item: FeedItem) => `${item.kind}:${item.id}`}
 				renderItem={({ item }) => (
@@ -260,6 +275,8 @@ export default function SearchScreen() {
 				ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
 				keyboardShouldPersistTaps="handled"
 				keyboardDismissMode="on-drag"
+				onViewableItemsChanged={onViewableItemsChanged}
+				viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
 				showsVerticalScrollIndicator={false}
 				contentContainerStyle={{
 					paddingHorizontal: spacing[5],

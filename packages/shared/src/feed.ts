@@ -121,7 +121,7 @@ export type FeedCommentsQuery = z.infer<typeof feedCommentsQuerySchema>;
  * as well defined as page N of the plain one.
  *
  * - `kind`       — one item type only (the search page's result tabs).
- * - `categoryId` — only NGOs tagged with this cause (the volunteer's vertical).
+ * - `categoryIds` — only NGOs tagged with at least one selected cause.
  * - `city`       — case-insensitive substring on the item's city, falling back
  *                  to the NGO's city.
  * - `search`     — substring over title / text / description / NGO name.
@@ -129,7 +129,10 @@ export type FeedCommentsQuery = z.infer<typeof feedCommentsQuerySchema>;
  */
 export const feedFilterSchema = z.object({
 	kind: postTagSchema.optional(),
-	categoryId: z.uuid().optional(),
+	categoryIds: z
+		.union([z.uuid(), z.array(z.uuid()).min(1)])
+		.transform((value) => (Array.isArray(value) ? value : [value]))
+		.optional(),
 	city: z.string().trim().max(80).optional(),
 	search: z.string().trim().max(120).optional(),
 	urgent: z

@@ -1,4 +1,5 @@
 import type { FeedTab, NeedType } from "@nabhya/shared";
+import { FlashList } from "@shopify/flash-list";
 import { useRouter } from "expo-router";
 import {
 	Flame,
@@ -7,23 +8,19 @@ import {
 	Sparkles,
 	UserPlus,
 } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ViewStyle } from "react-native";
 import {
 	ActivityIndicator,
-	FlatList,
 	RefreshControl,
 	View,
+	type ViewToken,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ALL_INDIA, CityPicker } from "@/components/city-picker";
 import { DiscoverRail } from "@/components/discover-rail";
 import { FeedCard, toPublicNeed } from "@/components/feed/feed-card";
-import {
-	ALL_CAUSES,
-	FeedFilterSheet,
-	FeedTabs,
-} from "@/components/feed/feed-filters";
+import { FeedFilterSheet, FeedTabs } from "@/components/feed/feed-filters";
 import { PledgeSheet } from "@/components/pledge-sheet";
 import {
 	EmptyState,
@@ -32,10 +29,14 @@ import {
 	Screen,
 } from "@/components/screen-shell";
 import { Pressable } from "@/components/ui/pressable";
-import { Caption, H2, H3, Label } from "@/components/ui/typography";
+import { Caption, H2, Label } from "@/components/ui/typography";
 import { typography } from "@/constants/design-system";
 import { useToggleFollow } from "@/hooks/use-engagement";
-import { useFeed, useFeedReaction } from "@/hooks/use-feed";
+import {
+	useFeed,
+	useFeedReaction,
+	useRecordFeedInteraction,
+} from "@/hooks/use-feed";
 import { useCategories, useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useDebounced } from "@/hooks/useDebounced";
@@ -81,10 +82,12 @@ export default function Home() {
 	const router = useRouter();
 
 	const [tab, setTab] = useState<FeedTab>("for_you");
-	const [categoryId, setCategoryId] = useState<string>(ALL_CAUSES);
+	const [categoryIds, setCategoryIds] = useState<string[]>([]);
 	const [needType, setNeedType] = useState<NeedType | undefined>();
 	const [filtersOpen, setFiltersOpen] = useState(false);
 	const [responding, setResponding] = useState<FeedNeedItem | null>(null);
+	const [detectedCity, setDetectedCity] = useState<string | null>(null);
+	const [showCityFallback, setShowCityFallback] = useState(false);
 
 	// Desktop's top bar owns a search field bound to this store; on a phone
 	// search is its own page, so the term is ignored there.
@@ -107,11 +110,40 @@ export default function Home() {
 
 	const feed = useFeed({
 		tab,
-		...(categoryId === ALL_CAUSES ? {} : { categoryId }),
+		...(categoryIds.length ? { categoryIds } : {}),
 		...(city === ALL_INDIA ? {} : { city }),
 		...(debouncedSearch ? { search: debouncedSearch } : {}),
 		...(needType ? { needType } : {}),
 	});
+	useEffect(() => {
+		const firstPage = feed.data?.pages[0];
+		if (
+			!feed.isLoading &&
+			!feed.isError &&
+			firstPage &&
+			firstPage.items.length === 0 &&
+			detectedCity &&
+			detectedCity !== "Mumbai" &&
+			city === detectedCity &&
+			!debouncedSearch &&
+			categoryIds.length === 0 &&
+			!needType
+		) {
+			setDetectedCity(null);
+			setCity("Mumbai");
+			setShowCityFallback(true);
+		}
+	}, [
+		categoryIds.length,
+		city,
+		debouncedSearch,
+		detectedCity,
+		feed.data,
+		feed.isError,
+		feed.isLoading,
+		needType,
+		setCity,
+	]);
 	const items = useMemo(
 		() => feed.data?.pages.flatMap((page) => page.items) ?? [],
 		[feed.data],
@@ -120,12 +152,28 @@ export default function Home() {
 	const toggleFollow = useToggleFollow();
 	const like = useFeedReaction("like");
 	const save = useFeedReaction("save");
+	const impression = useRecordFeedInteraction("impression");
+	const seen = useRef(new Set<string>());
+	const onViewableItemsChanged = useRef(
+		({ viewableItems }: { viewableItems: ViewToken[] }) => {
+			for (const token of viewableItems) {
+				const item = token.item as FeedItem | undefined;
+				if (!item) continue;
+				const key = `${item.kind}:${item.id}`;
+				if (seen.current.has(key)) continue;
+				seen.current.add(key);
+				impression.mutate({ item });
+			}
+		},
+	).current;
 
 	const loadMore = () => {
 		if (feed.hasNextPage && !feed.isFetchingNextPage) feed.fetchNextPage();
 	};
 
-	const gutter = spacing[5];
+	// Header keeps a small inset so text never touches the edge; the feed
+	// rows themselves are full-bleed tiles (no outer gutter).
+	const gutter = spacing[4];
 
 	const header = (
 		<View
@@ -159,7 +207,19 @@ export default function Home() {
 						gap: spacing[2],
 					}}
 				>
-					<CityPicker value={city} onChange={setCity} homeCity={homeCity} />
+					<CityPicker
+						value={city}
+						onChange={(nextCity) => {
+							setDetectedCity(null);
+							setShowCityFallback(false);
+							setCity(nextCity);
+						}}
+						onDetectedCity={(nextCity) => {
+							setDetectedCity(nextCity);
+							setShowCityFallback(false);
+						}}
+						homeCity={homeCity}
+					/>
 					{!isDesktop && (
 						<Pressable
 							onPress={() => router.push("/search")}
@@ -187,12 +247,17 @@ export default function Home() {
 					)}
 				</View>
 			</View>
+			{showCityFallback && (
+				<Caption color="tertiary" style={{ marginTop: spacing[1] }}>
+					No opportunities found nearby, so showing Mumbai instead.
+				</Caption>
+			)}
 			<FeedTabs
 				tab={tab}
 				onTab={setTab}
 				gutter={gutter}
 				onOpenFilters={() => setFiltersOpen(true)}
-				filterActive={categoryId !== ALL_CAUSES || !!needType}
+				filterActive={categoryIds.length > 0 || !!needType}
 			/>
 		</View>
 	);
@@ -224,9 +289,9 @@ export default function Home() {
 	);
 
 	const list = (
-		<FlatList
+		<FlashList
 			data={items}
-			keyExtractor={(item: FeedItem) => `${item.kind}:${item.id}`}
+			keyExtractor={(item) => `${item.kind}:${item.id}`}
 			renderItem={({ item }) => (
 				<FeedCard
 					item={item}
@@ -239,14 +304,27 @@ export default function Home() {
 				/>
 			)}
 			ListFooterComponent={footer}
-			ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
+			ItemSeparatorComponent={() => (
+				<View
+					style={{
+						// height: spacing[2],
+						backgroundColor: colors.background.warm,
+						borderTopWidth: 1,
+						borderBottomWidth: 1,
+						borderColor: colors.border.hairline,
+					}}
+				/>
+			)}
+			onViewableItemsChanged={onViewableItemsChanged}
+			viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
 			onEndReached={loadMore}
 			onEndReachedThreshold={0.6}
 			showsVerticalScrollIndicator={false}
 			contentContainerStyle={{
-				paddingHorizontal: gutter,
-				paddingTop: spacing[4],
+				paddingHorizontal: 0,
+				paddingTop: 0,
 				paddingBottom: spacing[12],
+				backgroundColor: colors.background.warm,
 			}}
 			refreshControl={
 				<RefreshControl
@@ -294,8 +372,8 @@ export default function Home() {
 				visible={filtersOpen}
 				onClose={() => setFiltersOpen(false)}
 				categories={categories.data ?? []}
-				categoryId={categoryId}
-				onCategory={setCategoryId}
+				categoryIds={categoryIds}
+				onCategories={setCategoryIds}
 				needType={needType}
 				onNeedType={setNeedType}
 			/>

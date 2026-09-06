@@ -23,7 +23,9 @@ import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption, H3, H5 } from "@/components/ui/typography";
 import { useDonationReceipt } from "@/hooks/use-engagement";
+import { useWithdrawPledge } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/use-theme";
+import { Alert } from "@/lib/alert";
 import { apiErrorMessage, donationsApi, needsApi, queryKeys } from "@/lib/api";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import type { MyDonation } from "@/lib/types";
@@ -60,6 +62,25 @@ export default function Donations() {
 function ItemPledges() {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
+	const withdraw = useWithdrawPledge();
+
+	const confirmWithdraw = (needId: string) => {
+		Alert.alert("Withdraw pledge?", "The NGO will no longer see this offer.", [
+			{ text: "Keep it", style: "cancel" },
+			{
+				text: "Withdraw",
+				style: "destructive",
+				onPress: () =>
+					withdraw.mutate(
+						{ needId },
+						{
+							onError: (error) =>
+								Alert.alert("Could not withdraw", apiErrorMessage(error)),
+						},
+					),
+			},
+		]);
+	};
 
 	const { query, items, loadMore } = usePagedQuery({
 		queryKey: queryKeys.myPledges({ limit: PAGE_SIZE }),
@@ -139,6 +160,16 @@ function ItemPledges() {
 							<Caption color="secondary" style={{ marginTop: spacing[2] }}>
 								“{item.reviewNote}”
 							</Caption>
+						)}
+						{item.status === "PENDING" && (
+							<Button
+								size="sm"
+								variant="outline"
+								onPress={() => confirmWithdraw(item.need.id)}
+								loading={withdraw.isPending}
+							>
+								Withdraw pledge
+							</Button>
 						)}
 					</Surface>
 				);

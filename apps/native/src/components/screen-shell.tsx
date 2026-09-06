@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BackButton } from "@/components/back-button";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H2, H3, Label } from "@/components/ui/typography";
+import { typography } from "@/constants/design-system";
 import { useTheme } from "@/hooks/use-theme";
 import { focusable } from "@/lib/focus";
 
@@ -95,14 +96,19 @@ export function ScreenHeader({
 				style={{
 					flexDirection: "row",
 					alignItems: "center",
+					justifyContent: "space-between",
 					gap: spacing[3],
 					marginBottom: spacing[5],
 					minHeight: 40,
 				}}
 			>
 				<BackButton />
-				<View style={{ flex: 1 }}>
-					<H3 accessibilityRole="header" numberOfLines={1}>
+				<View style={{ alignItems: "flex-end" }}>
+					<H3
+						accessibilityRole="header"
+						numberOfLines={1}
+						style={{ fontFamily: typography.fontFamily.display }}
+					>
 						{title}
 					</H3>
 					{subtitle && (
@@ -622,10 +628,14 @@ export function FilterChips<T extends string>({
 			showsHorizontalScrollIndicator={false}
 			accessibilityRole="tablist"
 			style={{
+				height: 32,
+				maxHeight: 32,
+				flexGrow: 0,
 				marginBottom: inline ? 0 : spacing[5],
 			}}
 			contentContainerStyle={{
 				flexDirection: "row",
+				alignItems: "center",
 				gap: spacing[2],
 			}}
 		>
@@ -643,7 +653,7 @@ export function FilterChips<T extends string>({
 						style={(state) => {
 							const { pressed } = state as PressState;
 							return {
-								minHeight: 38,
+								minHeight: 32,
 								justifyContent: "center",
 								paddingHorizontal: spacing[3.5],
 								borderRadius: 999,

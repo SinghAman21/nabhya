@@ -222,6 +222,8 @@ export const needsApi = {
 	detail: (id: string) => http.get<PublicNeed>(NEEDS.detail(id)),
 	pledge: (id: string, input: CreatePledgeInput) =>
 		http.post<{ id: string }>(NEEDS.pledge(id), input),
+	withdrawPledge: (id: string) =>
+		http.delete<{ id: string; status: "CANCELLED" }>(NEEDS.withdrawPledge(id)),
 	myPledges: (query: Partial<PaginationQuery>) =>
 		http.getPage<MyPledgeListItem>(NEEDS.MY_PLEDGES, query),
 };

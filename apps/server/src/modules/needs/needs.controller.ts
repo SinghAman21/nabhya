@@ -11,6 +11,7 @@ import {
 import {
 	Body,
 	Controller,
+	Delete,
 	Get,
 	Inject,
 	Param,
@@ -93,5 +94,16 @@ export class NeedsController {
 		@Body(new ZodValidationPipe(createPledgeSchema)) body: CreatePledgeInput,
 	) {
 		return this.needsService.pledge(user.id, id, body);
+	}
+
+	@Delete(":id/pledges/me")
+	@Roles("volunteer")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({ summary: "Withdraw your pending pledge" })
+	withdrawPledge(
+		@CurrentUser() user: AuthUser,
+		@Param("id", ParseUUIDPipe) id: string,
+	) {
+		return this.needsService.withdrawPledge(user.id, id);
 	}
 }

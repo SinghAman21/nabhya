@@ -79,6 +79,17 @@ export function FeedCommentsSheet({
 				<Caption color="tertiary" style={{ padding: spacing[5] }}>
 					Loading comments...
 				</Caption>
+			) : comments.isError ? (
+				<View style={{ padding: spacing[5], gap: spacing[2] }}>
+					<Body weight="semibold">Comments couldn't load</Body>
+					<Button
+						size="sm"
+						variant="outline"
+						onPress={() => comments.refetch()}
+					>
+						Try again
+					</Button>
+				</View>
 			) : comments.data?.items.length ? (
 				<SheetFlatList
 					data={comments.data.items}

@@ -1,9 +1,16 @@
-import { ChevronDown, MapPin } from "lucide-react-native";
-import { useState } from "react";
-import { View } from "react-native";
+import * as Location from "expo-location";
+import {
+	ChevronDown,
+	LocateFixed,
+	MapPin,
+	Search,
+	X,
+} from "lucide-react-native";
+import { useMemo, useState } from "react";
+import { ActivityIndicator, TextInput, View } from "react-native";
 import { Pressable } from "@/components/ui/pressable";
 import { Sheet, SheetOption } from "@/components/ui/sheet";
-import { Caption, H4 } from "@/components/ui/typography";
+import { Caption, H4, Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { focusable } from "@/lib/focus";
 
@@ -17,8 +24,8 @@ import { focusable } from "@/lib/focus";
  * things reads as broken.
  *
  * The default comes from the user's profile city (set at onboarding), not from
- * GPS. No permission prompt, no `expo-location` dependency, and the answer is
- * usually better — people know where they can actually turn up.
+ * GPS. The picker also offers an explicit foreground-location action for users
+ * who want nearby results without silently requesting permission.
  *
  * The trigger is a chip, sized to sit in the cause row; the choice opens in the
  * shared `Sheet`. An absolutely-positioned dropdown was clipped by the sticky
@@ -48,12 +55,14 @@ const METROS = [
 export function CityPicker({
 	value,
 	onChange,
+	onDetectedCity,
 	homeCity,
 	variant = "chip",
 }: {
 	/** `ALL_INDIA` (empty string) means unscoped. */
 	value: string;
 	onChange: (city: string) => void;
+	onDetectedCity?: (city: string) => void;
 	/** The user's profile city, pinned to the top of the list. */
 	homeCity?: string | null;
 	/**
@@ -65,15 +74,61 @@ export function CityPicker({
 }) {
 	const { colors, spacing } = useTheme();
 	const [open, setOpen] = useState(false);
+	const [search, setSearch] = useState("");
+	const [detecting, setDetecting] = useState(false);
+	const [locationError, setLocationError] = useState<string | null>(null);
 
-	const options = [
-		...(homeCity && !METROS.includes(homeCity) ? [homeCity] : []),
-		...METROS,
-	];
+	const options = useMemo(
+		() => [
+			...(homeCity && !METROS.includes(homeCity) ? [homeCity] : []),
+			...METROS,
+		],
+		[homeCity],
+	);
+	const filteredOptions = useMemo(() => {
+		const query = search.trim().toLowerCase();
+		return query
+			? options.filter((city) => city.toLowerCase().includes(query))
+			: options;
+	}, [options, search]);
 
 	const pick = (city: string) => {
 		onChange(city);
+		setSearch("");
+		setLocationError(null);
 		setOpen(false);
+	};
+
+	const detectLocation = async () => {
+		setDetecting(true);
+		setLocationError(null);
+		try {
+			const permission = await Location.requestForegroundPermissionsAsync();
+			if (!permission.granted) {
+				setLocationError(
+					"Location access is off. Choose a city below instead.",
+				);
+				return;
+			}
+			const position = await Location.getCurrentPositionAsync({
+				accuracy: Location.Accuracy.Balanced,
+			});
+			const [place] = await Location.reverseGeocodeAsync({
+				latitude: position.coords.latitude,
+				longitude: position.coords.longitude,
+			});
+			const city = place?.city ?? place?.district ?? place?.subregion;
+			if (!city) {
+				setLocationError("We found you, but could not name this city.");
+				return;
+			}
+			pick(city);
+			onDetectedCity?.(city);
+		} catch {
+			setLocationError("Could not detect your location. Choose a city below.");
+		} finally {
+			setDetecting(false);
+		}
 	};
 
 	const label = value || "All India";
@@ -151,24 +206,134 @@ export function CityPicker({
 			<Sheet
 				visible={open}
 				onClose={() => setOpen(false)}
-				title="Show posts from"
-				subtitle="Volunteering is local. Pick where you can actually turn up."
+				title="Choose your location"
+				subtitle="Find volunteer opportunities you can actually reach."
 			>
-				<View style={{ paddingBottom: spacing[2] }}>
+				<View style={{ paddingBottom: spacing[2], gap: spacing[5] }}>
+					<Pressable
+						onPress={detectLocation}
+						disabled={detecting}
+						accessibilityRole="button"
+						accessibilityLabel="Use my current location"
+						accessibilityState={{ busy: detecting, disabled: detecting }}
+						style={({ pressed }) => ({
+							flexDirection: "row",
+							alignItems: "center",
+							gap: spacing[3],
+							padding: spacing[4],
+							borderRadius: 16,
+							backgroundColor: pressed
+								? colors.primary.tint
+								: colors.background.subtle,
+						})}
+					>
+						<View
+							style={{
+								width: 40,
+								height: 40,
+								borderRadius: 20,
+								alignItems: "center",
+								justifyContent: "center",
+								backgroundColor: colors.primary.tint,
+							}}
+						>
+							{detecting ? (
+								<ActivityIndicator color={colors.primary.ink as string} />
+							) : (
+								<LocateFixed
+									size={20}
+									color={colors.primary.ink as string}
+									strokeWidth={2}
+								/>
+							)}
+						</View>
+						<View style={{ flex: 1, gap: 2 }}>
+							<Label weight="semibold">Use my current location</Label>
+							<Caption color="tertiary">
+								{detecting
+									? "Finding your city..."
+									: "Best for nearby opportunities"}
+							</Caption>
+						</View>
+					</Pressable>
+
+					{locationError && (
+						<Caption color="error" style={{ marginTop: -spacing[3] }}>
+							{locationError}
+						</Caption>
+					)}
+
+					<View style={{ gap: spacing[2] }}>
+						<Caption color="tertiary">Search for a city</Caption>
+						<View
+							style={{
+								flexDirection: "row",
+								alignItems: "center",
+								gap: spacing[2.5],
+								height: 46,
+								paddingHorizontal: spacing[3.5],
+								borderRadius: 12,
+								backgroundColor: colors.background.subtle,
+							}}
+						>
+							<Search
+								size={18}
+								color={colors.text.quaternary as string}
+								strokeWidth={1.9}
+							/>
+							<TextInput
+								value={search}
+								onChangeText={setSearch}
+								placeholder="Search cities"
+								placeholderTextColor={colors.text.quaternary as string}
+								returnKeyType="search"
+								accessibilityLabel="Search cities"
+								style={{
+									flex: 1,
+									fontFamily: "MonaSans",
+									fontSize: 15,
+									color: colors.text.primary as string,
+									paddingVertical: 0,
+								}}
+							/>
+							{search.length > 0 && (
+								<Pressable
+									onPress={() => setSearch("")}
+									accessibilityRole="button"
+									accessibilityLabel="Clear city search"
+									hitSlop={8}
+								>
+									<X size={16} color={colors.text.tertiary as string} />
+								</Pressable>
+							)}
+						</View>
+					</View>
+
+					<View style={{ gap: spacing[2] }}>
+						<Caption color="tertiary">
+							{search.trim() ? "Matching cities" : "Popular cities"}
+						</Caption>
+						{search.trim() && filteredOptions.length === 0 ? (
+							<Caption color="quaternary">No matching city found.</Caption>
+						) : (
+							filteredOptions.map((city) => (
+								<SheetOption
+									key={city}
+									label={city}
+									hint={city === homeCity ? "Your city" : undefined}
+									selected={value === city}
+									onPress={() => pick(city)}
+								/>
+							))
+						)}
+					</View>
+
 					<SheetOption
 						label="All India"
+						hint="Show opportunities everywhere"
 						selected={value === ALL_INDIA}
 						onPress={() => pick(ALL_INDIA)}
 					/>
-					{options.map((city) => (
-						<SheetOption
-							key={city}
-							label={city}
-							hint={city === homeCity ? "Your city" : undefined}
-							selected={value === city}
-							onPress={() => pick(city)}
-						/>
-					))}
 				</View>
 			</Sheet>
 		</>

@@ -22,7 +22,7 @@ export interface FeedFilters {
 	tab?: FeedTab;
 	/** Client kind; mapped to the server's item type. */
 	kind?: FeedKind;
-	categoryId?: string;
+	categoryIds?: string[];
 	city?: string;
 	search?: string;
 	needType?: NeedType;
@@ -41,10 +41,14 @@ export function useFeed(filters: FeedFilters, enabled = true) {
 	const tab = filters.tab ?? "for_you";
 	const query: Partial<FeedFilterQuery> = {
 		...(filters.kind ? { kind: KIND_TO_TYPE[filters.kind] } : {}),
-		...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+		...(filters.categoryIds?.length
+			? { categoryIds: filters.categoryIds }
+			: {}),
 		...(filters.city ? { city: filters.city } : {}),
 		...(filters.search ? { search: filters.search } : {}),
-		...(filters.needType ? { needType: filters.needType } : {}),
+		...(filters.needType
+			? { kind: "NEED" as const, needType: filters.needType }
+			: {}),
 		...(filters.needUrgency ? { needUrgency: filters.needUrgency } : {}),
 		...(tab === "urgent" ? { urgent: true } : {}),
 	};

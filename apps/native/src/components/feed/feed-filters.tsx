@@ -21,7 +21,9 @@ import {
 	UsersRound,
 	Utensils,
 } from "lucide-react-native";
+import { useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
+import { Button } from "@/components/ui/button";
 import { Pressable } from "@/components/ui/pressable";
 import { Sheet } from "@/components/ui/sheet";
 import { Caption, Label } from "@/components/ui/typography";
@@ -180,35 +182,55 @@ export function FeedTabs({
 }
 
 /**
- * The cause picker. One choice, applied on tap; "All causes" is always the
- * first row so there is no separate clear button to find.
+ * The cause picker. Changes are staged until Apply, and causes are multi-select
+ * so a volunteer can follow more than one vertical at once.
  */
 export function FeedFilterSheet({
 	visible,
 	onClose,
 	categories,
-	categoryId,
-	onCategory,
+	categoryIds,
+	onCategories,
 	needType,
 	onNeedType,
 }: {
 	visible: boolean;
 	onClose: () => void;
 	categories: Category[];
-	categoryId: string;
-	onCategory: (id: string) => void;
+	categoryIds: string[];
+	onCategories: (ids: string[]) => void;
 	needType?: NeedType;
 	onNeedType: (value: NeedType | undefined) => void;
 }) {
-	const { spacing } = useTheme();
+	const { colors, spacing } = useTheme();
+	const [draftCategoryIds, setDraftCategoryIds] = useState(categoryIds);
+	const [draftNeedType, setDraftNeedType] = useState(needType);
 
-	const pickCategory = (id: string) => {
-		onCategory(id);
-		onClose();
+	useEffect(() => {
+		if (visible) {
+			setDraftCategoryIds(categoryIds);
+			setDraftNeedType(needType);
+		}
+	}, [visible, categoryIds, needType]);
+
+	const toggleCategory = (id: string) => {
+		setDraftCategoryIds((current) =>
+			current.includes(id)
+				? current.filter((value) => value !== id)
+				: [...current, id],
+		);
 	};
 	const pickNeedType = (value: NeedType | undefined) => {
-		onNeedType(value);
+		setDraftNeedType(value);
+	};
+	const apply = () => {
+		onCategories(draftCategoryIds);
+		onNeedType(draftNeedType);
 		onClose();
+	};
+	const reset = () => {
+		setDraftCategoryIds([]);
+		setDraftNeedType(undefined);
 	};
 
 	return (
@@ -217,29 +239,49 @@ export function FeedFilterSheet({
 			onClose={onClose}
 			title="Shape your feed"
 			subtitle="Choose what you want to see first."
+			footer={
+				<View style={{ flexDirection: "row", gap: spacing[2] }}>
+					<Button
+						variant="outline"
+						// size="sm"
+						onPress={reset}
+						style={{
+							flex: 1,
+							backgroundColor: colors.background.subtle,
+						}}
+					>
+						Reset
+					</Button>
+					<Button onPress={apply} style={{ flex: 1 }}>
+						{draftCategoryIds.length > 0
+							? `Apply filters (${draftCategoryIds.length})`
+							: "Apply filters"}
+					</Button>
+				</View>
+			}
 		>
 			<View style={{ paddingBottom: spacing[2], gap: spacing[5] }}>
 				<FilterSection title="What you want to see">
 					<FilterCard
 						label="All"
 						icon={Layers3}
-						selected={!needType}
+						selected={!draftNeedType}
 						onPress={() => pickNeedType(undefined)}
 					/>
 					<FilterCard
 						label="Needs"
 						icon={HeartHandshake}
-						selected={needType === "WANT"}
+						selected={draftNeedType === "WANT"}
 						onPress={() =>
-							pickNeedType(needType === "WANT" ? undefined : "WANT")
+							pickNeedType(draftNeedType === "WANT" ? undefined : "WANT")
 						}
 					/>
 					<FilterCard
 						label="Offers"
 						icon={PackageOpen}
-						selected={needType === "OFFER"}
+						selected={draftNeedType === "OFFER"}
 						onPress={() =>
-							pickNeedType(needType === "OFFER" ? undefined : "OFFER")
+							pickNeedType(draftNeedType === "OFFER" ? undefined : "OFFER")
 						}
 					/>
 				</FilterSection>
@@ -248,16 +290,16 @@ export function FeedFilterSheet({
 					<FilterCard
 						label="All causes"
 						icon={Sparkles}
-						selected={categoryId === ALL_CAUSES}
-						onPress={() => pickCategory(ALL_CAUSES)}
+						selected={draftCategoryIds.length === 0}
+						onPress={() => setDraftCategoryIds([])}
 					/>
 					{categories.map((category, index) => (
 						<FilterCard
 							key={category.id}
 							label={category.name}
 							icon={categoryIcon(category.name, index)}
-							selected={categoryId === category.id}
-							onPress={() => pickCategory(category.id)}
+							selected={draftCategoryIds.includes(category.id)}
+							onPress={() => toggleCategory(category.id)}
 						/>
 					))}
 				</FilterSection>
@@ -330,7 +372,7 @@ function FilterCard({
 				strokeWidth={1.9}
 			/>
 			<Label
-				weight={selected ? "semibold" : "medium"}
+				weight={"medium"}
 				numberOfLines={2}
 				color={selected ? (colors.primary.ink as string) : "secondary"}
 				style={{ maxWidth: "100%", flexShrink: 1, textAlign: "left" }}

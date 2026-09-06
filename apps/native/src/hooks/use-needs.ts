@@ -45,6 +45,18 @@ export function useCreatePledge(needId: string) {
 	});
 }
 
+export function useWithdrawPledge() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({ needId }: { needId: string }) =>
+			needsApi.withdrawPledge(needId),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.needs });
+			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
+		},
+	});
+}
+
 // ─── Organisation ────────────────────────────────────────────────────────────
 
 export function useOrgNeeds(query: Partial<OrgNeedQuery> = {}) {

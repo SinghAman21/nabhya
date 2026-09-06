@@ -1,18 +1,15 @@
 import type { NeedType } from "@nabhya/shared";
+import { FlashList } from "@shopify/flash-list";
 import { Redirect, useRouter } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
 	ActivityIndicator,
-	FlatList,
 	RefreshControl,
 	View,
+	type ViewToken,
 } from "react-native";
 import { FeedCard } from "@/components/feed/feed-card";
-import {
-	ALL_CAUSES,
-	FeedFilterSheet,
-	FeedTabs,
-} from "@/components/feed/feed-filters";
+import { FeedFilterSheet, FeedTabs } from "@/components/feed/feed-filters";
 import {
 	EmptyState,
 	ErrorState,
@@ -21,7 +18,11 @@ import {
 	ScreenHeader,
 } from "@/components/screen-shell";
 import { useToggleFollow } from "@/hooks/use-engagement";
-import { useFeed, useFeedReaction } from "@/hooks/use-feed";
+import {
+	useFeed,
+	useFeedReaction,
+	useRecordFeedInteraction,
+} from "@/hooks/use-feed";
 import { useCategories } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
@@ -42,17 +43,31 @@ export default function NgoFeed() {
 	const toggleFollow = useToggleFollow();
 	const like = useFeedReaction("like");
 	const save = useFeedReaction("save");
+	const impression = useRecordFeedInteraction("impression");
+	const seen = useRef(new Set<string>());
+	const onViewableItemsChanged = useRef(
+		({ viewableItems }: { viewableItems: ViewToken[] }) => {
+			for (const token of viewableItems) {
+				const item = token.item as FeedItem | undefined;
+				if (!item) continue;
+				const key = `${item.kind}:${item.id}`;
+				if (seen.current.has(key)) continue;
+				seen.current.add(key);
+				impression.mutate({ item });
+			}
+		},
+	).current;
 	const [tab, setTab] = useState<
 		"for_you" | "following" | "trending" | "urgent"
 	>("for_you");
-	const [categoryId, setCategoryId] = useState<string>(ALL_CAUSES);
+	const [categoryIds, setCategoryIds] = useState<string[]>([]);
 	const [needType, setNeedType] = useState<NeedType | undefined>();
 	const [filtersOpen, setFiltersOpen] = useState(false);
 
 	const feed = useFeed(
 		{
 			tab,
-			...(categoryId === ALL_CAUSES ? {} : { categoryId }),
+			...(categoryIds.length ? { categoryIds } : {}),
 			...(needType ? { needType } : {}),
 		},
 		isOrg,
@@ -74,7 +89,7 @@ export default function NgoFeed() {
 				onTab={setTab}
 				gutter={spacing[5]}
 				onOpenFilters={() => setFiltersOpen(true)}
-				filterActive={categoryId !== ALL_CAUSES || !!needType}
+				filterActive={categoryIds.length > 0 || !!needType}
 			/>
 		</View>
 	);
@@ -107,7 +122,7 @@ export default function NgoFeed() {
 	return (
 		<Screen>
 			{header}
-			<FlatList
+			<FlashList
 				data={items}
 				keyExtractor={(item: FeedItem) => `${item.kind}:${item.id}`}
 				renderItem={({ item }) => (
@@ -136,6 +151,8 @@ export default function NgoFeed() {
 				ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
 				onEndReached={loadMore}
 				onEndReachedThreshold={0.6}
+				onViewableItemsChanged={onViewableItemsChanged}
+				viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
 				showsVerticalScrollIndicator={false}
 				contentContainerStyle={{
 					paddingHorizontal: spacing[5],
@@ -155,8 +172,8 @@ export default function NgoFeed() {
 				visible={filtersOpen}
 				onClose={() => setFiltersOpen(false)}
 				categories={categories.data ?? []}
-				categoryId={categoryId}
-				onCategory={setCategoryId}
+				categoryIds={categoryIds}
+				onCategories={setCategoryIds}
 				needType={needType}
 				onNeedType={setNeedType}
 			/>

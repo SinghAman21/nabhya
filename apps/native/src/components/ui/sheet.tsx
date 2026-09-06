@@ -520,6 +520,7 @@ export function SheetOption({
 				gap: spacing[3],
 				minHeight: 48,
 				paddingHorizontal: spacing[3],
+				paddingVertical: spacing[3],
 				borderRadius: borderRadius.md,
 				backgroundColor: pressed
 					? colors.background.subtle
