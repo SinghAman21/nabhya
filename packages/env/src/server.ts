@@ -28,16 +28,13 @@ export const env = createEnv({
 		/** Optional public base URL, for objects served without a signed link. */
 		R2_PUBLIC_BASE_URL: z.string().url().optional(),
 
-		// Dodo Payments. Optional for the same reason as R2: absent credentials
-		// fall back to a stub so the donation flow stays testable locally, and
-		// the stub is refused in production.
-		DODO_API_KEY: z.string().min(1).optional(),
-		DODO_WEBHOOK_SECRET: z.string().min(1).optional(),
-		/**
-		 * Dodo is product-based, so variable donations are modelled as N units
-		 * of a ₹1 "donation" product. This is that product's id.
-		 */
-		DODO_DONATION_PRODUCT_ID: z.string().min(1).optional(),
+		// Razorpay. Optional for the same reason as R2: absent credentials fall
+		// back to a stub so the donation flow stays testable locally, and the
+		// stub is refused in production. The client opens Razorpay's native
+		// checkout SDK with the order id + key id this produces.
+		RAZORPAY_KEY_ID: z.string().min(1).optional(),
+		RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
+		RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
 	},
 	runtimeEnv: process.env,
 	emptyStringAsUndefined: true,

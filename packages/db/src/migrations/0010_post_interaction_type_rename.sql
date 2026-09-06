@@ -1,0 +1,1 @@
+ALTER TYPE "public"."feed_interaction_type" RENAME TO "post_interaction_type";

@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
 	decimal,
+	foreignKey,
 	index,
 	integer,
 	pgEnum,
@@ -126,6 +127,14 @@ export const postInteractions = pgTable(
 			table.userId,
 			table.createdAt,
 		),
+		// Guards against an interaction being tagged for a different post kind
+		// than the post it points at — enforced via the composite unique on
+		// posts(id, tag), not a plain single-column FK to posts.id.
+		foreignKey({
+			columns: [table.postId, table.tag],
+			foreignColumns: [posts.id, posts.tag],
+			name: "post_interactions_post_tag_posts_fk",
+		}).onDelete("cascade"),
 	],
 );
 
@@ -149,6 +158,11 @@ export const postComments = pgTable(
 			table.createdAt,
 		),
 		index("post_comments_user_idx").on(table.userId),
+		foreignKey({
+			columns: [table.postId, table.tag],
+			foreignColumns: [posts.id, posts.tag],
+			name: "post_comments_post_tag_posts_fk",
+		}).onDelete("cascade"),
 	],
 );
 

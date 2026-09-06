@@ -48,7 +48,7 @@ export const donations = pgTable(
 
 		status: donationStatusEnum("status").notNull().default("PENDING"),
 
-		provider: varchar("provider").notNull().default("dodo"),
+		provider: varchar("provider").notNull().default("razorpay"),
 		/** Provider's checkout/session handle, used to resume an abandoned flow. */
 		providerCheckoutId: varchar("provider_checkout_id"),
 		/** Provider's settled payment id. Unique — guards against webhook replay. */

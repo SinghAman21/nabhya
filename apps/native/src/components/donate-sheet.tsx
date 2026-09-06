@@ -18,8 +18,7 @@ import { useAuthStore } from "@/store/auth-store";
  * Donation entry point.
  *
  * The amount is captured in rupees but sent as paise — integers only, so no
- * float rounding ever reaches the ledger. Dodo is product-based, so whole
- * rupees are the finest granularity the gateway can represent.
+ * float rounding ever reaches the ledger.
  */
 interface RazorpayCheckout {
 	open: (options: Record<string, unknown>) => Promise<unknown>;

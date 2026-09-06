@@ -1,12 +1,19 @@
 import "@/lib/crypto-polyfill";
 import { createClient } from "@supabase/supabase-js";
 import axios from "axios";
-import { AppState } from "react-native";
+import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
+import { AppState, Platform } from "react-native";
 import "react-native-url-polyfill/auto";
 import { API_URL, SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/env";
 import type { AuthResponse, LoginInput, SignUpInput } from "@/lib/types";
 import { storage } from "../storage";
 import { USERS } from "./endpoints";
+
+// Required by expo-web-browser so a browser tab left open by an interrupted
+// auth session (e.g. app backgrounded mid sign-in) resolves instead of
+// leaking; a no-op everywhere except that edge case.
+WebBrowser.maybeCompleteAuthSession();
 
 // Supabase's session storage adapter expects getItem/setItem/removeItem —
 // apps/native/src/lib/storage.ts uses get/set/remove for its other callers
@@ -23,7 +30,10 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 		storage: supabaseStorage,
 		autoRefreshToken: true,
 		persistSession: true,
-		detectSessionInUrl: false,
+		// The redirect flow below relies on Supabase parsing the session out of
+		// the URL fragment itself on web; native never has session tokens in its
+		// own address bar, so leave this off there.
+		detectSessionInUrl: Platform.OS === "web",
 	},
 });
 
@@ -57,6 +67,88 @@ export class AuthService {
 		});
 		this.throwIfSupabaseError(result.error);
 		return this.getAuthenticatedUser(result.data.session?.access_token);
+	}
+
+	/**
+	 * Google sign-in, routed through Supabase's OAuth provider (already
+	 * enabled in the Supabase dashboard — no client secret lives in this app).
+	 *
+	 * Web: a full-page redirect to Google and back. There is no popup here —
+	 * `expo-web-browser`'s popup flow polls `window.closed` to notice the
+	 * consent screen finishing, and Chrome's Cross-Origin-Opener-Policy blocks
+	 * that read for a cross-origin popup (Google's login page), which either
+	 * throws a console error or leaves the promise hanging. The browser tab
+	 * *is* the app on web, so there's nothing a popup buys here anyway —
+	 * Supabase parses the returned session out of the URL itself
+	 * (`detectSessionInUrl` above) once Google redirects back to this origin;
+	 * `getCurrentSession()` below picks it up on the next mount.
+	 *
+	 * Native has no redirect-capable webview of its own, so it opens the
+	 * system browser for the Google consent screen and gets handed back to
+	 * the app via the `nabhya://` deep link registered in app.json; Supabase
+	 * appends the session as a URL fragment on that redirect, which we parse
+	 * by hand rather than pull in expo-auth-session for one helper.
+	 */
+	async signInWithGoogle(): Promise<AuthResponse | null> {
+		if (Platform.OS === "web") {
+			const { error } = await supabase.auth.signInWithOAuth({
+				provider: "google",
+				options: { redirectTo: window.location.origin },
+			});
+			this.throwIfSupabaseError(error);
+			return null; // page is navigating away to Google; nothing left to do here
+		}
+
+		const redirectTo = Linking.createURL("auth/callback");
+		const { data, error } = await supabase.auth.signInWithOAuth({
+			provider: "google",
+			options: { redirectTo, skipBrowserRedirect: true },
+		});
+		this.throwIfSupabaseError(error);
+		if (!data?.url) {
+			throw new Error("Supabase did not return a Google sign-in URL");
+		}
+
+		const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+		if (result.type !== "success") {
+			// User closed the browser or backgrounded the app — not a real error.
+			throw new Error("CANCELLED");
+		}
+
+		const params = this.parseRedirectParams(result.url);
+		if (params.error) {
+			throw new Error(params.error_description ?? params.error);
+		}
+		if (!params.access_token || !params.refresh_token) {
+			throw new Error("Supabase did not return session tokens");
+		}
+
+		const session = await supabase.auth.setSession({
+			access_token: params.access_token,
+			refresh_token: params.refresh_token,
+		});
+		this.throwIfSupabaseError(session.error);
+		return this.getAuthenticatedUser(session.data.session?.access_token);
+	}
+
+	/**
+	 * Web-only: after Supabase auto-parses a Google redirect's session out of
+	 * the URL (`detectSessionInUrl`), pick up whatever session already exists
+	 * on this origin. Called once at boot so a page load right after the
+	 * Google round-trip lands signed in instead of back at the login screen.
+	 */
+	async getCurrentSession(): Promise<AuthResponse | null> {
+		const { data, error } = await supabase.auth.getSession();
+		if (error || !data.session?.access_token) return null;
+		return this.getAuthenticatedUser(data.session.access_token);
+	}
+
+	/** Supabase's implicit-grant redirect carries the session in a `#` fragment, not `?` query params. */
+	private parseRedirectParams(url: string): Record<string, string> {
+		const splitIndex =
+			url.indexOf("#") !== -1 ? url.indexOf("#") : url.indexOf("?");
+		if (splitIndex === -1) return {};
+		return Object.fromEntries(new URLSearchParams(url.slice(splitIndex + 1)));
 	}
 
 	async logout(): Promise<void> {
