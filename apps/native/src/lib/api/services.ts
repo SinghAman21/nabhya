@@ -8,12 +8,14 @@ import type {
 	CompleteOrgOnboardingInput,
 	CompleteVolunteerOnboardingInput,
 	CreateEventInput,
+	CreateFeedCommentInput,
 	CreateFeedMediaIntentsInput,
 	CreateFeedPostInput,
 	CreateNeedInput,
 	CreatePledgeInput,
 	DocumentQueueQuery,
 	DownloadUrlResponse,
+	FeedCommentsQuery,
 	FeedMediaIntentsResponse,
 	FeedQuery,
 	FollowingFeedQuery,
@@ -27,6 +29,7 @@ import type {
 	ReviewDocumentInput,
 	ReviewOrganizationInput,
 	ReviewPledgeInput,
+	SearchQuery,
 	SelectableRole,
 	SetOrgStatusInput,
 	SetUserStatusInput,
@@ -55,6 +58,7 @@ import type {
 	EventApplicant,
 	FeedApiItem,
 	FeedApiItemType,
+	FeedComment,
 	FeedPostRecord,
 	MyPledgeListItem,
 	MyProfile,
@@ -108,12 +112,9 @@ export const categoriesApi = {
 };
 
 export const searchApi = {
-	search: (query: {
-		search: string;
-		scope?: "all" | "ngos" | "need" | "event" | "story" | "post";
-		page?: number;
-		limit?: number;
-	}) => http.get<SearchResults>(SEARCH.LIST, query),
+	search: (
+		query: Pick<SearchQuery, "search"> & Partial<Omit<SearchQuery, "search">>,
+	) => http.get<SearchResults>(SEARCH.LIST, query),
 };
 
 export const organizationsApi = {
@@ -154,6 +155,23 @@ export const feedApi = {
 		on
 			? http.post<unknown>(FEED.interaction(type, id, action))
 			: http.delete<unknown>(FEED.interaction(type, id, action)),
+	interact: (
+		type: FeedApiItemType,
+		id: string,
+		action: "share" | "impression",
+	) => http.post<{ recorded: boolean }>(FEED.interaction(type, id, action)),
+	listComments: (
+		type: FeedApiItemType,
+		id: string,
+		query: Partial<FeedCommentsQuery>,
+	) => http.getPage<FeedComment>(FEED.comments(type, id), query),
+	createComment: (
+		type: FeedApiItemType,
+		id: string,
+		input: Pick<CreateFeedCommentInput, "body">,
+	) => http.post<FeedComment>(FEED.comments(type, id), input),
+	deleteComment: (id: string) =>
+		http.delete<{ deleted: boolean }>(FEED.deleteComment(id)),
 };
 
 export const uploadsApi = {

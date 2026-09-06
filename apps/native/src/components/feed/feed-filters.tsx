@@ -1,9 +1,30 @@
-import { FEED_TAB_LABELS, type FeedTab, feedTabSchema } from "@nabhya/shared";
-import { SlidersHorizontal } from "lucide-react-native";
+import {
+	FEED_TAB_LABELS,
+	type FeedTab,
+	feedTabSchema,
+	type NeedType,
+} from "@nabhya/shared";
+import {
+	BookOpen,
+	Boxes,
+	BriefcaseBusiness,
+	Building2,
+	HeartHandshake,
+	Layers3,
+	Leaf,
+	Megaphone,
+	PackageOpen,
+	SlidersHorizontal,
+	Sparkles,
+	Stethoscope,
+	TreePine,
+	UsersRound,
+	Utensils,
+} from "lucide-react-native";
 import { ScrollView, View } from "react-native";
 import { Pressable } from "@/components/ui/pressable";
-import { Sheet, SheetOption } from "@/components/ui/sheet";
-import { Caption } from "@/components/ui/typography";
+import { Sheet } from "@/components/ui/sheet";
+import { Caption, Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { focusable } from "@/lib/focus";
 import type { Category } from "@/lib/types";
@@ -168,17 +189,25 @@ export function FeedFilterSheet({
 	categories,
 	categoryId,
 	onCategory,
+	needType,
+	onNeedType,
 }: {
 	visible: boolean;
 	onClose: () => void;
 	categories: Category[];
 	categoryId: string;
 	onCategory: (id: string) => void;
+	needType?: NeedType;
+	onNeedType: (value: NeedType | undefined) => void;
 }) {
 	const { spacing } = useTheme();
 
-	const pick = (id: string) => {
+	const pickCategory = (id: string) => {
 		onCategory(id);
+		onClose();
+	};
+	const pickNeedType = (value: NeedType | undefined) => {
+		onNeedType(value);
 		onClose();
 	};
 
@@ -186,24 +215,151 @@ export function FeedFilterSheet({
 		<Sheet
 			visible={visible}
 			onClose={onClose}
-			title="Filter by cause"
-			subtitle="Show only posts from NGOs working on one thing."
+			title="Shape your feed"
+			subtitle="Choose what you want to see first."
 		>
-			<View style={{ paddingBottom: spacing[2] }}>
-				<SheetOption
-					label="All causes"
-					selected={categoryId === ALL_CAUSES}
-					onPress={() => pick(ALL_CAUSES)}
-				/>
-				{categories.map((category) => (
-					<SheetOption
-						key={category.id}
-						label={category.name}
-						selected={categoryId === category.id}
-						onPress={() => pick(category.id)}
+			<View style={{ paddingBottom: spacing[2], gap: spacing[5] }}>
+				<FilterSection title="What you want to see">
+					<FilterCard
+						label="All"
+						icon={Layers3}
+						selected={!needType}
+						onPress={() => pickNeedType(undefined)}
 					/>
-				))}
+					<FilterCard
+						label="Needs"
+						icon={HeartHandshake}
+						selected={needType === "WANT"}
+						onPress={() =>
+							pickNeedType(needType === "WANT" ? undefined : "WANT")
+						}
+					/>
+					<FilterCard
+						label="Offers"
+						icon={PackageOpen}
+						selected={needType === "OFFER"}
+						onPress={() =>
+							pickNeedType(needType === "OFFER" ? undefined : "OFFER")
+						}
+					/>
+				</FilterSection>
+
+				<FilterSection title="Cause">
+					<FilterCard
+						label="All causes"
+						icon={Sparkles}
+						selected={categoryId === ALL_CAUSES}
+						onPress={() => pickCategory(ALL_CAUSES)}
+					/>
+					{categories.map((category, index) => (
+						<FilterCard
+							key={category.id}
+							label={category.name}
+							icon={categoryIcon(category.name, index)}
+							selected={categoryId === category.id}
+							onPress={() => pickCategory(category.id)}
+						/>
+					))}
+				</FilterSection>
 			</View>
 		</Sheet>
 	);
+}
+
+function FilterSection({
+	title,
+	children,
+}: {
+	title: string;
+	children: React.ReactNode;
+}) {
+	const { spacing } = useTheme();
+	return (
+		<View style={{ gap: spacing[2] }}>
+			<Caption color="tertiary">{title}</Caption>
+			<View
+				style={{
+					flexDirection: "row",
+					flexWrap: "wrap",
+					gap: spacing[2],
+				}}
+			>
+				{children}
+			</View>
+		</View>
+	);
+}
+
+function FilterCard({
+	label,
+	icon: Icon,
+	selected,
+	onPress,
+}: {
+	label: string;
+	icon: typeof Layers3;
+	selected: boolean;
+	onPress: () => void;
+}) {
+	const { colors, spacing, borderRadius } = useTheme();
+	return (
+		<Pressable
+			onPress={onPress}
+			accessibilityRole="radio"
+			accessibilityState={{ checked: selected }}
+			{...focusable}
+			style={({ pressed }) => ({
+				flexGrow: 1,
+				flexBasis: 0,
+				minWidth: 88,
+				minHeight: 96,
+				alignItems: "flex-start",
+				justifyContent: "space-between",
+				padding: spacing[3],
+				borderRadius: borderRadius.md,
+				backgroundColor: selected
+					? colors.primary.tint
+					: pressed
+						? colors.background.tertiary
+						: colors.background.subtle,
+			})}
+		>
+			<Icon
+				size={20}
+				color={(selected ? colors.primary.ink : colors.text.tertiary) as string}
+				strokeWidth={1.9}
+			/>
+			<Label
+				weight={selected ? "semibold" : "medium"}
+				numberOfLines={2}
+				color={selected ? (colors.primary.ink as string) : "secondary"}
+				style={{ maxWidth: "100%", flexShrink: 1, textAlign: "left" }}
+			>
+				{label}
+			</Label>
+		</Pressable>
+	);
+}
+
+function categoryIcon(name: string, index: number) {
+	const normalized = name.toLowerCase();
+	if (normalized.includes("education") || normalized.includes("teach"))
+		return BookOpen;
+	if (normalized.includes("health") || normalized.includes("medical"))
+		return Stethoscope;
+	if (normalized.includes("food") || normalized.includes("hunger"))
+		return Utensils;
+	if (normalized.includes("environment") || normalized.includes("climate"))
+		return Leaf;
+	if (normalized.includes("tree") || normalized.includes("nature"))
+		return TreePine;
+	if (normalized.includes("women") || normalized.includes("child"))
+		return UsersRound;
+	if (normalized.includes("shelter") || normalized.includes("housing"))
+		return Building2;
+	if (normalized.includes("livelihood") || normalized.includes("employment"))
+		return BriefcaseBusiness;
+	if (normalized.includes("community") || normalized.includes("social"))
+		return Megaphone;
+	return [Boxes, HeartHandshake, Sparkles][index % 3] ?? Boxes;
 }

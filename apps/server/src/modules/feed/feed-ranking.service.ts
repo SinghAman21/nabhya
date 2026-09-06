@@ -222,32 +222,36 @@ export class FeedRankingService {
 					},
 				})),
 			)),
-			...eventRows.map(({ event, org, author }) => ({
-				id: event.id,
-				type: "EVENT" as const,
-				organizationId: event.organizationId,
-				organization: orgSummary(org),
-				author: author ? userSummary(author) : null,
-				createdAt: event.createdAt,
-				city: event.city ?? org.city,
-				state: event.state ?? org.state,
-				latitude: numberOrNull(event.latitude ?? org.latitude),
-				longitude: numberOrNull(event.longitude ?? org.longitude),
-				urgency: null,
-				categoryIds: [],
-				engagement: emptyEngagement(),
-				viewer: null,
-				content: {
-					title: event.title,
-					description: event.description,
-					coverImage: event.coverImage,
-					venue: event.venue,
-					startAt: event.startAt,
-					endAt: event.endAt,
-					volunteersNeeded: event.volunteersNeeded,
-					acceptedCount: event.acceptedCount,
-				},
-			})),
+			...(await Promise.all(
+				eventRows.map(async ({ event, org, author }) => ({
+					id: event.id,
+					type: "EVENT" as const,
+					organizationId: event.organizationId,
+					organization: orgSummary(org),
+					author: author ? userSummary(author) : null,
+					createdAt: event.createdAt,
+					city: event.city ?? org.city,
+					state: event.state ?? org.state,
+					latitude: numberOrNull(event.latitude ?? org.latitude),
+					longitude: numberOrNull(event.longitude ?? org.longitude),
+					urgency: null,
+					categoryIds: [],
+					engagement: emptyEngagement(),
+					viewer: null,
+					content: {
+						title: event.title,
+						description: event.description,
+						coverImage: event.coverImage
+							? await this.storage.createDownloadUrl(event.coverImage)
+							: null,
+						venue: event.venue,
+						startAt: event.startAt,
+						endAt: event.endAt,
+						volunteersNeeded: event.volunteersNeeded,
+						acceptedCount: event.acceptedCount,
+					},
+				})),
+			)),
 			...needRows.map(({ need, org, author }) => ({
 				id: need.id,
 				type: "NEED" as const,
@@ -273,28 +277,32 @@ export class FeedRankingService {
 					expiresAt: need.expiresAt,
 				},
 			})),
-			...announcementRows.map(({ announcement, org, author }) => ({
-				id: announcement.id,
-				type: "ANNOUNCEMENT" as const,
-				organizationId: announcement.organizationId,
-				organization: orgSummary(org),
-				author: author ? userSummary(author) : null,
-				createdAt: announcement.publishedAt ?? announcement.createdAt,
-				city: org.city,
-				state: org.state,
-				latitude: numberOrNull(org.latitude),
-				longitude: numberOrNull(org.longitude),
-				urgency: null,
-				categoryIds: [],
-				engagement: emptyEngagement(),
-				viewer: null,
-				content: {
-					title: announcement.title,
-					body: announcement.body,
-					coverImageKey: announcement.coverImageKey,
-					isPinned: announcement.isPinned,
-				},
-			})),
+			...(await Promise.all(
+				announcementRows.map(async ({ announcement, org, author }) => ({
+					id: announcement.id,
+					type: "ANNOUNCEMENT" as const,
+					organizationId: announcement.organizationId,
+					organization: orgSummary(org),
+					author: author ? userSummary(author) : null,
+					createdAt: announcement.publishedAt ?? announcement.createdAt,
+					city: org.city,
+					state: org.state,
+					latitude: numberOrNull(org.latitude),
+					longitude: numberOrNull(org.longitude),
+					urgency: null,
+					categoryIds: [],
+					engagement: emptyEngagement(),
+					viewer: null,
+					content: {
+						title: announcement.title,
+						body: announcement.body,
+						coverImage: announcement.coverImageKey
+							? await this.storage.createDownloadUrl(announcement.coverImageKey)
+							: null,
+						isPinned: announcement.isPinned,
+					},
+				})),
+			)),
 		];
 		await this.hydrate(result, user?.id);
 		return result;
@@ -628,6 +636,16 @@ function applyFilters(candidates: Candidate[], query: FeedFilterQuery) {
 		if (city && !(candidate.city ?? "").toLowerCase().includes(city))
 			return false;
 		if (query.urgent && !isUrgent(candidate, now)) return false;
+		if (
+			query.needType &&
+			(candidate.type !== "NEED" || candidate.content.type !== query.needType)
+		)
+			return false;
+		if (
+			query.needUrgency &&
+			(candidate.type !== "NEED" || candidate.urgency !== query.needUrgency)
+		)
+			return false;
 		if (search) {
 			const haystack = [
 				candidate.content.title,

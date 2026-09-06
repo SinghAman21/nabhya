@@ -49,7 +49,11 @@ export function toFeedItem(row: FeedApiItem): FeedItem {
 		isFollowing: row.viewer?.followsOrganization ?? false,
 		organization,
 		author: row.author
-			? { id: row.author.id, fullName: row.author.fullName }
+			? {
+					id: row.author.id,
+					fullName: row.author.fullName,
+					profileImage: row.author.profileImage,
+				}
 			: null,
 		engagement: row.engagement,
 		viewer: row.viewer
@@ -114,8 +118,20 @@ export function toFeedItem(row: FeedApiItem): FeedItem {
 				description: str(c.body) ?? "",
 				isUrgent: false,
 				story: {
-					coverImageKey: str(c.coverImageKey),
+					coverImage: str(c.coverImage),
 					isPinned: c.isPinned === true,
+				},
+			};
+		case "URGENT":
+			return {
+				...base,
+				kind: "post",
+				title: "",
+				description: str(c.text) ?? "",
+				isUrgent: true,
+				post: {
+					text: str(c.text) ?? "",
+					media: Array.isArray(c.media) ? (c.media as FeedMedia[]) : [],
 				},
 			};
 		default:

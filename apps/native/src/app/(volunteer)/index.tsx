@@ -1,4 +1,4 @@
-import type { FeedTab } from "@nabhya/shared";
+import type { FeedTab, NeedType } from "@nabhya/shared";
 import { useRouter } from "expo-router";
 import {
 	Flame,
@@ -82,6 +82,7 @@ export default function Home() {
 
 	const [tab, setTab] = useState<FeedTab>("for_you");
 	const [categoryId, setCategoryId] = useState<string>(ALL_CAUSES);
+	const [needType, setNeedType] = useState<NeedType | undefined>();
 	const [filtersOpen, setFiltersOpen] = useState(false);
 	const [responding, setResponding] = useState<FeedNeedItem | null>(null);
 
@@ -109,6 +110,7 @@ export default function Home() {
 		...(categoryId === ALL_CAUSES ? {} : { categoryId }),
 		...(city === ALL_INDIA ? {} : { city }),
 		...(debouncedSearch ? { search: debouncedSearch } : {}),
+		...(needType ? { needType } : {}),
 	});
 	const items = useMemo(
 		() => feed.data?.pages.flatMap((page) => page.items) ?? [],
@@ -190,7 +192,7 @@ export default function Home() {
 				onTab={setTab}
 				gutter={gutter}
 				onOpenFilters={() => setFiltersOpen(true)}
-				filterActive={categoryId !== ALL_CAUSES}
+				filterActive={categoryId !== ALL_CAUSES || !!needType}
 			/>
 		</View>
 	);
@@ -294,6 +296,8 @@ export default function Home() {
 				categories={categories.data ?? []}
 				categoryId={categoryId}
 				onCategory={setCategoryId}
+				needType={needType}
+				onNeedType={setNeedType}
 			/>
 			<PledgeSheet
 				need={responding ? toPublicNeed(responding) : null}

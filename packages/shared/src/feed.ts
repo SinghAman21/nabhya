@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { paginationQuerySchema } from "./common";
+import { needTypeSchema, needUrgencySchema } from "./needs";
 import type { UploadTicketResponse } from "./uploads";
 
 export const MAX_FEED_MEDIA = 4;
@@ -135,6 +136,8 @@ export const feedFilterSchema = z.object({
 		.union([z.boolean(), z.enum(["true", "false"])])
 		.transform((value) => value === true || value === "true")
 		.optional(),
+	needType: needTypeSchema.optional(),
+	needUrgency: needUrgencySchema.optional(),
 });
 export type FeedFilterQuery = z.infer<typeof feedFilterSchema>;
 

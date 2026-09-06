@@ -71,6 +71,8 @@ export const queryKeys = {
 	team: ["org", "team"] as const,
 
 	feed: (params?: unknown) => ["feed", params] as const,
+	feedComments: (id: string, params?: unknown) =>
+		["feed", "comments", id, params] as const,
 
 	myImpact: ["impact", "me"] as const,
 	orgImpact: (id: string) => ["impact", "org", id] as const,

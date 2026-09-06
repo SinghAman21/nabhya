@@ -693,6 +693,17 @@ export interface FeedEngagement {
 	pledges: number;
 }
 
+export interface FeedComment {
+	id: string;
+	body: string;
+	createdAt: string;
+	user: {
+		id: string;
+		fullName: string | null;
+		profileImage: string | null;
+	};
+}
+
 export interface FeedMedia {
 	id: string;
 	type: "IMAGE" | "VIDEO";
@@ -725,7 +736,11 @@ interface FeedItemBase {
 	isFollowing: boolean;
 	/** Null only for a post by a volunteer with no organisation. */
 	organization: OrganizationSummary | null;
-	author: { id: string; fullName: string | null } | null;
+	author: {
+		id: string;
+		fullName: string | null;
+		profileImage: string | null;
+	} | null;
 	engagement: FeedEngagement;
 	viewer: { liked: boolean; saved: boolean } | null;
 }
@@ -760,7 +775,7 @@ export interface FeedEventItem extends FeedItemBase {
 export interface FeedStoryItem extends FeedItemBase {
 	kind: "story";
 	story: {
-		coverImageKey: string | null;
+		coverImage: string | null;
 		isPinned: boolean;
 	};
 }

@@ -1,3 +1,4 @@
+import type { NeedType } from "@nabhya/shared";
 import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -45,12 +46,14 @@ export default function NgoFeed() {
 		"for_you" | "following" | "trending" | "urgent"
 	>("for_you");
 	const [categoryId, setCategoryId] = useState<string>(ALL_CAUSES);
+	const [needType, setNeedType] = useState<NeedType | undefined>();
 	const [filtersOpen, setFiltersOpen] = useState(false);
 
 	const feed = useFeed(
 		{
 			tab,
 			...(categoryId === ALL_CAUSES ? {} : { categoryId }),
+			...(needType ? { needType } : {}),
 		},
 		isOrg,
 	);
@@ -71,7 +74,7 @@ export default function NgoFeed() {
 				onTab={setTab}
 				gutter={spacing[5]}
 				onOpenFilters={() => setFiltersOpen(true)}
-				filterActive={categoryId !== ALL_CAUSES}
+				filterActive={categoryId !== ALL_CAUSES || !!needType}
 			/>
 		</View>
 	);
@@ -154,6 +157,8 @@ export default function NgoFeed() {
 				categories={categories.data ?? []}
 				categoryId={categoryId}
 				onCategory={setCategoryId}
+				needType={needType}
+				onNeedType={setNeedType}
 			/>
 		</Screen>
 	);

@@ -485,7 +485,7 @@ export function SheetFlatList<T>(props: FlatListProps<T>) {
 		<BottomSheetFlatList
 			keyboardShouldPersistTaps="handled"
 			showsVerticalScrollIndicator={false}
-			{...props}
+			{...(props as any)}
 			contentContainerStyle={contentContainerStyle}
 		/>
 	);

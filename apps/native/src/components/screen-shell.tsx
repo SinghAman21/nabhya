@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react-native";
 import {
 	ActivityIndicator,
 	Platform,
+	ScrollView,
 	type StyleProp,
 	View,
 	type ViewStyle,
@@ -616,13 +617,16 @@ export function FilterChips<T extends string>({
 	const { colors, spacing } = useTheme();
 
 	return (
-		<View
+		<ScrollView
+			horizontal
+			showsHorizontalScrollIndicator={false}
 			accessibilityRole="tablist"
 			style={{
-				flexDirection: "row",
-				flexWrap: "wrap",
-				gap: spacing[2],
 				marginBottom: inline ? 0 : spacing[5],
+			}}
+			contentContainerStyle={{
+				flexDirection: "row",
+				gap: spacing[2],
 			}}
 		>
 			{options.map((option) => {
@@ -662,7 +666,7 @@ export function FilterChips<T extends string>({
 					</Pressable>
 				);
 			})}
-		</View>
+		</ScrollView>
 	);
 }
 

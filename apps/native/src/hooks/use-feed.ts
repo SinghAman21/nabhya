@@ -1,7 +1,14 @@
-import type { FeedFilterQuery, FeedTab } from "@nabhya/shared";
+import type {
+	FeedCommentsQuery,
+	FeedFilterQuery,
+	FeedTab,
+	NeedType,
+	NeedUrgency,
+} from "@nabhya/shared";
 import {
 	useInfiniteQuery,
 	useMutation,
+	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
 import { feedApi, queryKeys, queryScopes } from "@/lib/api";
@@ -18,6 +25,8 @@ export interface FeedFilters {
 	categoryId?: string;
 	city?: string;
 	search?: string;
+	needType?: NeedType;
+	needUrgency?: NeedUrgency;
 }
 
 /**
@@ -35,6 +44,8 @@ export function useFeed(filters: FeedFilters, enabled = true) {
 		...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
 		...(filters.city ? { city: filters.city } : {}),
 		...(filters.search ? { search: filters.search } : {}),
+		...(filters.needType ? { needType: filters.needType } : {}),
+		...(filters.needUrgency ? { needUrgency: filters.needUrgency } : {}),
 		...(tab === "urgent" ? { urgent: true } : {}),
 	};
 	const fetchPage =
@@ -66,6 +77,58 @@ export function useFeedReaction(action: "like" | "save") {
 		mutationFn: ({ item, on }: { item: FeedItem; on: boolean }) =>
 			feedApi.react(KIND_TO_TYPE[item.kind], item.id, action, on),
 		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
+		},
+	});
+}
+
+export function useRecordFeedInteraction(action: "share" | "impression") {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({ item }: { item: FeedItem }) =>
+			feedApi.interact(KIND_TO_TYPE[item.kind], item.id, action),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
+		},
+	});
+}
+
+export function useFeedComments(
+	item: FeedItem | null,
+	query: Partial<FeedCommentsQuery> = {},
+) {
+	return useQuery({
+		queryKey: queryKeys.feedComments(item?.id ?? "", query),
+		queryFn: () =>
+			feedApi.listComments(
+				KIND_TO_TYPE[item?.kind as FeedItem["kind"]],
+				item?.id as string,
+				query,
+			),
+		enabled: !!item,
+	});
+}
+
+export function useCreateFeedComment() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({ item, body }: { item: FeedItem; body: string }) =>
+			feedApi.createComment(KIND_TO_TYPE[item.kind], item.id, { body }),
+		onSuccess: (_data, variables) => {
+			queryClient.invalidateQueries({
+				queryKey: ["feed", "comments", variables.item.id],
+			});
+			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
+		},
+	});
+}
+
+export function useDeleteFeedComment() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (id: string) => feedApi.deleteComment(id),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["feed", "comments"] });
 			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
 		},
 	});

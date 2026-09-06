@@ -1,22 +1,26 @@
 import { Image } from "expo-image";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
+import { useVideoPlayer, VideoView } from "expo-video";
 import {
 	BadgeCheck,
 	Bookmark,
 	CalendarDays,
 	Heart,
 	MapPin,
+	MessageCircle,
 	Pin,
 	Share2,
 	Users,
 } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Share, useWindowDimensions, View } from "react-native";
+import { FeedCommentsSheet } from "@/components/feed/feed-comments-sheet";
 import { Surface } from "@/components/screen-shell";
 import { StatusPill } from "@/components/status-pill";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H5, Label } from "@/components/ui/typography";
+import { useRecordFeedInteraction } from "@/hooks/use-feed";
 import { useTheme } from "@/hooks/use-theme";
 import { formatDateRange, formatProgress, formatRelative } from "@/lib/format";
 import { splitPostText } from "@/lib/post-text";
@@ -27,6 +31,7 @@ import type {
 	FeedPostItem,
 	PublicNeed,
 } from "@/lib/types";
+import { useAuthStore } from "@/store/auth-store";
 
 const DAY_MS = 86_400_000;
 
@@ -78,6 +83,10 @@ export function FeedCard({
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
 	const [expanded, setExpanded] = useState(false);
+	const [commentsOpen, setCommentsOpen] = useState(false);
+	const email = useAuthStore((state) => state.email);
+	const recordShare = useRecordFeedInteraction("share");
+	const recordImpression = useRecordFeedInteraction("impression");
 
 	const org = item.organization;
 	const closed = item.kind === "need" && item.need.status !== "OPEN";
@@ -95,10 +104,15 @@ export function FeedCard({
 			await Share.share({
 				message: `${headline}${org ? ` — ${org.organizationName}` : ""} on Nabhya\n${Linking.createURL(path)}`,
 			});
+			if (email) recordShare.mutate({ item });
 		} catch {
 			// Web without the share API, or the user dismissed the sheet.
 		}
 	};
+
+	useEffect(() => {
+		if (email) recordImpression.mutate({ item });
+	}, [email, item.id, item.kind, recordImpression.mutate]);
 
 	const primary = (() => {
 		switch (item.kind) {
@@ -139,87 +153,111 @@ export function FeedCard({
 	const saved = item.viewer?.saved ?? false;
 
 	return (
-		<Surface padded={false} style={{ overflow: "hidden" }}>
-			<View style={{ padding: spacing[4], gap: spacing[3] }}>
-				<PosterHeader
-					item={item}
-					onOpen={org ? () => router.push(`/ngos/${org.id}`) : undefined}
-					onToggleFollow={
-						org ? () => onToggleFollow(org.id, item.isFollowing) : undefined
-					}
-				/>
+		<>
+			<Surface padded={false} style={{ overflow: "hidden" }}>
+				<View style={{ padding: spacing[4], gap: spacing[3] }}>
+					<PosterHeader
+						item={item}
+						onOpen={org ? () => router.push(`/ngos/${org.id}`) : undefined}
+						onToggleFollow={
+							org ? () => onToggleFollow(org.id, item.isFollowing) : undefined
+						}
+					/>
 
-				{item.kind === "post" ? (
-					<PostBody item={item} expanded={expanded} onExpand={setExpanded} />
-				) : (
-					<View style={{ gap: spacing[1] }}>
-						<Eyebrow item={item} />
-						<H5 numberOfLines={2}>{item.title}</H5>
-						{item.description ? (
-							<Caption
-								color="tertiary"
-								numberOfLines={
-									item.kind === "story" ? (expanded ? undefined : 4) : 2
-								}
-							>
-								{item.description}
-							</Caption>
-						) : null}
-					</View>
-				)}
+					{item.kind === "post" ? (
+						<>
+							<Eyebrow item={item} />
+							<PostBody
+								item={item}
+								expanded={expanded}
+								onExpand={setExpanded}
+							/>
+						</>
+					) : (
+						<View style={{ gap: spacing[1] }}>
+							<Eyebrow item={item} />
+							<H5 numberOfLines={2}>{item.title}</H5>
+							{item.description ? (
+								<Caption
+									color="tertiary"
+									numberOfLines={
+										item.kind === "story" ? (expanded ? undefined : 4) : 2
+									}
+								>
+									{item.description}
+								</Caption>
+							) : null}
+						</View>
+					)}
 
-				{item.kind === "need" && <NeedFacts item={item} />}
-				{item.kind === "event" && <EventFacts item={item} />}
-			</View>
+					{item.kind === "need" && <NeedFacts item={item} />}
+					{item.kind === "event" && <EventFacts item={item} />}
+					{item.kind === "event" && item.event.coverImage && (
+						<FeedMediaImage uri={item.event.coverImage} />
+					)}
+					{item.kind === "story" && item.story.coverImage && (
+						<FeedMediaImage uri={item.story.coverImage} />
+					)}
+				</View>
 
-			<View style={{ height: 1, backgroundColor: colors.border.hairline }} />
+				<View style={{ height: 1, backgroundColor: colors.border.hairline }} />
 
-			<View
-				style={{ flexDirection: "row", alignItems: "stretch", minHeight: 48 }}
-			>
-				{primary ? (
-					<Pressable
-						onPress={primary.onPress}
-						disabled={primary.disabled}
-						accessibilityRole="button"
-						accessibilityState={{ disabled: primary.disabled }}
-						accessibilityLabel={`${primary.label}: ${headline}`}
-						style={({ pressed }) => ({
-							flex: 1,
-							alignItems: "center",
-							justifyContent: "center",
-							paddingVertical: spacing[3],
-							opacity: primary.disabled ? 0.45 : 1,
-							backgroundColor: pressed
-								? (colors.background.subtle as string)
-								: "transparent",
-						})}
-					>
-						<Label weight="semibold" color={colors.primary.ink}>
-							{primary.label}
-						</Label>
-					</Pressable>
-				) : (
-					<View style={{ flex: 1 }} />
-				)}
-				<Reaction
-					icon={Heart}
-					active={liked}
-					count={item.engagement.likes}
-					label={liked ? "Unlike" : "Like"}
-					activeColor={colors.error.main as string}
-					onPress={onToggleLike ? () => onToggleLike(item, liked) : undefined}
-				/>
-				<Reaction
-					icon={Bookmark}
-					active={saved}
-					label={saved ? "Unsave" : "Save"}
-					activeColor={colors.text.primary as string}
-					onPress={onToggleSave ? () => onToggleSave(item, saved) : undefined}
-				/>
-				<Reaction icon={Share2} label={`Share ${headline}`} onPress={share} />
-			</View>
-		</Surface>
+				<View
+					style={{ flexDirection: "row", alignItems: "stretch", minHeight: 48 }}
+				>
+					{primary ? (
+						<Pressable
+							onPress={primary.onPress}
+							disabled={primary.disabled}
+							accessibilityRole="button"
+							accessibilityState={{ disabled: primary.disabled }}
+							accessibilityLabel={`${primary.label}: ${headline}`}
+							style={({ pressed }) => ({
+								flex: 1,
+								alignItems: "center",
+								justifyContent: "center",
+								paddingVertical: spacing[3],
+								opacity: primary.disabled ? 0.45 : 1,
+								backgroundColor: pressed
+									? (colors.background.subtle as string)
+									: "transparent",
+							})}
+						>
+							<Label weight="semibold" color={colors.primary.ink}>
+								{primary.label}
+							</Label>
+						</Pressable>
+					) : (
+						<View style={{ flex: 1 }} />
+					)}
+					<Reaction
+						icon={Heart}
+						active={liked}
+						count={item.engagement.likes}
+						label={liked ? "Unlike" : "Like"}
+						activeColor={colors.error.main as string}
+						onPress={onToggleLike ? () => onToggleLike(item, liked) : undefined}
+					/>
+					<Reaction
+						icon={Bookmark}
+						active={saved}
+						label={saved ? "Unsave" : "Save"}
+						activeColor={colors.text.primary as string}
+						onPress={onToggleSave ? () => onToggleSave(item, saved) : undefined}
+					/>
+					<Reaction
+						icon={MessageCircle}
+						count={item.engagement.comments}
+						label={`Comments on ${headline}`}
+						onPress={() => setCommentsOpen(true)}
+					/>
+					<Reaction icon={Share2} label={`Share ${headline}`} onPress={share} />
+				</View>
+			</Surface>
+			{commentsOpen && (
+				<FeedCommentsSheet item={item} onClose={() => setCommentsOpen(false)} />
+			)}
+		</>
 	);
 }
 
@@ -318,10 +356,14 @@ function PosterHeader({
 					gap: spacing[2.5],
 				}}
 			>
-				{org?.logo ? (
+				{org?.logo || item.author?.profileImage ? (
 					<Image
-						source={{ uri: org.logo }}
-						style={{ width: 36, height: 36, borderRadius: borderRadius.sm }}
+						source={{ uri: org?.logo ?? item.author?.profileImage ?? "" }}
+						style={{
+							width: 36,
+							height: 36,
+							borderRadius: org ? borderRadius.sm : 18,
+						}}
 						contentFit="cover"
 						accessibilityIgnoresInvertColors
 					/>
@@ -454,7 +496,7 @@ function PostBody({
 	const { colors, spacing, borderRadius } = useTheme();
 	const { width } = useWindowDimensions();
 	const post = item.post;
-	const media = post.media.filter((m) => m.type === "IMAGE").slice(0, 4);
+	const media = post.media.slice(0, 4);
 	const body = splitPostText(post.text);
 	const long = post.text.length > 220;
 	// Card width minus page gutters and card padding, capped for desktop.
@@ -482,24 +524,76 @@ function PostBody({
 			)}
 			{media.length > 0 && (
 				<View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>
-					{media.map((m) => (
-						<Image
-							key={m.id}
-							source={{ uri: m.url }}
-							contentFit="cover"
-							transition={150}
-							accessibilityIgnoresInvertColors
-							style={{
-								width: tile,
-								height: media.length === 1 ? tile * 0.75 : tile,
-								borderRadius: borderRadius.md,
-								backgroundColor: colors.background.subtle,
-							}}
-						/>
-					))}
+					{media.map((m) =>
+						m.type === "IMAGE" ? (
+							<Image
+								key={m.id}
+								source={{ uri: m.url }}
+								contentFit="cover"
+								transition={150}
+								accessibilityIgnoresInvertColors
+								style={{
+									width: tile,
+									height: media.length === 1 ? tile * 0.75 : tile,
+									borderRadius: borderRadius.md,
+									backgroundColor: colors.background.subtle,
+								}}
+							/>
+						) : (
+							<FeedVideo key={m.id} uri={m.url} width={tile} height={tile} />
+						),
+					)}
 				</View>
 			)}
 		</View>
+	);
+}
+
+function FeedMediaImage({ uri }: { uri: string }) {
+	const { colors, borderRadius } = useTheme();
+	return (
+		<Image
+			source={{ uri }}
+			contentFit="cover"
+			transition={150}
+			accessibilityIgnoresInvertColors
+			style={{
+				width: "100%",
+				height: 180,
+				borderRadius: borderRadius.md,
+				backgroundColor: colors.background.subtle,
+			}}
+		/>
+	);
+}
+
+function FeedVideo({
+	uri,
+	width,
+	height,
+}: {
+	uri: string;
+	width: number;
+	height: number;
+}) {
+	const { borderRadius } = useTheme();
+	const player = useVideoPlayer(uri, (instance) => {
+		instance.muted = true;
+	});
+
+	return (
+		<VideoView
+			player={player}
+			contentFit="cover"
+			nativeControls
+			style={{
+				width,
+				height,
+				borderRadius: borderRadius.md,
+				backgroundColor: "#111111",
+			}}
+			accessibilityLabel="Feed video"
+		/>
 	);
 }
 

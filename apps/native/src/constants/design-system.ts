@@ -107,7 +107,7 @@ export const darkColors = {
 		contrast: "#1A0F0A",
 		/** 9.49:1 on the dark background — the light-mode ink would vanish here. */
 		ink: "#FF9A66",
-		tint: "#3A1608",
+		tint: "#4A2A20",
 	},
 	neutral: {
 		50: "#171717",

@@ -1,5 +1,11 @@
 import type { db as dbType } from "@nabhya/db";
-import { bookmarks, organizations, reviews, users } from "@nabhya/db/schema";
+import {
+	bookmarks,
+	follows,
+	organizations,
+	reviews,
+	users,
+} from "@nabhya/db/schema";
 import type {
 	PaginationQuery,
 	ReplyToReviewInput,
@@ -89,6 +95,31 @@ export class EngagementService {
 		]);
 
 		return paginate(items, totals?.value ?? 0, query);
+	}
+
+	/** Idempotent follow mutation used by the feed's Following lens. */
+	async follow(userId: string, organizationId: string) {
+		await this.organizationsService.getPublicById(organizationId);
+		await this.db
+			.insert(follows)
+			.values({ userId, organizationId })
+			.onConflictDoNothing();
+
+		return { following: true };
+	}
+
+	/** Idempotent unfollow mutation used by the feed's Following lens. */
+	async unfollow(userId: string, organizationId: string) {
+		await this.db
+			.delete(follows)
+			.where(
+				and(
+					eq(follows.userId, userId),
+					eq(follows.organizationId, organizationId),
+				),
+			);
+
+		return { following: false };
 	}
 
 	// ─── Reviews ─────────────────────────────────────────────────────────────

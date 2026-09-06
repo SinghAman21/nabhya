@@ -50,6 +50,28 @@ export class EngagementController {
 		return this.engagementService.toggleBookmark(user.id, id);
 	}
 
+	@Post("organizations/:id/follow")
+	@Roles("volunteer")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({ summary: "Follow an NGO (idempotent)" })
+	follow(
+		@CurrentUser() user: AuthUser,
+		@Param("id", ParseUUIDPipe) id: string,
+	) {
+		return this.engagementService.follow(user.id, id);
+	}
+
+	@Delete("organizations/:id/follow")
+	@Roles("volunteer")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({ summary: "Unfollow an NGO (idempotent)" })
+	unfollow(
+		@CurrentUser() user: AuthUser,
+		@Param("id", ParseUUIDPipe) id: string,
+	) {
+		return this.engagementService.unfollow(user.id, id);
+	}
+
 	@Get("me/bookmarks")
 	@Roles("volunteer")
 	@ApiBearerAuth("access-token")

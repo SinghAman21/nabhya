@@ -86,8 +86,14 @@ export const FEED = {
 	FOLLOWING: `${API_PREFIX}/feed/following`,
 	UPLOAD_INTENTS: `${API_PREFIX}/feed/upload-intents`,
 	detail: (id: string) => `${API_PREFIX}/feed/${id}`,
-	interaction: (type: string, id: string, action: "like" | "save" | "share") =>
-		`${API_PREFIX}/feed/${type}/${id}/${action}`,
+	interaction: (
+		type: string,
+		id: string,
+		action: "like" | "save" | "share" | "impression",
+	) => `${API_PREFIX}/feed/${type}/${id}/${action}`,
+	comments: (type: string, id: string) =>
+		`${API_PREFIX}/feed/${type}/${id}/comments`,
+	deleteComment: (id: string) => `${API_PREFIX}/feed/comments/${id}`,
 } as const;
 
 export const UPLOADS = {
