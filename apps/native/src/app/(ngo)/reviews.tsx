@@ -9,6 +9,7 @@ import {
 	EmptyState,
 	ErrorState,
 	FilterChips,
+	GridCell,
 	LoadingState,
 	Screen,
 	ScreenHeader,
@@ -22,6 +23,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { Body, BodySmall, Caption, H2 } from "@/components/ui/typography";
 import { useReplyToReview } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
+import { useGridColumns } from "@/hooks/useMedia";
 import { apiErrorMessage, engagementApi, queryKeys } from "@/lib/api";
 import { formatRelative } from "@/lib/format";
 import type { ReviewItem } from "@/lib/types";
@@ -56,6 +58,7 @@ export default function OrgReviews() {
 	const [filter, setFilter] = useState<ReplyFilter>("ALL");
 	const [replying, setReplying] = useState<ReviewItem | null>(null);
 	const query = useOrgReviewPages();
+	const columns = useGridColumns();
 
 	const summary = query.data?.pages[0]?.summary;
 	const all = query.data?.pages.flatMap((page) => page.items) ?? [];
@@ -152,6 +155,9 @@ export default function OrgReviews() {
 				/>
 			) : (
 				<FlatList
+					key={`grid-${columns}`}
+					numColumns={columns}
+					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
 					data={items}
 					keyExtractor={(item) => item.id}
 					showsVerticalScrollIndicator={false}
@@ -203,7 +209,9 @@ export default function OrgReviews() {
 						/>
 					}
 					renderItem={({ item }) => (
-						<ReviewRow review={item} onReply={() => setReplying(item)} />
+						<GridCell>
+							<ReviewRow review={item} onReply={() => setReplying(item)} />
+						</GridCell>
 					)}
 				/>
 			)}

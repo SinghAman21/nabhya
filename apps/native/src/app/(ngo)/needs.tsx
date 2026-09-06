@@ -12,6 +12,7 @@ import {
 	EmptyState,
 	ErrorState,
 	FilterChips,
+	GridCell,
 	LoadingState,
 	Screen,
 	ScreenHeader,
@@ -24,6 +25,7 @@ import { Body, Caption, Label } from "@/components/ui/typography";
 import { useDeleteNeed } from "@/hooks/use-needs";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
+import { useGridColumns } from "@/hooks/useMedia";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage, orgNeedsApi, queryKeys } from "@/lib/api";
 import { formatProgress, formatRelative } from "@/lib/format";
@@ -66,6 +68,7 @@ export default function NgoNeeds() {
 
 	const query = useOrgNeedPages(filter === "ALL" ? {} : { type: filter });
 	const deleteNeed = useDeleteNeed();
+	const columns = useGridColumns();
 
 	const isVerified = me?.organization?.verificationStatus === "VERIFIED";
 	const items = query.data?.pages.flatMap((page) => page.items) ?? [];
@@ -134,6 +137,9 @@ export default function NgoNeeds() {
 				/>
 			) : (
 				<FlatList
+					key={`grid-${columns}`}
+					numColumns={columns}
+					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
 					data={items}
 					keyExtractor={(item) => item.id}
 					showsVerticalScrollIndicator={false}
@@ -182,12 +188,14 @@ export default function NgoNeeds() {
 						/>
 					}
 					renderItem={({ item }) => (
-						<NeedRow
-							need={item}
-							onReview={() => setReviewing(item)}
-							onEdit={() => setEditing(item)}
-							onDelete={() => confirmDelete(item)}
-						/>
+						<GridCell>
+							<NeedRow
+								need={item}
+								onReview={() => setReviewing(item)}
+								onEdit={() => setEditing(item)}
+								onDelete={() => confirmDelete(item)}
+							/>
+						</GridCell>
 					)}
 				/>
 			)}

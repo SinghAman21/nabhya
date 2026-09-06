@@ -7,6 +7,7 @@ import { InitialAvatar } from "@/components/initial-avatar";
 import {
 	EmptyState,
 	ErrorState,
+	GridCell,
 	LoadingState,
 	Screen,
 	ScreenHeader,
@@ -24,6 +25,7 @@ import {
 	useUpdateAdmin,
 } from "@/hooks/use-directory";
 import { useTheme } from "@/hooks/use-theme";
+import { useGridColumns } from "@/hooks/useMedia";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
@@ -40,6 +42,7 @@ export default function OrgTeam() {
 	const [managing, setManaging] = useState<OrgTeamMember | null>(null);
 
 	const query = useOrgTeam();
+	const columns = useGridColumns();
 	const items = query.data ?? [];
 	const openInvite = () => setInviting(true);
 
@@ -69,6 +72,9 @@ export default function OrgTeam() {
 				/>
 			) : (
 				<FlatList
+					key={`grid-${columns}`}
+					numColumns={columns}
+					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
 					data={items}
 					keyExtractor={(item) => item.id}
 					showsVerticalScrollIndicator={false}
@@ -90,7 +96,9 @@ export default function OrgTeam() {
 						/>
 					}
 					renderItem={({ item }) => (
-						<MemberRow member={item} onPress={() => setManaging(item)} />
+						<GridCell>
+							<MemberRow member={item} onPress={() => setManaging(item)} />
+						</GridCell>
 					)}
 				/>
 			)}

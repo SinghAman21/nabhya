@@ -7,6 +7,7 @@ import { LoadMoreFooter } from "@/components/load-more-footer";
 import {
 	EmptyState,
 	ErrorState,
+	GridCell,
 	LoadingState,
 	MetricRow,
 	Screen,
@@ -16,6 +17,7 @@ import {
 import { StatusPill } from "@/components/status-pill";
 import { Body, BodySmall, Caption } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
+import { useGridColumns } from "@/hooks/useMedia";
 import { apiErrorMessage, donationsApi, queryKeys } from "@/lib/api";
 import { formatDate, formatRelative } from "@/lib/format";
 import type { OrgDonation } from "@/lib/types";
@@ -45,6 +47,7 @@ export default function OrgDonations() {
 
 	const stats = query.data?.pages[0]?.stats;
 	const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+	const columns = useGridColumns();
 
 	const loadMore = () => {
 		if (query.hasNextPage && !query.isFetchingNextPage) query.fetchNextPage();
@@ -86,6 +89,9 @@ export default function OrgDonations() {
 				/>
 			) : (
 				<FlatList
+					key={`grid-${columns}`}
+					numColumns={columns}
+					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
 					data={items}
 					keyExtractor={(item) => item.id}
 					showsVerticalScrollIndicator={false}
@@ -117,7 +123,11 @@ export default function OrgDonations() {
 							noun="donations"
 						/>
 					}
-					renderItem={({ item }) => <DonationRow donation={item} />}
+					renderItem={({ item }) => (
+						<GridCell>
+							<DonationRow donation={item} />
+						</GridCell>
+					)}
 				/>
 			)}
 		</Screen>

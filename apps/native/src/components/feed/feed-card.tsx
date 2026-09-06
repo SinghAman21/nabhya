@@ -1,23 +1,32 @@
 import { Image } from "expo-image";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
-import { useVideoPlayer, VideoView } from "expo-video";
 import {
 	BadgeCheck,
 	Bookmark,
 	CalendarDays,
+	Clock,
 	Heart,
 	MapPin,
 	MessageCircle,
 	Pin,
-	Play,
 	Share2,
 	Users,
 } from "lucide-react-native";
-import { useState } from "react";
-import { Share, useWindowDimensions, View } from "react-native";
+import { useRef, useState } from "react";
+import {
+	Animated,
+	Easing,
+	Share,
+	useWindowDimensions,
+	View,
+} from "react-native";
 import { FeedCommentsSheet } from "@/components/feed/feed-comments-sheet";
-import { StatusPill } from "@/components/status-pill";
+import {
+	FeedMediaCarousel,
+	FeedMediaViewer,
+	type MediaViewerActions,
+} from "@/components/feed/feed-media";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H5, Label } from "@/components/ui/typography";
 import { useRecordFeedInteraction } from "@/hooks/use-feed";
@@ -27,6 +36,7 @@ import { splitPostText } from "@/lib/post-text";
 import type {
 	FeedEventItem,
 	FeedItem,
+	FeedMedia,
 	FeedNeedItem,
 	FeedPostItem,
 	PublicNeed,
@@ -35,7 +45,6 @@ import { useAuthStore } from "@/store/auth-store";
 
 const DAY_MS = 86_400_000;
 
-/** The pledge sheet takes a `PublicNeed`; a feed row carries the same facts. */
 export function toPublicNeed(item: FeedNeedItem): PublicNeed {
 	return {
 		id: item.id,
@@ -56,23 +65,12 @@ export function toPublicNeed(item: FeedNeedItem): PublicNeed {
 }
 
 export interface FeedCardActions {
-	/** Opens the pledge sheet for a need. Events navigate to their own page. */
 	onRespond: (item: FeedNeedItem) => void;
 	onToggleFollow: (organizationId: string, following: boolean) => void;
 	onToggleLike?: (item: FeedItem, liked: boolean) => void;
 	onToggleSave?: (item: FeedItem, saved: boolean) => void;
 }
 
-/**
- * One post in the feed, whatever its kind.
- *
- * Every card reads the same way top to bottom — who, what kind of thing, what,
- * the facts that decide it, then one action — so the eye never has to relearn
- * the layout between a need, an event, an update and a plain post. Kind is
- * said in words on the eyebrow line, never by colour alone. The footer holds
- * the one primary action on the left and the light-touch reactions on the
- * right, in the order people expect from every other feed: like, save, share.
- */
 export function FeedCard({
 	item,
 	onRespond,
@@ -80,19 +78,29 @@ export function FeedCard({
 	onToggleLike,
 	onToggleSave,
 }: { item: FeedItem } & FeedCardActions) {
-	const { colors, spacing } = useTheme();
+	const { colors, spacing, borderRadius } = useTheme();
 	const router = useRouter();
 	const { width } = useWindowDimensions();
 	const compactActions = width < 380;
 	const [expanded, setExpanded] = useState(false);
 	const [commentsOpen, setCommentsOpen] = useState(false);
-	const email = useAuthStore((state) => state.email);
+	const email = useAuthStore((s) => s.email);
 	const recordShare = useRecordFeedInteraction("share");
 
 	const org = item.organization;
 	const closed = item.kind === "need" && item.need.status !== "OPEN";
 	const headline =
 		item.title || org?.organizationName || item.author?.fullName || "Post";
+	const liked = item.viewer?.liked ?? false;
+	const saved = item.viewer?.saved ?? false;
+
+	// One fullscreen viewer per card, shared by post media and cover images.
+	// It lives here (not in the carousel) so "comment" can dismiss the modal
+	// first — a sheet opened underneath a modal would never be seen.
+	const [viewer, setViewer] = useState<{
+		media: FeedMedia[];
+		index: number;
+	} | null>(null);
 
 	const share = async () => {
 		const path =
@@ -107,11 +115,16 @@ export function FeedCard({
 			});
 			if (email) recordShare.mutate({ item });
 		} catch {
-			// Web without the share API, or the user dismissed the sheet.
+			/* user dismissed or web without Share API */
 		}
 	};
 
-	const primary = (() => {
+	const primary: {
+		label: string;
+		disabled: boolean;
+		onPress: () => void;
+		tone: "neutral" | "primary" | "success" | "secondary";
+	} | null = (() => {
 		switch (item.kind) {
 			case "need":
 				return {
@@ -122,18 +135,25 @@ export function FeedCard({
 							: "Claim this",
 					disabled: closed,
 					onPress: () => onRespond(item),
+					tone: closed
+						? "neutral"
+						: item.need.type === "WANT"
+							? "primary"
+							: "success",
 				};
 			case "event":
 				return {
 					label: "View & apply",
 					disabled: false,
 					onPress: () => router.push(`/events/${item.id}`),
+					tone: "primary",
 				};
 			case "story":
 				return {
 					label: expanded ? "Show less" : "Read more",
 					disabled: false,
 					onPress: () => setExpanded((v) => !v),
+					tone: "secondary",
 				};
 			default:
 				return org
@@ -141,127 +161,281 @@ export function FeedCard({
 							label: "View NGO",
 							disabled: false,
 							onPress: () => router.push(`/ngos/${org.id}`),
+							tone: "secondary",
 						}
 					: null;
 		}
 	})();
 
-	const liked = item.viewer?.liked ?? false;
-	const saved = item.viewer?.saved ?? false;
+	const shadow = {
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.06,
+		shadowRadius: 8,
+		elevation: 3,
+	};
+
+	const mediaActions: MediaViewerActions = {
+		headline,
+		liked,
+		saved,
+		likeCount: item.engagement.likes,
+		commentCount: item.engagement.comments,
+		...(onToggleLike ? { onToggleLike: () => onToggleLike(item, liked) } : {}),
+		...(onToggleSave ? { onToggleSave: () => onToggleSave(item, saved) } : {}),
+		onComment: () => {
+			setViewer(null);
+			setCommentsOpen(true);
+		},
+		onShare: share,
+	};
+	const openViewer = (media: FeedMedia[], index: number) =>
+		setViewer({ media, index });
+
+	// Tile content width for media pages: card minus its outer margins and
+	// inner padding. PostBody reuses the same number.
+	const mediaWidth = Math.min(width, 720) - spacing[4] * 2 - spacing[3] * 2;
+
+	const coverUrl =
+		item.kind === "event"
+			? item.event.coverImage
+			: item.kind === "story"
+				? item.story.coverImage
+				: null;
+	const coverMedia: FeedMedia[] = coverUrl
+		? [{ id: `${item.id}-cover`, type: "IMAGE", url: coverUrl, sortOrder: 0 }]
+		: [];
 
 	return (
 		<>
-			{/* Tile, not a card: full-bleed, square corners, no shadow. The
-			    list owns the separation (gap + hairlines), so rows reclaim
-			    the old card gutter + outer page gutter as content width. */}
-			<View style={{ backgroundColor: colors.background.card }}>
-				<View style={{ padding: spacing[4], gap: spacing[3] }}>
-					<PosterHeader
-						item={item}
-						onOpen={org ? () => router.push(`/ngos/${org.id}`) : undefined}
-						onToggleFollow={
-							org ? () => onToggleFollow(org.id, item.isFollowing) : undefined
-						}
-					/>
+			<View
+				style={{
+					backgroundColor: colors.background.card,
+					borderRadius: borderRadius["2xl"],
+					marginHorizontal: spacing[3],
+					marginVertical: spacing[2],
+					overflow: "hidden",
+					...shadow,
+				}}
+			>
+				{/* HEADER — the follow button only exists until you follow;
+				    after that there is nothing to do here. */}
+				<PosterHeader
+					item={item}
+					onOpen={org ? () => router.push(`/ngos/${org.id}`) : undefined}
+					onToggleFollow={
+						org && !item.isFollowing
+							? () => onToggleFollow(org.id, false)
+							: undefined
+					}
+				/>
 
-					{item.kind === "post" ? (
-						<>
-							<Eyebrow item={item} />
-							<PostBody
-								item={item}
-								expanded={expanded}
-								onExpand={setExpanded}
-							/>
-						</>
-					) : (
-						<View style={{ gap: spacing[1] }}>
-							<Eyebrow item={item} />
-							<H5 numberOfLines={2}>{item.title}</H5>
-							{item.description ? (
-								<Caption
-									color="tertiary"
-									numberOfLines={
-										item.kind === "story" ? (expanded ? undefined : 4) : 2
-									}
-								>
-									{item.description}
+				{/* CONTENT */}
+				<View
+					style={{
+						paddingHorizontal: spacing[4],
+						paddingBottom: spacing[3],
+						gap: spacing[3],
+					}}
+				>
+					{/* Kind pill + Urgent / Pinned */}
+					<View
+						style={{
+							flexDirection: "row",
+							alignItems: "center",
+							gap: spacing[2],
+							flexWrap: "wrap",
+						}}
+					>
+						<KindPill
+							kind={item.kind}
+							needType={item.kind === "need" ? item.need.type : undefined}
+						/>
+						{item.isUrgent && <UrgentPill />}
+						{item.kind === "story" && item.story.isPinned && (
+							<View
+								style={{
+									flexDirection: "row",
+									alignItems: "center",
+									gap: spacing[1],
+								}}
+							>
+								<Pin size={12} color={colors.text.quaternary as string} />
+								<Caption color="quaternary" weight="medium">
+									Pinned
 								</Caption>
-							) : null}
-						</View>
-					)}
+							</View>
+						)}
+					</View>
 
+					{/* Title */}
+					{item.title ? (
+						<H5 numberOfLines={2} style={{ lineHeight: 24 }}>
+							{item.title}
+						</H5>
+					) : null}
+
+					{/* Body */}
+					{item.kind === "post" ? (
+						<PostBody
+							item={item}
+							expanded={expanded}
+							onExpand={setExpanded}
+							pageWidth={mediaWidth}
+							onOpenViewer={(index) =>
+								item.kind === "post" && openViewer(item.post.media, index)
+							}
+						/>
+					) : item.description ? (
+						<Body
+							color="secondary"
+							numberOfLines={
+								item.kind === "story" ? (expanded ? undefined : 4) : 3
+							}
+						>
+							{item.description}
+						</Body>
+					) : null}
+					{item.kind === "story" &&
+						item.description &&
+						item.description.length > 180 &&
+						!expanded && (
+							<Pressable
+								onPress={() => setExpanded(true)}
+								hitSlop={6}
+								style={{
+									alignSelf: "flex-start",
+									marginTop: -spacing[1],
+								}}
+							>
+								<Caption weight="semibold" color={colors.primary.ink as string}>
+									Read more
+								</Caption>
+							</Pressable>
+						)}
+
+					{/* Need / Event facts */}
 					{item.kind === "need" && <NeedFacts item={item} />}
 					{item.kind === "event" && <EventFacts item={item} />}
-					{item.kind === "event" && item.event.coverImage && (
-						<FeedMediaImage uri={item.event.coverImage} />
-					)}
-					{item.kind === "story" && item.story.coverImage && (
-						<FeedMediaImage uri={item.story.coverImage} />
+
+					{/* Cover media — same carousel + viewer as post media. */}
+					{coverMedia.length > 0 && (
+						<FeedMediaCarousel
+							media={coverMedia}
+							pageWidth={mediaWidth}
+							onOpenViewer={(index) => openViewer(coverMedia, index)}
+						/>
 					)}
 				</View>
 
-				<View style={{ height: 1, backgroundColor: colors.border.hairline }} />
+				{/* PRIMARY CTA */}
+				{primary && (
+					<View
+						style={{
+							paddingHorizontal: spacing[4],
+							paddingBottom: spacing[3],
+						}}
+					>
+						<PrimaryButton {...primary} />
+					</View>
+				)}
 
+				{/* DIVIDER */}
 				<View
-					style={{ flexDirection: "row", alignItems: "stretch", minHeight: 48 }}
+					style={{
+						height: 1,
+						backgroundColor: colors.border.hairline,
+						marginHorizontal: spacing[4],
+					}}
+				/>
+
+				{/* REACTION BAR */}
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						paddingVertical: spacing[2],
+						paddingHorizontal: spacing[3],
+					}}
 				>
-					{primary ? (
-						<Pressable
-							onPress={primary.onPress}
-							disabled={primary.disabled}
-							accessibilityRole="button"
-							accessibilityState={{ disabled: primary.disabled }}
-							accessibilityLabel={`${primary.label}: ${headline}`}
-							style={({ pressed }) => ({
-								flex: 1,
-								alignItems: "center",
-								justifyContent: "center",
-								paddingVertical: spacing[3],
-								opacity: primary.disabled ? 0.45 : 1,
-								backgroundColor: pressed
-									? (colors.background.subtle as string)
-									: "transparent",
-							})}
-						>
-							<Label weight="semibold" color={colors.primary.ink}>
-								{primary.label}
-							</Label>
-						</Pressable>
-					) : (
-						<View style={{ flex: 1 }} />
-					)}
-					<Reaction
-						icon={Heart}
-						active={liked}
-						count={item.engagement.likes}
-						label={liked ? "Unlike" : "Like"}
-						activeColor={colors.error.main as string}
-						compact={compactActions}
-						onPress={onToggleLike ? () => onToggleLike(item, liked) : undefined}
-					/>
-					<Reaction
-						icon={Bookmark}
-						active={saved}
-						label={saved ? "Unsave" : "Save"}
-						activeColor={colors.text.primary as string}
-						compact={compactActions}
-						onPress={onToggleSave ? () => onToggleSave(item, saved) : undefined}
-					/>
-					<Reaction
-						icon={MessageCircle}
-						count={item.engagement.comments}
-						label={`Comments on ${headline}`}
-						compact={compactActions}
-						onPress={() => setCommentsOpen(true)}
-					/>
-					<Reaction
-						icon={Share2}
-						label={`Share ${headline}`}
-						onPress={share}
-						compact={compactActions}
-					/>
+					<View
+						style={{
+							flex: 1,
+							flexDirection: "row",
+							alignItems: "center",
+							gap: spacing[1],
+						}}
+					>
+						<AnimatedReaction
+							icon={Heart}
+							active={liked}
+							count={item.engagement.likes}
+							label={liked ? "Unlike" : "Like"}
+							activeColor={colors.error.main as string}
+							compact={compactActions}
+							onPress={
+								onToggleLike ? () => onToggleLike(item, liked) : undefined
+							}
+						/>
+						<ReactionDivider />
+						<Reaction
+							icon={MessageCircle}
+							count={item.engagement.comments}
+							label={`Comments on ${headline}`}
+							compact={compactActions}
+							onPress={() => setCommentsOpen(true)}
+						/>
+						<ReactionDivider />
+						<Reaction
+							icon={Bookmark}
+							active={saved}
+							label={saved ? "Unsave" : "Save"}
+							activeColor={colors.text.primary as string}
+							compact={compactActions}
+							onPress={
+								onToggleSave ? () => onToggleSave(item, saved) : undefined
+							}
+						/>
+						<ReactionDivider />
+						<Reaction
+							icon={Share2}
+							label={`Share ${headline}`}
+							compact={compactActions}
+							onPress={share}
+						/>
+					</View>
 				</View>
+
+				{/* ENGAGEMENT SUMMARY */}
+				{item.engagement.likes > 0 && (
+					<View
+						style={{
+							paddingHorizontal: spacing[4],
+							paddingBottom: spacing[3],
+						}}
+					>
+						<Caption color="tertiary" weight="medium">
+							{item.engagement.likes === 1
+								? "1 like"
+								: `${item.engagement.likes} likes`}
+							{item.engagement.comments > 0
+								? `  ·  ${item.engagement.comments} comment${
+										item.engagement.comments === 1 ? "" : "s"
+									}`
+								: ""}
+						</Caption>
+					</View>
+				)}
 			</View>
+			{viewer && (
+				<FeedMediaViewer
+					visible
+					media={viewer.media}
+					initialIndex={viewer.index}
+					actions={mediaActions}
+					onClose={() => setViewer(null)}
+				/>
+			)}
 			{commentsOpen && (
 				<FeedCommentsSheet item={item} onClose={() => setCommentsOpen(false)} />
 			)}
@@ -269,9 +443,238 @@ export function FeedCard({
 	);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Pieces                                                                     */
-/* -------------------------------------------------------------------------- */
+/* ────────────────────────────────────────────────────────────────────────────
+   PIECES
+   ──────────────────────────────────────────────────────────────────────────── */
+
+export function KindPill({
+	kind,
+	needType,
+}: {
+	kind: FeedItem["kind"];
+	needType?: "WANT" | "OFFER";
+}) {
+	const { colors, spacing } = useTheme();
+	const config = {
+		need: {
+			text: needType === "WANT" ? "Needs items" : "Giving away",
+			bg: needType === "WANT" ? "#FFF1F0" : "#ECFDF5",
+			textColor: needType === "WANT" ? "#CF1322" : "#047857",
+		},
+		event: {
+			text: "Volunteer event",
+			bg: "#EFF6FF",
+			textColor: "#1D4ED8",
+		},
+		story: {
+			text: "Story",
+			bg: "#F5F3FF",
+			textColor: "#6D28D9",
+		},
+		post: {
+			text: "Update",
+			bg: colors.background.subtle as string,
+			textColor: colors.text.secondary as string,
+		},
+	};
+	const c = config[kind];
+	return (
+		<View
+			style={{
+				flexDirection: "row",
+				alignItems: "center",
+				gap: spacing[1],
+				paddingHorizontal: spacing[2.5],
+				paddingVertical: spacing[1],
+				borderRadius: 999,
+				backgroundColor: c.bg,
+			}}
+		>
+			<View
+				style={{
+					width: 6,
+					height: 6,
+					borderRadius: 3,
+					backgroundColor: c.textColor,
+				}}
+			/>
+			<Caption weight="semibold" style={{ color: c.textColor, fontSize: 11 }}>
+				{c.text}
+			</Caption>
+		</View>
+	);
+}
+
+export function UrgentPill() {
+	const { colors, spacing } = useTheme();
+	return (
+		<View
+			style={{
+				flexDirection: "row",
+				alignItems: "center",
+				gap: spacing[1],
+				paddingHorizontal: spacing[2.5],
+				paddingVertical: spacing[1],
+				borderRadius: 999,
+				backgroundColor: "#FFF1F0",
+			}}
+		>
+			<View
+				style={{
+					width: 6,
+					height: 6,
+					borderRadius: 3,
+					backgroundColor: colors.error.main as string,
+				}}
+			/>
+			<Caption
+				weight="semibold"
+				style={{ color: colors.error.main as string, fontSize: 11 }}
+			>
+				Urgent
+			</Caption>
+		</View>
+	);
+}
+
+function PrimaryButton({
+	label,
+	disabled,
+	onPress,
+	tone,
+}: {
+	label: string;
+	disabled: boolean;
+	onPress: () => void;
+	tone: "primary" | "success" | "secondary" | "neutral";
+}) {
+	const { colors, spacing, borderRadius } = useTheme();
+	const bg = disabled
+		? (colors.background.subtle as string)
+		: tone === "primary"
+			? (colors.primary.main as string)
+			: tone === "success"
+				? (colors.success.main as string)
+				: tone === "secondary"
+					? (colors.background.subtle as string)
+					: (colors.background.subtle as string);
+	const text = disabled
+		? (colors.text.tertiary as string)
+		: tone === "primary" || tone === "success"
+			? "#FFFFFF"
+			: (colors.primary.ink as string);
+
+	return (
+		<Pressable
+			onPress={onPress}
+			disabled={disabled}
+			accessibilityRole="button"
+			accessibilityState={{ disabled }}
+			accessibilityLabel={`${label}: ${label}`}
+			style={({ pressed }) => ({
+				alignItems: "center",
+				justifyContent: "center",
+				paddingVertical: spacing[3],
+				borderRadius: borderRadius.lg,
+				backgroundColor:
+					pressed && !disabled
+						? tone === "primary" || tone === "success"
+							? (colors.primary.ink as string)
+							: (colors.background.tertiary as string)
+						: bg,
+				opacity: disabled ? 0.5 : 1,
+			})}
+		>
+			<Label weight="semibold" style={{ color: text }}>
+				{label}
+			</Label>
+		</Pressable>
+	);
+}
+
+/** Like button with a spring-scale animation when toggled. */
+function AnimatedReaction({
+	icon: Icon,
+	active,
+	count,
+	label,
+	activeColor,
+	onPress,
+	compact = false,
+}: {
+	icon: typeof Heart;
+	active?: boolean;
+	count?: number;
+	label: string;
+	activeColor?: string;
+	onPress?: () => void;
+	compact?: boolean;
+}) {
+	const { colors, spacing, borderRadius } = useTheme();
+	const scale = useRef(new Animated.Value(1)).current;
+	const color = active
+		? (activeColor ?? (colors.text.primary as string))
+		: (colors.text.tertiary as string);
+
+	const trigger = () => {
+		if (!onPress) return;
+		onPress();
+		Animated.sequence([
+			Animated.timing(scale, {
+				toValue: 1.35,
+				duration: 120,
+				easing: Easing.out(Easing.ease),
+				useNativeDriver: true,
+			}),
+			Animated.timing(scale, {
+				toValue: 1,
+				duration: 180,
+				easing: Easing.elastic(1.2),
+				useNativeDriver: true,
+			}),
+		]).start();
+	};
+
+	return (
+		<Pressable
+			onPress={trigger}
+			disabled={!onPress}
+			accessibilityRole="button"
+			accessibilityLabel={label}
+			accessibilityState={
+				active === undefined ? undefined : { selected: active }
+			}
+			hitSlop={6}
+			style={({ pressed }) => ({
+				flexDirection: "row",
+				alignItems: "center",
+				justifyContent: "center",
+				gap: spacing[1],
+				paddingHorizontal: compact ? spacing[2] : spacing[3],
+				paddingVertical: spacing[2],
+				borderRadius: borderRadius.md,
+				backgroundColor: pressed
+					? (colors.background.subtle as string)
+					: "transparent",
+				minWidth: compact ? 52 : 64,
+			})}
+		>
+			<Animated.View style={{ transform: [{ scale }] }}>
+				<Icon
+					size={20}
+					color={color}
+					strokeWidth={1.8}
+					fill={active ? color : "transparent"}
+				/>
+			</Animated.View>
+			{count !== undefined && count > 0 ? (
+				<Caption weight="semibold" color={active ? color : "tertiary"}>
+					{compact && count > 999 ? `${(count / 1000).toFixed(1)}k` : count}
+				</Caption>
+			) : null}
+		</Pressable>
+	);
+}
 
 function Reaction({
 	icon: Icon,
@@ -290,50 +693,65 @@ function Reaction({
 	onPress?: () => void;
 	compact?: boolean;
 }) {
-	const { colors, spacing } = useTheme();
+	const { colors, spacing, borderRadius } = useTheme();
 	const color = active
 		? (activeColor ?? (colors.text.primary as string))
 		: (colors.text.tertiary as string);
+
 	return (
-		<>
-			<View style={{ width: 1, backgroundColor: colors.border.hairline }} />
-			<Pressable
-				onPress={onPress}
-				disabled={!onPress}
-				accessibilityRole="button"
-				accessibilityLabel={label}
-				accessibilityState={
-					active === undefined ? undefined : { selected: active }
-				}
-				hitSlop={4}
-				style={({ pressed }) => ({
-					minWidth: compact ? 44 : 52,
-					paddingHorizontal: compact ? spacing[1.5] : spacing[2.5],
-					flexDirection: "row",
-					alignItems: "center",
-					justifyContent: "center",
-					gap: spacing[1],
-					backgroundColor: pressed
-						? (colors.background.subtle as string)
-						: "transparent",
-				})}
-			>
-				<Icon
-					size={18}
-					color={color}
-					strokeWidth={1.9}
-					fill={active ? color : "transparent"}
-				/>
-				{count ? (
-					<Caption weight="medium" color={active ? color : "tertiary"}>
-						{count}
-					</Caption>
-				) : null}
-			</Pressable>
-		</>
+		<Pressable
+			onPress={onPress}
+			disabled={!onPress}
+			accessibilityRole="button"
+			accessibilityLabel={label}
+			accessibilityState={
+				active === undefined ? undefined : { selected: active }
+			}
+			hitSlop={6}
+			style={({ pressed }) => ({
+				flexDirection: "row",
+				alignItems: "center",
+				justifyContent: "center",
+				gap: spacing[1],
+				paddingHorizontal: compact ? spacing[2] : spacing[3],
+				paddingVertical: spacing[2],
+				borderRadius: borderRadius.md,
+				backgroundColor: pressed
+					? (colors.background.subtle as string)
+					: "transparent",
+				minWidth: compact ? 52 : 64,
+			})}
+		>
+			<Icon
+				size={20}
+				color={color}
+				strokeWidth={1.8}
+				fill={active ? color : "transparent"}
+			/>
+			{count !== undefined && count > 0 ? (
+				<Caption weight="semibold" color={active ? color : "tertiary"}>
+					{compact && count > 999 ? `${(count / 1000).toFixed(1)}k` : count}
+				</Caption>
+			) : null}
+		</Pressable>
 	);
 }
 
+function ReactionDivider() {
+	const { colors } = useTheme();
+	return (
+		<View
+			style={{
+				width: 1,
+				height: 20,
+				backgroundColor: colors.border.hairline,
+				marginHorizontal: 2,
+			}}
+		/>
+	);
+}
+
+/* ── Header ── */
 function PosterHeader({
 	item,
 	onOpen,
@@ -348,10 +766,17 @@ function PosterHeader({
 	const name = org?.organizationName ?? item.author?.fullName ?? "Volunteer";
 	const place = item.city ?? item.state ?? "India";
 	const initial = name.charAt(0).toUpperCase() || "N";
+	const avatarSize = 40;
 
 	return (
 		<View
-			style={{ flexDirection: "row", alignItems: "center", gap: spacing[2.5] }}
+			style={{
+				flexDirection: "row",
+				alignItems: "center",
+				gap: spacing[3],
+				padding: spacing[4],
+				paddingBottom: spacing[2],
+			}}
 		>
 			<Pressable
 				onPress={onOpen}
@@ -363,35 +788,62 @@ function PosterHeader({
 					flex: 1,
 					flexDirection: "row",
 					alignItems: "center",
-					gap: spacing[2.5],
+					gap: spacing[3],
 				}}
 			>
-				{org?.logo || item.author?.profileImage ? (
-					<Image
-						source={{ uri: org?.logo ?? item.author?.profileImage ?? "" }}
-						style={{
-							width: 36,
-							height: 36,
-							borderRadius: org ? borderRadius.sm : 18,
-						}}
-						contentFit="cover"
-						accessibilityIgnoresInvertColors
-					/>
-				) : (
-					<View
-						style={{
-							width: 36,
-							height: 36,
-							borderRadius: org ? borderRadius.sm : 18,
-							backgroundColor: colors.background.subtle,
-							alignItems: "center",
-							justifyContent: "center",
-						}}
-					>
-						<Label weight="bold">{initial}</Label>
-					</View>
-				)}
-				<View style={{ flex: 1 }}>
+				{/* Avatar with optional verified badge */}
+				<View>
+					{org?.logo || item.author?.profileImage ? (
+						<Image
+							source={{
+								uri: org?.logo ?? item.author?.profileImage ?? "",
+							}}
+							style={{
+								width: avatarSize,
+								height: avatarSize,
+								borderRadius: org ? borderRadius.md : avatarSize / 2,
+							}}
+							contentFit="cover"
+							accessibilityIgnoresInvertColors
+						/>
+					) : (
+						<View
+							style={{
+								width: avatarSize,
+								height: avatarSize,
+								borderRadius: org ? borderRadius.md : avatarSize / 2,
+								backgroundColor: colors.background.subtle,
+								alignItems: "center",
+								justifyContent: "center",
+							}}
+						>
+							<Label weight="bold" style={{ fontSize: 16 }}>
+								{initial}
+							</Label>
+						</View>
+					)}
+					{org && (
+						<View
+							style={{
+								position: "absolute",
+								bottom: -2,
+								right: -2,
+								backgroundColor: colors.background.card,
+								borderRadius: 999,
+								padding: 1,
+							}}
+						>
+							<BadgeCheck
+								size={14}
+								color={colors.info.main as string}
+								strokeWidth={2.5}
+							/>
+						</View>
+					)}
+				</View>
+
+				{/* Name + meta */}
+				<View style={{ flex: 1, justifyContent: "center" }}>
 					<View
 						style={{
 							flexDirection: "row",
@@ -402,124 +854,78 @@ function PosterHeader({
 						<Label
 							weight="semibold"
 							numberOfLines={1}
-							style={{ flexShrink: 1 }}
+							style={{ flexShrink: 1, fontSize: 15 }}
 						>
 							{name}
 						</Label>
-						{org && (
-							<BadgeCheck
-								size={15}
-								color={colors.info.ink}
-								strokeWidth={2.2}
-								accessibilityLabel="Verified NGO"
-							/>
-						)}
 					</View>
-					<Caption color="quaternary" numberOfLines={1}>
+					<Caption
+						color="quaternary"
+						numberOfLines={1}
+						style={{ marginTop: 1 }}
+					>
 						{place} · {formatRelative(item.postedAt)}
 					</Caption>
 				</View>
 			</Pressable>
 
-			{onToggleFollow && org && (
+			{/* Rendered only while not following (the card hides it after).
+		    Unfollow lives on the NGO page, not in the feed. */}
+			{onToggleFollow && org && !item.isFollowing && (
 				<Pressable
 					onPress={onToggleFollow}
 					accessibilityRole="button"
-					accessibilityState={{ selected: item.isFollowing }}
-					accessibilityLabel={
-						item.isFollowing
-							? `Unfollow ${org.organizationName}`
-							: `Follow ${org.organizationName}`
-					}
+					accessibilityLabel={`Follow ${org.organizationName}`}
 					hitSlop={8}
 					style={({ pressed }) => ({
-						minHeight: 30,
-						justifyContent: "center",
-						paddingHorizontal: spacing[3],
+						paddingHorizontal: spacing[3.5],
+						paddingVertical: spacing[1.5],
 						borderRadius: 999,
-						borderWidth: 1,
-						borderColor: item.isFollowing
-							? "transparent"
-							: (colors.border.medium as string),
-						backgroundColor:
-							item.isFollowing || pressed
-								? (colors.background.subtle as string)
-								: "transparent",
+						backgroundColor: pressed
+							? (colors.primary.ink as string)
+							: (colors.primary.main as string),
 					})}
 				>
 					<Caption
-						weight="medium"
-						color={
-							item.isFollowing ? "tertiary" : (colors.primary.ink as string)
-						}
+						weight="semibold"
+						style={{
+							color: "#FFFFFF",
+							fontSize: 12,
+						}}
 					>
-						{item.isFollowing ? "Following" : "Follow"}
+						Follow
 					</Caption>
 				</Pressable>
 			)}
 		</View>
 	);
 }
-
-/** Says what kind of post this is, in words. */
-function Eyebrow({ item }: { item: FeedItem }) {
-	const { colors, spacing } = useTheme();
-
-	const text =
-		item.kind === "need"
-			? item.need.type === "WANT"
-				? "Needs items"
-				: "Giving away"
-			: item.kind === "event"
-				? "Volunteer event"
-				: "Update";
-
-	return (
-		<View
-			style={{ flexDirection: "row", alignItems: "center", gap: spacing[2] }}
-		>
-			<Caption weight="medium" color="secondary">
-				{text}
-			</Caption>
-			{item.isUrgent && <StatusPill label="Urgent" tone="error" />}
-			{item.kind === "story" && item.story.isPinned && (
-				<Pin size={12} color={colors.text.quaternary as string} />
-			)}
-		</View>
-	);
-}
-
-/**
- * A plain post: the text, then up to four media tiles. One image gets the
- * full width at 4:3; two or more share a row of squares. Videos show a still
- * frame placeholder — playback is the detail page's job.
- */
+/* ── Post body (text + media carousel) ── */
 function PostBody({
 	item,
 	expanded,
 	onExpand,
+	pageWidth,
+	onOpenViewer,
 }: {
 	item: FeedPostItem;
 	expanded: boolean;
 	onExpand: (next: boolean) => void;
+	pageWidth: number;
+	onOpenViewer: (index: number) => void;
 }) {
-	const { colors, spacing, borderRadius } = useTheme();
-	const { width } = useWindowDimensions();
+	const { colors, spacing } = useTheme();
 	const post = item.post;
-	const media = post.media.slice(0, 4);
 	const body = splitPostText(post.text);
 	const long = post.text.length > 220;
-	// Tile content width: full-bleed row minus only the tile's own inner
-	// padding (no page gutter, no card inset any more).
-	const inner = Math.min(width, 720) - spacing[4] * 2;
-	const gap = spacing[1.5];
-	const tile = media.length > 1 ? (inner - gap) / 2 : inner;
 
 	return (
-		<View style={{ gap: spacing[3] }}>
+		<View style={{ gap: spacing[2] }}>
 			{body.title ? <H5 numberOfLines={2}>{body.title}</H5> : null}
 			{body.description ? (
-				<Body numberOfLines={expanded ? undefined : 6}>{body.description}</Body>
+				<Body color="secondary" numberOfLines={expanded ? undefined : 5}>
+					{body.description}
+				</Body>
 			) : null}
 			{long && (
 				<Pressable
@@ -528,121 +934,25 @@ function PostBody({
 					hitSlop={6}
 					style={{ alignSelf: "flex-start" }}
 				>
-					<Caption weight="medium" color={colors.primary.ink as string}>
+					<Caption weight="semibold" color={colors.primary.ink as string}>
 						{expanded ? "Show less" : "Read more"}
 					</Caption>
 				</Pressable>
 			)}
-			{media.length > 0 && (
-				<View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>
-					{media.map((m) =>
-						m.type === "IMAGE" ? (
-							<Image
-								key={m.id}
-								source={{ uri: m.url }}
-								contentFit="cover"
-								transition={150}
-								accessibilityIgnoresInvertColors
-								style={{
-									width: tile,
-									height: media.length === 1 ? tile * 0.75 : tile,
-									borderRadius: borderRadius.md,
-									backgroundColor: colors.background.subtle,
-								}}
-							/>
-						) : (
-							<FeedVideo key={m.id} uri={m.url} width={tile} height={tile} />
-						),
-					)}
-				</View>
+			{post.media.length > 0 && (
+				<FeedMediaCarousel
+					media={post.media}
+					pageWidth={pageWidth}
+					onOpenViewer={onOpenViewer}
+				/>
 			)}
 		</View>
 	);
 }
 
-function FeedMediaImage({ uri }: { uri: string }) {
-	const { colors, borderRadius } = useTheme();
-	return (
-		<Image
-			source={{ uri }}
-			contentFit="cover"
-			transition={150}
-			accessibilityIgnoresInvertColors
-			style={{
-				width: "100%",
-				height: 180,
-				borderRadius: borderRadius.md,
-				backgroundColor: colors.background.subtle,
-			}}
-		/>
-	);
-}
-
-function FeedVideo({
-	uri,
-	width,
-	height,
-}: {
-	uri: string;
-	width: number;
-	height: number;
-}) {
-	const { borderRadius } = useTheme();
-	const [active, setActive] = useState(false);
-	if (!active) {
-		return (
-			<Pressable
-				onPress={() => setActive(true)}
-				accessibilityRole="button"
-				accessibilityLabel="Play feed video"
-				style={{
-					width,
-					height,
-					borderRadius: borderRadius.md,
-					backgroundColor: "#111111",
-					alignItems: "center",
-					justifyContent: "center",
-				}}
-			>
-				<Play size={22} color="#FFFFFF" fill="#FFFFFF" />
-			</Pressable>
-		);
-	}
-	return <FeedVideoPlayer uri={uri} width={width} height={height} />;
-}
-
-function FeedVideoPlayer({
-	uri,
-	width,
-	height,
-}: {
-	uri: string;
-	width: number;
-	height: number;
-}) {
-	const { borderRadius } = useTheme();
-	const player = useVideoPlayer(uri, (instance) => {
-		instance.muted = true;
-	});
-
-	return (
-		<VideoView
-			player={player}
-			contentFit="cover"
-			nativeControls
-			style={{
-				width,
-				height,
-				borderRadius: borderRadius.md,
-				backgroundColor: "#111111",
-			}}
-			accessibilityLabel="Feed video"
-		/>
-	);
-}
-
-function NeedFacts({ item }: { item: FeedNeedItem }) {
-	const { colors, spacing } = useTheme();
+/* ── Need facts ── */
+export function NeedFacts({ item }: { item: FeedNeedItem }) {
+	const { colors, spacing, borderRadius } = useTheme();
 	const [now] = useState(() => Date.now());
 	const { need } = item;
 
@@ -658,9 +968,9 @@ function NeedFacts({ item }: { item: FeedNeedItem }) {
 	if (target === 0 && !expiresAt) return null;
 
 	return (
-		<View style={{ gap: spacing[2] }}>
+		<View style={{ gap: spacing[2.5], marginTop: spacing[1] }}>
 			{target > 0 && (
-				<>
+				<View style={{ gap: spacing[2] }}>
 					<View
 						style={{
 							flexDirection: "row",
@@ -669,18 +979,35 @@ function NeedFacts({ item }: { item: FeedNeedItem }) {
 							gap: spacing[2],
 						}}
 					>
-						<Caption weight="medium">
-							{formatProgress(done, need.quantity, need.unit)}
-						</Caption>
-						<Caption color="quaternary">
-							{ratio >= 1
-								? "Complete"
-								: `${remaining} ${need.unit ?? "more"} to go`}
+						<View
+							style={{
+								flexDirection: "row",
+								alignItems: "baseline",
+								gap: spacing[1],
+							}}
+						>
+							<Label weight="bold" style={{ fontSize: 18 }}>
+								{done}
+							</Label>
+							<Caption color="secondary" weight="medium">
+								{" "}
+								/ {target} {need.unit}
+							</Caption>
+						</View>
+						<Caption
+							weight="semibold"
+							color={
+								ratio >= 1 ? "success" : closingSoon ? "warning" : "tertiary"
+							}
+						>
+							{ratio >= 1 ? "Complete ✓" : `${remaining} ${need.unit} to go`}
 						</Caption>
 					</View>
+
+					{/* Progress track */}
 					<View
 						style={{
-							height: 4,
+							height: 6,
 							borderRadius: 999,
 							backgroundColor: colors.background.subtle,
 							overflow: "hidden",
@@ -688,82 +1015,221 @@ function NeedFacts({ item }: { item: FeedNeedItem }) {
 					>
 						<View
 							style={{
-								width: `${Math.max(ratio * 100, ratio > 0 ? 4 : 0)}%`,
+								width: `${Math.max(ratio * 100, ratio > 0 ? 3 : 0)}%`,
 								height: "100%",
 								borderRadius: 999,
 								backgroundColor:
 									ratio >= 1
 										? (colors.success.main as string)
-										: (colors.primary.main as string),
+										: closingSoon
+											? (colors.warning.main as string)
+											: (colors.primary.main as string),
 							}}
 						/>
 					</View>
-				</>
+				</View>
 			)}
 			{expiresAt && (
-				<Caption color={closingSoon ? colors.warning.ink : "quaternary"}>
-					{msLeft !== null && msLeft <= 0
-						? "Closed"
-						: `Closes ${formatRelative(need.expiresAt)}`}
-				</Caption>
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						gap: spacing[1.5],
+					}}
+				>
+					<Clock
+						size={13}
+						color={
+							closingSoon
+								? (colors.warning.main as string)
+								: (colors.text.quaternary as string)
+						}
+						strokeWidth={2}
+					/>
+					<Caption
+						color={closingSoon ? colors.warning.ink : "quaternary"}
+						weight={closingSoon ? "semibold" : "medium"}
+					>
+						{msLeft !== null && msLeft <= 0
+							? "Closed"
+							: `Closes ${formatRelative(need.expiresAt)}`}
+					</Caption>
+				</View>
 			)}
 		</View>
 	);
 }
 
+/* ── Event facts ── */
 function EventFacts({ item }: { item: FeedEventItem }) {
-	const { colors, spacing } = useTheme();
+	const { colors, spacing, borderRadius } = useTheme();
 	const { event } = item;
 	const remaining = Math.max(0, event.volunteersNeeded - event.acceptedCount);
 	const place = event.venue ?? item.city;
 
 	return (
-		<View style={{ gap: spacing[1.5] }}>
-			<Fact icon={CalendarDays}>
-				{formatDateRange(event.startAt, event.endAt)}
-			</Fact>
-			{place && <Fact icon={MapPin}>{place}</Fact>}
+		<View style={{ gap: spacing[2], marginTop: spacing[1] }}>
+			<View style={{ flexDirection: "row", gap: spacing[2] }}>
+				{/* Date chip */}
+				<View
+					style={{
+						flex: 1,
+						flexDirection: "row",
+						alignItems: "center",
+						gap: spacing[2],
+						padding: spacing[2.5],
+						borderRadius: borderRadius.lg,
+						backgroundColor: colors.background.subtle as string,
+					}}
+				>
+					<View
+						style={{
+							width: 32,
+							height: 32,
+							borderRadius: borderRadius.md,
+							backgroundColor: "#EFF6FF",
+							alignItems: "center",
+							justifyContent: "center",
+						}}
+					>
+						<CalendarDays size={16} color="#1D4ED8" strokeWidth={2} />
+					</View>
+					<View style={{ flex: 1 }}>
+						<Caption weight="semibold" numberOfLines={1}>
+							{formatDateRange(event.startAt, event.endAt)}
+						</Caption>
+						<Caption color="quaternary" style={{ fontSize: 11 }}>
+							Event date
+						</Caption>
+					</View>
+				</View>
+
+				{/* Location chip */}
+				{place && (
+					<View
+						style={{
+							flex: 1,
+							flexDirection: "row",
+							alignItems: "center",
+							gap: spacing[2],
+							padding: spacing[2.5],
+							borderRadius: borderRadius.lg,
+							backgroundColor: colors.background.subtle as string,
+						}}
+					>
+						<View
+							style={{
+								width: 32,
+								height: 32,
+								borderRadius: borderRadius.md,
+								backgroundColor: "#F0FDF4",
+								alignItems: "center",
+								justifyContent: "center",
+							}}
+						>
+							<MapPin size={16} color="#047857" strokeWidth={2} />
+						</View>
+						<View style={{ flex: 1 }}>
+							<Caption weight="semibold" numberOfLines={1}>
+								{place}
+							</Caption>
+							<Caption color="quaternary" style={{ fontSize: 11 }}>
+								Location
+							</Caption>
+						</View>
+					</View>
+				)}
+			</View>
+
+			{/* Spots row */}
 			<View
 				style={{
 					flexDirection: "row",
 					alignItems: "center",
 					justifyContent: "space-between",
 					gap: spacing[2],
+					padding: spacing[2.5],
+					borderRadius: borderRadius.lg,
+					backgroundColor: colors.background.subtle as string,
 				}}
 			>
-				<Fact icon={Users}>
-					{remaining > 0
-						? `${remaining} of ${event.volunteersNeeded} spots left`
-						: "All spots filled"}
-				</Fact>
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						gap: spacing[2],
+					}}
+				>
+					<View
+						style={{
+							width: 32,
+							height: 32,
+							borderRadius: borderRadius.md,
+							backgroundColor: "#FFF7ED",
+							alignItems: "center",
+							justifyContent: "center",
+						}}
+					>
+						<Users size={16} color="#C2410C" strokeWidth={2} />
+					</View>
+					<View>
+						<Caption weight="semibold">
+							{remaining > 0
+								? `${remaining} of ${event.volunteersNeeded} spots left`
+								: "All spots filled"}
+						</Caption>
+						<Caption color="quaternary" style={{ fontSize: 11 }}>
+							Volunteers
+						</Caption>
+					</View>
+				</View>
 				{item.isUrgent && remaining > 0 && (
-					<Caption color={colors.warning.ink}>Starts soon</Caption>
+					<View
+						style={{
+							paddingHorizontal: spacing[2],
+							paddingVertical: spacing[0.5],
+							borderRadius: 999,
+							backgroundColor: "#FFF7ED",
+						}}
+					>
+						<Caption
+							weight="semibold"
+							style={{ color: "#C2410C", fontSize: 11 }}
+						>
+							Starts soon
+						</Caption>
+					</View>
 				)}
 			</View>
-		</View>
-	);
-}
 
-function Fact({
-	icon: Icon,
-	children,
-}: {
-	icon: typeof MapPin;
-	children: React.ReactNode;
-}) {
-	const { colors, spacing } = useTheme();
-	return (
-		<View
-			style={{ flexDirection: "row", alignItems: "center", gap: spacing[1.5] }}
-		>
-			<Icon
-				size={13}
-				color={colors.text.quaternary as string}
-				strokeWidth={2}
-			/>
-			<Caption color="secondary" numberOfLines={1} style={{ flexShrink: 1 }}>
-				{children}
-			</Caption>
+			{/* Mini spots progress */}
+			{event.volunteersNeeded > 0 && (
+				<View
+					style={{
+						flexDirection: "row",
+						gap: spacing[1],
+						paddingHorizontal: spacing[1],
+					}}
+				>
+					{Array.from({
+						length: Math.min(event.volunteersNeeded, 12),
+					}).map((_, i) => (
+						<View
+							// biome-ignore lint/suspicious/noArrayIndexKey: static progress segments never reorder
+							key={`spot-${i}`}
+							style={{
+								flex: 1,
+								height: 4,
+								borderRadius: 999,
+								backgroundColor:
+									i < event.acceptedCount
+										? "#F97316"
+										: (colors.background.subtle as string),
+							}}
+						/>
+					))}
+				</View>
+			)}
 		</View>
 	);
 }

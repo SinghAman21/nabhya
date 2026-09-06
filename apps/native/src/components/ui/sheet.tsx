@@ -363,8 +363,10 @@ function WebSheet({
 /**
  * Grabber, title, optional subtitle and a close target. `divided` draws the
  * hairline that tells the reader the body has scrolled under the title.
+ *
+ * Exported for `Drawer`, so the slide-over speaks the same header language.
  */
-function SheetHeader({
+export function SheetHeader({
 	title,
 	subtitle,
 	onClose,

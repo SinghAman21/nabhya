@@ -20,18 +20,14 @@ import { useMedia } from "@/hooks/useMedia";
 import { useAuthStore } from "@/store/auth-store";
 
 const NGO_NAV_ITEMS: NavItem[] = [
+	// Feed is the landing page, so it leads — unsectioned, like Dashboard.
+	{ label: "Feed", href: "/(ngo)/feed", icon: Newspaper },
 	{ label: "Dashboard", href: "/(ngo)", icon: House },
 	{
 		label: "Needs",
 		href: "/(ngo)/needs",
 		icon: HeartHandshake,
 		section: "Programmes",
-	},
-	{
-		label: "Feed",
-		href: "/feed",
-		icon: Newspaper,
-		section: "Audience",
 	},
 	{
 		label: "Events",
@@ -96,6 +92,15 @@ export default function NgoLayout() {
 	return (
 		<View style={{ flex: 1 }}>
 			<Tabs screenOptions={tabBarOptions} tabBar={renderTabBar}>
+				<Tabs.Screen
+					name="feed"
+					options={{
+						title: "Feed",
+						tabBarIcon: ({ color, size }) => (
+							<Newspaper size={size} color={color} />
+						),
+					}}
+				/>
 				<Tabs.Screen
 					name="index"
 					options={{

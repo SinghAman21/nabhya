@@ -81,7 +81,9 @@ export default function Index() {
 		} else if (status.role === "superadmin") {
 			router.replace("/(admin)");
 		} else if (status.role === "organisation") {
-			router.replace(status.isOnboarded ? "/(ngo)" : "/(onboarding)");
+			// Feed first — the dashboard and everything else hang off the
+			// sidebar/tab bar, which stay mounted on every (ngo) route.
+			router.replace(status.isOnboarded ? "/(ngo)/feed" : "/(onboarding)");
 		} else {
 			router.replace(
 				status.isOnboarded ? "/(volunteer)" : "/(onboarding)/volunteer",

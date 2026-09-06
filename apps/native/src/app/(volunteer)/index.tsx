@@ -46,28 +46,6 @@ import { focusable } from "@/lib/focus";
 import type { FeedItem, FeedNeedItem } from "@/lib/types";
 import { useFeedStore } from "@/store/feed-store";
 
-/**
- * Home — one feed for everything a volunteer can act on.
- *
- * Needs, offers, events and NGO updates arrive interleaved and ranked by the
- * server; the tabs are lenses over that one list, not separate lists, so a
- * volunteer never has to know whether the thing they want is a "need" or an
- * "event" before they can find it. The cause (the platform's verticals) and
- * the city narrow it further, and all of it is a real server filter — nothing
- * here reinterprets one page of results on the client.
- *
- * The header is two short rows and nothing else: "Home" with the city picker
- * and search on the right — this is a local product, so "where" stays one tap
- * away — then the lens chips with the cause filter folded into a sheet.
- * Notifications live in the Activity tab, so there is no bell up here, and the
- * whole header is fixed rather than scrolling away and coming back as a
- * different one.
- */
-
-/**
- * `position: "sticky"` is web-only and absent from React Native's `ViewStyle`
- * union, so the cast lives in one place instead of inside the screen.
- */
 const STICKY_RAIL = {
 	width: 320,
 	position: "sticky",
@@ -89,16 +67,12 @@ export default function Home() {
 	const [detectedCity, setDetectedCity] = useState<string | null>(null);
 	const [showCityFallback, setShowCityFallback] = useState(false);
 
-	// Desktop's top bar owns a search field bound to this store; on a phone
-	// search is its own page, so the term is ignored there.
 	const storeSearch = useFeedStore((s) => s.search);
 	const search = isDesktop ? storeSearch : "";
 	const city = useFeedStore((s) => s.city);
 	const setCity = useFeedStore((s) => s.setCity);
 	const cityTouched = useFeedStore((s) => s.cityTouched);
 
-	// Scope to the user's own city on first load, and only until they choose —
-	// after that their choice stands for the session.
 	const me = useMe();
 	const homeCity = me.data?.city ?? null;
 	useEffect(() => {
@@ -171,8 +145,6 @@ export default function Home() {
 		if (feed.hasNextPage && !feed.isFetchingNextPage) feed.fetchNextPage();
 	};
 
-	// Header keeps a small inset so text never touches the edge; the feed
-	// rows themselves are full-bleed tiles (no outer gutter).
 	const gutter = spacing[4];
 
 	const header = (
@@ -233,9 +205,6 @@ export default function Home() {
 								borderRadius: 999,
 								alignItems: "center",
 								justifyContent: "center",
-								// backgroundColor: pressed
-								//   ? colors.background.tertiary
-								//   : colors.background.subtle,
 							})}
 						>
 							<Search
@@ -307,11 +276,8 @@ export default function Home() {
 			ItemSeparatorComponent={() => (
 				<View
 					style={{
-						// height: spacing[2],
+						height: spacing[2],
 						backgroundColor: colors.background.warm,
-						borderTopWidth: 1,
-						borderBottomWidth: 1,
-						borderColor: colors.border.hairline,
 					}}
 				/>
 			)}
@@ -322,7 +288,7 @@ export default function Home() {
 			showsVerticalScrollIndicator={false}
 			contentContainerStyle={{
 				paddingHorizontal: 0,
-				paddingTop: 0,
+				paddingTop: spacing[2],
 				paddingBottom: spacing[12],
 				backgroundColor: colors.background.warm,
 			}}
@@ -340,7 +306,6 @@ export default function Home() {
 		<Screen
 			style={{
 				paddingHorizontal: 0,
-				// Tighter than a titled page: the city row is the title.
 				paddingTop: insets.top + spacing[1],
 			}}
 		>
@@ -385,15 +350,7 @@ export default function Home() {
 	);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Empty states                                                               */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Each lens empties for a different reason, and says so. "Nothing here" on the
- * Following tab reads as a broken app; "you don't follow anyone yet" reads as
- * an invitation.
- */
+/* ── Empty states ── */
 function FeedEmpty({
 	tab,
 	search,

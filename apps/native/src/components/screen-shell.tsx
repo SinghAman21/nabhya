@@ -13,6 +13,7 @@ import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H2, H3, Label } from "@/components/ui/typography";
 import { typography } from "@/constants/design-system";
 import { useTheme } from "@/hooks/use-theme";
+import { useGridColumns } from "@/hooks/useMedia";
 import { focusable } from "@/lib/focus";
 
 /**
@@ -204,6 +205,29 @@ export function Surface({
 		>
 			{children}
 		</Pressable>
+	);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Grid cell                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One cell in a multi-column `FlatList` (`numColumns={useGridColumns()}`).
+ *
+ * On a phone this renders nothing extra — the card is the row. On desktop it
+ * takes an equal share of the row and caps its width at one column, so a
+ * half-empty last row keeps its cards aligned instead of ballooning to fill
+ * the row. Pair with `key={\`grid-${columns}\`}` (a `numColumns` change needs
+ * a remount to re-layout) and `columnWrapperStyle` carrying the gutter.
+ */
+export function GridCell({ children }: { children: React.ReactNode }) {
+	const columns = useGridColumns();
+
+	if (columns === 1) return <>{children}</>;
+
+	return (
+		<View style={{ flex: 1, maxWidth: `${100 / columns}%` }}>{children}</View>
 	);
 }
 

@@ -17,6 +17,7 @@ import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
 import {
 	EmptyState,
 	ErrorState,
+	GridCell,
 	LoadingState,
 	Screen,
 	ScreenHeader,
@@ -37,6 +38,7 @@ import { useOpenDocument } from "@/hooks/use-documents";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useFileUpload } from "@/hooks/use-upload";
+import { useGridColumns } from "@/hooks/useMedia";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { focusable } from "@/lib/focus";
@@ -69,6 +71,7 @@ export default function OrgReports() {
 
 	const me = useMe();
 	const query = useFinancialReports(me.data?.organization?.id);
+	const columns = useGridColumns();
 	const remove = useDeleteFinancialReport();
 	const openDocument = useOpenDocument();
 
@@ -117,6 +120,9 @@ export default function OrgReports() {
 				/>
 			) : (
 				<FlatList
+					key={`grid-${columns}`}
+					numColumns={columns}
+					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
 					data={items}
 					keyExtractor={(item) => item.id}
 					showsVerticalScrollIndicator={false}
@@ -138,79 +144,81 @@ export default function OrgReports() {
 						/>
 					}
 					renderItem={({ item }) => (
-						<Surface onPress={() => openDocument.mutate(item.documentKey)}>
-							<View
-								style={{
-									flexDirection: "row",
-									alignItems: "center",
-									gap: spacing[3],
-								}}
-							>
+						<GridCell>
+							<Surface onPress={() => openDocument.mutate(item.documentKey)}>
 								<View
 									style={{
-										width: 40,
-										height: 40,
-										borderRadius: 12,
+										flexDirection: "row",
 										alignItems: "center",
-										justifyContent: "center",
-										backgroundColor: colors.background.subtle,
+										gap: spacing[3],
 									}}
 								>
-									<FileText
-										size={18}
-										color={colors.text.secondary as string}
-										strokeWidth={1.75}
-									/>
+									<View
+										style={{
+											width: 40,
+											height: 40,
+											borderRadius: 12,
+											alignItems: "center",
+											justifyContent: "center",
+											backgroundColor: colors.background.subtle,
+										}}
+									>
+										<FileText
+											size={18}
+											color={colors.text.secondary as string}
+											strokeWidth={1.75}
+										/>
+									</View>
+									<View style={{ flex: 1, minWidth: 0 }}>
+										<Body weight="bold" numberOfLines={1}>
+											{item.title}
+										</Body>
+										<Caption color="tertiary" numberOfLines={1}>
+											{FINANCIAL_REPORT_LABELS[
+												item.type as keyof typeof FINANCIAL_REPORT_LABELS
+											] ?? item.type}{" "}
+											· {formatFinancialYear(item.financialYear)}
+										</Caption>
+									</View>
 								</View>
-								<View style={{ flex: 1, minWidth: 0 }}>
-									<Body weight="bold" numberOfLines={1}>
-										{item.title}
-									</Body>
-									<Caption color="tertiary" numberOfLines={1}>
-										{FINANCIAL_REPORT_LABELS[
-											item.type as keyof typeof FINANCIAL_REPORT_LABELS
-										] ?? item.type}{" "}
-										· {formatFinancialYear(item.financialYear)}
-									</Caption>
-								</View>
-							</View>
 
-							<View
-								style={{
-									flexDirection: "row",
-									alignItems: "center",
-									justifyContent: "space-between",
-									marginTop: spacing[3],
-									paddingTop: spacing[3],
-									borderTopWidth: 1,
-									borderTopColor: colors.border.hairline,
-								}}
-							>
-								<Caption color="quaternary">
-									Published {formatRelative(item.createdAt)}
-								</Caption>
-								<View style={{ flexDirection: "row", gap: spacing[3] }}>
-									<TextAction
-										label={
-											openDocument.isPending &&
-											openDocument.variables === item.documentKey
-												? "Opening…"
-												: "View"
-										}
-										tone="brand"
-										disabled={openDocument.isPending}
-										onPress={() => openDocument.mutate(item.documentKey)}
-										accessibilityLabel={`View ${item.title}`}
-									/>
-									<TextAction
-										label="Withdraw"
-										tone="danger"
-										onPress={() => confirmDelete(item)}
-										accessibilityLabel={`Withdraw ${item.title}`}
-									/>
+								<View
+									style={{
+										flexDirection: "row",
+										alignItems: "center",
+										justifyContent: "space-between",
+										marginTop: spacing[3],
+										paddingTop: spacing[3],
+										borderTopWidth: 1,
+										borderTopColor: colors.border.hairline,
+									}}
+								>
+									<Caption color="quaternary">
+										Published {formatRelative(item.createdAt)}
+									</Caption>
+									<View style={{ flexDirection: "row", gap: spacing[3] }}>
+										<TextAction
+											label={
+												openDocument.isPending &&
+												openDocument.variables === item.documentKey
+													? "Opening…"
+													: "View"
+											}
+											tone="brand"
+											disabled={openDocument.isPending}
+											onPress={() => openDocument.mutate(item.documentKey)}
+											accessibilityLabel={`View ${item.title}`}
+										/>
+										<TextAction
+											label="Withdraw"
+											tone="danger"
+											onPress={() => confirmDelete(item)}
+											accessibilityLabel={`Withdraw ${item.title}`}
+										/>
+									</View>
 								</View>
-							</View>
-						</Surface>
+							</Surface>
+						</GridCell>
 					)}
 				/>
 			)}

@@ -12,6 +12,7 @@ import {
 	EmptyState,
 	ErrorState,
 	FilterChips,
+	GridCell,
 	LoadingState,
 	Screen,
 	ScreenHeader,
@@ -28,6 +29,7 @@ import { Body, Caption, Label } from "@/components/ui/typography";
 import { useDeleteEvent } from "@/hooks/use-events";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
+import { useGridColumns } from "@/hooks/useMedia";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage, orgEventsApi, queryKeys } from "@/lib/api";
 import { formatDateRange } from "@/lib/format";
@@ -71,6 +73,7 @@ export default function NgoEvents() {
 
 	const query = useOrgEventPages(filter === "ALL" ? {} : { status: filter });
 	const deleteEvent = useDeleteEvent();
+	const columns = useGridColumns();
 
 	const isVerified = me?.organization?.verificationStatus === "VERIFIED";
 	const items = query.data?.pages.flatMap((page) => page.items) ?? [];
@@ -139,6 +142,9 @@ export default function NgoEvents() {
 				/>
 			) : (
 				<FlatList
+					key={`grid-${columns}`}
+					numColumns={columns}
+					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
 					data={items}
 					keyExtractor={(item) => item.id}
 					showsVerticalScrollIndicator={false}
@@ -187,12 +193,14 @@ export default function NgoEvents() {
 						/>
 					}
 					renderItem={({ item }) => (
-						<EventRow
-							event={item}
-							onReview={() => setReviewing(item)}
-							onEdit={() => setEditing(item)}
-							onDelete={() => confirmDelete(item)}
-						/>
+						<GridCell>
+							<EventRow
+								event={item}
+								onReview={() => setReviewing(item)}
+								onEdit={() => setEditing(item)}
+								onDelete={() => confirmDelete(item)}
+							/>
+						</GridCell>
 					)}
 				/>
 			)}

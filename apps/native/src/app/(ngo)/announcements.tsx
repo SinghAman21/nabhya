@@ -12,6 +12,7 @@ import {
 	EmptyState,
 	ErrorState,
 	FilterChips,
+	GridCell,
 	LoadingState,
 	Screen,
 	ScreenHeader,
@@ -30,6 +31,7 @@ import {
 	useUpdateAnnouncement,
 } from "@/hooks/use-directory";
 import { useTheme } from "@/hooks/use-theme";
+import { useGridColumns } from "@/hooks/useMedia";
 import { Alert } from "@/lib/alert";
 import { apiErrorMessage, publishingApi, queryKeys } from "@/lib/api";
 import { focusable } from "@/lib/focus";
@@ -73,6 +75,7 @@ export default function OrgAnnouncements() {
 	const [editing, setEditing] = useState<Announcement | null>(null);
 
 	const query = useMyAnnouncementPages();
+	const columns = useGridColumns();
 	const remove = useDeleteAnnouncement();
 
 	const all = query.data?.pages.flatMap((page) => page.items) ?? [];
@@ -124,6 +127,9 @@ export default function OrgAnnouncements() {
 				/>
 			) : (
 				<FlatList
+					key={`grid-${columns}`}
+					numColumns={columns}
+					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
 					data={items}
 					keyExtractor={(item) => item.id}
 					showsVerticalScrollIndicator={false}
@@ -156,11 +162,13 @@ export default function OrgAnnouncements() {
 						/>
 					}
 					renderItem={({ item }) => (
-						<AnnouncementRow
-							announcement={item}
-							onEdit={() => setEditing(item)}
-							onDelete={() => confirmDelete(item)}
-						/>
+						<GridCell>
+							<AnnouncementRow
+								announcement={item}
+								onEdit={() => setEditing(item)}
+								onDelete={() => confirmDelete(item)}
+							/>
+						</GridCell>
 					)}
 				/>
 			)}
