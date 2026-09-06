@@ -33,7 +33,9 @@ export function DocumentUploadTile({
 	saving?: boolean;
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
-	const { pickAndUpload, isUploading, error } = useFileUpload(purpose);
+	const { pickAndUpload, isUploading, error } = useFileUpload(purpose, {
+		fileNameHint: title,
+	});
 	const openDocument = useOpenDocument();
 
 	const busy = isUploading || saving;

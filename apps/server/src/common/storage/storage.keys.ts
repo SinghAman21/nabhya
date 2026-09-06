@@ -30,6 +30,21 @@ const PURPOSE_TARGETS: Record<StoragePurpose, PurposeTarget> = {
 	CERTIFICATE: { bucket: FEED_MEDIA_BUCKET, prefix: "certificates" },
 };
 
+function pad(value: number): string {
+	return value.toString().padStart(2, "0");
+}
+
+function formatDate(date: Date): string {
+	return `${pad(date.getUTCDate())}${pad(date.getUTCMonth() + 1)}${date
+		.getUTCFullYear()
+		.toString()
+		.slice(-2)}`;
+}
+
+function formatDateTime(date: Date): string {
+	return `${formatDate(date)}${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}`;
+}
+
 /**
  * Strips anything that could escape the intended prefix or confuse tooling.
  * The random UUID in front means a sanitised collision can't overwrite an
@@ -50,6 +65,44 @@ function safeFileName(fileName: string): string {
 	return cleaned || "file";
 }
 
+function fileExtension(fileName: string): string {
+	const extension = fileName.split(".").pop()?.toLowerCase();
+	if (!extension || extension === fileName.toLowerCase()) return "";
+	return `.${safeFileName(extension)}`;
+}
+
+function stripExtension(fileName: string): string {
+	const lastDot = fileName.lastIndexOf(".");
+	if (lastDot <= 0) return fileName;
+	return fileName.slice(0, lastDot);
+}
+
+function readableSegment(value: string, fallback: string): string {
+	const cleaned = safeFileName(value)
+		.replace(/\.+/g, "-")
+		.replace(/-+/g, "-")
+		.replace(/^[-.]+|[-.]+$/g, "");
+	return cleaned || fallback;
+}
+
+function buildReadableDocumentName(input: {
+	label: string;
+	fileName: string;
+	createdAt?: Date;
+}): string {
+	const dateTime = formatDateTime(input.createdAt ?? new Date());
+	const base = readableSegment(stripExtension(input.fileName), input.label);
+	const ext = fileExtension(input.fileName);
+	return `${base}-${dateTime}${ext}`;
+}
+
+function buildReadableFolderName(input: {
+	label: string;
+	createdAt?: Date;
+}): string {
+	return `${readableSegment(input.label, "folder")}-${formatDate(input.createdAt ?? new Date())}`;
+}
+
 /**
  * Builds a bucketed object key. `ownerId` scopes the object to the organization
  * or user it belongs to, which is what makes ownership checkable on download:
@@ -59,8 +112,25 @@ export function buildStorageKey(input: {
 	purpose: StoragePurpose;
 	ownerId: string;
 	fileName: string;
+	ownerLabel?: string;
+	documentLabel?: string;
+	createdAt?: Date;
 }): string {
 	const target = PURPOSE_TARGETS[input.purpose];
+
+	if (input.purpose === "ORG_DOCUMENT" || input.purpose === "USER_DOCUMENT") {
+		const folder = buildReadableFolderName({
+			label: input.ownerLabel ?? input.ownerId,
+			createdAt: input.createdAt,
+		});
+		const documentName = buildReadableDocumentName({
+			label: input.documentLabel ?? input.fileName,
+			fileName: input.fileName,
+			createdAt: input.createdAt,
+		});
+		return `${target.bucket}/${target.prefix}/${folder}/${input.ownerId}/${documentName}`;
+	}
+
 	return `${target.bucket}/${target.prefix}/${input.ownerId}/${randomUUID()}-${safeFileName(input.fileName)}`;
 }
 
@@ -77,13 +147,22 @@ export function buildFeedMediaKey(input: {
 export function parseStorageKey(
 	key: string,
 ): { purpose: StoragePurpose; ownerId: string } | null {
-	const [bucket, prefix, ownerId] = key.split("/");
-	if (!bucket || !prefix || !ownerId) return null;
+	const segments = key.split("/");
+	if (segments.length < 4) return null;
 
-	const purpose = (Object.entries(PURPOSE_TARGETS) as Array<
-		[StoragePurpose, PurposeTarget]
-	>).find(([, target]) => target.bucket === bucket && target.prefix === prefix)?.[0];
+	const [bucket, prefix] = segments;
+	const purpose = (Object.keys(PURPOSE_TARGETS) as StoragePurpose[]).find(
+		(candidate) =>
+			PURPOSE_TARGETS[candidate].bucket === bucket &&
+			PURPOSE_TARGETS[candidate].prefix === prefix,
+	);
 	if (!purpose) return null;
 
-	return { purpose, ownerId };
+	if (purpose === "ORG_DOCUMENT" || purpose === "USER_DOCUMENT") {
+		const ownerId = segments.length >= 5 ? segments[3] : segments[2];
+		return ownerId ? { purpose, ownerId } : null;
+	}
+
+	const ownerId = segments[2];
+	return ownerId ? { purpose, ownerId } : null;
 }

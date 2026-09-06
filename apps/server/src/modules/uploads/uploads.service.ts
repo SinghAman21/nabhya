@@ -53,11 +53,17 @@ export class UploadsService {
 	async createIntent(user: AuthUser, input: UploadIntentInput) {
 		const purpose = input.purpose as StoragePurpose;
 		const ownerId = await this.resolveOwnerId(user, purpose);
+		const ownerLabel =
+			purpose === "ORG_DOCUMENT"
+				? await this.resolveOrganizationLabel(user.id)
+				: undefined;
 
 		const key = buildStorageKey({
 			purpose,
 			ownerId,
+			ownerLabel,
 			fileName: input.fileName,
+			createdAt: new Date(),
 		});
 
 		return this.storage.createUploadTicket({
@@ -185,5 +191,18 @@ export class UploadsService {
 		}
 
 		return organization.id;
+	}
+
+	private async resolveOrganizationLabel(userId: string): Promise<string> {
+		const organization = await this.db.query.organizations.findFirst({
+			where: eq(organizations.ownerUserId, userId),
+			columns: { organizationName: true },
+		});
+
+		if (!organization) {
+			throw new NotFoundException("Organization not found");
+		}
+
+		return organization.organizationName;
 	}
 }

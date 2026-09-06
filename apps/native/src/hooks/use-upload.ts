@@ -32,7 +32,10 @@ export interface PickedUpload {
  * caller can attach it to a record. The server re-verifies the object landed
  * before it trusts that key.
  */
-export function useFileUpload(purpose: UploadPurpose) {
+export function useFileUpload(
+	purpose: UploadPurpose,
+	options?: { fileNameHint?: string },
+) {
 	const [isUploading, setUploading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -69,7 +72,7 @@ export function useFileUpload(purpose: UploadPurpose) {
 		try {
 			const intent: UploadIntentInput = {
 				purpose,
-				fileName: asset.name,
+				fileName: readableUploadFileName(options?.fileNameHint, asset.name),
 				contentType,
 				// A zero size means the picker couldn't determine it; send 1 so the
 				// schema's min passes and let the server's post-upload HEAD decide.
@@ -79,7 +82,12 @@ export function useFileUpload(purpose: UploadPurpose) {
 			const ticket = await uploadsApi.createIntent(intent);
 			await putFile(ticket, asset.uri, contentType);
 
-			return { key: ticket.key, fileName: asset.name, size, contentType };
+			return {
+				key: ticket.key,
+				fileName: readableUploadFileName(options?.fileNameHint, asset.name),
+				size,
+				contentType,
+			};
 		} catch (e) {
 			setError(
 				e instanceof Error ? e.message : "Upload failed. Please try again.",
@@ -185,6 +193,22 @@ export function useImageUpload(purpose: UploadPurpose) {
 		error,
 		clearError: () => setError(null),
 	};
+}
+
+function readableUploadFileName(
+	hint: string | undefined,
+	originalName: string,
+): string {
+	const baseName = (hint ?? originalName)
+		.toLowerCase()
+		.replace(/[^a-z0-9._-]+/g, "-")
+		.replace(/\.{2,}/g, ".")
+		.replace(/^[-.]+|[-.]+$/g, "")
+		.slice(-80);
+	const fallback = baseName || "file";
+	const extension = originalName.split(".").pop()?.toLowerCase();
+	if (!extension || extension === originalName.toLowerCase()) return fallback;
+	return `${fallback}.${extension.replace(/[^a-z0-9]+/g, "")}`;
 }
 
 /**
