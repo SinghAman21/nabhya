@@ -8,10 +8,12 @@ import {
 	Star,
 } from "lucide-react-native";
 import { useState } from "react";
-import { ScrollView, View } from "react-native";
+import { ScrollView, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BackButton } from "@/components/back-button";
 import { DonateSheet } from "@/components/donate-sheet";
+import { OrgCover, OrgLogo } from "@/components/org-branding";
+import { PageTabs } from "@/components/page-tabs";
 import {
 	LoadMoreButton,
 	PAGE_SIZE,
@@ -21,7 +23,8 @@ import { ReviewSheet } from "@/components/review-sheet";
 import {
 	EmptyState,
 	ErrorState,
-	FilterChips,
+	type Fact,
+	FactList,
 	ListGroup,
 	ListRow,
 	LoadingState,
@@ -35,6 +38,7 @@ import {
 	verificationTone,
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import { confirm, toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H2, H3, Label } from "@/components/ui/typography";
 import {
@@ -51,7 +55,6 @@ import {
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
-import { Alert } from "@/lib/alert";
 import {
 	apiErrorMessage,
 	engagementApi,
@@ -60,7 +63,45 @@ import {
 } from "@/lib/api";
 import { focusable } from "@/lib/focus";
 import { formatDate, formatRelative } from "@/lib/format";
+import { verticalScrollbar } from "@/lib/scroll";
 import { useAuthStore } from "@/store/auth-store";
+
+/**
+ * An NGO's public page — the one screen a volunteer or donor judges an
+ * organisation by.
+ *
+ * ## Layout
+ *
+ * A hero, then two columns on desktop: what you read on the left, what you
+ * *do* and look up on the right.
+ *
+ * The hero is the NGO's own branding — the cover band and logo it uploads on
+ * `(ngo)/edit`, drawn through the same `OrgCover` / `OrgLogo` as its private
+ * profile so the two cannot drift. Before this the page opened on a bare `H2`:
+ * the organisation had somewhere to put a cover photo and a logo and nowhere
+ * they appeared.
+ *
+ * On desktop the aside holds the actions and the registry facts, which does two
+ * things. Donate stops being a bar welded to the bottom of a 1000pt window —
+ * fine on a phone, odd on a desk — and the details stop being a `ListRow` list
+ * with the label hard left and a right-aligned value clamped to `maxWidth: 60%`,
+ * which is what they were. `FactList` stacks label over value, so a registration
+ * number reads the same at any column width.
+ *
+ * Tabs are `PageTabs`, the same underline row as the NGO's own profile, rather
+ * than `FilterChips`. A filled pill says "this list is filtered to a subset";
+ * these are four different kinds of content about one subject.
+ */
+
+/** Two columns of content, and no wider than a prose column plus its aside. */
+const PAGE: ViewStyle = {
+	width: "100%",
+	maxWidth: 1080,
+	alignSelf: "center",
+};
+
+const MAIN_COLUMN = 2;
+const ASIDE_COLUMN = 1;
 
 type Tab = "about" | "updates" | "reviews" | "transparency";
 
@@ -71,11 +112,6 @@ const TABS: Array<{ value: Tab; label: string }> = [
 	{ value: "transparency", label: "Transparency" },
 ];
 
-/**
- * An NGO's public page. Name and standing first, its record in numbers, then
- * the tabs. Save lives in the header beside back; the one action a visitor is
- * likely to take — donate — is pinned to the bottom.
- */
 export default function NgoProfilePage() {
 	const { id } = useLocalSearchParams<{ id: string }>();
 	const { colors, spacing } = useTheme();
@@ -108,65 +144,189 @@ export default function NgoProfilePage() {
 	const onBookmark = () =>
 		requireSignIn(() =>
 			toggleBookmark.mutate(id, {
-				onError: (error) =>
-					Alert.alert("Could not save", apiErrorMessage(error)),
+				onError: (error) => toast.error(apiErrorMessage(error)),
 			}),
 		);
 
+	const data = org.data;
 	const gutter = spacing[5];
-	const desktopWidth = isDesktop
-		? ({ maxWidth: 720, width: "100%", alignSelf: "center" } as const)
-		: undefined;
+	const location =
+		[data?.city, data?.state].filter(Boolean).join(", ") || "Location not set";
+
+	const logoSize = isDesktop ? 92 : 72;
+	const logoOverlap = Math.round(logoSize * 0.45);
+
+	const donateButton = (
+		<Button
+			onPress={() => requireSignIn(() => setDonateOpen(true))}
+			accessibilityLabel={`Donate to ${data?.organizationName ?? "this NGO"}`}
+		>
+			{email ? "Donate" : "Sign in to donate"}
+		</Button>
+	);
+
+	const saveControl = (
+		<Pressable
+			onPress={onBookmark}
+			hitSlop={8}
+			disabled={toggleBookmark.isPending}
+			accessibilityRole="button"
+			accessibilityLabel={bookmarked ? "Remove from saved" : "Save this NGO"}
+			accessibilityState={{
+				selected: bookmarked,
+				disabled: toggleBookmark.isPending,
+			}}
+			{...focusable}
+			style={({ pressed }) => ({
+				width: 40,
+				height: 40,
+				borderRadius: 999,
+				alignItems: "center",
+				justifyContent: "center",
+				backgroundColor: pressed
+					? colors.background.tertiary
+					: colors.background.subtle,
+			})}
+		>
+			<Bookmark
+				size={20}
+				color={colors.text.primary as string}
+				fill={bookmarked ? (colors.text.primary as string) : "transparent"}
+			/>
+		</Pressable>
+	);
+
+	const hero = data ? (
+		<Surface padded={false} style={{ overflow: "hidden" }}>
+			<OrgCover
+				imageKey={data.coverImage}
+				height={isDesktop ? 184 : 120}
+				empty=""
+			/>
+			<View style={{ paddingHorizontal: gutter, paddingBottom: spacing[5] }}>
+				<View
+					style={{
+						marginTop: -logoOverlap,
+						marginBottom: spacing[3],
+						// Paints the logo over the cover it overlaps.
+						zIndex: 1,
+						alignSelf: "flex-start",
+					}}
+				>
+					<OrgLogo
+						name={data.organizationName}
+						imageKey={data.logo}
+						size={logoSize}
+						ring
+					/>
+				</View>
+
+				<H2 accessibilityRole="header">{data.organizationName}</H2>
+				<Caption color="tertiary" style={{ marginTop: spacing[1] }}>
+					{location}
+					{data.foundingYear ? ` · Since ${data.foundingYear}` : ""}
+				</Caption>
+
+				<View
+					style={{
+						flexDirection: "row",
+						flexWrap: "wrap",
+						gap: spacing[2],
+						marginTop: spacing[3],
+					}}
+				>
+					<StatusPill
+						label={humanizeStatus(data.verificationStatus)}
+						tone={verificationTone(data.verificationStatus)}
+					/>
+					{data.categories?.map((category) => (
+						<StatusPill key={category.id} label={category.name} />
+					))}
+				</View>
+			</View>
+		</Surface>
+	) : null;
+
+	const metrics = impact.data ? (
+		<MetricRow
+			stats={[
+				{ label: "Volunteers", value: impact.data.volunteersEngaged },
+				{ label: "Hours given", value: impact.data.volunteerHours },
+				{ label: "Events", value: impact.data.eventsHosted },
+			]}
+		/>
+	) : null;
+
+	const tabs = <PageTabs tabs={TABS} value={tab} onChange={setTab} />;
+
+	const panel = data ? (
+		<>
+			{tab === "about" && (
+				<AboutTab organization={data} withFacts={!isDesktop} />
+			)}
+			{tab === "updates" && <UpdatesTab organizationId={id} />}
+			{tab === "reviews" && (
+				<ReviewsTab
+					organizationId={id}
+					onWrite={() => requireSignIn(() => setReviewOpen(true))}
+				/>
+			)}
+			{tab === "transparency" && <TransparencyTab organizationId={id} />}
+		</>
+	) : null;
+
+	/**
+	 * Desktop only. The two actions a visitor has, in the column they are
+	 * looking at rather than welded to the bottom of the window.
+	 */
+	const actionCard = data ? (
+		<Surface>
+			<View style={{ gap: spacing[3] }}>
+				{donateButton}
+				<Button
+					variant="outline"
+					onPress={onBookmark}
+					loading={toggleBookmark.isPending}
+					accessibilityState={{ selected: bookmarked }}
+				>
+					{bookmarked ? "Saved" : "Save this NGO"}
+				</Button>
+				<Caption color="quaternary">
+					Donations are collected by Nabhya and passed to the organisation. You
+					get a receipt either way.
+				</Caption>
+			</View>
+		</Surface>
+	) : null;
 
 	return (
 		<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
 			<View
 				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					justifyContent: "space-between",
-					minHeight: 40,
-					paddingHorizontal: gutter,
 					paddingTop: insets.top + spacing[2],
 					paddingBottom: spacing[2],
+					paddingHorizontal: gutter,
 				}}
 			>
-				<BackButton fallbackHref="/ngos" />
-				<Pressable
-					onPress={onBookmark}
-					hitSlop={8}
-					disabled={toggleBookmark.isPending}
-					accessibilityRole="button"
-					accessibilityLabel={
-						bookmarked ? "Remove from saved" : "Save this NGO"
-					}
-					accessibilityState={{
-						selected: bookmarked,
-						disabled: toggleBookmark.isPending,
-					}}
-					{...focusable}
-					style={({ pressed }) => ({
-						width: 40,
-						height: 40,
-						borderRadius: 999,
-						alignItems: "center",
-						justifyContent: "center",
-						backgroundColor: pressed
-							? colors.background.tertiary
-							: colors.background.subtle,
-					})}
+				<View
+					style={[
+						PAGE,
+						{
+							flexDirection: "row",
+							alignItems: "center",
+							justifyContent: "space-between",
+							minHeight: 40,
+						},
+					]}
 				>
-					<Bookmark
-						size={20}
-						color={colors.text.primary as string}
-						fill={bookmarked ? (colors.text.primary as string) : "transparent"}
-					/>
-				</Pressable>
+					<BackButton fallbackHref="/ngos" />
+					{isDesktop ? null : saveControl}
+				</View>
 			</View>
 
 			{org.isLoading ? (
 				<LoadingState />
-			) : org.isError || !org.data ? (
+			) : org.isError || !data ? (
 				<ErrorState
 					message={apiErrorMessage(org.error, "This NGO is not available.")}
 					onRetry={() => org.refetch()}
@@ -174,99 +334,88 @@ export default function NgoProfilePage() {
 			) : (
 				<>
 					<ScrollView
-						showsVerticalScrollIndicator={false}
+						{...verticalScrollbar}
 						contentContainerStyle={{
 							paddingHorizontal: gutter,
-							paddingTop: spacing[2],
 							paddingBottom: spacing[8],
-							...desktopWidth,
 						}}
 					>
-						<H2 accessibilityRole="header" style={{ marginBottom: spacing[2] }}>
-							{org.data.organizationName}
-						</H2>
-						<View
-							style={{
-								flexDirection: "row",
-								flexWrap: "wrap",
-								gap: spacing[2],
-								marginBottom: spacing[2],
-							}}
-						>
-							<StatusPill
-								label={humanizeStatus(org.data.verificationStatus)}
-								tone={verificationTone(org.data.verificationStatus)}
-							/>
-							{org.data.categories?.map((category) => (
-								<StatusPill key={category.id} label={category.name} />
-							))}
+						<View style={PAGE}>
+							{hero}
+
+							{isDesktop ? (
+								<View
+									style={{
+										flexDirection: "row",
+										gap: spacing[6],
+										marginTop: spacing[6],
+									}}
+								>
+									<View
+										style={{
+											flex: MAIN_COLUMN,
+											minWidth: 0,
+											gap: spacing[6],
+										}}
+									>
+										{metrics}
+										<View>
+											{tabs}
+											{panel}
+										</View>
+									</View>
+									<View
+										style={{
+											flex: ASIDE_COLUMN,
+											minWidth: 0,
+											gap: spacing[6],
+										}}
+									>
+										{actionCard}
+										<View>
+											<SectionTitle>Details</SectionTitle>
+											<OrgFacts organization={data} />
+										</View>
+									</View>
+								</View>
+							) : (
+								<View style={{ marginTop: spacing[5], gap: spacing[5] }}>
+									{metrics}
+									<View>
+										{tabs}
+										{panel}
+									</View>
+								</View>
+							)}
 						</View>
-						<Caption color="tertiary" style={{ marginBottom: spacing[5] }}>
-							{[org.data.city, org.data.state].filter(Boolean).join(", ") ||
-								"Location not set"}
-							{org.data.foundingYear ? ` · Since ${org.data.foundingYear}` : ""}
-						</Caption>
-
-						{/* Impact is the headline: what this NGO has actually done. */}
-						{impact.data && (
-							<View style={{ marginBottom: spacing[5] }}>
-								<MetricRow
-									stats={[
-										{
-											label: "Volunteers",
-											value: impact.data.volunteersEngaged,
-										},
-										{ label: "Hours given", value: impact.data.volunteerHours },
-										{ label: "Events", value: impact.data.eventsHosted },
-									]}
-								/>
-							</View>
-						)}
-
-						<FilterChips options={TABS} value={tab} onChange={setTab} />
-
-						{tab === "about" && <AboutTab organization={org.data} />}
-						{tab === "updates" && <UpdatesTab organizationId={id} />}
-						{tab === "reviews" && (
-							<ReviewsTab
-								organizationId={id}
-								onWrite={() => requireSignIn(() => setReviewOpen(true))}
-							/>
-						)}
-						{tab === "transparency" && <TransparencyTab organizationId={id} />}
 					</ScrollView>
 
-					<View
-						style={{
-							paddingHorizontal: gutter,
-							paddingTop: spacing[3],
-							paddingBottom: insets.bottom + spacing[3],
-							borderTopWidth: 1,
-							borderTopColor: colors.border.hairline,
-							backgroundColor: colors.background.card,
-						}}
-					>
-						<View style={desktopWidth}>
-							<Button
-								onPress={() => requireSignIn(() => setDonateOpen(true))}
-								accessibilityLabel={`Donate to ${org.data.organizationName}`}
-							>
-								{email ? "Donate" : "Sign in to donate"}
-							</Button>
+					{isDesktop ? null : (
+						<View
+							style={{
+								paddingHorizontal: gutter,
+								paddingTop: spacing[3],
+								paddingBottom: insets.bottom + spacing[3],
+								borderTopWidth: 1,
+								borderTopColor: colors.border.hairline,
+								backgroundColor: colors.background.card,
+							}}
+						>
+							{donateButton}
 						</View>
-					</View>
+					)}
 				</>
 			)}
 
 			<ReviewSheet
 				organizationId={id}
-				organizationName={org.data?.organizationName ?? ""}
+				organizationName={data?.organizationName ?? ""}
 				visible={reviewOpen}
 				onClose={() => setReviewOpen(false)}
 			/>
 			<DonateSheet
 				organizationId={id}
-				organizationName={org.data?.organizationName ?? ""}
+				organizationName={data?.organizationName ?? ""}
 				visible={donateOpen}
 				onClose={() => setDonateOpen(false)}
 			/>
@@ -275,61 +424,99 @@ export default function NgoProfilePage() {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Facts                                                                      */
+/* -------------------------------------------------------------------------- */
+
+type Organization = NonNullable<ReturnType<typeof useOrganization>["data"]>;
+
+/**
+ * The registry record. On desktop it lives in the aside; on a phone there is no
+ * aside, so `AboutTab` renders it under the prose — one component either way so
+ * the two placements cannot say different things.
+ */
+function OrgFacts({ organization }: { organization: Organization }) {
+	const facts: Fact[] = [
+		{ label: "Type", value: humanizeStatus(organization.orgType) },
+		{ label: "Registration number", value: organization.registrationNumber },
+		{
+			label: "Founded",
+			value: organization.foundingYear
+				? String(organization.foundingYear)
+				: null,
+		},
+		{
+			label: "Team size",
+			value: organization.teamSize ? `${organization.teamSize} people` : null,
+		},
+		{ label: "Website", value: organization.website },
+		{
+			label: "Address",
+			value: [
+				organization.address,
+				[organization.city, organization.state].filter(Boolean).join(", "),
+				organization.pincode,
+			]
+				.filter(Boolean)
+				.join("\n"),
+		},
+	];
+
+	return <FactList facts={facts} />;
+}
+
+/* -------------------------------------------------------------------------- */
 /* About                                                                      */
 /* -------------------------------------------------------------------------- */
 
 function AboutTab({
 	organization,
+	withFacts,
 }: {
-	organization: NonNullable<ReturnType<typeof useOrganization>["data"]>;
+	organization: Organization;
+	/** Only on a phone — desktop draws the facts in the aside instead. */
+	withFacts?: boolean;
 }) {
 	const { spacing } = useTheme();
-	const facts = [
-		{ label: "Type", value: humanizeStatus(organization.orgType) },
-		{ label: "Registration", value: organization.registrationNumber },
-		{
-			label: "Team size",
-			value: organization.teamSize ? String(organization.teamSize) : null,
-		},
-		{ label: "Website", value: organization.website },
-		{ label: "Address", value: organization.address },
-	].filter((fact) => fact.value);
+
+	const hasProse =
+		organization.description || organization.mission || organization.vision;
 
 	return (
-		<View>
-			{organization.description && (
-				<Body color="secondary" style={{ marginBottom: spacing[5] }}>
-					{organization.description}
-				</Body>
+		<View style={{ gap: spacing[5] }}>
+			{hasProse ? (
+				<Surface>
+					<View style={{ gap: spacing[4] }}>
+						{organization.description ? (
+							<Body>{organization.description}</Body>
+						) : null}
+						{organization.mission ? (
+							<View style={{ gap: spacing[1] }}>
+								<Label color="tertiary">Mission</Label>
+								<Body color="secondary">{organization.mission}</Body>
+							</View>
+						) : null}
+						{organization.vision ? (
+							<View style={{ gap: spacing[1] }}>
+								<Label color="tertiary">Vision</Label>
+								<Body color="secondary">{organization.vision}</Body>
+							</View>
+						) : null}
+					</View>
+				</Surface>
+			) : (
+				<EmptyState
+					icon={Newspaper}
+					title="Nothing written yet"
+					description="This NGO has not added a description of its work."
+				/>
 			)}
-			{organization.mission && (
-				<View style={{ marginBottom: spacing[5] }}>
-					<SectionTitle>Mission</SectionTitle>
-					<Body color="secondary">{organization.mission}</Body>
-				</View>
-			)}
-			{facts.length > 0 && (
-				<>
+
+			{withFacts ? (
+				<View>
 					<SectionTitle>Details</SectionTitle>
-					<ListGroup>
-						{facts.map((fact) => (
-							<ListRow
-								key={fact.label}
-								label={fact.label}
-								value={
-									<Caption
-										color="secondary"
-										numberOfLines={2}
-										style={{ maxWidth: "60%", textAlign: "right" }}
-									>
-										{fact.value}
-									</Caption>
-								}
-							/>
-						))}
-					</ListGroup>
-				</>
-			)}
+					<OrgFacts organization={organization} />
+				</View>
+			) : null}
 		</View>
 	);
 }
@@ -432,23 +619,19 @@ function ReviewsTab({
 	const myUserId = me.data?.id;
 	const hasMine = !!myUserId && items.some((r) => r.user.id === myUserId);
 
-	const confirmDelete = () => {
-		Alert.alert(
-			"Delete your review?",
-			"It will be removed for everyone. You can write a new one later.",
-			[
-				{ text: "Keep it", style: "cancel" },
-				{
-					text: "Delete",
-					style: "destructive",
-					onPress: () =>
-						remove.mutate(undefined, {
-							onError: (error) =>
-								Alert.alert("Could not delete", apiErrorMessage(error)),
-						}),
-				},
-			],
-		);
+	const confirmDelete = async () => {
+		const ok = await confirm({
+			title: "Delete your review?",
+			message:
+				"It will be removed for everyone. You can write a new one later.",
+			confirmLabel: "Delete",
+			cancelLabel: "Keep it",
+		});
+		if (!ok) return;
+		remove.mutate(undefined, {
+			onSuccess: () => toast.success("Review deleted."),
+			onError: (error) => toast.error(apiErrorMessage(error)),
+		});
 	};
 
 	if (query.isLoading) return <LoadingState />;
@@ -653,7 +836,7 @@ function TransparencyTab({ organizationId }: { organizationId: string }) {
 
 	const open = (key: string) =>
 		openDocument.mutate(key, {
-			onError: (error) => Alert.alert("Could not open", apiErrorMessage(error)),
+			onError: (error) => toast.error(apiErrorMessage(error)),
 		});
 
 	return (

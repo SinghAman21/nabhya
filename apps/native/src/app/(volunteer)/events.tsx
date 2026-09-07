@@ -99,11 +99,16 @@ function ApplicationCard({
 }) {
 	const { colors, spacing } = useTheme();
 
+	// Amber for "still waiting", green for "you're in". Both used to be amber,
+	// which made an acceptance read as a problem.
 	const next =
 		application.status === "PENDING"
-			? "Waiting for the NGO to review"
+			? { text: "Waiting for the NGO to review", ink: colors.warning.ink }
 			: application.status === "ACCEPTED"
-				? "You're in — turn up and get marked present"
+				? {
+						text: "You're in — turn up and get marked present",
+						ink: colors.success.ink,
+					}
 				: null;
 
 	return (
@@ -133,8 +138,8 @@ function ApplicationCard({
 			</Caption>
 
 			{next && (
-				<Caption color={colors.warning.ink} style={{ marginTop: spacing[2] }}>
-					{next}
+				<Caption color={next.ink} style={{ marginTop: spacing[2] }}>
+					{next.text}
 				</Caption>
 			)}
 

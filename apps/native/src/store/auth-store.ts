@@ -4,36 +4,6 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { storage } from "@/lib/storage";
 import type { OnboardingStatus, User } from "@/lib/types";
 
-export interface OrgProfile {
-	orgName: string;
-	phone: string;
-	orgType: string;
-	registrationNumber: string;
-	address: string;
-	city: string;
-	state: string;
-	pincode: string;
-	teamSize: number;
-	foundingYear: number;
-	description: string;
-	website: string;
-}
-
-const emptyProfile: OrgProfile = {
-	orgName: "",
-	phone: "",
-	orgType: "",
-	registrationNumber: "",
-	address: "",
-	city: "",
-	state: "",
-	pincode: "",
-	teamSize: 0,
-	foundingYear: 0,
-	description: "",
-	website: "",
-};
-
 /**
  * Canonical vocabulary — `organisation`, not `ngo`. The Expo route group is
  * still called `(ngo)` for readability, but the role value matches the server
@@ -45,14 +15,11 @@ export interface AuthState {
 	user: User | null;
 	email: string | null;
 	role: UserRole | null;
-	/** Draft state for the multi-step NGO onboarding wizard. */
-	orgProfile: OrgProfile;
 	isOnboarded: boolean;
 	isVerified: boolean;
 	isHydrated: boolean;
 	setUser: (user: User) => void;
 	setRole: (role: UserRole) => void;
-	mergeProfile: (fields: Partial<OrgProfile>) => void;
 	setAuth: (email: string) => void;
 	setOnboarded: () => void;
 	setVerified: () => void;
@@ -68,16 +35,11 @@ export const useAuthStore = create<AuthState>()(
 			user: null,
 			email: null,
 			role: null,
-			orgProfile: { ...emptyProfile },
 			isOnboarded: false,
 			isVerified: false,
 			isHydrated: false,
 			setUser: (user) => set({ user, email: user.email }),
 			setRole: (role) => set({ role }),
-			mergeProfile: (fields) =>
-				set((state) => ({
-					orgProfile: { ...state.orgProfile, ...fields },
-				})),
 			setAuth: (email) => set({ email }),
 			setOnboarded: () => set({ isOnboarded: true }),
 			setVerified: () => set({ isVerified: true }),
@@ -95,7 +57,6 @@ export const useAuthStore = create<AuthState>()(
 					user: null,
 					email: null,
 					role: null,
-					orgProfile: { ...emptyProfile },
 					isOnboarded: false,
 					isVerified: false,
 				});
@@ -120,7 +81,6 @@ export const useAuthStore = create<AuthState>()(
 				user: state.user,
 				email: state.email,
 				role: state.role,
-				orgProfile: state.orgProfile,
 				isOnboarded: state.isOnboarded,
 				isVerified: state.isVerified,
 			}),

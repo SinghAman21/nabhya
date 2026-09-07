@@ -1,6 +1,10 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { StubStorageProvider } from "../src/common/storage";
+import {
+	NGO_VERIFICATION_BUCKET,
+	parseStorageKey,
+	StubStorageProvider,
+} from "../src/common/storage";
 import { UploadsService } from "../src/modules/uploads/uploads.service";
 import {
 	authUserFor,
@@ -50,8 +54,19 @@ describe("UploadsService", () => {
 				size: 1000,
 			});
 
-			// The client never proposes a key; it is derived from the token.
-			expect(ticket.key.startsWith(`user-documents/${user.id}/`)).toBe(true);
+			// The client never proposes a key; it is derived from the token. The
+			// document prefixes carry a readable folder between the prefix and
+			// the owner id — `<bucket>/user-documents/<label>-<date>/<userId>/…`
+			// — so the owner segment is asserted through `parseStorageKey`,
+			// which is the function authorisation actually uses, rather than by
+			// re-deriving the layout here and drifting from it.
+			expect(
+				ticket.key.startsWith(`${NGO_VERIFICATION_BUCKET}/user-documents/`),
+			).toBe(true);
+			expect(parseStorageKey(ticket.key)).toEqual({
+				purpose: "USER_DOCUMENT",
+				ownerId: user.id,
+			});
 		});
 
 		it("scopes an org document to the caller's organization", async () => {
@@ -66,7 +81,13 @@ describe("UploadsService", () => {
 				size: 1000,
 			});
 
-			expect(ticket.key.startsWith(`org-documents/${org.id}/`)).toBe(true);
+			expect(
+				ticket.key.startsWith(`${NGO_VERIFICATION_BUCKET}/org-documents/`),
+			).toBe(true);
+			expect(parseStorageKey(ticket.key)).toEqual({
+				purpose: "ORG_DOCUMENT",
+				ownerId: org.id,
+			});
 		});
 
 		it("refuses org-scoped uploads from someone with no organization", async () => {
@@ -178,8 +199,12 @@ describe("UploadsService", () => {
 			const victim = await createUser(db, { role: "volunteer" });
 			const attacker = await createUser(db, { role: "volunteer" });
 
-			// Hand-built key aimed at the victim's folder.
-			const forged = `user-documents/${victim.id}/anything.pdf`;
+			// A *well-formed* key aimed at the victim's folder: the point of this
+			// test is the ownership check, so the key has to survive parsing.
+			// Built without the bucket prefix it was merely malformed, which is
+			// a different refusal — covered by the test above — and told us
+			// nothing about whether ownership is enforced.
+			const forged = `${NGO_VERIFICATION_BUCKET}/user-documents/someone-070926/${victim.id}/anything.pdf`;
 
 			await expect(
 				service.createDownloadUrl(authUserFor(attacker, ["volunteer"]), forged),
@@ -190,7 +215,9 @@ describe("UploadsService", () => {
 	describe("confirming uploads", () => {
 		it("rejects a key that was never uploaded", async () => {
 			await expect(
-				service.assertUploaded("user-documents/someone/never-uploaded.pdf"),
+				service.assertUploaded(
+					`${NGO_VERIFICATION_BUCKET}/user-documents/someone-070926/nobody/never-uploaded.pdf`,
+				),
 			).rejects.toBeInstanceOf(BadRequestException);
 		});
 

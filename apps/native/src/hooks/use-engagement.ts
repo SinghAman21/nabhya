@@ -5,7 +5,6 @@ import type {
 	NotificationQuery,
 	PaginationQuery,
 	ReplyToReviewInput,
-	ReviewQuery,
 	UpsertReviewInput,
 } from "@nabhya/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -106,17 +105,6 @@ export function useToggleFollow() {
 
 // ─── Reviews ─────────────────────────────────────────────────────────────────
 
-export function useReviews(
-	organizationId: string | undefined,
-	query: Partial<ReviewQuery> = {},
-) {
-	return useQuery({
-		queryKey: queryKeys.reviews(organizationId ?? "", query),
-		queryFn: () => engagementApi.listReviews(organizationId as string, query),
-		enabled: !!organizationId,
-	});
-}
-
 export function useUpsertReview(organizationId: string) {
 	const queryClient = useQueryClient();
 	return useMutation({
@@ -135,13 +123,6 @@ export function useDeleteMyReview(organizationId: string) {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.reviews });
 		},
-	});
-}
-
-export function useMyOrgReviews(query: Partial<ReviewQuery> = {}) {
-	return useQuery({
-		queryKey: queryKeys.orgReviews(query),
-		queryFn: () => engagementApi.listMyOrgReviews(query),
 	});
 }
 
@@ -263,12 +244,5 @@ export function useDonationReceipt(id: string | undefined) {
 		queryKey: queryKeys.donationReceipt(id ?? ""),
 		queryFn: () => donationsApi.receipt(id as string),
 		enabled: !!id,
-	});
-}
-
-export function useOrgDonations(query: Partial<DonationQuery> = {}) {
-	return useQuery({
-		queryKey: queryKeys.orgDonations(query),
-		queryFn: () => donationsApi.listForOrg(query),
 	});
 }

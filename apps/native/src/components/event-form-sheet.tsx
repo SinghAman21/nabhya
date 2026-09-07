@@ -5,6 +5,7 @@ import { DateTimeField } from "@/components/date-time-field";
 import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
 import {
 	useCreateEvent,
@@ -144,13 +145,22 @@ export function EventFormSheet({
 		if (isEditing && event) {
 			updateEvent.mutate(
 				{ id: event.id, input: parsed.data as CreateEventInput },
-				{ onSuccess: close, onError },
+				{
+					onSuccess: () => {
+						toast.success("Event updated.");
+						close();
+					},
+					onError,
+				},
 			);
 			return;
 		}
 
 		createEvent.mutate(parsed.data as CreateEventInput, {
-			onSuccess: close,
+			onSuccess: () => {
+				toast.success("Event published. Volunteers can apply now.");
+				close();
+			},
 			onError,
 		});
 	};

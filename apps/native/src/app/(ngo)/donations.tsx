@@ -1,5 +1,6 @@
 import { formatMinor } from "@nabhya/shared";
 import { useInfiniteQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import { HandCoins } from "lucide-react-native";
 import { FlatList, RefreshControl, View } from "react-native";
 import { InitialAvatar } from "@/components/initial-avatar";
@@ -15,11 +16,13 @@ import {
 	Surface,
 } from "@/components/screen-shell";
 import { StatusPill } from "@/components/status-pill";
+import { Button } from "@/components/ui/button";
 import { Body, BodySmall, Caption } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { useGridColumns } from "@/hooks/useMedia";
 import { apiErrorMessage, donationsApi, queryKeys } from "@/lib/api";
 import { formatDate, formatRelative } from "@/lib/format";
+import { verticalScrollbar } from "@/lib/scroll";
 import type { OrgDonation } from "@/lib/types";
 
 const PAGE_SIZE = 20;
@@ -43,6 +46,7 @@ function useOrgDonationPages() {
  */
 export default function OrgDonations() {
 	const { colors, spacing } = useTheme();
+	const router = useRouter();
 	const query = useOrgDonationPages();
 
 	const stats = query.data?.pages[0]?.stats;
@@ -94,7 +98,7 @@ export default function OrgDonations() {
 					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
 					data={items}
 					keyExtractor={(item) => item.id}
-					showsVerticalScrollIndicator={false}
+					{...verticalScrollbar}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
 					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
 					onEndReached={loadMore}
@@ -111,7 +115,18 @@ export default function OrgDonations() {
 						<EmptyState
 							icon={HandCoins}
 							title="No donations yet"
-							description="When a volunteer donates from your public profile, it appears here with the amount, the donor's name (unless they chose to stay anonymous) and any message they left."
+							description="Donations come from your public profile, with the amount, the donor's name (unless they chose to stay anonymous) and any message they left. A profile with a logo, a description and a published report gets far more of them."
+							// An empty state with nothing to do is a dead end. The
+							// profile is the page donors actually give from, so it is
+							// the one useful thing to offer here.
+							action={
+								<Button
+									variant="outline"
+									onPress={() => router.push("/(ngo)/profile")}
+								>
+									Check your profile
+								</Button>
+							}
 						/>
 					}
 					ListFooterComponent={

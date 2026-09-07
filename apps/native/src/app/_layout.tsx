@@ -7,6 +7,7 @@ import { SplashScreen, Stack } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { OverlayHost } from "@/components/ui/overlay";
 import { ThemeProvider } from "@/hooks/use-app-theme";
 import { queryClient } from "@/lib/api";
 import { HEADERLESS } from "@/lib/navigation";
@@ -72,6 +73,10 @@ export default function RootLayout() {
 							<Stack.Screen name="feed" />
 						</Stack>
 						<PortalHost />
+						{/* Toasts and confirmations. Every open sheet mounts its own
+						    host, which takes over while it is up — see the host-stack
+						    note in `ui/overlay.tsx`. */}
+						<OverlayHost />
 					</View>
 				</GestureHandlerRootView>
 			</ThemeProvider>

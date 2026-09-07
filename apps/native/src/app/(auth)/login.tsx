@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { AuthError, authErrorCopy } from "@/components/auth-error";
 import { AuthSplitLayout } from "@/components/auth-split-layout";
 import { GoogleSignInButton } from "@/components/google-signin-button";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,6 @@ import { FormField } from "@/components/ui/form";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
-import { Alert } from "@/lib/alert";
 import { authService } from "@/lib/api/auth";
 import { apiErrorMessage } from "@/lib/api/http";
 import { focusable } from "@/lib/focus";
@@ -23,6 +23,10 @@ export default function Login() {
 	const queryClient = useQueryClient();
 	const router = useRouter();
 	const [loading, setLoading] = useState(false);
+	const [failure, setFailure] = useState<{
+		message: string;
+		hint?: "sign-up" | "sign-in";
+	} | null>(null);
 	const form = useForm<SignInInput>({
 		// biome-ignore lint/suspicious/noExplicitAny: @hookform/resolvers v5 Zod v4 incompatibility
 		resolver: zodResolver(signInSchema as any),
@@ -31,6 +35,7 @@ export default function Login() {
 
 	const onSubmit = form.handleSubmit(async (data) => {
 		setLoading(true);
+		setFailure(null);
 		try {
 			const result = await authService.login({
 				email: data.email,
@@ -42,14 +47,17 @@ export default function Login() {
 			}
 			router.replace("/");
 		} catch (error) {
-			// The real reason matters here — "email not confirmed", a 401 from the
-			// API, or a network failure each need a different response from the
-			// user, and a fixed string told them none of it.
-			Alert.alert(
-				"Couldn't sign you in",
-				apiErrorMessage(
-					error,
-					"Check your email and password, then try again.",
+			// Inline, above the button, rather than in an OS dialog you have to
+			// dismiss before you can see the field you got wrong. The real reason
+			// matters here — a wrong password, an unconfirmed email and a dead
+			// network each need a different response from the user.
+			setFailure(
+				authErrorCopy(
+					apiErrorMessage(
+						error,
+						"Check your email and password, then try again.",
+					),
+					"sign-in",
 				),
 			);
 		} finally {
@@ -102,7 +110,7 @@ export default function Login() {
 				name="password"
 				label="Password"
 				placeholder="Your password"
-				secureTextEntry
+				revealable
 				autoComplete="current-password"
 				textContentType="password"
 				returnKeyType="go"
@@ -110,16 +118,28 @@ export default function Login() {
 				accessibilityLabel="Password"
 			/>
 
+			<AuthError
+				message={failure?.message ?? null}
+				{...(failure?.hint === "sign-up"
+					? {
+							action: {
+								label: "Create an account →",
+								onPress: () => router.push("/(auth)/signup"),
+							},
+						}
+					: {})}
+			/>
+
 			<Button
 				onPress={onSubmit}
 				loading={loading}
 				size="lg"
-				style={{ marginTop: spacing[6] }}
+				style={{ marginTop: failure ? spacing[4] : spacing[6] }}
 			>
 				Sign in
 			</Button>
 
-			<GoogleSignInButton />
+			<GoogleSignInButton onError={(message) => setFailure({ message })} />
 		</AuthSplitLayout>
 	);
 }

@@ -7,10 +7,12 @@ import {
 	useWindowDimensions,
 	View,
 } from "react-native";
+import { OverlayHost } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
 import { Sheet, SheetHeader } from "@/components/ui/sheet";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
+import { verticalScrollbar } from "@/lib/scroll";
 
 /**
  * The slide-over panel.
@@ -31,12 +33,18 @@ export interface DrawerProps {
 	children: React.ReactNode;
 	/** Pinned below the body: the primary action lives here, never in the scroll. */
 	footer?: React.ReactNode;
+	/**
+	 * Widens the desktop panel from 440 to 520, and the narrow-web dialog with
+	 * it. For a body that is not a column of short fields — a writing canvas, a
+	 * strip of media tiles — where 440 crams the measure.
+	 */
+	wide?: boolean;
 }
 
 export function Drawer(props: DrawerProps) {
 	const { isDesktop } = useMedia();
 	if (!isDesktop) {
-		const { visible, onClose, title, subtitle, children, footer } = props;
+		const { visible, onClose, title, subtitle, children, footer, wide } = props;
 		return (
 			<Sheet
 				visible={visible}
@@ -44,6 +52,7 @@ export function Drawer(props: DrawerProps) {
 				title={title}
 				subtitle={subtitle}
 				footer={footer}
+				wide={wide}
 			>
 				{children}
 			</Sheet>
@@ -57,6 +66,7 @@ export function Drawer(props: DrawerProps) {
 /* -------------------------------------------------------------------------- */
 
 const PANEL_WIDTH = 440;
+const WIDE_PANEL_WIDTH = 520;
 
 function DesktopDrawer({
 	visible,
@@ -65,12 +75,16 @@ function DesktopDrawer({
 	subtitle,
 	children,
 	footer,
+	wide,
 }: DrawerProps) {
 	const { colors, spacing, elevation, isDark } = useTheme();
 	const { width, height } = useWindowDimensions();
 	const [scrolled, setScrolled] = useState(false);
 
-	const panelWidth = Math.min(PANEL_WIDTH, Math.max(320, width - 64));
+	const panelWidth = Math.min(
+		wide ? WIDE_PANEL_WIDTH : PANEL_WIDTH,
+		Math.max(320, width - 64),
+	);
 	const slide = useRef(new Animated.Value(panelWidth)).current;
 	const [mounted, setMounted] = useState(visible);
 	const mountedRef = useRef(visible);
@@ -184,7 +198,7 @@ function DesktopDrawer({
 					/>
 					<ScrollView
 						keyboardShouldPersistTaps="handled"
-						showsVerticalScrollIndicator={false}
+						{...verticalScrollbar}
 						onScroll={(e) => setScrolled(e.nativeEvent.contentOffset.y > 4)}
 						scrollEventThrottle={32}
 						contentContainerStyle={{
@@ -210,6 +224,8 @@ function DesktopDrawer({
 					)}
 				</Animated.View>
 			</View>
+			{/* Same reason as the sheet's: the root host is below this Modal. */}
+			<OverlayHost />
 		</Modal>
 	);
 }

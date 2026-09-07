@@ -1,8 +1,9 @@
 import { Stack } from "expo-router";
+import { withAppShell } from "@/components/app-shell";
 import { HEADERLESS } from "@/lib/navigation";
 
 /** Public NGO directory and profiles — browsable without an account. */
-export default function NgosLayout() {
+function NgosLayout() {
 	return (
 		<Stack screenOptions={HEADERLESS}>
 			<Stack.Screen name="index" />
@@ -10,3 +11,5 @@ export default function NgosLayout() {
 		</Stack>
 	);
 }
+
+export default withAppShell(NgosLayout);

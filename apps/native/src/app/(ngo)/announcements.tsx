@@ -22,6 +22,7 @@ import { StatusPill } from "@/components/status-pill";
 import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { confirm, toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption } from "@/components/ui/typography";
@@ -32,10 +33,10 @@ import {
 } from "@/hooks/use-directory";
 import { useTheme } from "@/hooks/use-theme";
 import { useGridColumns } from "@/hooks/useMedia";
-import { Alert } from "@/lib/alert";
 import { apiErrorMessage, publishingApi, queryKeys } from "@/lib/api";
 import { focusable } from "@/lib/focus";
 import { formatRelative } from "@/lib/format";
+import { verticalScrollbar } from "@/lib/scroll";
 import type { Announcement } from "@/lib/types";
 
 type StatusFilter = "ALL" | "PUBLISHED" | "DRAFT";
@@ -86,19 +87,17 @@ export default function OrgAnnouncements() {
 		if (query.hasNextPage && !query.isFetchingNextPage) query.fetchNextPage();
 	};
 
-	const confirmDelete = (announcement: Announcement) => {
-		Alert.alert("Delete update", `"${announcement.title}" will be removed.`, [
-			{ text: "Cancel", style: "cancel" },
-			{
-				text: "Delete",
-				style: "destructive",
-				onPress: () =>
-					remove.mutate(announcement.id, {
-						onError: (error) =>
-							Alert.alert("Could not delete", apiErrorMessage(error)),
-					}),
-			},
-		]);
+	const confirmDelete = async (announcement: Announcement) => {
+		const ok = await confirm({
+			title: "Delete this update?",
+			message: `"${announcement.title}" will be removed from your public profile and from every feed it reached.`,
+			confirmLabel: "Delete",
+		});
+		if (!ok) return;
+		remove.mutate(announcement.id, {
+			onSuccess: () => toast.success("Update deleted."),
+			onError: (error) => toast.error(apiErrorMessage(error)),
+		});
 	};
 
 	const openCreate = () => setComposing(true);
@@ -132,7 +131,7 @@ export default function OrgAnnouncements() {
 					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
 					data={items}
 					keyExtractor={(item) => item.id}
-					showsVerticalScrollIndicator={false}
+					{...verticalScrollbar}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
 					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
 					onEndReached={loadMore}
@@ -327,7 +326,16 @@ function AnnouncementSheet({
 		setErrors({});
 		const payload = parsed.data as UpsertAnnouncementInput;
 		const options = {
-			onSuccess: onClose,
+			onSuccess: () => {
+				toast.success(
+					payload.status === "PUBLISHED"
+						? isEditing
+							? "Update saved and published."
+							: "Update published. People who follow you have been notified."
+						: "Draft saved.",
+				);
+				onClose();
+			},
 			onError: (e: unknown) => setErrors({ form: apiErrorMessage(e) }),
 		};
 

@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { withAppShell } from "@/components/app-shell";
 import {
 	Banner,
 	ErrorState,
@@ -14,13 +15,14 @@ import { Caption, Label } from "@/components/ui/typography";
 import { useMe, useUpdateProfile } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
+import { verticalScrollbar } from "@/lib/scroll";
 
 /**
  * The volunteer's own details. Saves straight back to the profile and returns;
  * a success alert on top of a screen that has already changed is one tap too
  * many, so there isn't one.
  */
-export default function EditProfile() {
+function EditProfile() {
 	const { spacing } = useTheme();
 	const router = useRouter();
 
@@ -81,7 +83,7 @@ export default function EditProfile() {
 					behavior={Platform.OS === "ios" ? "padding" : undefined}
 				>
 					<ScrollView
-						showsVerticalScrollIndicator={false}
+						{...verticalScrollbar}
 						contentContainerStyle={{ paddingBottom: spacing[12] }}
 						keyboardShouldPersistTaps="handled"
 						automaticallyAdjustKeyboardInsets
@@ -186,3 +188,5 @@ function Field({
 		</View>
 	);
 }
+
+export default withAppShell(EditProfile);

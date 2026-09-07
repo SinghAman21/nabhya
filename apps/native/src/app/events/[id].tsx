@@ -25,6 +25,7 @@ import {
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { confirm, toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption, H2, Label } from "@/components/ui/typography";
 import {
@@ -35,9 +36,9 @@ import {
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
-import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDateRange, formatDateTime } from "@/lib/format";
+import { verticalScrollbar } from "@/lib/scroll";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
@@ -81,8 +82,7 @@ export default function EventDetail() {
 			return;
 		}
 		if (!isVolunteer) {
-			Alert.alert(
-				"Volunteer account needed",
+			toast.info(
 				"Applications come from volunteer accounts. Organisation accounts manage their own events instead.",
 			);
 			return;
@@ -98,29 +98,24 @@ export default function EventDetail() {
 					setMessage("");
 					setApplyOpen(false);
 				},
-				onError: (error) =>
-					Alert.alert("Could not apply", apiErrorMessage(error)),
+				onError: (error) => toast.error(apiErrorMessage(error)),
 			},
 		);
 	};
 
-	const onWithdraw = () => {
-		Alert.alert(
-			"Withdraw your application?",
-			"Your place goes back to the pool. You can apply again while applications are open.",
-			[
-				{ text: "Keep it", style: "cancel" },
-				{
-					text: "Withdraw",
-					style: "destructive",
-					onPress: () =>
-						withdraw.mutate(undefined, {
-							onError: (error) =>
-								Alert.alert("Could not withdraw", apiErrorMessage(error)),
-						}),
-				},
-			],
-		);
+	const onWithdraw = async () => {
+		const ok = await confirm({
+			title: "Withdraw your application?",
+			message:
+				"Your place goes back to the pool. You can apply again while applications are open.",
+			confirmLabel: "Withdraw",
+			cancelLabel: "Keep it",
+		});
+		if (!ok) return;
+		withdraw.mutate(undefined, {
+			onSuccess: () => toast.success("Application withdrawn."),
+			onError: (error) => toast.error(apiErrorMessage(error)),
+		});
 	};
 
 	const gutter = spacing[5];
@@ -224,7 +219,7 @@ export default function EventDetail() {
 			) : (
 				<>
 					<ScrollView
-						showsVerticalScrollIndicator={false}
+						{...verticalScrollbar}
 						contentContainerStyle={{
 							paddingHorizontal: gutter,
 							paddingTop: spacing[2],

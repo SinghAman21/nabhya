@@ -9,6 +9,7 @@ import {
 	Heart,
 	MapPin,
 	MessageCircle,
+	MoreHorizontal,
 	Pin,
 	Share2,
 	Users,
@@ -30,8 +31,9 @@ import {
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H5, Label } from "@/components/ui/typography";
 import { useRecordFeedInteraction } from "@/hooks/use-feed";
+import { useStoredImageUrl } from "@/hooks/use-stored-image";
 import { useTheme } from "@/hooks/use-theme";
-import { formatDateRange, formatProgress, formatRelative } from "@/lib/format";
+import { formatDateRange, formatRelative } from "@/lib/format";
 import { splitPostText } from "@/lib/post-text";
 import type {
 	FeedEventItem,
@@ -69,6 +71,13 @@ export interface FeedCardActions {
 	onToggleFollow: (organizationId: string, following: boolean) => void;
 	onToggleLike?: (item: FeedItem, liked: boolean) => void;
 	onToggleSave?: (item: FeedItem, saved: boolean) => void;
+	/**
+	 * Supplied only where the viewer authored the row — the NGO feed passes it
+	 * for that org's own posts. Present means an overflow control is drawn in
+	 * the header; absent means the card has no owner affordances at all, which
+	 * is every volunteer's view of it.
+	 */
+	onDelete?: (item: FeedItem) => void;
 }
 
 export function FeedCard({
@@ -77,6 +86,7 @@ export function FeedCard({
 	onToggleFollow,
 	onToggleLike,
 	onToggleSave,
+	onDelete,
 }: { item: FeedItem } & FeedCardActions) {
 	const { colors, spacing, borderRadius } = useTheme();
 	const router = useRouter();
@@ -228,6 +238,7 @@ export function FeedCard({
 							? () => onToggleFollow(org.id, false)
 							: undefined
 					}
+					{...(onDelete ? { onDelete: () => onDelete(item) } : {})}
 				/>
 
 				{/* CONTENT */}
@@ -455,21 +466,30 @@ export function KindPill({
 	needType?: "WANT" | "OFFER";
 }) {
 	const { colors, spacing } = useTheme();
+	/*
+	 * Every tone comes from the token scales. These four pills were hardcoded
+	 * light-mode hexes, so on a dark card they drew as bright white-tinted
+	 * blocks — and each `textColor` was a `main`-grade colour on its own tint,
+	 * which is the combination the colour rules single out as unreadable. `bg`
+	 * plus `ink` is the pair that is contrast-checked in both schemes.
+	 */
 	const config = {
 		need: {
 			text: needType === "WANT" ? "Needs items" : "Giving away",
-			bg: needType === "WANT" ? "#FFF1F0" : "#ECFDF5",
-			textColor: needType === "WANT" ? "#CF1322" : "#047857",
+			bg: (needType === "WANT" ? colors.error.bg : colors.success.bg) as string,
+			textColor: (needType === "WANT"
+				? colors.error.ink
+				: colors.success.ink) as string,
 		},
 		event: {
 			text: "Volunteer event",
-			bg: "#EFF6FF",
-			textColor: "#1D4ED8",
+			bg: colors.info.bg as string,
+			textColor: colors.info.ink as string,
 		},
 		story: {
 			text: "Story",
-			bg: "#F5F3FF",
-			textColor: "#6D28D9",
+			bg: colors.accent.bg as string,
+			textColor: colors.accent.ink as string,
 		},
 		post: {
 			text: "Update",
@@ -516,9 +536,11 @@ export function UrgentPill() {
 				paddingHorizontal: spacing[2.5],
 				paddingVertical: spacing[1],
 				borderRadius: 999,
-				backgroundColor: "#FFF1F0",
+				backgroundColor: colors.error.bg as string,
 			}}
 		>
+			{/* The dot is the one place `main` is right: it is a fill. The word
+			    beside it is type, so it takes `ink`. */}
 			<View
 				style={{
 					width: 6,
@@ -529,7 +551,7 @@ export function UrgentPill() {
 			/>
 			<Caption
 				weight="semibold"
-				style={{ color: colors.error.main as string, fontSize: 11 }}
+				style={{ color: colors.error.ink as string, fontSize: 11 }}
 			>
 				Urgent
 			</Caption>
@@ -756,10 +778,13 @@ function PosterHeader({
 	item,
 	onOpen,
 	onToggleFollow,
+	onDelete,
 }: {
 	item: FeedItem;
 	onOpen?: () => void;
 	onToggleFollow?: () => void;
+	/** Owner-only. Confirmation is the caller's job, not the header's. */
+	onDelete?: () => void;
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
 	const org = item.organization;
@@ -767,6 +792,13 @@ function PosterHeader({
 	const place = item.city ?? item.state ?? "India";
 	const initial = name.charAt(0).toUpperCase() || "N";
 	const avatarSize = 40;
+	// `logo` and `profileImage` are private storage **keys**, not URLs — passing
+	// one to `<Image>` renders nothing, which is why every card drew an initial
+	// even for an NGO that had uploaded a logo. Onboarding now collects one, so
+	// this had to start resolving them.
+	const avatarUrl = useStoredImageUrl(
+		org?.logo ?? item.author?.profileImage ?? null,
+	);
 
 	return (
 		<View
@@ -793,11 +825,9 @@ function PosterHeader({
 			>
 				{/* Avatar with optional verified badge */}
 				<View>
-					{org?.logo || item.author?.profileImage ? (
+					{avatarUrl ? (
 						<Image
-							source={{
-								uri: org?.logo ?? item.author?.profileImage ?? "",
-							}}
+							source={{ uri: avatarUrl }}
 							style={{
 								width: avatarSize,
 								height: avatarSize,
@@ -897,6 +927,33 @@ function PosterHeader({
 					</Caption>
 				</Pressable>
 			)}
+
+			{/* Owner controls. Drawn only when the caller supplied a handler, so a
+			    volunteer's feed keeps a header with nothing to press. */}
+			{onDelete && (
+				<Pressable
+					onPress={onDelete}
+					accessibilityRole="button"
+					accessibilityLabel="Post options"
+					hitSlop={8}
+					style={({ pressed }) => ({
+						width: 32,
+						height: 32,
+						borderRadius: 999,
+						alignItems: "center",
+						justifyContent: "center",
+						backgroundColor: pressed
+							? (colors.background.subtle as string)
+							: "transparent",
+					})}
+				>
+					<MoreHorizontal
+						size={18}
+						color={colors.text.tertiary as string}
+						strokeWidth={2}
+					/>
+				</Pressable>
+			)}
 		</View>
 	);
 }
@@ -952,7 +1009,7 @@ function PostBody({
 
 /* ── Need facts ── */
 export function NeedFacts({ item }: { item: FeedNeedItem }) {
-	const { colors, spacing, borderRadius } = useTheme();
+	const { colors, spacing } = useTheme();
 	const [now] = useState(() => Date.now());
 	const { need } = item;
 
@@ -1087,12 +1144,16 @@ function EventFacts({ item }: { item: FeedEventItem }) {
 							width: 32,
 							height: 32,
 							borderRadius: borderRadius.md,
-							backgroundColor: "#EFF6FF",
+							backgroundColor: colors.info.bg as string,
 							alignItems: "center",
 							justifyContent: "center",
 						}}
 					>
-						<CalendarDays size={16} color="#1D4ED8" strokeWidth={2} />
+						<CalendarDays
+							size={16}
+							color={colors.info.ink as string}
+							strokeWidth={2}
+						/>
 					</View>
 					<View style={{ flex: 1 }}>
 						<Caption weight="semibold" numberOfLines={1}>
@@ -1122,12 +1183,16 @@ function EventFacts({ item }: { item: FeedEventItem }) {
 								width: 32,
 								height: 32,
 								borderRadius: borderRadius.md,
-								backgroundColor: "#F0FDF4",
+								backgroundColor: colors.success.bg as string,
 								alignItems: "center",
 								justifyContent: "center",
 							}}
 						>
-							<MapPin size={16} color="#047857" strokeWidth={2} />
+							<MapPin
+								size={16}
+								color={colors.success.ink as string}
+								strokeWidth={2}
+							/>
 						</View>
 						<View style={{ flex: 1 }}>
 							<Caption weight="semibold" numberOfLines={1}>
@@ -1165,12 +1230,16 @@ function EventFacts({ item }: { item: FeedEventItem }) {
 							width: 32,
 							height: 32,
 							borderRadius: borderRadius.md,
-							backgroundColor: "#FFF7ED",
+							backgroundColor: colors.primary.tint as string,
 							alignItems: "center",
 							justifyContent: "center",
 						}}
 					>
-						<Users size={16} color="#C2410C" strokeWidth={2} />
+						<Users
+							size={16}
+							color={colors.primary.ink as string}
+							strokeWidth={2}
+						/>
 					</View>
 					<View>
 						<Caption weight="semibold">
@@ -1189,12 +1258,12 @@ function EventFacts({ item }: { item: FeedEventItem }) {
 							paddingHorizontal: spacing[2],
 							paddingVertical: spacing[0.5],
 							borderRadius: 999,
-							backgroundColor: "#FFF7ED",
+							backgroundColor: colors.primary.tint as string,
 						}}
 					>
 						<Caption
 							weight="semibold"
-							style={{ color: "#C2410C", fontSize: 11 }}
+							style={{ color: colors.primary.ink as string, fontSize: 11 }}
 						>
 							Starts soon
 						</Caption>
@@ -1223,7 +1292,7 @@ function EventFacts({ item }: { item: FeedEventItem }) {
 								borderRadius: 999,
 								backgroundColor:
 									i < event.acceptedCount
-										? "#F97316"
+										? (colors.primary.main as string)
 										: (colors.background.subtle as string),
 							}}
 						/>

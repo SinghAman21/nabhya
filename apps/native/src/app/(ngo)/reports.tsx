@@ -26,6 +26,7 @@ import {
 import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { confirm, toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption } from "@/components/ui/typography";
@@ -39,10 +40,10 @@ import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useFileUpload } from "@/hooks/use-upload";
 import { useGridColumns } from "@/hooks/useMedia";
-import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { focusable } from "@/lib/focus";
 import { formatRelative } from "@/lib/format";
+import { verticalScrollbar } from "@/lib/scroll";
 import type { FinancialReport } from "@/lib/types";
 
 type ReportType = CreateFinancialReportInput["type"];
@@ -77,23 +78,17 @@ export default function OrgReports() {
 
 	const items = query.data ?? [];
 
-	const confirmDelete = (report: FinancialReport) => {
-		Alert.alert(
-			"Withdraw report",
-			`"${report.title}" will no longer be visible on your public profile.`,
-			[
-				{ text: "Cancel", style: "cancel" },
-				{
-					text: "Withdraw",
-					style: "destructive",
-					onPress: () =>
-						remove.mutate(report.id, {
-							onError: (error) =>
-								Alert.alert("Could not withdraw", apiErrorMessage(error)),
-						}),
-				},
-			],
-		);
+	const confirmDelete = async (report: FinancialReport) => {
+		const ok = await confirm({
+			title: "Withdraw this report?",
+			message: `"${report.title}" will no longer be visible on your public profile. Transparency reports are what donors look for, so withdrawing one is visible by its absence.`,
+			confirmLabel: "Withdraw",
+		});
+		if (!ok) return;
+		remove.mutate(report.id, {
+			onSuccess: () => toast.success("Report withdrawn."),
+			onError: (error) => toast.error(apiErrorMessage(error)),
+		});
 	};
 
 	const openCreate = () => setComposing(true);
@@ -125,7 +120,7 @@ export default function OrgReports() {
 					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
 					data={items}
 					keyExtractor={(item) => item.id}
-					showsVerticalScrollIndicator={false}
+					{...verticalScrollbar}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
 					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
 					refreshControl={
@@ -296,7 +291,10 @@ function ReportSheet({
 		}
 		setErrors({});
 		create.mutate(parsed.data, {
-			onSuccess: close,
+			onSuccess: () => {
+				toast.success("Report published on your profile.");
+				close();
+			},
 			onError: (e) => setErrors({ form: apiErrorMessage(e) }),
 		});
 	};

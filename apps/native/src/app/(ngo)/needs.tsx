@@ -21,14 +21,15 @@ import {
 import { humanizeStatus, StatusPill } from "@/components/status-pill";
 import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
+import { confirm, toast } from "@/components/ui/overlay";
 import { Body, Caption, Label } from "@/components/ui/typography";
 import { useDeleteNeed } from "@/hooks/use-needs";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useGridColumns } from "@/hooks/useMedia";
-import { Alert } from "@/lib/alert";
 import { apiErrorMessage, orgNeedsApi, queryKeys } from "@/lib/api";
 import { formatProgress, formatRelative } from "@/lib/format";
+import { verticalScrollbar } from "@/lib/scroll";
 import type { OrgNeedListItem } from "@/lib/types";
 
 type TypeFilter = "ALL" | NeedType;
@@ -78,23 +79,17 @@ export default function NgoNeeds() {
 		if (query.hasNextPage && !query.isFetchingNextPage) query.fetchNextPage();
 	};
 
-	const confirmDelete = (need: OrgNeedListItem) => {
-		Alert.alert(
-			"Remove post",
-			`"${need.title}" will be removed. Posts with accepted pledges are closed instead of deleted.`,
-			[
-				{ text: "Cancel", style: "cancel" },
-				{
-					text: "Remove",
-					style: "destructive",
-					onPress: () =>
-						deleteNeed.mutate(need.id, {
-							onError: (error) =>
-								Alert.alert("Could not remove", apiErrorMessage(error)),
-						}),
-				},
-			],
-		);
+	const confirmDelete = async (need: OrgNeedListItem) => {
+		const ok = await confirm({
+			title: "Remove this post?",
+			message: `"${need.title}" will be removed. A post with accepted pledges is closed instead of deleted, so the people who pledged keep their record of it.`,
+			confirmLabel: "Remove",
+		});
+		if (!ok) return;
+		deleteNeed.mutate(need.id, {
+			onSuccess: () => toast.success("Post removed."),
+			onError: (error) => toast.error(apiErrorMessage(error)),
+		});
 	};
 
 	const openCreate = () => setSheetOpen(true);
@@ -142,7 +137,7 @@ export default function NgoNeeds() {
 					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
 					data={items}
 					keyExtractor={(item) => item.id}
-					showsVerticalScrollIndicator={false}
+					{...verticalScrollbar}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
 					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
 					onEndReached={loadMore}

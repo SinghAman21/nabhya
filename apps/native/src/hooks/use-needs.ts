@@ -3,7 +3,6 @@ import type {
 	CreatePledgeInput,
 	OrgNeedQuery,
 	PaginationQuery,
-	PublicNeedQuery,
 	ReviewPledgeInput,
 	UpdateNeedInput,
 } from "@nabhya/shared";
@@ -11,21 +10,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { needsApi, orgNeedsApi, queryKeys, queryScopes } from "@/lib/api";
 
 // ─── Public / volunteer ──────────────────────────────────────────────────────
-
-export function usePublicNeeds(query: Partial<PublicNeedQuery> = {}) {
-	return useQuery({
-		queryKey: queryKeys.publicNeeds(query),
-		queryFn: () => needsApi.listPublic(query),
-	});
-}
-
-export function usePublicNeed(id: string | undefined) {
-	return useQuery({
-		queryKey: queryKeys.publicNeed(id ?? ""),
-		queryFn: () => needsApi.detail(id as string),
-		enabled: !!id,
-	});
-}
 
 export function useMyPledges(query: Partial<PaginationQuery> = {}) {
 	return useQuery({
@@ -59,10 +43,15 @@ export function useWithdrawPledge() {
 
 // ─── Organisation ────────────────────────────────────────────────────────────
 
-export function useOrgNeeds(query: Partial<OrgNeedQuery> = {}) {
+export function useOrgNeeds(
+	query: Partial<OrgNeedQuery> = {},
+	/** Off for a screen that mounts a consumer it may never open. */
+	enabled = true,
+) {
 	return useQuery({
 		queryKey: queryKeys.orgNeeds(query),
 		queryFn: () => orgNeedsApi.list(query),
+		enabled,
 	});
 }
 
@@ -73,6 +62,11 @@ export function useCreateNeed() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.orgNeeds });
 			queryClient.invalidateQueries({ queryKey: queryScopes.needs });
+			// The composer can create one of these straight from the feed, and
+			// the ranking pool holds open needs, upcoming events and published
+			// announcements — so the feed is stale the moment one is written,
+			// whichever surface wrote it.
+			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
 		},
 	});
 }

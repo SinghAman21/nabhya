@@ -20,12 +20,12 @@ import {
 	StatusPill,
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import { confirm, toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption, H3, H5 } from "@/components/ui/typography";
 import { useDonationReceipt } from "@/hooks/use-engagement";
 import { useWithdrawPledge } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/use-theme";
-import { Alert } from "@/lib/alert";
 import { apiErrorMessage, donationsApi, needsApi, queryKeys } from "@/lib/api";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import type { MyDonation } from "@/lib/types";
@@ -64,22 +64,22 @@ function ItemPledges() {
 	const router = useRouter();
 	const withdraw = useWithdrawPledge();
 
-	const confirmWithdraw = (needId: string) => {
-		Alert.alert("Withdraw pledge?", "The NGO will no longer see this offer.", [
-			{ text: "Keep it", style: "cancel" },
+	const confirmWithdraw = async (needId: string) => {
+		const ok = await confirm({
+			title: "Withdraw this pledge?",
+			message:
+				"The NGO will no longer see this offer, and they may already be counting on it.",
+			confirmLabel: "Withdraw",
+			cancelLabel: "Keep it",
+		});
+		if (!ok) return;
+		withdraw.mutate(
+			{ needId },
 			{
-				text: "Withdraw",
-				style: "destructive",
-				onPress: () =>
-					withdraw.mutate(
-						{ needId },
-						{
-							onError: (error) =>
-								Alert.alert("Could not withdraw", apiErrorMessage(error)),
-						},
-					),
+				onSuccess: () => toast.success("Pledge withdrawn."),
+				onError: (error) => toast.error(apiErrorMessage(error)),
 			},
-		]);
+		);
 	};
 
 	const { query, items, loadMore } = usePagedQuery({

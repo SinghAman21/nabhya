@@ -1,4 +1,5 @@
 import { isSelfieDocument } from "@nabhya/shared";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import {
 	Award,
@@ -12,7 +13,7 @@ import {
 	UserRound,
 } from "lucide-react-native";
 import { useState } from "react";
-import { RefreshControl, ScrollView, View, type ViewStyle } from "react-native";
+import { RefreshControl, ScrollView, View } from "react-native";
 import {
 	Banner,
 	ErrorState,
@@ -33,9 +34,11 @@ import { useSignOut } from "@/hooks/use-auth";
 import { useMyImpact } from "@/hooks/use-directory";
 import { useMyUserDocuments } from "@/hooks/use-documents";
 import { useMe } from "@/hooks/use-profile";
+import { useStoredImageUrl } from "@/hooks/use-stored-image";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { apiErrorMessage } from "@/lib/api";
+import { verticalScrollbar } from "@/lib/scroll";
 
 /**
  * The volunteer's own page, top to bottom in the order a person needs it:
@@ -52,12 +55,13 @@ import { apiErrorMessage } from "@/lib/api";
  * the thing the person came for.
  */
 
-const STICKY_RAIL = {
-	width: 340,
-	position: "sticky",
-	top: 0,
-	alignSelf: "flex-start",
-} as unknown as ViewStyle;
+/**
+ * The desktop rail. `flexGrow: 0, flexShrink: 0` is spelled out because a
+ * fixed `width` alone loses to flex when the row has spare space, and this
+ * column previously used `position: sticky` — which needs a scrolling
+ * ancestor it did not have, so it only made the column size to its content.
+ */
+const RAIL = { width: 340, flexGrow: 0, flexShrink: 0 } as const;
 
 const APPEARANCE_LABEL = { system: "System", light: "Light", dark: "Dark" };
 
@@ -113,7 +117,11 @@ export default function VolunteerProfile() {
 			<View
 				style={{ flexDirection: "row", alignItems: "center", gap: spacing[4] }}
 			>
-				<Avatar name={me.data?.name} verified={isVerified} />
+				<Avatar
+					name={me.data?.name}
+					imageKey={me.data?.profileImage}
+					verified={isVerified}
+				/>
 				<View style={{ flex: 1, minWidth: 0 }}>
 					<H3 numberOfLines={1}>{me.data?.name ?? "Volunteer"}</H3>
 					{location ? (
@@ -305,61 +313,82 @@ export default function VolunteerProfile() {
 		</Sheet>
 	);
 
+	/*
+	 * One `ScrollView` for both platforms, varying only the layout inside it.
+	 * The desktop branch used to be a plain `View`, so on a window shorter than
+	 * the page — which is most of them, once the settings group is open — the
+	 * bottom of the profile was drawn into `overflow: hidden` and could not be
+	 * reached at all: no sign-out, no appearance, no certificates.
+	 */
 	return (
 		<Screen>
 			<ScreenHeader title="Profile" />
 
-			{isDesktop ? (
-				<View style={{ flexDirection: "row", gap: spacing[6] }}>
-					<View style={STICKY_RAIL}>
-						{identity}
-						{verification}
-						{signOutButton}
+			<ScrollView
+				{...verticalScrollbar}
+				contentContainerStyle={{ paddingBottom: spacing[10] }}
+				refreshControl={
+					<RefreshControl
+						refreshing={me.isRefetching}
+						onRefresh={() => {
+							me.refetch();
+							documents.refetch();
+							impact.refetch();
+						}}
+						tintColor={colors.text.quaternary as string}
+					/>
+				}
+			>
+				{isDesktop ? (
+					<View style={{ flexDirection: "row", gap: spacing[6] }}>
+						<View style={RAIL}>
+							{identity}
+							{verification}
+							{signOutButton}
+						</View>
+						<View style={{ flex: 1, minWidth: 0 }}>
+							{numbers}
+							{activity}
+							{settings}
+						</View>
 					</View>
-					<View style={{ flex: 1 }}>
+				) : (
+					<>
+						{identity}
 						{numbers}
+						{verification}
 						{activity}
 						{settings}
-					</View>
-				</View>
-			) : (
-				<ScrollView
-					showsVerticalScrollIndicator={false}
-					contentContainerStyle={{ paddingBottom: spacing[10] }}
-					refreshControl={
-						<RefreshControl
-							refreshing={me.isRefetching}
-							onRefresh={() => {
-								me.refetch();
-								documents.refetch();
-								impact.refetch();
-							}}
-							tintColor={colors.text.quaternary as string}
-						/>
-					}
-				>
-					{identity}
-					{numbers}
-					{verification}
-					{activity}
-					{settings}
-					{signOutButton}
-				</ScrollView>
-			)}
+						{signOutButton}
+					</>
+				)}
+			</ScrollView>
 
 			{appearanceSheet}
 		</Screen>
 	);
 }
 
+/**
+ * The photo, with initials as the designed fallback.
+ *
+ * `profileImage` is a storage **key**, not a URL — the bucket is private — so it
+ * has to be exchanged for a short-lived signed URL first, and that exchange can
+ * legitimately return nothing (no photo, or a dev environment with no `R2_*`
+ * credentials, where the storage stub has nothing to sign). Initials are
+ * therefore the normal case, not an error state.
+ */
 function Avatar({
 	name,
+	imageKey,
 	verified,
 }: {
 	name?: string | null;
+	imageKey?: string | null;
 	verified?: boolean;
 }) {
 	const { colors } = useTheme();
+	const url = useStoredImageUrl(imageKey);
 	const initials =
 		name
 			?.trim()
@@ -371,18 +400,33 @@ function Avatar({
 
 	return (
 		<View style={{ position: "relative" }}>
-			<View
-				style={{
-					width: 60,
-					height: 60,
-					borderRadius: 30,
-					alignItems: "center",
-					justifyContent: "center",
-					backgroundColor: colors.primary.tint,
-				}}
-			>
-				<H4 color={colors.primary.ink as string}>{initials}</H4>
-			</View>
+			{url ? (
+				<Image
+					source={{ uri: url }}
+					contentFit="cover"
+					accessibilityIgnoresInvertColors
+					accessibilityLabel={name ?? "Your photo"}
+					style={{
+						width: 60,
+						height: 60,
+						borderRadius: 30,
+						backgroundColor: colors.background.subtle,
+					}}
+				/>
+			) : (
+				<View
+					style={{
+						width: 60,
+						height: 60,
+						borderRadius: 30,
+						alignItems: "center",
+						justifyContent: "center",
+						backgroundColor: colors.primary.tint,
+					}}
+				>
+					<H4 color={colors.primary.ink as string}>{initials}</H4>
+				</View>
+			)}
 			{verified && (
 				<View
 					accessibilityLabel="Verified"

@@ -1,11 +1,12 @@
 import { Stack } from "expo-router";
+import { withAppShell } from "@/components/app-shell";
 import { HEADERLESS } from "@/lib/navigation";
 
 /**
  * Public event routes — reachable without an account. The API backing these
  * screens is @Public/@OptionalAuth, so no guard belongs here.
  */
-export default function PublicEventsLayout() {
+function PublicEventsLayout() {
 	return (
 		<Stack screenOptions={HEADERLESS}>
 			<Stack.Screen name="index" />
@@ -13,3 +14,5 @@ export default function PublicEventsLayout() {
 		</Stack>
 	);
 }
+
+export default withAppShell(PublicEventsLayout);

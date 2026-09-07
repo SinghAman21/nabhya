@@ -4,11 +4,11 @@ import { View } from "react-native";
 import { FilterChips } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { confirm, toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
 import { Caption, Label } from "@/components/ui/typography";
 import { useBroadcast } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
-import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 
 type Audience = BroadcastInput["audience"];
@@ -66,7 +66,7 @@ export function BroadcastSheet({
 		onClose();
 	};
 
-	const send = () => {
+	const send = async () => {
 		setTouched(true);
 		if (title.trim().length < MIN_LENGTH || body.trim().length < MIN_LENGTH) {
 			return;
@@ -76,32 +76,29 @@ export function BroadcastSheet({
 		const audienceLabel =
 			AUDIENCES.find((a) => a.value === audience)?.label ?? "Everyone";
 
-		Alert.alert(
-			`Send to ${audienceLabel.toLowerCase()}?`,
-			"This notifies every matching account and cannot be undone.",
-			[
-				{ text: "Cancel", style: "cancel" },
-				{
-					text: "Send",
-					onPress: () =>
-						broadcast.mutate(
-							{ title: title.trim(), body: body.trim(), audience },
-							{
-								onSuccess: (result) => {
-									reset();
-									onClose();
-									Alert.alert(
-										"Sent",
-										`Delivered to ${result.delivered} ${
-											result.delivered === 1 ? "person" : "people"
-										}.`,
-									);
-								},
-								onError: (e) => setError(apiErrorMessage(e)),
-							},
-						),
+		const ok = await confirm({
+			title: `Send to ${audienceLabel.toLowerCase()}?`,
+			message: "This notifies every matching account and cannot be undone.",
+			confirmLabel: "Send",
+			// Not destructive — it creates something rather than removing it —
+			// but still worth a stop, because the audience is everyone.
+			destructive: false,
+		});
+		if (!ok) return;
+		broadcast.mutate(
+			{ title: title.trim(), body: body.trim(), audience },
+			{
+				onSuccess: (result) => {
+					reset();
+					onClose();
+					toast.success(
+						`Delivered to ${result.delivered} ${
+							result.delivered === 1 ? "person" : "people"
+						}.`,
+					);
 				},
-			],
+				onError: (e) => setError(apiErrorMessage(e)),
+			},
 		);
 	};
 

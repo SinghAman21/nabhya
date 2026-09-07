@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { Bell } from "lucide-react-native";
 import { View } from "react-native";
+import { withAppShell } from "@/components/app-shell";
 import { PAGE_SIZE, PagedList, usePagedQuery } from "@/components/paged-list";
 import { EmptyState, Screen, ScreenHeader } from "@/components/screen-shell";
 import { Pressable } from "@/components/ui/pressable";
@@ -31,7 +32,7 @@ function destinationFor(item: NotificationItem): string | null {
  * the gutter and a bold title. Tapping marks the row read and opens whatever it
  * is about, when it is about something the app can show.
  */
-export default function Notifications() {
+function Notifications() {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
 	const markRead = useMarkNotificationsRead();
@@ -151,3 +152,5 @@ export default function Notifications() {
 		</Screen>
 	);
 }
+
+export default withAppShell(Notifications);

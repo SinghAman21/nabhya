@@ -18,6 +18,7 @@ import {
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { confirm, toast } from "@/components/ui/overlay";
 import { Sheet, SheetFlatList } from "@/components/ui/sheet";
 import { Body, BodySmall, Caption } from "@/components/ui/typography";
 import {
@@ -27,7 +28,6 @@ import {
 } from "@/hooks/use-engagement";
 import { useEventApplicants, useReviewApplication } from "@/hooks/use-events";
 import { useTheme } from "@/hooks/use-theme";
-import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatRelative } from "@/lib/format";
 import type { EventApplicant } from "@/lib/types";
@@ -80,9 +80,16 @@ export function ApplicantsSheet({
 				input: { status, reviewNote: note.trim() || undefined },
 			},
 			{
-				onSuccess: () => setNote(""),
-				onError: (error) =>
-					Alert.alert("Could not update", apiErrorMessage(error)),
+				onSuccess: () => {
+					setNote("");
+					const who = applicant.volunteer.fullName ?? "The volunteer";
+					toast.success(
+						status === "ACCEPTED"
+							? `${who} accepted. They have been notified.`
+							: `${who} declined.`,
+					);
+				},
+				onError: (error) => toast.error(apiErrorMessage(error)),
 			},
 		);
 	};
@@ -305,28 +312,22 @@ function AttendanceControls({
 	const certificate = applicant.certificate;
 	const busy = attendance.isPending || issue.isPending || revoke.isPending;
 
-	const confirmRevoke = () => {
+	const confirmRevoke = async () => {
 		if (!certificate) return;
 		// The record survives revocation, so a link already shared with an
 		// employer resolves to "revoked" rather than disappearing.
-		Alert.alert(
-			"Revoke certificate",
-			`${certificate.code} will show as revoked to anyone who verifies it. This cannot be undone.`,
-			[
-				{ text: "Cancel", style: "cancel" },
-				{
-					text: "Revoke",
-					style: "destructive",
-					onPress: () =>
-						revoke.mutate(
-							{ id: certificate.id, reason: "Revoked by the organization" },
-							{
-								onError: (error) =>
-									Alert.alert("Could not revoke", apiErrorMessage(error)),
-							},
-						),
-				},
-			],
+		const ok = await confirm({
+			title: "Revoke this certificate?",
+			message: `${certificate.code} will show as revoked to anyone who verifies it, including anyone the volunteer has already sent it to. This cannot be undone.`,
+			confirmLabel: "Revoke",
+		});
+		if (!ok) return;
+		revoke.mutate(
+			{ id: certificate.id, reason: "Revoked by the organization" },
+			{
+				onSuccess: () => toast.success("Certificate revoked."),
+				onError: (error) => toast.error(apiErrorMessage(error)),
+			},
 		);
 	};
 
@@ -334,8 +335,7 @@ function AttendanceControls({
 		attendance.mutate(
 			{ applicationId: applicant.id, attended: !attended },
 			{
-				onError: (error) =>
-					Alert.alert("Could not update", apiErrorMessage(error)),
+				onError: (error) => toast.error(apiErrorMessage(error)),
 			},
 		);
 	};
@@ -347,10 +347,9 @@ function AttendanceControls({
 				onSuccess: () => {
 					setNote("");
 					setShowNote(false);
-					Alert.alert("Certificate issued", "The volunteer has been notified.");
+					toast.success("Certificate issued. The volunteer has been notified.");
 				},
-				onError: (error) =>
-					Alert.alert("Could not issue", apiErrorMessage(error)),
+				onError: (error) => toast.error(apiErrorMessage(error)),
 			},
 		);
 	};

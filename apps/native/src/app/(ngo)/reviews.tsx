@@ -19,6 +19,7 @@ import { StatusPill } from "@/components/status-pill";
 import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, BodySmall, Caption, H2 } from "@/components/ui/typography";
 import { useReplyToReview } from "@/hooks/use-engagement";
@@ -26,6 +27,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { useGridColumns } from "@/hooks/useMedia";
 import { apiErrorMessage, engagementApi, queryKeys } from "@/lib/api";
 import { formatRelative } from "@/lib/format";
+import { verticalScrollbar } from "@/lib/scroll";
 import type { ReviewItem } from "@/lib/types";
 
 type ReplyFilter = "ALL" | "UNANSWERED";
@@ -160,7 +162,7 @@ export default function OrgReviews() {
 					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
 					data={items}
 					keyExtractor={(item) => item.id}
-					showsVerticalScrollIndicator={false}
+					{...verticalScrollbar}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
 					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
 					onEndReached={loadMore}
@@ -368,7 +370,10 @@ function ReplySheet({
 		respond.mutate(
 			{ reviewId: review.id, input: { reply: text } },
 			{
-				onSuccess: onClose,
+				onSuccess: () => {
+					toast.success("Reply posted. It shows under the review.");
+					onClose();
+				},
 				onError: (e) => setError(apiErrorMessage(e)),
 			},
 		);

@@ -28,6 +28,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { useDebounced } from "@/hooks/useDebounced";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
+import { verticalScrollbar } from "@/lib/scroll";
 import type { AdminUserListItem } from "@/lib/types";
 
 type Filter = "volunteer" | "organisation" | "SUSPENDED" | "PENDING_ID" | "ALL";
@@ -90,7 +91,7 @@ export default function AdminVolunteers() {
 				<FlatList
 					data={query.items}
 					keyExtractor={(item) => item.id}
-					showsVerticalScrollIndicator={false}
+					{...verticalScrollbar}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
 					ItemSeparatorComponent={() => <View style={{ height: spacing[2] }} />}
 					onEndReached={() => {

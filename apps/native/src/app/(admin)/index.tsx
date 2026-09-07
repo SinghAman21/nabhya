@@ -23,6 +23,7 @@ import { useSignOut } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { focusable } from "@/lib/focus";
+import { verticalScrollbar } from "@/lib/scroll";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
@@ -88,7 +89,7 @@ export default function AdminOverviewScreen() {
 				/>
 			) : (
 				<ScrollView
-					showsVerticalScrollIndicator={false}
+					{...verticalScrollbar}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
 					refreshControl={
 						<RefreshControl

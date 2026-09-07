@@ -9,6 +9,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Body, Caption, H1, Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
+import { verticalScrollbar } from "@/lib/scroll";
 
 const BREAKPOINT = 768;
 const BRAND_BG = "#0A0A0A";
@@ -155,7 +156,7 @@ export function AuthSplitLayout({
 					}}
 					keyboardShouldPersistTaps="handled"
 					automaticallyAdjustKeyboardInsets
-					showsVerticalScrollIndicator={false}
+					{...verticalScrollbar}
 				>
 					{children}
 					{alternate}

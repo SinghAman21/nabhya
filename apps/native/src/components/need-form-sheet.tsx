@@ -12,6 +12,7 @@ import { ChoiceChips } from "@/components/choice-chips";
 import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
 import { useCreateNeed, useUpdateNeed } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/use-theme";
@@ -111,11 +112,23 @@ export function NeedFormSheet({
 		if (isEditing && need) {
 			updateNeed.mutate(
 				{ id: need.id, input: data },
-				{ onSuccess: close, onError },
+				{
+					onSuccess: () => {
+						toast.success("Post updated.");
+						close();
+					},
+					onError,
+				},
 			);
 			return;
 		}
-		createNeed.mutate(data, { onSuccess: close, onError });
+		createNeed.mutate(data, {
+			onSuccess: () => {
+				toast.success("Posted. It is live in the feed now.");
+				close();
+			},
+			onError,
+		});
 	});
 
 	const saving = createNeed.isPending || updateNeed.isPending;

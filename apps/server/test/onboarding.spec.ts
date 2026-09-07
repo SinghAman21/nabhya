@@ -1,5 +1,14 @@
-import { categories, organizationAdmins, users } from "@nabhya/db/schema";
+import {
+	categories,
+	organizationAdmins,
+	organizationCategories,
+	users,
+} from "@nabhya/db/schema";
 import type { CompleteOrgOnboardingInput } from "@nabhya/shared";
+import {
+	completeOrgOnboardingSchema,
+	completeVolunteerOnboardingSchema,
+} from "@nabhya/shared";
 import { ConflictException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -49,6 +58,7 @@ describe("OnboardingService", () => {
 		city: "Mumbai",
 		state: "Maharashtra",
 		pincode: "400050",
+		categoryIds: [],
 	};
 
 	describe("status", () => {
@@ -163,6 +173,47 @@ describe("OnboardingService", () => {
 			expect(org.website).toBeNull();
 		});
 
+		it("links the causes the wizard collected", async () => {
+			// `organization_categories` is what the feed's "For you" lens joins
+			// through, so an NGO onboarded without causes is unmatchable.
+			const owner = await createUser(db, { role: "organisation" });
+			const inserted = await db
+				.insert(categories)
+				.values([
+					{ name: "Education", slug: "education" },
+					{ name: "Health", slug: "health" },
+				])
+				.returning();
+			const [first, second] = inserted;
+			if (!first || !second) throw new Error("category insert failed");
+
+			const org = await service.completeOrganizationOnboarding(
+				authUserFor(owner, ["organisation"]),
+				{ ...orgPayload, categoryIds: [first.id, second.id] },
+			);
+
+			const links = await db.query.organizationCategories.findMany({
+				where: eq(organizationCategories.organizationId, org.id),
+			});
+			expect(links.map((l) => l.categoryId).sort()).toEqual(
+				[first.id, second.id].sort(),
+			);
+		});
+
+		it("stores the coordinates captured at onboarding", async () => {
+			// Without coordinates at onboarding an NGO never appears in "near me",
+			// since the only other way to set them is an edit screen nobody opens.
+			const owner = await createUser(db, { role: "organisation" });
+
+			const org = await service.completeOrganizationOnboarding(
+				authUserFor(owner, ["organisation"]),
+				{ ...orgPayload, latitude: 19.0596, longitude: 72.8295 },
+			);
+
+			expect(Number(org.latitude)).toBeCloseTo(19.0596, 4);
+			expect(Number(org.longitude)).toBeCloseTo(72.8295, 4);
+		});
+
 		it("records the optional wizard fields instead of dropping them", async () => {
 			// These are collected by the client, so they have to land somewhere.
 			const owner = await createUser(db, { role: "organisation" });
@@ -180,6 +231,79 @@ describe("OnboardingService", () => {
 			expect(org.teamSize).toBe(24);
 			expect(org.foundingYear).toBe(2011);
 			expect(org.description).toContain("after-school");
+		});
+	});
+
+	/**
+	 * The wizards post **raw form values** — "" for every untouched optional
+	 * field — and this schema is the only normaliser. The service specs call the
+	 * service directly and so never exercise the controller's validation pipe,
+	 * which is how the client shipped once posting its own parsed output: an
+	 * `optionalText` field parses "" into `null`, and `null` is not valid input
+	 * for it, so the API answered 400 "expected string, received null" on `bio`,
+	 * `profileImage` and `description`.
+	 */
+	describe("wizard payloads, as the client sends them", () => {
+		it("accepts a volunteer payload with every optional field blank", () => {
+			const parsed = completeVolunteerOnboardingSchema.safeParse({
+				fullName: "Asha Menon",
+				// As typed, spaces and country code included — the wizard's own
+				// placeholder is 16 characters and a raw `max(15)` rejected it.
+				phone: "+91 98765 43210",
+				profileImage: "",
+				city: "Pune",
+				state: "Maharashtra",
+				latitude: undefined,
+				longitude: undefined,
+				categoryIds: [],
+				bio: "",
+			});
+
+			expect(parsed.success).toBe(true);
+			if (!parsed.success) return;
+			expect(parsed.data.phone).toBe("+919876543210");
+			expect(parsed.data.bio).toBeNull();
+			expect(parsed.data.profileImage).toBeNull();
+		});
+
+		it("accepts an org payload with blank optional text and blank numbers", () => {
+			const parsed = completeOrgOnboardingSchema.safeParse({
+				...orgPayload,
+				description: "",
+				website: "",
+				// Untouched numeric inputs. Coercing these to 0 is what made an
+				// optional "Founded in" fail with "Enter a valid year".
+				teamSize: "",
+				foundingYear: "",
+			});
+
+			expect(parsed.success).toBe(true);
+			if (!parsed.success) return;
+			expect(parsed.data.description).toBeNull();
+			expect(parsed.data.teamSize).toBeUndefined();
+			expect(parsed.data.foundingYear).toBeUndefined();
+		});
+
+		it("still rejects what it should", () => {
+			const missingType = completeOrgOnboardingSchema.safeParse({
+				...orgPayload,
+				orgType: "",
+			});
+			expect(missingType.success).toBe(false);
+
+			const badPincode = completeOrgOnboardingSchema.safeParse({
+				...orgPayload,
+				pincode: "4000",
+			});
+			expect(badPincode.success).toBe(false);
+
+			const shortPhone = completeVolunteerOnboardingSchema.safeParse({
+				fullName: "Asha Menon",
+				phone: "98765",
+				city: "Pune",
+				state: "Maharashtra",
+			});
+			expect(shortPhone.success).toBe(false);
 		});
 	});
 
@@ -217,6 +341,39 @@ describe("OnboardingService", () => {
 			const interests = await db.query.userCategories.findMany();
 			expect(interests).toHaveLength(1);
 			expect(interests[0]?.categoryId).toBe(cause.id);
+		});
+
+		it("saves the avatar key and coordinates, and keeps an old avatar on re-submit", async () => {
+			const user = await createUser(db, { role: "volunteer" });
+			const auth = authUserFor(user, ["volunteer"]);
+			const base = {
+				fullName: "Asha Menon",
+				phone: "9876543210",
+				city: "Pune",
+				state: "Maharashtra",
+				categoryIds: [],
+			};
+
+			await service.completeVolunteerOnboarding(auth, {
+				...base,
+				profileImage: "avatar/asha/photo.jpg",
+				latitude: 18.5204,
+				longitude: 73.8567,
+			});
+
+			const first = await db.query.users.findFirst({
+				where: eq(users.id, user.id),
+			});
+			expect(first?.profileImage).toBe("avatar/asha/photo.jpg");
+			expect(Number(first?.latitude)).toBeCloseTo(18.5204, 4);
+
+			// A resubmission without a photo must not blank the one on file.
+			await service.completeVolunteerOnboarding(auth, base);
+
+			const second = await db.query.users.findFirst({
+				where: eq(users.id, user.id),
+			});
+			expect(second?.profileImage).toBe("avatar/asha/photo.jpg");
 		});
 
 		it("replaces interests on re-submission rather than accumulating them", async () => {

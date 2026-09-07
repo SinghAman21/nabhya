@@ -16,6 +16,7 @@ import {
 import { StatusPill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { confirm, toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption } from "@/components/ui/typography";
 import {
@@ -26,9 +27,9 @@ import {
 } from "@/hooks/use-directory";
 import { useTheme } from "@/hooks/use-theme";
 import { useGridColumns } from "@/hooks/useMedia";
-import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
+import { verticalScrollbar } from "@/lib/scroll";
 import type { OrgTeamMember } from "@/lib/types";
 
 /**
@@ -77,7 +78,7 @@ export default function OrgTeam() {
 					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
 					data={items}
 					keyExtractor={(item) => item.id}
-					showsVerticalScrollIndicator={false}
+					{...verticalScrollbar}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
 					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
 					refreshControl={
@@ -171,29 +172,36 @@ function MemberSheet({
 		setError(null);
 		update.mutate(
 			{ id: member.id, input: { designation: designation.trim() } },
-			{ onSuccess: onClose, onError: (e) => setError(apiErrorMessage(e)) },
+			{
+				// The sheet closes on success, so without this the screen just
+				// blinks and nothing says the role was saved.
+				onSuccess: () => {
+					toast.success("Role updated.");
+					onClose();
+				},
+				onError: (e) => setError(apiErrorMessage(e)),
+			},
 		);
 	};
 
-	const confirmRemove = () => {
+	const confirmRemove = async () => {
 		if (!member) return;
 		const name = member.user.fullName ?? member.user.email;
-		Alert.alert(
-			"Remove from team",
-			`${name} will lose access to this organisation. They keep their own account.`,
-			[
-				{ text: "Cancel", style: "cancel" },
-				{
-					text: "Remove",
-					style: "destructive",
-					onPress: () =>
-						remove.mutate(member.id, {
-							onSuccess: onClose,
-							onError: (e) => setError(apiErrorMessage(e)),
-						}),
-				},
-			],
-		);
+		const ok = await confirm({
+			title: "Remove from the team?",
+			message: `${name} will lose access to this organisation. They keep their own account, and you can invite them again.`,
+			confirmLabel: "Remove",
+		});
+		if (!ok) return;
+		remove.mutate(member.id, {
+			onSuccess: () => {
+				toast.success(`${name} removed from the team.`);
+				onClose();
+			},
+			// Inline, not a toast: this sheet stays open on failure and the
+			// error belongs next to the button that is still sitting there.
+			onError: (e) => setError(apiErrorMessage(e)),
+		});
 	};
 
 	const dirty = (member?.designation ?? "") !== designation.trim();
@@ -292,7 +300,12 @@ function InviteSheet({
 		}
 		setErrors({});
 		invite.mutate(parsed.data, {
-			onSuccess: close,
+			onSuccess: () => {
+				toast.success(
+					`${parsed.data.email} can now act for this organisation.`,
+				);
+				close();
+			},
 			onError: (e) => setErrors({ form: apiErrorMessage(e) }),
 		});
 	};

@@ -62,6 +62,21 @@ export const lightColors = {
 		/** Text/icon grade on this tone's `bg` (8.01:1). `main` is a fill colour. */
 		ink: "#1E40AF",
 	},
+	/**
+	 * The fifth tone, for a category that is neither a status nor an action:
+	 * today only "Story" on a feed card. It exists as a token because the card
+	 * previously drew that pill from two hardcoded violets, which meant a
+	 * white-violet pill on a near-black card in dark mode.
+	 */
+	accent: {
+		main: "#8B5CF6",
+		light: "#A78BFA",
+		dark: "#7C3AED",
+		bg: "#F5F3FF",
+		border: "#8B5CF6",
+		/** Text/icon grade on this tone's `bg` (8.59:1). `main` is a fill colour. */
+		ink: "#5B21B6",
+	},
 	background: {
 		warm: "#FBFBF9",
 		primary: "#FFFFFF",
@@ -158,6 +173,15 @@ export const darkColors = {
 		border: "#3B82F6",
 		/** Text/icon grade on this tone's dark `bg` (9.07:1). */
 		ink: "#93C5FD",
+	},
+	accent: {
+		main: "#8B5CF6",
+		light: "#A78BFA",
+		dark: "#7C3AED",
+		bg: "#231A47",
+		border: "#8B5CF6",
+		/** Text/icon grade on this tone's dark `bg` (8.24:1). */
+		ink: "#C4B5FD",
 	},
 	background: {
 		warm: "#0E0E0E",

@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { optionalText } from "./common";
+import { optionalText, phoneSchema } from "./common";
 import {
+	orgCausesStepSchema,
 	step1BasicInfoSchema,
 	step2AddressSchema,
 	step4TeamSchema,
@@ -10,12 +11,22 @@ import {
  * The org onboarding wizard collects its data step by step and keeps it in the
  * client store; this is the single payload it submits at the end. Built by
  * merging the per-step schemas so the wizard and the API can never drift.
+ *
+ * Every field the team/causes steps add is optional in its own step schema, so
+ * there is no `.partial()` here — a blank optional field arrives as absent,
+ * not as a zero that the range checks then reject.
  */
 export const completeOrgOnboardingSchema = step1BasicInfoSchema
 	.extend(step2AddressSchema.shape)
-	.extend(step4TeamSchema.partial().shape);
+	.extend(orgCausesStepSchema.shape)
+	.extend(step4TeamSchema.shape);
 
 export type CompleteOrgOnboardingInput = z.infer<
+	typeof completeOrgOnboardingSchema
+>;
+
+/** What the client sends: raw form values. See the volunteer counterpart. */
+export type CompleteOrgOnboardingPayload = z.input<
 	typeof completeOrgOnboardingSchema
 >;
 
@@ -36,7 +47,7 @@ export const ORG_TYPE_FROM_ENUM = {
 
 export const updateOrganizationSchema = z.object({
 	organizationName: z.string().trim().min(2).max(100).optional(),
-	phone: z.string().trim().min(10).max(15).optional(),
+	phone: phoneSchema.optional(),
 	email: z.email("Enter a valid email").optional(),
 	registrationNumber: optionalText(60),
 	description: optionalText(1000),

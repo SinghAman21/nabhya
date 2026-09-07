@@ -10,6 +10,7 @@ import {
 } from "react";
 import { Platform, useColorScheme } from "react-native";
 import { storage } from "@/lib/storage";
+import { applyWebStyles } from "@/lib/web-styles";
 
 const THEME_KEY = "nabhya-theme";
 
@@ -73,6 +74,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 				document.documentElement.classList.remove("dark");
 			}
 		}
+	}, [effectiveIsDark, restored]);
+
+	/*
+	 * The web-only rules that cannot be expressed as React Native styles: the
+	 * scrollbar, and lifting Radix poppers above the sheet's modal. Injected
+	 * rather than written in `global.css`, because raw `::-webkit-scrollbar`
+	 * and attribute selectors do not survive NativeWind's compilation of that
+	 * stylesheet. This is also the only place that knows the resolved scheme,
+	 * which is what makes the scrollbar thumb theme-aware.
+	 * See `lib/web-styles.ts`.
+	 */
+	useEffect(() => {
+		if (restored) applyWebStyles(effectiveIsDark);
 	}, [effectiveIsDark, restored]);
 
 	const toggleTheme = useCallback(() => {

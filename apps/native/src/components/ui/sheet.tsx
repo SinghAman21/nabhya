@@ -23,11 +23,13 @@ import {
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { OverlayHost } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H4 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { focusable } from "@/lib/focus";
+import { verticalScrollbar } from "@/lib/scroll";
 
 /**
  * The one bottom sheet.
@@ -49,6 +51,18 @@ import { focusable } from "@/lib/focus";
  * two-field form is a short card and a long list still scrolls. Pass
  * `detents` for a sheet whose content has no natural height (a list).
  */
+/*
+ * **Do not put a portalling primitive inside a sheet.** `DropdownMenu`,
+ * `Select` and anything else built on `@rn-primitives` renders through a
+ * portal, and a portal cannot be made to clear this sheet reliably on either
+ * platform: on native the root `PortalHost` sits *below* the React Native
+ * `Modal` the sheet is hosted in, and on web react-native-web hosts that Modal
+ * at `zIndex: 9999` while Radix pins its popper wrapper to the content's own
+ * computed z-index — which no prop on the menu can raise, because the props
+ * spread lands on a child of the positioned element. Use an inline control
+ * instead; `post-composer.tsx` chose `ChoiceChips` for exactly this reason.
+ */
+
 export interface SheetProps {
 	visible: boolean;
 	onClose: () => void;
@@ -64,6 +78,12 @@ export interface SheetProps {
 	 * Required when `scrollable` is false and the body is a list.
 	 */
 	detents?: Array<string | number>;
+	/**
+	 * Widens the desktop dialog from 480 to 620. For a body that is not a
+	 * column of fields — a writing canvas, a media grid — where 480 crams the
+	 * measure and wraps a four-tile strip onto two rows.
+	 */
+	wide?: boolean;
 }
 
 export function Sheet(props: SheetProps) {
@@ -220,7 +240,7 @@ function NativeSheet({
 					{scrollable ? (
 						<BottomSheetScrollView
 							keyboardShouldPersistTaps="handled"
-							showsVerticalScrollIndicator={false}
+							{...verticalScrollbar}
 							onScroll={onScroll}
 							contentContainerStyle={{
 								paddingHorizontal: spacing[5],
@@ -236,6 +256,9 @@ function NativeSheet({
 					)}
 				</BottomSheet>
 			</GestureHandlerRootView>
+			{/* A toast raised from inside this sheet has to be drawn inside the
+			    Modal: the root host sits underneath it. See `ui/overlay.tsx`. */}
+			<OverlayHost />
 		</Modal>
 	);
 }
@@ -253,6 +276,7 @@ function WebSheet({
 	footer,
 	scrollable = true,
 	detents,
+	wide,
 }: SheetProps) {
 	const { colors, spacing, borderRadius, elevation, isDark } = useTheme();
 	const insets = useSafeAreaInsets();
@@ -271,7 +295,7 @@ function WebSheet({
 				borderTopRightRadius: borderRadius["2xl"],
 				...(isDesktop
 					? {
-							width: 480,
+							width: wide ? 620 : 480,
 							alignSelf: "center",
 							borderRadius: borderRadius["2xl"],
 							marginBottom: spacing[10],
@@ -293,7 +317,7 @@ function WebSheet({
 			{scrollable ? (
 				<ScrollView
 					keyboardShouldPersistTaps="handled"
-					showsVerticalScrollIndicator={false}
+					{...verticalScrollbar}
 					onScroll={(e) => setScrolled(e.nativeEvent.contentOffset.y > 4)}
 					scrollEventThrottle={32}
 					contentContainerStyle={{
@@ -352,6 +376,7 @@ function WebSheet({
 				/>
 				{panel}
 			</KeyboardAvoidingView>
+			<OverlayHost />
 		</Modal>
 	);
 }
@@ -366,16 +391,18 @@ function WebSheet({
  *
  * Exported for `Drawer`, so the slide-over speaks the same header language.
  */
-export function SheetHeader({
-	title,
-	subtitle,
-	onClose,
+/**
+ * The pinned top of a sheet: rounded corners, the sheet fill, the grabber and
+ * the hairline that appears once the body has scrolled under it. Everything a
+ * header needs *around* its content, so a custom header (`header` on
+ * `SheetProps`) gets all of it for free and cannot drift from the default one.
+ */
+export function SheetChrome({
+	children,
 	divided,
 	grabber,
 }: {
-	title: string;
-	subtitle?: string;
-	onClose: () => void;
+	children: React.ReactNode;
 	divided: boolean;
 	grabber: boolean;
 }) {
@@ -403,6 +430,28 @@ export function SheetHeader({
 					}}
 				/>
 			)}
+			{children}
+		</View>
+	);
+}
+
+export function SheetHeader({
+	title,
+	subtitle,
+	onClose,
+	divided,
+	grabber,
+}: {
+	title: string;
+	subtitle?: string;
+	onClose: () => void;
+	divided: boolean;
+	grabber: boolean;
+}) {
+	const { colors, spacing } = useTheme();
+
+	return (
+		<SheetChrome divided={divided} grabber={grabber}>
 			<View
 				style={{
 					flexDirection: "row",
@@ -450,7 +499,7 @@ export function SheetHeader({
 					/>
 				</Pressable>
 			</View>
-		</View>
+		</SheetChrome>
 	);
 }
 
@@ -476,7 +525,7 @@ export function SheetFlatList<T>(props: FlatListProps<T>) {
 		return (
 			<FlatList
 				keyboardShouldPersistTaps="handled"
-				showsVerticalScrollIndicator={false}
+				{...verticalScrollbar}
 				{...props}
 				contentContainerStyle={contentContainerStyle}
 			/>
@@ -486,7 +535,7 @@ export function SheetFlatList<T>(props: FlatListProps<T>) {
 	return (
 		<BottomSheetFlatList
 			keyboardShouldPersistTaps="handled"
-			showsVerticalScrollIndicator={false}
+			{...verticalScrollbar}
 			{...(props as any)}
 			contentContainerStyle={contentContainerStyle}
 		/>

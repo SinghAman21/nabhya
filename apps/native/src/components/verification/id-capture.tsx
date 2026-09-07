@@ -1,8 +1,4 @@
-import {
-	GOVERNMENT_ID_DOCUMENT_TYPES,
-	USER_DOCUMENT_LABELS,
-	type UserDocumentType,
-} from "@nabhya/shared";
+import { USER_DOCUMENT_LABELS, type UserDocumentType } from "@nabhya/shared";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { Camera, ImageUp, RotateCcw } from "lucide-react-native";
@@ -13,7 +9,6 @@ import { Pressable } from "@/components/ui/pressable";
 import { Caption, H5 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { useImageUpload } from "@/hooks/use-upload";
-import { Alert } from "@/lib/alert";
 import { focusable } from "@/lib/focus";
 
 export interface IdCaptureValue {
@@ -22,10 +17,23 @@ export interface IdCaptureValue {
 }
 
 /**
- * Government-ID step: pick which ID, then photograph it or choose one from the
- * library. The image is normalised and uploaded straight to storage; the parent
- * receives only the document type and the resulting object key.
+ * One government ID, and only one: the Aadhaar card.
+ *
+ * The step used to open with a chip row of every accepted ID — Aadhaar, PAN,
+ * licence, voter ID, passport — which read as a checklist of documents to
+ * produce rather than a choice between them, and made the first thing on the
+ * screen a decision nobody needed to make. Aadhaar is the near-universal one
+ * and the only ID a reviewer can check a name and a photo against, so the
+ * screen asks for it by name. `documentType` stays on the value because the
+ * server accepts the whole enum and a reviewer sees which type they are
+ * looking at; widening this back into a picker is a UI change, not a schema
+ * one.
+ *
+ * The image is normalised and uploaded straight to storage; the parent receives
+ * only the document type and the resulting object key.
  */
+const ID_TYPE: UserDocumentType = "AADHAR_CARD";
+
 export function IdCapture({
 	onChange,
 	disabled,
@@ -35,40 +43,31 @@ export function IdCapture({
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
 	const { uploadImage, isUploading, error } = useImageUpload("USER_DOCUMENT");
-	const [documentType, setDocumentType] =
-		useState<UserDocumentType>("AADHAR_CARD");
 	const [preview, setPreview] = useState<string | null>(null);
+	const [permissionError, setPermissionError] = useState<string | null>(null);
 
 	const busy = isUploading || disabled;
-
-	const chooseType = (type: UserDocumentType) => {
-		if (type === documentType || busy) return;
-		setDocumentType(type);
-		// A previously captured image belonged to the old type, so drop it.
-		if (preview) {
-			setPreview(null);
-			onChange(null);
-		}
-	};
 
 	const handleAsset = async (asset?: { uri: string; width?: number }) => {
 		if (!asset) return;
 		const uploaded = await uploadImage(asset.uri, {
-			fileName: `${documentType.toLowerCase()}.jpg`,
+			fileName: `${ID_TYPE.toLowerCase()}.jpg`,
 			sourceWidth: asset.width,
 		});
 		if (uploaded) {
 			setPreview(asset.uri);
-			onChange({ documentType, key: uploaded.key });
+			onChange({ documentType: ID_TYPE, key: uploaded.key });
 		}
 	};
 
 	const takePhoto = async () => {
+		setPermissionError(null);
 		const permission = await ImagePicker.requestCameraPermissionsAsync();
 		if (!permission.granted) {
-			Alert.alert(
-				"Camera access needed",
-				"Allow camera access to photograph your ID, or choose one from your library instead.",
+			// Inline, beside the buttons that caused it: an OS dialog has to be
+			// dismissed before you can reach "Choose file", which is the way out.
+			setPermissionError(
+				"Camera access is off. Allow it in settings, or choose a photo from your library instead.",
 			);
 			return;
 		}
@@ -80,6 +79,7 @@ export function IdCapture({
 	};
 
 	const chooseFromLibrary = async () => {
+		setPermissionError(null);
 		const result = await ImagePicker.launchImageLibraryAsync({
 			mediaTypes: ["images"],
 			quality: 0.7,
@@ -90,63 +90,20 @@ export function IdCapture({
 	return (
 		<View style={{ gap: spacing[3] }}>
 			<View>
-				<H5>Government ID</H5>
+				<H5>{USER_DOCUMENT_LABELS[ID_TYPE] ?? "Government ID"}</H5>
 				<Caption color="tertiary" style={{ marginTop: spacing[0.5] }}>
-					Pick the ID you're using, then take a clear, well-lit photo with all
-					four corners in frame.
+					Take a clear, well-lit photo with all four corners in frame.
 				</Caption>
-			</View>
-
-			<View
-				accessibilityRole="radiogroup"
-				style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[2] }}
-			>
-				{GOVERNMENT_ID_DOCUMENT_TYPES.map((type) => {
-					const selected = type === documentType;
-					const label = USER_DOCUMENT_LABELS[type] ?? type;
-					return (
-						<Pressable
-							key={type}
-							onPress={() => chooseType(type)}
-							hitSlop={4}
-							disabled={busy}
-							accessibilityRole="radio"
-							accessibilityLabel={label}
-							accessibilityState={{ checked: selected, disabled: !!busy }}
-							{...focusable}
-							style={({ pressed }) => ({
-								minHeight: 38,
-								justifyContent: "center",
-								paddingHorizontal: spacing[3.5],
-								borderRadius: 999,
-								backgroundColor: selected
-									? (colors.text.primary as string)
-									: pressed
-										? colors.background.subtle
-										: "transparent",
-								borderWidth: selected ? 0 : 1,
-								borderColor: colors.border.medium,
-							})}
-						>
-							<Caption
-								weight="medium"
-								color={selected ? (colors.text.inverse as string) : "secondary"}
-							>
-								{label}
-							</Caption>
-						</Pressable>
-					);
-				})}
 			</View>
 
 			{preview ? (
 				<View style={{ gap: spacing[2] }}>
 					<Image
 						source={{ uri: preview }}
-						accessibilityLabel="Photo of your ID"
+						accessibilityLabel="Photo of your Aadhaar card"
 						style={{
 							width: "100%",
-							height: 200,
+							aspectRatio: 8 / 5,
 							borderRadius: borderRadius.lg,
 							backgroundColor: colors.background.tertiary,
 						}}
@@ -219,6 +176,11 @@ export function IdCapture({
 				</View>
 			)}
 
+			{permissionError ? (
+				<Caption accessibilityLiveRegion="polite" color={colors.error.ink}>
+					{permissionError}
+				</Caption>
+			) : null}
 			{error && <Caption color={colors.error.ink}>{error}</Caption>}
 		</View>
 	);

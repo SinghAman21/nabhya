@@ -4,12 +4,15 @@ import {
 	Bookmark,
 	Building2,
 	CalendarDays,
+	Clock,
 	HeartHandshake,
 	Megaphone,
 	Search,
+	X,
 } from "lucide-react-native";
 import { useRef, useState } from "react";
 import { View, type ViewToken } from "react-native";
+import { withAppShell } from "@/components/app-shell";
 import { BackButton } from "@/components/back-button";
 import { FeedCard, toPublicNeed } from "@/components/feed/feed-card";
 import { SearchField } from "@/components/feed/search-field";
@@ -33,6 +36,8 @@ import { useTheme } from "@/hooks/use-theme";
 import { useDebounced } from "@/hooks/useDebounced";
 import { apiErrorMessage } from "@/lib/api";
 import { focusable } from "@/lib/focus";
+import { useRecentSearches } from "@/lib/recent-searches";
+import { verticalScrollbar } from "@/lib/scroll";
 import type { FeedItem, FeedKind, FeedNeedItem } from "@/lib/types";
 
 /**
@@ -45,6 +50,12 @@ import type { FeedItem, FeedKind, FeedNeedItem } from "@/lib/types";
  * in, result tabs split by what the person is looking for: everything, NGOs,
  * needs, events or updates. Search is the one place the city scope is dropped
  * on purpose — someone typing a name wants that name, wherever it is.
+ *
+ * Recent terms sit above the examples once there are any, because on a phone
+ * the commonest search is one already made: the same NGO, the same item, a day
+ * later. They are device-local (`lib/recent-searches.ts`) and a term is only
+ * recorded when it is committed — the Search key, or opening a result — so the
+ * list holds words rather than the prefixes typed on the way to them.
  */
 
 type Scope = "all" | "ngos" | FeedKind;
@@ -70,12 +81,13 @@ const EXAMPLES = [
 	"Laptops",
 ];
 
-export default function SearchScreen() {
+function SearchScreen() {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
 	const [query, setQuery] = useState("");
 	const [scope, setScope] = useState<Scope>("all");
 	const [responding, setResponding] = useState<FeedNeedItem | null>(null);
+	const recent = useRecentSearches();
 
 	const term = useDebounced(query.trim());
 	const active = term.length > 0;
@@ -109,9 +121,73 @@ export default function SearchScreen() {
 		orgItems.length === 0 &&
 		feedItems.length === 0;
 
+	/** Opening a result is as much a commit as pressing Search. */
+	const openOrg = (organizationId: string) => {
+		recent.record(query);
+		router.push(`/ngos/${organizationId}`);
+	};
+
 	/* ---- Before typing: teach what search can do ------------------------- */
 	const guide = (
 		<View style={{ paddingTop: spacing[5] }}>
+			{recent.terms.length > 0 && (
+				<View style={{ marginBottom: spacing[6] }}>
+					<View
+						style={{
+							flexDirection: "row",
+							alignItems: "center",
+							justifyContent: "space-between",
+						}}
+					>
+						<SectionTitle>Recent</SectionTitle>
+						<Pressable
+							onPress={recent.clear}
+							hitSlop={8}
+							accessibilityRole="button"
+							accessibilityLabel="Clear recent searches"
+							{...focusable}
+							style={{ minHeight: 32, justifyContent: "center" }}
+						>
+							<Caption weight="medium" color={colors.primary.ink}>
+								Clear
+							</Caption>
+						</Pressable>
+					</View>
+					<ListGroup>
+						{recent.terms.map((term) => (
+							<ListRow
+								key={term}
+								icon={Clock}
+								label={term}
+								onPress={() => setQuery(term)}
+								value={
+									<Pressable
+										onPress={() => recent.remove(term)}
+										hitSlop={10}
+										accessibilityRole="button"
+										accessibilityLabel={`Remove ${term} from recent searches`}
+										{...focusable}
+										style={{
+											width: 32,
+											height: 32,
+											alignItems: "center",
+											justifyContent: "center",
+											borderRadius: 999,
+										}}
+									>
+										<X
+											size={14}
+											color={colors.text.quaternary as string}
+											strokeWidth={2}
+										/>
+									</Pressable>
+								}
+							/>
+						))}
+					</ListGroup>
+				</View>
+			)}
+
 			<SectionTitle>Try searching for</SectionTitle>
 			<View
 				style={{
@@ -193,7 +269,7 @@ export default function SearchScreen() {
 									[org.city, org.state].filter(Boolean).join(", ") ||
 									"Verified NGO"
 								}
-								onPress={() => router.push(`/ngos/${org.id}`)}
+								onPress={() => openOrg(org.id)}
 							/>
 						))}
 					</ListGroup>
@@ -241,11 +317,14 @@ export default function SearchScreen() {
 					borderBottomColor: colors.border.hairline,
 				}}
 			>
-				<BackButton style={{ backgroundColor: "none", width: 24 }} />
+				{/* `"none"` is not a colour — RN ignored it and the button kept its
+				    default fill. `transparent` is what was meant. */}
+				<BackButton style={{ backgroundColor: "transparent", width: 24 }} />
 				<View style={{ flex: 1 }}>
 					<SearchField
 						value={query}
 						onChange={setQuery}
+						onSubmit={recent.record}
 						pending={query.trim() !== term}
 						autoFocus
 					/>
@@ -277,7 +356,7 @@ export default function SearchScreen() {
 				keyboardDismissMode="on-drag"
 				onViewableItemsChanged={onViewableItemsChanged}
 				viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
-				showsVerticalScrollIndicator={false}
+				{...verticalScrollbar}
 				contentContainerStyle={{
 					paddingHorizontal: spacing[5],
 					paddingBottom: spacing[12],
@@ -321,3 +400,5 @@ function scopeNoun(scope: Scope) {
 			return "results";
 	}
 }
+
+export default withAppShell(SearchScreen);

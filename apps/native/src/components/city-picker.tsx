@@ -1,4 +1,3 @@
-import * as Location from "expo-location";
 import {
 	ChevronDown,
 	LocateFixed,
@@ -12,7 +11,9 @@ import { Pressable } from "@/components/ui/pressable";
 import { Sheet, SheetOption } from "@/components/ui/sheet";
 import { Caption, H4, Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
+import { CITY_SUGGESTIONS, nearestCity, normaliseCityName } from "@/lib/cities";
 import { focusable } from "@/lib/focus";
+import { placeParts, requestPosition, reverseGeocode } from "@/lib/location";
 
 /**
  * City scope for the feed.
@@ -32,25 +33,18 @@ import { focusable } from "@/lib/focus";
  * header and by every card below it.
  *
  * Known data problem: `needs.city` is free text, so "Mumbai",
- * "mumbai" and "Bombay" are three cities to the query. The list below is a
- * stopgap; the real fix is a canonical city table, or at least a normalising
- * write path.
+ * "mumbai" and "Bombay" are three cities to the query. The city list and the
+ * alias/case normalisation now live in `lib/cities.ts`, shared with the two
+ * onboarding wizards — this picker filters a feed, they write the rows the
+ * feed filters, and the two disagreeing about a spelling is exactly how a
+ * city ends up with nothing in it. The real fix is still server-side: a
+ * canonical city table, or a normalising write path.
  */
 
 export const ALL_INDIA = "";
 
-const METROS = [
-	"Mumbai",
-	"Pune",
-	"Delhi",
-	"Bengaluru",
-	"Hyderabad",
-	"Chennai",
-	"Kolkata",
-	"Ahmedabad",
-	"Jaipur",
-	"Nagpur",
-];
+/** The picker's own shortlist: the metros most rows are actually in. */
+const METROS = CITY_SUGGESTIONS.slice(0, 12);
 
 export function CityPicker({
 	value,
@@ -103,29 +97,40 @@ export function CityPicker({
 		setDetecting(true);
 		setLocationError(null);
 		try {
-			const permission = await Location.requestForegroundPermissionsAsync();
-			if (!permission.granted) {
+			// Never gated on a permission *query* — on the web that answers
+			// "prompt" without asking, so this used to fail instantly having
+			// never shown the browser's dialog. See `lib/location.ts`.
+			const position = await requestPosition();
+			if (position.status === "denied") {
 				setLocationError(
 					"Location access is off. Choose a city below instead.",
 				);
 				return;
 			}
-			const position = await Location.getCurrentPositionAsync({
-				accuracy: Location.Accuracy.Balanced,
-			});
-			const [place] = await Location.reverseGeocodeAsync({
-				latitude: position.coords.latitude,
-				longitude: position.coords.longitude,
-			});
-			const city = place?.city ?? place?.district ?? place?.subregion;
+			if (position.status === "failed") {
+				setLocationError(
+					"Could not detect your location. Choose a city below.",
+				);
+				return;
+			}
+
+			const place = await reverseGeocode(position.latitude, position.longitude);
+			const named = place ? placeParts(place).city : null;
+			// The geocoder's spelling is not ours: it returns "Bombay" and
+			// "bengaluru" depending on the device, and either one filters the feed
+			// down to nothing. With no name at all, fall back to the nearest city
+			// we know — the web has no reverse geocoding to begin with.
+			const city = named
+				? normaliseCityName(named)
+				: (nearestCity(position.latitude, position.longitude)?.city ?? null);
+
 			if (!city) {
 				setLocationError("We found you, but could not name this city.");
 				return;
 			}
+
 			pick(city);
 			onDetectedCity?.(city);
-		} catch {
-			setLocationError("Could not detect your location. Choose a city below.");
 		} finally {
 			setDetecting(false);
 		}

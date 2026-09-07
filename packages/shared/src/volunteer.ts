@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { optionalText } from "./common";
+import {
+	latitudeSchema,
+	longitudeSchema,
+	optionalText,
+	phoneSchema,
+} from "./common";
 
 /**
  * Volunteer onboarding mirrors the org wizard's shape: a small set of steps,
@@ -12,16 +17,18 @@ export const volunteerProfileStepSchema = z.object({
 		.trim()
 		.min(2, "Enter your full name")
 		.max(100, "Name must be under 100 characters"),
-	phone: z
-		.string()
-		.trim()
-		.min(10, "Enter a valid phone number")
-		.max(15, "Enter a valid phone number"),
+	phone: phoneSchema,
+	/** Storage object key from `POST /api/uploads/intent`, purpose `AVATAR`. */
+	profileImage: optionalText(500),
 });
 
 export const volunteerLocationStepSchema = z.object({
 	city: z.string().trim().min(2, "City is required").max(80),
 	state: z.string().trim().min(2, "State is required").max(80),
+	// Set only from the device's own location, never typed. Feeds the same
+	// proximity search the organisations use.
+	latitude: latitudeSchema.optional(),
+	longitude: longitudeSchema.optional(),
 });
 
 export const volunteerInterestsStepSchema = z.object({
@@ -43,6 +50,20 @@ export type VolunteerInterestsStep = z.infer<
 	typeof volunteerInterestsStepSchema
 >;
 export type CompleteVolunteerOnboardingInput = z.infer<
+	typeof completeVolunteerOnboardingSchema
+>;
+
+/**
+ * What the client actually sends — the schema's **input** side.
+ *
+ * The wizard posts the raw form values ("" for an untouched optional field) and
+ * lets the server normalise them, because the parse is not idempotent: an
+ * `optionalText` field parses `""` into `null`, and `null` is not valid *input*
+ * for it. Posting the client-parsed output therefore failed server validation
+ * with "expected string, received null" on `bio` and `profileImage`. There is
+ * one normaliser, and it is the one at the boundary.
+ */
+export type CompleteVolunteerOnboardingPayload = z.input<
 	typeof completeVolunteerOnboardingSchema
 >;
 
@@ -159,7 +180,7 @@ export function computeUserVerificationStatus(
 
 export const updateUserProfileSchema = z.object({
 	fullName: z.string().trim().min(2).max(100).optional(),
-	phone: z.string().trim().min(10).max(15).optional(),
+	phone: phoneSchema.optional(),
 	profileImage: optionalText(500),
 	bio: optionalText(500),
 	city: z.string().trim().min(2).max(80).optional(),

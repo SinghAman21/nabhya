@@ -30,6 +30,8 @@ export const queryKeys = {
 	myOrganization: ["organizations", "me"] as const,
 	myOrgDocuments: ["organizations", "me", "documents"] as const,
 	myUserDocuments: ["users", "me", "documents"] as const,
+	/** Signed read URL for one stored object key. */
+	storedImage: (key: string) => ["uploads", "download-url", key] as const,
 
 	adminOverview: ["admin", "overview"] as const,
 	adminOrganizations: (params?: unknown) =>

@@ -7,39 +7,12 @@ import {
 	Users,
 } from "lucide-react-native";
 import { View } from "react-native";
-import { type NavItem, Sidebar } from "@/components/sidebar";
+import { ADMIN_NAV_ITEMS } from "@/components/nav-items";
+import { Sidebar } from "@/components/sidebar";
 import { renderTabBar, useTabBarOptions } from "@/components/tab-bar";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { useAuthStore } from "@/store/auth-store";
-
-const ADMIN_NAV_ITEMS: NavItem[] = [
-	{ label: "Overview", href: "/(admin)", icon: LayoutDashboard },
-	{
-		label: "Queue",
-		href: "/(admin)/queue",
-		icon: FileCheck2,
-		section: "Review",
-	},
-	{
-		label: "NGOs",
-		href: "/(admin)/organizations",
-		icon: Building2,
-		section: "Directory",
-	},
-	{
-		label: "Volunteers",
-		href: "/(admin)/volunteers",
-		icon: Users,
-		section: "Directory",
-	},
-	{
-		label: "Activity",
-		href: "/(admin)/audit",
-		icon: ScrollText,
-		section: "Records",
-	},
-];
 
 /**
  * Superadmin console. The client-side role check here is convenience only —

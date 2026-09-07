@@ -1,6 +1,6 @@
 import type {
-	CompleteOrgOnboardingInput,
-	CompleteVolunteerOnboardingInput,
+	CompleteOrgOnboardingPayload,
+	CompleteVolunteerOnboardingPayload,
 	SelectableRole,
 	UpdateUserProfileInput,
 } from "@nabhya/shared";
@@ -68,7 +68,7 @@ export function useCompleteOrgOnboarding() {
 	const setOnboarded = useAuthStore((s) => s.setOnboarded);
 
 	return useMutation({
-		mutationFn: (input: CompleteOrgOnboardingInput) =>
+		mutationFn: (input: CompleteOrgOnboardingPayload) =>
 			onboardingApi.completeOrganization(input),
 		onSuccess: () => {
 			setOnboarded();
@@ -83,7 +83,7 @@ export function useCompleteVolunteerOnboarding() {
 	const setOnboarded = useAuthStore((s) => s.setOnboarded);
 
 	return useMutation({
-		mutationFn: (input: CompleteVolunteerOnboardingInput) =>
+		mutationFn: (input: CompleteVolunteerOnboardingPayload) =>
 			onboardingApi.completeVolunteer(input),
 		onSuccess: () => {
 			setOnboarded();

@@ -17,6 +17,7 @@ import {
 	verificationTone,
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import { confirm, toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption } from "@/components/ui/typography";
 import {
@@ -25,7 +26,6 @@ import {
 	useSetOrganizationStatus,
 } from "@/hooks/use-admin";
 import { useTheme } from "@/hooks/use-theme";
-import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 
@@ -85,14 +85,20 @@ export function OrgDetailSheet({
 				input: { verificationStatus, reason: text || undefined },
 			},
 			{
-				onSuccess: () => setReason(""),
-				onError: (error) =>
-					Alert.alert("Could not update", apiErrorMessage(error)),
+				onSuccess: () => {
+					setReason("");
+					toast.success(
+						verificationStatus === "VERIFIED"
+							? "Organization verified."
+							: "Organization rejected.",
+					);
+				},
+				onError: (error) => toast.error(apiErrorMessage(error)),
 			},
 		);
 	};
 
-	const toggleSuspension = () => {
+	const toggleSuspension = async () => {
 		if (!organizationId || !org) return;
 		const suspending = org.status !== "SUSPENDED";
 		const text = reason.trim();
@@ -103,33 +109,32 @@ export function OrgDetailSheet({
 		}
 		setReasonError(null);
 
-		Alert.alert(
-			suspending ? "Suspend organization?" : "Reinstate organization?",
-			suspending
-				? "Their published events will be cancelled and open needs closed."
+		const ok = await confirm({
+			title: suspending ? "Suspend organization?" : "Reinstate organization?",
+			message: suspending
+				? "Their published events will be cancelled and their open needs closed. Volunteers who applied will be notified."
 				: "They will be able to publish again.",
-			[
-				{ text: "Cancel", style: "cancel" },
-				{
-					text: suspending ? "Suspend" : "Reinstate",
-					style: suspending ? "destructive" : "default",
-					onPress: () =>
-						setStatus.mutate(
-							{
-								id: organizationId,
-								input: {
-									status: suspending ? "SUSPENDED" : "ACTIVE",
-									reason: text || undefined,
-								},
-							},
-							{
-								onSuccess: () => setReason(""),
-								onError: (error) =>
-									Alert.alert("Could not update", apiErrorMessage(error)),
-							},
-						),
+			confirmLabel: suspending ? "Suspend" : "Reinstate",
+			destructive: suspending,
+		});
+		if (!ok) return;
+		setStatus.mutate(
+			{
+				id: organizationId,
+				input: {
+					status: suspending ? "SUSPENDED" : "ACTIVE",
+					reason: text || undefined,
 				},
-			],
+			},
+			{
+				onSuccess: () => {
+					setReason("");
+					toast.success(
+						suspending ? "Organization suspended." : "Organization reinstated.",
+					);
+				},
+				onError: (error) => toast.error(apiErrorMessage(error)),
+			},
 		);
 	};
 

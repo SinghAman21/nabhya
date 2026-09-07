@@ -1,5 +1,10 @@
 import type { db as dbType } from "@nabhya/db";
-import { organizationAdmins, organizations, users } from "@nabhya/db/schema";
+import {
+	organizationAdmins,
+	organizationCategories,
+	organizations,
+	users,
+} from "@nabhya/db/schema";
 import {
 	type CompleteOrgOnboardingInput,
 	type CompleteVolunteerOnboardingInput,
@@ -79,8 +84,11 @@ export class OnboardingService {
 
 	/**
 	 * Creates the NGO from the wizard payload and records the owner as its first
-	 * admin. Both writes share a transaction so a failure cannot leave an
-	 * organization without an owning admin row.
+	 * admin. Every write shares a transaction so a failure cannot leave an
+	 * organization without an owning admin row, or with half its causes.
+	 *
+	 * The logo is not part of this payload: its upload key can only be minted
+	 * once the organization exists, so the client PATCHes it on afterwards.
 	 */
 	async completeOrganizationOnboarding(
 		user: AuthUser,
@@ -111,6 +119,12 @@ export class OnboardingService {
 					city: input.city,
 					state: input.state,
 					pincode: input.pincode,
+					// Decimal columns take strings; a raw number round-trips through
+					// pg but drops precision the driver would have preserved.
+					latitude:
+						input.latitude !== undefined ? String(input.latitude) : null,
+					longitude:
+						input.longitude !== undefined ? String(input.longitude) : null,
 					teamSize: input.teamSize ?? null,
 					foundingYear: input.foundingYear ?? null,
 					description: input.description ?? null,
@@ -120,6 +134,21 @@ export class OnboardingService {
 				})
 				.returning();
 			const created = takeFirstOrThrow(inserted, "create organization");
+
+			// The feed's "For you" lens joins volunteers' interests through
+			// `organization_categories`, so an NGO with none is unmatchable.
+			const categoryIds = input.categoryIds ?? [];
+			if (categoryIds.length > 0) {
+				await tx
+					.insert(organizationCategories)
+					.values(
+						categoryIds.map((categoryId) => ({
+							organizationId: created.id,
+							categoryId,
+						})),
+					)
+					.onConflictDoNothing();
+			}
 
 			await tx.insert(organizationAdmins).values({
 				organizationId: created.id,
@@ -134,6 +163,10 @@ export class OnboardingService {
 					phone: input.phone,
 					city: input.city,
 					state: input.state,
+					latitude:
+						input.latitude !== undefined ? String(input.latitude) : null,
+					longitude:
+						input.longitude !== undefined ? String(input.longitude) : null,
 					onboardedAt: new Date(),
 					updatedAt: new Date(),
 				})
@@ -164,7 +197,13 @@ export class OnboardingService {
 				phone: input.phone,
 				city: input.city,
 				state: input.state,
+				latitude: input.latitude !== undefined ? String(input.latitude) : null,
+				longitude:
+					input.longitude !== undefined ? String(input.longitude) : null,
 				bio: input.bio ?? null,
+				// Only overwrite the avatar when the wizard actually sent one, so
+				// re-running the volunteer step never blanks an existing photo.
+				...(input.profileImage ? { profileImage: input.profileImage } : {}),
 				onboardedAt: new Date(),
 				updatedAt: new Date(),
 			})
@@ -172,7 +211,7 @@ export class OnboardingService {
 
 		// The wizard submits every step at once and the schema defaults this to
 		// [], so the selection is always authoritative — an empty one clears.
-		await this.usersService.setInterests(user.id, input.categoryIds);
+		await this.usersService.setInterests(user.id, input.categoryIds ?? []);
 
 		void this.audit.record({
 			performedBy: user.id,

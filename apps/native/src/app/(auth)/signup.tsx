@@ -3,6 +3,7 @@ import { type SignUpInput, signUpSchema } from "@nabhya/shared";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { AuthError, authErrorCopy } from "@/components/auth-error";
 import { AuthSplitLayout } from "@/components/auth-split-layout";
 import { GoogleSignInButton } from "@/components/google-signin-button";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,6 @@ import { FormField } from "@/components/ui/form";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
-import { Alert } from "@/lib/alert";
 import { authService } from "@/lib/api/auth";
 import { apiErrorMessage } from "@/lib/api/http";
 import { focusable } from "@/lib/focus";
@@ -21,6 +21,10 @@ export default function SignUp() {
 	const setUser = useAuthStore((s) => s.setUser);
 	const router = useRouter();
 	const [loading, setLoading] = useState(false);
+	const [failure, setFailure] = useState<{
+		message: string;
+		hint?: "sign-up" | "sign-in";
+	} | null>(null);
 	const form = useForm<SignUpInput>({
 		// biome-ignore lint/suspicious/noExplicitAny: @hookform/resolvers v5 Zod v4 incompatibility
 		resolver: zodResolver(signUpSchema as any),
@@ -29,6 +33,7 @@ export default function SignUp() {
 
 	const onSubmit = form.handleSubmit(async (data) => {
 		setLoading(true);
+		setFailure(null);
 		try {
 			const result = await authService.signup({
 				email: data.email,
@@ -40,9 +45,12 @@ export default function SignUp() {
 			}
 			router.replace("/");
 		} catch (error) {
-			Alert.alert(
-				"Couldn't create your account",
-				apiErrorMessage(error, "Check your details and try again."),
+			// Inline, above the button — see the same note in `login.tsx`.
+			setFailure(
+				authErrorCopy(
+					apiErrorMessage(error, "Check your details and try again."),
+					"sign-up",
+				),
 			);
 		} finally {
 			setLoading(false);
@@ -106,7 +114,7 @@ export default function SignUp() {
 				name="password"
 				label="Password"
 				placeholder="At least 8 characters"
-				secureTextEntry
+				revealable
 				autoComplete="new-password"
 				textContentType="newPassword"
 				returnKeyType="go"
@@ -114,11 +122,23 @@ export default function SignUp() {
 				accessibilityLabel="Password"
 			/>
 
+			<AuthError
+				message={failure?.message ?? null}
+				{...(failure?.hint === "sign-in"
+					? {
+							action: {
+								label: "Sign in instead →",
+								onPress: () => router.push("/(auth)/login"),
+							},
+						}
+					: {})}
+			/>
+
 			<Button
 				onPress={onSubmit}
 				loading={loading}
 				size="lg"
-				style={{ marginTop: spacing[6] }}
+				style={{ marginTop: failure ? spacing[4] : spacing[6] }}
 			>
 				Create account
 			</Button>
@@ -129,7 +149,7 @@ export default function SignUp() {
 				By continuing you agree to use Nabhya honestly and respectfully.
 			</Caption>
 
-			<GoogleSignInButton />
+			<GoogleSignInButton onError={(message) => setFailure({ message })} />
 		</AuthSplitLayout>
 	);
 }

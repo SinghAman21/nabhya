@@ -1,3 +1,4 @@
+import type { PostTag } from "@nabhya/shared";
 import { useRouter } from "expo-router";
 import {
 	Building2,
@@ -5,14 +6,19 @@ import {
 	FileText,
 	HandCoins,
 	HeartHandshake,
+	type LucideIcon,
 	Megaphone,
 	PenLine,
 	ShieldCheck,
 	Star,
 	Users,
 } from "lucide-react-native";
-import { RefreshControl, ScrollView, View } from "react-native";
+import { useState } from "react";
+import { RefreshControl, ScrollView, View, type ViewStyle } from "react-native";
+import { EventFormSheet } from "@/components/event-form-sheet";
 import { InitialAvatar } from "@/components/initial-avatar";
+import { NeedFormSheet } from "@/components/need-form-sheet";
+import { PostComposer } from "@/components/post-composer";
 import {
 	Banner,
 	ErrorState,
@@ -25,36 +31,64 @@ import {
 	SectionTitle,
 	Surface,
 } from "@/components/screen-shell";
-import { Caption, H5 } from "@/components/ui/typography";
+import { Pressable } from "@/components/ui/pressable";
+import { Caption, H5, Label } from "@/components/ui/typography";
 import { useOrganizationImpact } from "@/hooks/use-directory";
 import { useOrgEvents } from "@/hooks/use-events";
 import { useOrgNeeds } from "@/hooks/use-needs";
 import { useMyOrganization } from "@/hooks/use-organization";
 import { useTheme } from "@/hooks/use-theme";
+import { useMedia } from "@/hooks/useMedia";
 import { apiErrorMessage } from "@/lib/api";
+import { focusable } from "@/lib/focus";
+import { orgVerificationCopy } from "@/lib/org-verification";
+import { verticalScrollbar } from "@/lib/scroll";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
  * The organisation's home tab, in the order a coordinator needs it:
  *
  * 1. Anything blocking them — verification, while it is not done.
- * 2. Anything waiting on them — pending applicants and pledges, with counts
+ * 2. Anything they came here to *do* — post, ask for something, run an event.
+ *    A dashboard that only reports is a wall the coordinator has to walk
+ *    around; these are the three creation acts in the product and they open
+ *    in place, not two navigations away.
+ * 3. Anything waiting on them — pending applicants and pledges, with counts
  *    and a tap straight to the screen where the decision is made.
- * 3. The numbers — one `MetricRow`, and public impact once verified.
- * 4. Everything else — one grouped list into the management screens, so no
- *    feature hangs off the Profile tab alone.
+ * 4. The numbers — one `MetricRow`, and public impact once verified.
+ * 5. Whatever the surrounding chrome does not already offer.
  *
- * Everything is composed from `screen-shell`: three surfaces, not eighteen.
+ * That last point is why the "Manage" list differs by platform, and it is not
+ * an inconsistency: **the list holds what the navigation does not.** On desktop
+ * the sidebar already carries nine destinations, so repeating them as an
+ * eleven-row list was the same menu twice on one screen, and the two could
+ * disagree. On mobile the tab bar carries five, so the other six have to live
+ * somewhere and this is it.
+ *
+ * Everything is composed from `screen-shell`: a handful of surfaces, not
+ * eighteen.
  */
+
+const STICKY_ASIDE = {
+	width: 320,
+	position: "sticky",
+	top: 0,
+	alignSelf: "flex-start",
+} as unknown as ViewStyle;
+
+const DESKTOP_MAX_WIDTH = 1080;
+
 export default function NgoDashboard() {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
+	const { isDesktop } = useMedia();
 	const email = useAuthStore((s) => s.email);
-	const storeProfile = useAuthStore((s) => s.orgProfile);
-
 	const orgQuery = useMyOrganization();
 	const org = orgQuery.data;
-	const orgName = org?.organizationName || storeProfile.orgName || "Your NGO";
+	// No draft fallback: the onboarding draft is cleared the moment the
+	// organisation is created, so by the time this screen renders the record is
+	// the only source of the name.
+	const orgName = org?.organizationName || "Your NGO";
 	const status = org?.verificationStatus;
 	const isVerified = status === "VERIFIED";
 
@@ -63,6 +97,12 @@ export default function NgoDashboard() {
 	const eventsQuery = useOrgEvents();
 	const needsQuery = useOrgNeeds();
 	const impactQuery = useOrganizationImpact(isVerified ? org?.id : undefined);
+
+	/* Creation, in place. Each sheet is the same one its own screen opens, so
+	   there is one form per thing in the codebase and not two that drift. */
+	const [composerTag, setComposerTag] = useState<PostTag | null>(null);
+	const [needFormOpen, setNeedFormOpen] = useState(false);
+	const [eventFormOpen, setEventFormOpen] = useState(false);
 
 	const events = eventsQuery.data?.items ?? [];
 	const needs = needsQuery.data?.items ?? [];
@@ -108,32 +148,53 @@ export default function NgoDashboard() {
 		orgQuery.isLoading || eventsQuery.isLoading || needsQuery.isLoading;
 	const error = orgQuery.error ?? eventsQuery.error ?? needsQuery.error;
 
+	/** Shared with `(ngo)/profile.tsx`, which draws the same banner and row. */
+	const verificationCopy = orgVerificationCopy(status, org?.rejectionReason);
+
 	const verification = isVerified ? null : (
 		<Banner
-			tone={
-				status === "REJECTED"
-					? "error"
-					: status === "UNDER_REVIEW"
-						? "info"
-						: "warning"
-			}
-			title={
-				status === "REJECTED"
-					? "Verification was not approved"
-					: status === "UNDER_REVIEW"
-						? "Verification under review"
-						: "Get verified to go public"
-			}
-			description={
-				status === "REJECTED"
-					? (org?.rejectionReason ??
-						"See the reviewer's notes and upload corrected documents.")
-					: status === "UNDER_REVIEW"
-						? "A reviewer is checking your documents. Usually a few days."
-						: "Upload your registration certificate and PAN card. Until then, events and needs stay private."
-			}
+			tone={verificationCopy.tone}
+			title={verificationCopy.title}
+			description={verificationCopy.description}
 			onPress={() => router.push("/(ngo)/verification")}
 		/>
+	);
+
+	/*
+	 * Three acts on one surface, hairline-divided — the same language as
+	 * `MetricRow`, so the page reads as two rows of one thing rather than a
+	 * card wall. Posting needs a verified org (the API enforces it on both the
+	 * post and the upload-intent route); needs and events can be drafted
+	 * before that, so only the first tile is gated.
+	 */
+	const quickActions = (
+		<View>
+			<SectionTitle>Create</SectionTitle>
+			<Surface padded={false}>
+				<View style={{ flexDirection: "row" }}>
+					<ActionTile
+						icon={PenLine}
+						label="Post"
+						hint={isVerified ? "Share an update" : "Verify first"}
+						disabled={!isVerified}
+						first
+						onPress={() => setComposerTag("POST")}
+					/>
+					<ActionTile
+						icon={HeartHandshake}
+						label="Need"
+						hint="Ask for items"
+						onPress={() => setNeedFormOpen(true)}
+					/>
+					<ActionTile
+						icon={CalendarDays}
+						label="Event"
+						hint="Call volunteers"
+						onPress={() => setEventFormOpen(true)}
+					/>
+				</View>
+			</Surface>
+		</View>
 	);
 
 	const decisions = (
@@ -211,82 +272,141 @@ export default function NgoDashboard() {
 			</View>
 		) : null;
 
+	const verificationRow = (
+		<ListRow
+			icon={ShieldCheck}
+			label="Verification"
+			value={<Caption color="tertiary">{verificationCopy.label}</Caption>}
+			onPress={() => router.push("/(ngo)/verification")}
+		/>
+	);
+
+	const publicProfileRow = org ? (
+		<ListRow
+			icon={Building2}
+			label="Your public page"
+			hint="Exactly what a volunteer or donor sees"
+			onPress={() => router.push(`/ngos/${org.id}`)}
+		/>
+	) : null;
+
+	/**
+	 * What the chrome does not already offer. Desktop: the sidebar has the nine
+	 * destinations, so only these are missing. Mobile: the tab bar has five, so
+	 * the rest belong here.
+	 */
 	const manage = (
 		<View>
-			<SectionTitle>Manage</SectionTitle>
+			<SectionTitle>{isDesktop ? "Also here" : "Manage"}</SectionTitle>
 			<ListGroup>
-				<ListRow
-					icon={HeartHandshake}
-					label="Needs"
-					hint={`${openNeeds} open · post requests and review pledges`}
-					onPress={() => router.push("/(ngo)/needs")}
-				/>
-				<ListRow
-					icon={CalendarDays}
-					label="Events"
-					hint={`${publishedEvents} published · create and review applicants`}
-					onPress={() => router.push("/(ngo)/events")}
-				/>
-				<ListRow
-					icon={Megaphone}
-					label="Updates"
-					hint="Announcements on your public profile"
-					onPress={() => router.push("/(ngo)/announcements")}
-				/>
-				<ListRow
-					icon={PenLine}
-					label="Feed"
-					hint="See other NGOs' posts"
-					onPress={() => router.push("/(ngo)/feed")}
-				/>
-				<ListRow
-					icon={Star}
-					label="Reviews"
-					hint="Read and reply publicly"
-					onPress={() => router.push("/(ngo)/reviews")}
-				/>
-				<ListRow
-					icon={HandCoins}
-					label="Donations"
-					hint="Money received through Nabhya"
-					onPress={() => router.push("/(ngo)/donations")}
-				/>
-				<ListRow
-					icon={FileText}
-					label="Reports"
-					hint="Annual reports and audited statements"
-					onPress={() => router.push("/(ngo)/reports")}
-				/>
-				<ListRow
-					icon={Users}
-					label="Team"
-					hint="Who can act for your NGO"
-					onPress={() => router.push("/(ngo)/team")}
-				/>
-				<ListRow
-					icon={ShieldCheck}
-					label="Verification"
-					value={
-						<Caption color="tertiary">
-							{isVerified
-								? "Verified"
-								: status === "UNDER_REVIEW"
-									? "Under review"
-									: status === "REJECTED"
-										? "Action needed"
-										: "Not started"}
-						</Caption>
-					}
-					onPress={() => router.push("/(ngo)/verification")}
-				/>
-				<ListRow
-					icon={Building2}
-					label="Profile"
-					hint="What volunteers and donors see"
-					onPress={() => router.push("/(ngo)/profile")}
-				/>
+				{isDesktop
+					? [verificationRow, publicProfileRow]
+					: [
+							<ListRow
+								key="updates"
+								icon={Megaphone}
+								label="Updates"
+								hint="Announcements on your public profile"
+								onPress={() => router.push("/(ngo)/announcements")}
+							/>,
+							<ListRow
+								key="reviews"
+								icon={Star}
+								label="Reviews"
+								hint="Read and reply publicly"
+								onPress={() => router.push("/(ngo)/reviews")}
+							/>,
+							<ListRow
+								key="donations"
+								icon={HandCoins}
+								label="Donations"
+								hint="Money received through Nabhya"
+								onPress={() => router.push("/(ngo)/donations")}
+							/>,
+							<ListRow
+								key="reports"
+								icon={FileText}
+								label="Reports"
+								hint="Annual reports and audited statements"
+								onPress={() => router.push("/(ngo)/reports")}
+							/>,
+							<ListRow
+								key="team"
+								icon={Users}
+								label="Team"
+								hint="Who can act for your NGO"
+								onPress={() => router.push("/(ngo)/team")}
+							/>,
+							verificationRow,
+							publicProfileRow,
+						]}
 			</ListGroup>
 		</View>
+	);
+
+	const sheets = (
+		<>
+			<PostComposer
+				visible={!!composerTag}
+				onClose={() => setComposerTag(null)}
+				{...(composerTag ? { initialTag: composerTag } : {})}
+			/>
+			<NeedFormSheet
+				visible={needFormOpen}
+				onClose={() => setNeedFormOpen(false)}
+				defaultCity={org?.city}
+				defaultState={org?.state}
+			/>
+			<EventFormSheet
+				visible={eventFormOpen}
+				event={null}
+				onClose={() => setEventFormOpen(false)}
+				defaultCity={org?.city}
+				defaultState={org?.state}
+			/>
+		</>
+	);
+
+	const body = isLoading ? (
+		<LoadingState />
+	) : error ? (
+		<ErrorState message={apiErrorMessage(error)} onRetry={refetchAll} />
+	) : isDesktop ? (
+		/*
+		 * Two columns, capped and centred. The decisions and the numbers are
+		 * what a coordinator scans; creation and the leftover destinations are
+		 * what they reach for, so they sit in the narrow aside where they do not
+		 * push the numbers below the fold.
+		 */
+		<View
+			style={{
+				width: "100%",
+				maxWidth: DESKTOP_MAX_WIDTH,
+				alignSelf: "center",
+				flexDirection: "row",
+				gap: spacing[6],
+			}}
+		>
+			<View style={{ flex: 1, gap: spacing[6] }}>
+				{verification}
+				{decisions}
+				{numbers}
+				{impactBlock}
+			</View>
+			<View style={[STICKY_ASIDE, { gap: spacing[6] }]}>
+				{quickActions}
+				{manage}
+			</View>
+		</View>
+	) : (
+		<>
+			{verification}
+			{quickActions}
+			{decisions}
+			{numbers}
+			{impactBlock}
+			{manage}
+		</>
 	);
 
 	return (
@@ -298,7 +418,7 @@ export default function NgoDashboard() {
 			/>
 
 			<ScrollView
-				showsVerticalScrollIndicator={false}
+				{...verticalScrollbar}
 				contentContainerStyle={{ paddingBottom: spacing[12], gap: spacing[6] }}
 				refreshControl={
 					<RefreshControl
@@ -308,21 +428,81 @@ export default function NgoDashboard() {
 					/>
 				}
 			>
-				{isLoading ? (
-					<LoadingState />
-				) : error ? (
-					<ErrorState message={apiErrorMessage(error)} onRetry={refetchAll} />
-				) : (
-					<>
-						{verification}
-						{decisions}
-						{numbers}
-						{impactBlock}
-						{manage}
-					</>
-				)}
+				{body}
 			</ScrollView>
+
+			{sheets}
 		</Screen>
+	);
+}
+
+/**
+ * One creation act. Icon over label over consequence — three lines is enough
+ * to distinguish "ask for items" from "call volunteers", which is the choice
+ * a new coordinator actually finds hard.
+ *
+ * The icon sits in the brand tint rather than on it: `primary.main` is a fill
+ * and fails AA for a glyph, so the well is `primary.tint` and the mark is
+ * `primary.ink`.
+ */
+function ActionTile({
+	icon: Icon,
+	label,
+	hint,
+	disabled,
+	first,
+	onPress,
+}: {
+	icon: LucideIcon;
+	label: string;
+	hint: string;
+	disabled?: boolean;
+	/** Suppresses the leading hairline on the first tile in the row. */
+	first?: boolean;
+	onPress: () => void;
+}) {
+	const { colors, spacing, borderRadius } = useTheme();
+
+	return (
+		<Pressable
+			onPress={onPress}
+			disabled={disabled}
+			accessibilityRole="button"
+			accessibilityLabel={`${label}. ${hint}`}
+			accessibilityState={{ disabled: !!disabled }}
+			{...focusable}
+			style={({ pressed, hovered }) => ({
+				flex: 1,
+				alignItems: "center",
+				gap: spacing[1.5],
+				paddingVertical: spacing[4],
+				paddingHorizontal: spacing[2],
+				borderLeftWidth: first ? 0 : 1,
+				borderLeftColor: colors.border.hairline,
+				backgroundColor:
+					pressed || hovered ? colors.background.subtle : "transparent",
+				opacity: disabled ? 0.45 : 1,
+			})}
+		>
+			<View
+				style={{
+					width: 36,
+					height: 36,
+					borderRadius: borderRadius.md,
+					alignItems: "center",
+					justifyContent: "center",
+					backgroundColor: colors.primary.tint,
+				}}
+			>
+				<Icon size={18} color={colors.primary.ink as string} strokeWidth={2} />
+			</View>
+			<Label weight="semibold" numberOfLines={1}>
+				{label}
+			</Label>
+			<Caption color="quaternary" numberOfLines={1}>
+				{hint}
+			</Caption>
+		</Pressable>
 	);
 }
 

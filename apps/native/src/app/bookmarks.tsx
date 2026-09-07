@@ -1,14 +1,15 @@
 import { useRouter } from "expo-router";
 import { Bookmark } from "lucide-react-native";
 import { View } from "react-native";
+import { withAppShell } from "@/components/app-shell";
 import { PAGE_SIZE, PagedList, usePagedQuery } from "@/components/paged-list";
 import { EmptyState, Screen, ScreenHeader } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, Label } from "@/components/ui/typography";
 import { useToggleBookmark } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
-import { Alert } from "@/lib/alert";
 import { apiErrorMessage, engagementApi, queryKeys } from "@/lib/api";
 import { focusable } from "@/lib/focus";
 import type { BookmarkListItem } from "@/lib/types";
@@ -18,7 +19,7 @@ import type { BookmarkListItem } from "@/lib/types";
  * "Remove" on the right to drop it. Paged, since a keen volunteer can save
  * more than one screen of them.
  */
-export default function Bookmarks() {
+function Bookmarks() {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
 	const toggle = useToggleBookmark();
@@ -30,9 +31,17 @@ export default function Bookmarks() {
 	});
 
 	const remove = (item: BookmarkListItem) => {
+		const name = item.organization.organizationName;
 		toggle.mutate(item.organization.id, {
-			onError: (error) =>
-				Alert.alert("Could not remove", apiErrorMessage(error)),
+			// Undo rather than a confirmation: unsaving is one tap, reversible in
+			// one tap, and a dialog in front of it would cost more than the
+			// mistake does.
+			onSuccess: () =>
+				toast.success(`${name} removed.`, {
+					label: "Undo",
+					onPress: () => toggle.mutate(item.organization.id),
+				}),
+			onError: (error) => toast.error(apiErrorMessage(error)),
 		});
 	};
 
@@ -132,3 +141,5 @@ export default function Bookmarks() {
 		</Screen>
 	);
 }
+
+export default withAppShell(Bookmarks);

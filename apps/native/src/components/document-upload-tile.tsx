@@ -1,15 +1,18 @@
 import type { UploadPurpose } from "@nabhya/shared";
 import { Check, FileText, Upload } from "lucide-react-native";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
+import { Surface } from "@/components/screen-shell";
 import {
 	humanizeStatus,
 	StatusPill,
 	verificationTone,
 } from "@/components/status-pill";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption } from "@/components/ui/typography";
 import { useOpenDocument } from "@/hooks/use-documents";
 import { useTheme } from "@/hooks/use-theme";
 import { useFileUpload } from "@/hooks/use-upload";
+import { focusable } from "@/lib/focus";
 import type { AdminOrgDocument } from "@/lib/types";
 
 /**
@@ -47,16 +50,7 @@ export function DocumentUploadTile({
 
 	if (existing) {
 		return (
-			<View
-				style={{
-					borderWidth: 1,
-					borderColor: colors.border.light,
-					backgroundColor: colors.background.primary,
-					borderRadius: borderRadius.lg,
-					padding: spacing[4],
-					marginBottom: spacing[3],
-				}}
-			>
+			<Surface>
 				<View
 					style={{
 						flexDirection: "row",
@@ -104,12 +98,23 @@ export function DocumentUploadTile({
 					<Pressable
 						onPress={() => openDocument.mutate(existing.documentKey)}
 						hitSlop={8}
+						accessibilityRole="button"
+						accessibilityLabel={`View ${title}`}
+						{...focusable}
 					>
-						<Caption weight="medium" color={colors.primary.main as string}>
+						<Caption weight="medium" color={colors.primary.ink as string}>
 							{openDocument.isPending ? "Opening…" : "View"}
 						</Caption>
 					</Pressable>
-					<Pressable onPress={pick} disabled={busy} hitSlop={8}>
+					<Pressable
+						onPress={pick}
+						disabled={busy}
+						hitSlop={8}
+						accessibilityRole="button"
+						accessibilityLabel={`Replace ${title}`}
+						accessibilityState={{ disabled: Boolean(busy) }}
+						{...focusable}
+					>
 						<Caption weight="medium" color="secondary">
 							{busy ? "Uploading…" : "Replace"}
 						</Caption>
@@ -118,13 +123,13 @@ export function DocumentUploadTile({
 
 				{error && (
 					<Caption
-						color={colors.error.main as string}
+						color={colors.error.ink as string}
 						style={{ marginTop: spacing[2] }}
 					>
 						{error}
 					</Caption>
 				)}
-			</View>
+			</Surface>
 		);
 	}
 
@@ -132,6 +137,10 @@ export function DocumentUploadTile({
 		<Pressable
 			onPress={pick}
 			disabled={busy}
+			accessibilityRole="button"
+			accessibilityLabel={`${title}. ${hint}`}
+			accessibilityState={{ disabled: Boolean(busy) }}
+			{...focusable}
 			style={({ pressed }) => ({
 				borderWidth: 2,
 				borderColor: pressed ? colors.primary.main : colors.border.medium,
@@ -139,7 +148,6 @@ export function DocumentUploadTile({
 				borderRadius: borderRadius.lg,
 				padding: spacing[6],
 				alignItems: "center",
-				marginBottom: spacing[3],
 				opacity: busy ? 0.6 : 1,
 			})}
 		>
@@ -181,7 +189,7 @@ export function DocumentUploadTile({
 
 			{error && (
 				<Caption
-					color={colors.error.main as string}
+					color={colors.error.ink as string}
 					style={{ marginTop: spacing[2], textAlign: "center" }}
 				>
 					{error}
@@ -203,8 +211,8 @@ export function UploadedBadge({ label }: { label: string }) {
 				marginTop: spacing[2],
 			}}
 		>
-			<Check size={14} color={colors.success.main as string} />
-			<Caption color={colors.success.main as string}>{label}</Caption>
+			<Check size={14} color={colors.success.ink as string} />
+			<Caption color={colors.success.ink as string}>{label}</Caption>
 		</View>
 	);
 }

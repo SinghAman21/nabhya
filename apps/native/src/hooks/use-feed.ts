@@ -4,6 +4,7 @@ import type {
 	FeedTab,
 	NeedType,
 	NeedUrgency,
+	PostTag,
 } from "@nabhya/shared";
 import {
 	useInfiniteQuery,
@@ -13,6 +14,7 @@ import {
 } from "@tanstack/react-query";
 import { feedApi, queryKeys, queryScopes } from "@/lib/api";
 import { KIND_TO_TYPE } from "@/lib/feed-adapter";
+import { type ComposerMedia, uploadFeedMedia } from "@/lib/feed-media";
 import type { FeedItem, FeedKind } from "@/lib/types";
 
 const PAGE_SIZE = 12;
@@ -67,6 +69,69 @@ export function useFeed(filters: FeedFilters, enabled = true) {
 		getNextPageParam: (last) =>
 			last.meta.hasMore ? last.meta.page + 1 : undefined,
 		enabled,
+	});
+}
+
+/**
+ * Publish a post: upload the attachments, then create the row.
+ *
+ * The two steps are one mutation because they are one user action and they
+ * fail as one — a post created without its media would be a silent
+ * half-success, and media uploaded without a post is orphaned bytes. The
+ * media list is threaded through so the composer's tiles can show real
+ * per-file progress; `onMediaChange` is called from inside the upload loop.
+ *
+ * Both `POST /api/feed` and the upload-intent route require a **verified**
+ * organisation server-side, so the composer gates itself on verification
+ * rather than letting this fail at the end of four uploads.
+ */
+export function useCreateFeedPost() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async ({
+			text,
+			tag,
+			media,
+			onMediaChange,
+		}: {
+			text: string;
+			tag: PostTag;
+			media: ComposerMedia[];
+			onMediaChange: (id: string, patch: Partial<ComposerMedia>) => void;
+		}) => {
+			const uploaded =
+				media.length > 0 ? await uploadFeedMedia(media, onMediaChange) : null;
+
+			return feedApi.create({
+				text,
+				tag,
+				mediaKeys: uploaded?.mediaKeys ?? [],
+				// The schema refuses media keys without their folder, so this pair
+				// is set together or not at all.
+				...(uploaded ? { mediaFolder: uploaded.mediaFolder } : {}),
+			});
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
+		},
+	});
+}
+
+/**
+ * Delete a post. The server allows it for the post's own author (or a
+ * superadmin) and removes the stored media with it, which is why an NGO
+ * needs this reachable from the feed: it is the only way to take back
+ * something already published.
+ */
+export function useDeleteFeedPost() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: (id: string) => feedApi.remove(id),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
+		},
 	});
 }
 

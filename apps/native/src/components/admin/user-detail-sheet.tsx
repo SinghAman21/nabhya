@@ -19,11 +19,11 @@ import {
 	verificationTone,
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import { confirm, toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption } from "@/components/ui/typography";
 import { useAdminUser, useSetUserStatus } from "@/hooks/use-admin";
 import { useTheme } from "@/hooks/use-theme";
-import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 
@@ -60,7 +60,7 @@ export function UserDetailSheet({
 		if (reasonError && text.trim()) setReasonError(null);
 	};
 
-	const toggleSuspension = () => {
+	const toggleSuspension = async () => {
 		if (!userId || !user) return;
 		const suspending = user.status !== "SUSPENDED";
 		const text = reason.trim();
@@ -71,33 +71,32 @@ export function UserDetailSheet({
 		}
 		setReasonError(null);
 
-		Alert.alert(
-			suspending ? "Suspend account?" : "Reinstate account?",
-			suspending
+		const ok = await confirm({
+			title: suspending ? "Suspend account?" : "Reinstate account?",
+			message: suspending
 				? "They will be signed out and blocked from the app until reinstated."
 				: "They will regain access immediately.",
-			[
-				{ text: "Cancel", style: "cancel" },
-				{
-					text: suspending ? "Suspend" : "Reinstate",
-					style: suspending ? "destructive" : "default",
-					onPress: () =>
-						setStatus.mutate(
-							{
-								id: userId,
-								input: {
-									status: suspending ? "SUSPENDED" : "ACTIVE",
-									reason: text || undefined,
-								},
-							},
-							{
-								onSuccess: () => setReason(""),
-								onError: (error) =>
-									Alert.alert("Could not update", apiErrorMessage(error)),
-							},
-						),
+			confirmLabel: suspending ? "Suspend" : "Reinstate",
+			destructive: suspending,
+		});
+		if (!ok) return;
+		setStatus.mutate(
+			{
+				id: userId,
+				input: {
+					status: suspending ? "SUSPENDED" : "ACTIVE",
+					reason: text || undefined,
 				},
-			],
+			},
+			{
+				onSuccess: () => {
+					setReason("");
+					toast.success(
+						suspending ? "Account suspended." : "Account reinstated.",
+					);
+				},
+				onError: (error) => toast.error(apiErrorMessage(error)),
+			},
 		);
 	};
 

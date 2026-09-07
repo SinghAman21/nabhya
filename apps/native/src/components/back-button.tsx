@@ -3,7 +3,6 @@ import { ChevronLeft } from "lucide-react-native";
 import type { ViewStyle } from "react-native";
 import { Pressable } from "@/components/ui/pressable";
 import { useTheme } from "@/hooks/use-theme";
-import { useMedia } from "@/hooks/useMedia";
 import { focusable } from "@/lib/focus";
 
 interface BackButtonProps {
@@ -22,6 +21,15 @@ interface BackButtonProps {
  * reads as navigation, where an arrow reads as an action. `ScreenHeader back`
  * lays it out inline with the title; the two hero screens (event, NGO) place
  * it themselves.
+ *
+ * It renders on desktop too. It used to return `null` there on the theory that
+ * the browser's own back button and the sidebar cover it — but half the app's
+ * pushed pages (notifications, bookmarks, a certificate, an NGO's public page)
+ * are not sidebar destinations, so on the web they opened with no visible way
+ * back and a header whose title sat where the control should be. Chrome's back
+ * button is also the *browser's* history, not the app's: it is one row of
+ * pixels outside the viewport, and a keyboard user tabbing the page never
+ * reaches it.
  */
 export function BackButton({
 	hitSlop = 8,
@@ -30,11 +38,8 @@ export function BackButton({
 	style,
 	fallbackHref = "/",
 }: BackButtonProps) {
-	const { isDesktop } = useMedia();
 	const { colors } = useTheme();
 	const router = useRouter();
-
-	if (isDesktop) return null;
 
 	const goBack = () => {
 		if (router.canGoBack()) router.back();

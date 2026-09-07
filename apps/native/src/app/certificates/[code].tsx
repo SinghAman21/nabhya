@@ -13,6 +13,7 @@ import { useVerifyCertificate } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
+import { verticalScrollbar } from "@/lib/scroll";
 
 /**
  * Public certificate verification.
@@ -44,7 +45,7 @@ export default function VerifyCertificate() {
 				/>
 			) : (
 				<ScrollView
-					showsVerticalScrollIndicator={false}
+					{...verticalScrollbar}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
 				>
 					<View style={{ alignItems: "center", marginBottom: spacing[6] }}>

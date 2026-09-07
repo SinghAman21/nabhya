@@ -192,10 +192,72 @@ comments live under `/api/feed/:type/:id/*`; "Follow" is `organization_follows`
 to four media files are created via `/api/feed/upload-intents` + `POST /api/feed`.
 Client: `lib/feed-adapter.ts` maps the server row to the card's `FeedItem`
 (kinds `need`/`event`/`story`/`post`), `hooks/use-feed.ts` picks the view per lens
-(Urgent = For You + `urgent`), `components/feed/*` render it, `app/search.tsx`
-searches NGOs and posts with kind tabs, `app/feed.tsx` is the composer (linked from
-the NGO dashboard). All sheets go through `components/ui/sheet.tsx`
-(`@gorhom/bottom-sheet` in a Modal on native).
+(Urgent = For You + `urgent`), `components/feed/*` render it, and `app/search.tsx`
+searches NGOs and posts with kind tabs. The composer is
+`components/post-composer.tsx` — `PostComposer` (the drawer) plus
+`PostComposerBar` (the prompt row) — mounted from `(ngo)/feed.tsx` and the NGO
+dashboard; `app/feed.tsx` is only a back-compat redirect to `(ngo)/feed`.
+
+**The composer creates all four feed row types, each through the endpoint that
+owns it** — Update → `POST /api/feed`, Need → `POST /api/org/needs`, Event →
+`POST /api/org/events`, Announcement → `POST /api/org/announcements` — and
+collects the structured fields each one needs (a need's quantity/unit/expiry, an
+event's dates/venue/headcount), which is what makes `NeedFacts` and `EventFacts`
+render on the card. It used to write a `posts` row for all of them and vary only
+the tag; because `FeedRankingService` emits a post's candidate type straight
+from its tag (`type: post.tag`) while its content stays `{ text, media }`, a
+post tagged `NEED` reached `toFeedItem`'s `NEED` branch, which reads
+`content.title`/`quantity`/`description` — so the card had no title, no body,
+no facts and a CTA pointing at a need id that was really a post id. Rows written
+before the fix are still in the database, so `toFeedItem` now discriminates on
+**`content.text`** (present on a posts row and nothing else) rather than on the
+declared type. `URGENT` is a tag but not a composer type: it is Update plus the
+urgency switch, and `URGENCY` in the composer records why an event's urgency is
+derived and an announcement's impossible. Media, drafts and the
+mention-a-need/event tool are Update-only, each saying why.
+
+`components/composer/` holds the parts: `composer-bar` (the trigger),
+`need-fields` / `event-fields` / `announcement-fields` (one per type, each
+exporting its own value shape so adding a field touches one file),
+`property-row`, `amount-field`, `place-field`, `media-tiles` and `tools`.
+`post-composer.tsx` is the shell that holds the state and submits; it
+re-exports `PostComposerBar` so callers keep one import path. Four product
+rules live in those files rather than being re-decided per screen:
+
+- **Properties are a chip row, not a stack of fields.** `PropertyRow` +
+  `PropertyChip` carry every boolean and every optional field in one wrapping
+  line — a chip is `add` / `off` / `on`, an add-chip opens its field below
+  (`RevealedFields`) and stays on as the index of what the post carries, and
+  anything the author *cannot* set is a `PropertyNote` sentence rather than a
+  dead control (an event's urgency is derived from its start date). This
+  replaced a full-width switch row per boolean, which made "pinned" the
+  heaviest element on an announcement whose only property it was.
+- **A count and its unit are one control.** `AmountField` renders
+  `− 200 blankets +` under one label with quick-add chips (`+10 +50 +100`),
+  because "200" and "blankets" are one fact and the card prints them as one
+  string. Empty is unspecified, never `0`: `−` at 1 clears, since a need's
+  `quantity` is optional in the schema while `0` is invalid.
+- **Place is never asked for.** The city comes from the NGO's registration and
+  is stated in a note; an "Another city" chip opens `PlaceField` for the
+  exceptions. **The state has no UI at all** — `onboarding.ts` requires one to
+  register, so it travels silently from the org record, and `PlaceField` shows
+  a box only if that record somehow lacks it. An event's **address** is
+  prefilled from the org rather than silent, because an address often *isn't*
+  the NGO's.
+- **Dates are typed or picked.** `date-time-field.tsx` masks as you type
+  (`12032026` → `12/03/2026`, and the colon in `HH:MM`) and opens an inline
+  Monday-first `MonthGrid` from a calendar button. Inline, not a popover — a
+  portalling primitive cannot clear the host modal, and every caller is inside
+  a sheet or drawer. Picking a day keeps the time already entered.
+
+Attachment vetting and the upload loop live in `lib/feed-media.ts`, which is
+also where the reasons are written down: **the server derives a post's
+IMAGE-vs-VIDEO from the object key's file extension**, so a media file name
+must always carry the extension matching its content type. Deleting one's own
+post is `useDeleteFeedPost` → `DELETE /api/feed/:id`, surfaced as an overflow
+control the feed card draws only when the caller passes `onDelete`. All sheets
+go through `components/ui/sheet.tsx` (`@gorhom/bottom-sheet` in a Modal on
+native; `wide` widens the desktop dialog to 560 for a non-column body).
 
 Client route groups: `(auth)`, `(onboarding)` (`index` = NGO wizard, `volunteer` =
 volunteer wizard), `(ngo)`, `(volunteer)`, `(admin)`, and public `events/`,
@@ -206,9 +268,12 @@ design: `POST /api/donations/webhook` (called by Razorpay, signature-authenticat
 and `POST /api/admin/events/close-finished` (a cron target — see Deploying).
 If you add an endpoint, wire it to a screen or explain here why it has none.
 
-**Not built:** `apps/web`, email/push delivery (notifications are in-app only),
-and pagination controls — every list endpoint returns a `Paginated<T>` envelope
-but the screens only ever render page 1.
+**Not built:** `apps/web`, and email/push delivery (notifications are in-app
+only). Paging *is* wired: `apps/native/src/components/paged-list.tsx`
+(`usePagedQuery` + `PagedList`) turns any `Paginated<T>` endpoint into an
+infinite list, and the two screens that do not use it say why in the file — the
+team endpoint returns the whole team, and the volunteer activity timeline merges
+the first page of five endpoints because a true merged cursor is server work.
 
 ### Conventions worth copying
 

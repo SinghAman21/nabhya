@@ -2,9 +2,10 @@ import { DONATION_PRESETS_MINOR, formatMinor } from "@nabhya/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, Platform, View } from "react-native";
+import { Platform, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption, Label } from "@/components/ui/typography";
@@ -183,16 +184,14 @@ export function DonateSheet({
 				}) => {
 					onClose();
 					if (!orderId || !razorpayKeyId) {
-						Alert.alert(
-							"Payment unavailable",
-							"This payment provider does not support native checkout.",
+						toast.error(
+							"This payment provider does not support checkout here. Nothing has been charged.",
 						);
 						return;
 					}
 					const checkout = await loadRazorpay();
 					if (!checkout) {
-						Alert.alert(
-							"Couldn't open checkout",
+						toast.error(
 							Platform.OS === "web"
 								? "Razorpay's checkout script didn't load. Check your connection and try again."
 								: "Donations open Razorpay's secure checkout, which is not available in this preview — use the dev client build instead.",
@@ -217,9 +216,12 @@ export function DonateSheet({
 							theme: { color: colors.primary.main as string },
 						});
 						queryClient.invalidateQueries({ queryKey: queryScopes.donations });
-						Alert.alert(
-							"Thank you!",
-							"We're confirming your donation now — check My Donations shortly.",
+						// Deliberately not "donation complete": only Razorpay's
+						// signed webhook moves a donation to COMPLETED, so the
+						// client's own success callback can only promise that it
+						// is being confirmed.
+						toast.success(
+							"Thank you — we're confirming your donation now. It will show in My Donations shortly.",
 						);
 					} catch (err: unknown) {
 						// User-cancelled checkouts land here too (react-native-razorpay
@@ -229,9 +231,9 @@ export function DonateSheet({
 							typeof err === "object" && err !== null && "description" in err
 								? String((err as { description?: unknown }).description)
 								: null;
-						Alert.alert(
-							"Payment not completed",
-							description || "You can try again from My Donations.",
+						toast.error(
+							description ||
+								"Payment not completed. You can try again from My Donations.",
 						);
 					}
 				},

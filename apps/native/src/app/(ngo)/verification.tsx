@@ -1,6 +1,6 @@
-import type { UploadOrgDocumentInput } from "@nabhya/shared";
 import { ORG_DOCUMENT_LABELS } from "@nabhya/shared";
-import { RefreshControl, ScrollView, View } from "react-native";
+import { Lock, ShieldCheck } from "lucide-react-native";
+import { RefreshControl, ScrollView, View, type ViewStyle } from "react-native";
 import { DocumentUploadTile } from "@/components/document-upload-tile";
 import {
 	Banner,
@@ -9,48 +9,64 @@ import {
 	Screen,
 	ScreenHeader,
 	SectionTitle,
+	Surface,
 } from "@/components/screen-shell";
 import { StepIndicator } from "@/components/step-indicator";
-import { Caption } from "@/components/ui/typography";
+import { Body, Caption, Label } from "@/components/ui/typography";
 import { useMyOrgDocuments, useUploadOrgDocument } from "@/hooks/use-documents";
 import { useMyOrganization } from "@/hooks/use-organization";
 import { useTheme } from "@/hooks/use-theme";
+import { useMedia } from "@/hooks/useMedia";
 import { apiErrorMessage } from "@/lib/api";
-
-type DocType = UploadOrgDocumentInput["documentType"];
-
-const REQUIRED: Array<{ type: DocType; hint: string }> = [
-	{
-		type: "NGO_REGISTRATION_CERTIFICATE",
-		hint: "Trust deed, society registration or Section 8 incorporation certificate.",
-	},
-	{
-		type: "PAN_CARD",
-		hint: "The organisation's PAN card, not a trustee's.",
-	},
-];
-
-const OPTIONAL: Array<{ type: DocType; hint: string }> = [
-	{
-		type: "80G_CERTIFICATE",
-		hint: "Lets donors claim tax relief. Shown as a badge on your profile.",
-	},
-	{
-		type: "12A_CERTIFICATE",
-		hint: "Income-tax registration for the trust. Speeds up review.",
-	},
-];
-
-const STEPS = ["Documents", "Review", "Verified"];
+import {
+	ORG_OPTIONAL_DOCUMENTS,
+	ORG_REQUIRED_DOCUMENTS,
+	ORG_VERIFICATION_STEPS,
+	type OrgDocumentType,
+	orgVerificationStep,
+} from "@/lib/org-verification";
+import { verticalScrollbar } from "@/lib/scroll";
 
 /**
- * Verification, as a three-step journey the NGO can see itself on: upload the
- * required documents, wait for review, become verified. The step indicator is
- * derived from the organisation's status and the document set, so it moves on
- * its own as the reviewer works.
+ * Verification, as a three-stage journey the NGO can see itself on.
+ *
+ * ## Layout
+ *
+ * Desktop is two columns. The wide one is the work — the stage rail, where you
+ * stand, and the upload slots. The narrow one is the reassurance: what a
+ * reviewer is checking, how long it takes, and that none of it is ever public.
+ * That copy used to be a single grey sentence at the very bottom, below eight
+ * upload tiles, which is the one place a worried person will not look.
+ *
+ * The upload slots pair up two-across on desktop. Each is a card, and a column
+ * of four full-width cards on a 1000pt page is a lot of scrolling for four
+ * files.
+ *
+ * The stage rail sits inside a `Surface` via `StepIndicator embedded`. It used
+ * to be the wizard variant, dragged into place with
+ * `marginHorizontal: -spacing[6]` to cancel gutters and a safe-area inset it
+ * had no business applying on a pushed page that already has a header.
+ *
+ * ## Where the document set is defined
+ *
+ * `lib/org-verification.ts`, not here — the profile's Verification tab reports
+ * on the same four slots and the same three stages, and two screens disagreeing
+ * about which one you are on is worse than neither showing it.
  */
+
+/** Wide enough for two upload cards side by side, and no wider. */
+const PAGE: ViewStyle = {
+	width: "100%",
+	maxWidth: 1080,
+	alignSelf: "center",
+};
+
+const MAIN_COLUMN = 2;
+const ASIDE_COLUMN = 1;
+
 export default function NgoVerification() {
 	const { colors, spacing } = useTheme();
+	const { isDesktop } = useMedia();
 
 	const org = useMyOrganization();
 	const documents = useMyOrgDocuments();
@@ -59,19 +75,23 @@ export default function NgoVerification() {
 	const byType = new Map(
 		(documents.data ?? []).map((doc) => [doc.documentType, doc]),
 	);
-	const requiredUploaded = REQUIRED.filter((d) => byType.has(d.type)).length;
-	const allRequired = requiredUploaded === REQUIRED.length;
+	const requiredUploaded = ORG_REQUIRED_DOCUMENTS.filter((d) =>
+		byType.has(d.type),
+	).length;
+	const allRequired = requiredUploaded === ORG_REQUIRED_DOCUMENTS.length;
 	const rejected = (documents.data ?? []).filter(
 		(doc) => doc.verificationStatus === "REJECTED",
 	);
 
 	const status = org.data?.verificationStatus;
 	const isVerified = status === "VERIFIED";
-	const currentStep = isVerified ? 2 : allRequired ? 1 : 0;
+	const currentStep = orgVerificationStep(status, requiredUploaded);
 
-	const handleUploaded = (documentType: DocType, key: string) => {
+	const handleUploaded = (documentType: OrgDocumentType, key: string) =>
 		upload.mutate({ documentType, documentKey: key });
-	};
+
+	const isSaving = (type: OrgDocumentType) =>
+		upload.isPending && upload.variables?.documentType === type;
 
 	const banner = isVerified ? (
 		<Banner
@@ -97,21 +117,146 @@ export default function NgoVerification() {
 	) : (
 		<Banner
 			tone="warning"
-			title={`${requiredUploaded} of ${REQUIRED.length} required documents uploaded`}
+			title={`${requiredUploaded} of ${ORG_REQUIRED_DOCUMENTS.length} required documents uploaded`}
 			description="Review starts as soon as both are in. Until you're verified, events and needs stay private."
 		/>
 	);
 
-	const isSaving = (type: DocType) =>
-		upload.isPending && upload.variables?.documentType === type;
+	/**
+	 * Two across on desktop, one per row on a phone. `flexBasis: "48%"` rather
+	 * than `flex: 1` so a section with an odd number of slots leaves the last
+	 * one at half width instead of stretching it across the row.
+	 */
+	const slots = (specs: typeof ORG_REQUIRED_DOCUMENTS) => (
+		<View
+			style={{
+				flexDirection: isDesktop ? "row" : "column",
+				flexWrap: "wrap",
+				gap: spacing[3],
+			}}
+		>
+			{specs.map((doc) => (
+				<View
+					key={doc.type}
+					style={isDesktop ? { flexBasis: "48%", flexGrow: 1 } : undefined}
+				>
+					<DocumentUploadTile
+						title={ORG_DOCUMENT_LABELS[doc.type] ?? doc.type}
+						hint={doc.hint}
+						purpose="ORG_DOCUMENT"
+						existing={byType.get(doc.type)}
+						onUploaded={(key) => handleUploaded(doc.type, key)}
+						saving={isSaving(doc.type)}
+					/>
+				</View>
+			))}
+		</View>
+	);
+
+	const stages = (
+		<Surface>
+			<StepIndicator
+				steps={ORG_VERIFICATION_STEPS}
+				currentStep={currentStep}
+				embedded
+			/>
+		</Surface>
+	);
+
+	const main = (
+		<View style={{ gap: spacing[6] }}>
+			{stages}
+			{banner}
+
+			{upload.isError ? (
+				<Banner
+					tone="error"
+					title="Could not attach the document"
+					description={apiErrorMessage(upload.error)}
+				/>
+			) : null}
+
+			<View>
+				<SectionTitle>Required</SectionTitle>
+				{slots(ORG_REQUIRED_DOCUMENTS)}
+			</View>
+
+			<View>
+				<SectionTitle>Optional</SectionTitle>
+				{slots(ORG_OPTIONAL_DOCUMENTS)}
+			</View>
+		</View>
+	);
+
+	/**
+	 * The answers to the two questions an NGO actually has here — "what are they
+	 * looking for?" and "who sees my PAN card?" — placed where they are read
+	 * rather than in a footnote under the last upload slot.
+	 */
+	const aside = (
+		<View style={{ gap: spacing[6] }}>
+			<View>
+				<SectionTitle>What a reviewer checks</SectionTitle>
+				<Surface>
+					<View style={{ gap: spacing[4] }}>
+						<Note
+							icon={ShieldCheck}
+							title="That the organisation is real"
+							body="The registration certificate is matched against the registration number on your profile, so the two need to agree."
+						/>
+						<Note
+							icon={ShieldCheck}
+							title="That the PAN belongs to the NGO"
+							body="Not a trustee's or a founder's. A personal PAN is the most common reason a review is sent back."
+						/>
+						<Note
+							icon={ShieldCheck}
+							title="That the copy is readable"
+							body="A photograph is fine if every line can be read. Corners cut off, glare across a seal, or a page missing all mean another round."
+						/>
+					</View>
+				</Surface>
+			</View>
+
+			<Surface>
+				<View style={{ flexDirection: "row", gap: spacing[3] }}>
+					<Lock
+						size={18}
+						strokeWidth={1.75}
+						color={colors.text.tertiary as string}
+					/>
+					<View style={{ flex: 1, gap: spacing[1] }}>
+						<Label>Private to you and the reviewer</Label>
+						<Caption color="tertiary">
+							These documents never appear on your public page, in the feed, or
+							to a volunteer or donor. Verification shows as a badge; the paper
+							behind it does not.
+						</Caption>
+					</View>
+				</View>
+			</Surface>
+
+			<Surface>
+				<View style={{ gap: spacing[1] }}>
+					<Label>How long it takes</Label>
+					<Caption color="tertiary">
+						Usually a few days once both required documents are in. You are
+						notified either way — there is nothing to keep checking.
+					</Caption>
+				</View>
+			</Surface>
+		</View>
+	);
 
 	return (
 		<Screen>
-			<ScreenHeader
-				back
-				title="Verification"
-				subtitle="Reviewed by the Nabhya team"
-			/>
+			<View style={PAGE}>
+				<ScreenHeader
+					back
+					title="Verification"
+					subtitle="Reviewed by the Nabhya team"
+				/>
+			</View>
 
 			{documents.isLoading || org.isLoading ? (
 				<LoadingState />
@@ -122,75 +267,63 @@ export default function NgoVerification() {
 				/>
 			) : (
 				<ScrollView
-					showsVerticalScrollIndicator={false}
+					{...verticalScrollbar}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
 					refreshControl={
-						<RefreshControl
-							refreshing={documents.isRefetching || org.isRefetching}
-							onRefresh={() => {
-								documents.refetch();
-								org.refetch();
-							}}
-							tintColor={colors.text.quaternary as string}
-						/>
+						isDesktop ? undefined : (
+							<RefreshControl
+								refreshing={documents.isRefetching || org.isRefetching}
+								onRefresh={() => {
+									documents.refetch();
+									org.refetch();
+								}}
+								tintColor={colors.text.quaternary as string}
+							/>
+						)
 					}
 				>
-					{/* StepIndicator carries its own gutters and top padding; pull it
-					    back into the screen's gutters so it lines up with the cards. */}
-					<View
-						style={{ marginHorizontal: -spacing[6], marginTop: -spacing[6] }}
-					>
-						<StepIndicator steps={STEPS} currentStep={currentStep} />
+					<View style={PAGE}>
+						{isDesktop ? (
+							<View style={{ flexDirection: "row", gap: spacing[6] }}>
+								<View style={{ flex: MAIN_COLUMN, minWidth: 0 }}>{main}</View>
+								<View style={{ flex: ASIDE_COLUMN, minWidth: 0 }}>{aside}</View>
+							</View>
+						) : (
+							<View style={{ gap: spacing[6] }}>
+								{main}
+								{aside}
+							</View>
+						)}
 					</View>
-
-					<View style={{ marginBottom: spacing[6] }}>{banner}</View>
-
-					{upload.isError && (
-						<View style={{ marginBottom: spacing[5] }}>
-							<Banner
-								tone="error"
-								title="Could not attach the document"
-								description={apiErrorMessage(upload.error)}
-							/>
-						</View>
-					)}
-
-					<SectionTitle>Required</SectionTitle>
-					<View style={{ gap: spacing[3], marginBottom: spacing[6] }}>
-						{REQUIRED.map((doc) => (
-							<DocumentUploadTile
-								key={doc.type}
-								title={ORG_DOCUMENT_LABELS[doc.type] ?? doc.type}
-								hint={doc.hint}
-								purpose="ORG_DOCUMENT"
-								existing={byType.get(doc.type)}
-								onUploaded={(key) => handleUploaded(doc.type, key)}
-								saving={isSaving(doc.type)}
-							/>
-						))}
-					</View>
-
-					<SectionTitle>Optional</SectionTitle>
-					<View style={{ gap: spacing[3] }}>
-						{OPTIONAL.map((doc) => (
-							<DocumentUploadTile
-								key={doc.type}
-								title={ORG_DOCUMENT_LABELS[doc.type] ?? doc.type}
-								hint={doc.hint}
-								purpose="ORG_DOCUMENT"
-								existing={byType.get(doc.type)}
-								onUploaded={(key) => handleUploaded(doc.type, key)}
-								saving={isSaving(doc.type)}
-							/>
-						))}
-					</View>
-
-					<Caption color="quaternary" style={{ marginTop: spacing[6] }}>
-						Documents are private to you and the reviewer. They are never shown
-						on your public profile.
-					</Caption>
 				</ScrollView>
 			)}
 		</Screen>
+	);
+}
+
+function Note({
+	icon: Icon,
+	title,
+	body,
+}: {
+	icon: typeof ShieldCheck;
+	title: string;
+	body: string;
+}) {
+	const { colors, spacing } = useTheme();
+
+	return (
+		<View style={{ flexDirection: "row", gap: spacing[3] }}>
+			<Icon
+				size={17}
+				strokeWidth={1.75}
+				color={colors.text.tertiary as string}
+				style={{ marginTop: 2 }}
+			/>
+			<View style={{ flex: 1, gap: spacing[0.5] }}>
+				<Body weight="medium">{title}</Body>
+				<Caption color="tertiary">{body}</Caption>
+			</View>
+		</View>
 	);
 }

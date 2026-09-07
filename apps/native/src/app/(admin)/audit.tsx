@@ -20,6 +20,7 @@ import { useAuditLogsPaged } from "@/hooks/use-admin-lists";
 import { useTheme } from "@/hooks/use-theme";
 import { useDebounced } from "@/hooks/useDebounced";
 import { apiErrorMessage } from "@/lib/api";
+import { verticalScrollbar } from "@/lib/scroll";
 
 type EntityFilter = NonNullable<AuditLogQuery["entityName"]> | "ALL";
 
@@ -73,7 +74,7 @@ export default function AdminAuditLog() {
 				<FlatList
 					data={query.items}
 					keyExtractor={(item) => item.id}
-					showsVerticalScrollIndicator={false}
+					{...verticalScrollbar}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
 					ItemSeparatorComponent={() => (
 						<View

@@ -25,14 +25,15 @@ import {
 } from "@/components/status-pill";
 import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
+import { confirm, toast } from "@/components/ui/overlay";
 import { Body, Caption, Label } from "@/components/ui/typography";
 import { useDeleteEvent } from "@/hooks/use-events";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useGridColumns } from "@/hooks/useMedia";
-import { Alert } from "@/lib/alert";
 import { apiErrorMessage, orgEventsApi, queryKeys } from "@/lib/api";
 import { formatDateRange } from "@/lib/format";
+import { verticalScrollbar } from "@/lib/scroll";
 import type { OrgEventListItem } from "@/lib/types";
 
 type StatusFilter = "ALL" | EventStatus;
@@ -83,25 +84,24 @@ export default function NgoEvents() {
 		if (query.hasNextPage && !query.isFetchingNextPage) query.fetchNextPage();
 	};
 
-	const confirmDelete = (event: OrgEventListItem) => {
-		Alert.alert(
-			"Remove event",
-			event.acceptedCount > 0
-				? `${event.acceptedCount} volunteer${event.acceptedCount === 1 ? " has" : "s have"} already been accepted, so this event will be cancelled rather than deleted.`
-				: `"${event.title}" will be deleted.`,
-			[
-				{ text: "Cancel", style: "cancel" },
-				{
-					text: event.acceptedCount > 0 ? "Cancel event" : "Delete",
-					style: "destructive",
-					onPress: () =>
-						deleteEvent.mutate(event.id, {
-							onError: (error) =>
-								Alert.alert("Could not remove", apiErrorMessage(error)),
-						}),
-				},
-			],
-		);
+	const confirmDelete = async (event: OrgEventListItem) => {
+		// An event with accepted volunteers is cancelled, not deleted — the
+		// server keeps it so their applications and certificates survive — so
+		// the wording and the button both have to say which one is happening.
+		const cancelling = event.acceptedCount > 0;
+		const ok = await confirm({
+			title: cancelling ? "Cancel this event?" : "Delete this event?",
+			message: cancelling
+				? `${event.acceptedCount} volunteer${event.acceptedCount === 1 ? " has" : "s have"} already been accepted, so "${event.title}" will be cancelled rather than deleted. They will be notified.`
+				: `"${event.title}" will be deleted. This cannot be undone.`,
+			confirmLabel: cancelling ? "Cancel event" : "Delete",
+		});
+		if (!ok) return;
+		deleteEvent.mutate(event.id, {
+			onSuccess: () =>
+				toast.success(cancelling ? "Event cancelled." : "Event deleted."),
+			onError: (error) => toast.error(apiErrorMessage(error)),
+		});
 	};
 
 	const openCreate = () => setFormOpen(true);
@@ -147,7 +147,7 @@ export default function NgoEvents() {
 					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
 					data={items}
 					keyExtractor={(item) => item.id}
-					showsVerticalScrollIndicator={false}
+					{...verticalScrollbar}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
 					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
 					onEndReached={loadMore}

@@ -391,6 +391,68 @@ function Chevron() {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Facts                                                                      */
+/* -------------------------------------------------------------------------- */
+
+export interface Fact {
+	label: string;
+	/** Rendered as `Body` when a string. Falsy values drop the whole row. */
+	value?: React.ReactNode;
+}
+
+/**
+ * A record's own details — label above value, hairline between rows.
+ *
+ * Deliberately *not* a `ListRow` with a trailing `value`. That shape puts the
+ * label hard left and the value hard right, which works for a short state word
+ * on a phone and falls apart everywhere else: on a 660pt column a phone number
+ * ends up a hand's width from the word "Phone", and a two-line address wraps
+ * against the label. Stacking removes the question of how wide the gap should
+ * be, and reads the same at every column width.
+ *
+ * Empty facts are dropped rather than shown blank, so a sparse organisation
+ * gets a short card instead of a column of dashes.
+ */
+export function FactList({ facts }: { facts: Fact[] }) {
+	const { colors, spacing } = useTheme();
+	const present = facts.filter((fact) => Boolean(fact.value));
+
+	if (present.length === 0) return null;
+
+	return (
+		<Surface padded={false}>
+			{present.map((fact, index) => (
+				<View key={fact.label}>
+					{index > 0 && (
+						<View
+							style={{
+								height: 1,
+								marginLeft: spacing[4],
+								backgroundColor: colors.border.hairline,
+							}}
+						/>
+					)}
+					<View
+						style={{
+							paddingHorizontal: spacing[4],
+							paddingVertical: spacing[3.5],
+							gap: spacing[0.5],
+						}}
+					>
+						<Caption color="tertiary">{fact.label}</Caption>
+						{typeof fact.value === "string" ? (
+							<Body>{fact.value}</Body>
+						) : (
+							fact.value
+						)}
+					</View>
+				</View>
+			))}
+		</Surface>
+	);
+}
+
+/* -------------------------------------------------------------------------- */
 /* Metrics                                                                    */
 /* -------------------------------------------------------------------------- */
 

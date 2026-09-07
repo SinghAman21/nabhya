@@ -10,11 +10,11 @@ import {
 } from "@/components/screen-shell";
 import { StatusPill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
 import { Caption, H5 } from "@/components/ui/typography";
 import { useCertificatePdf } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
-import { Alert } from "@/lib/alert";
 import { apiErrorMessage, certificatesApi, queryKeys } from "@/lib/api";
 import { focusable } from "@/lib/focus";
 import { formatDate } from "@/lib/format";
@@ -39,10 +39,9 @@ export default function Certificates() {
 			onSuccess: async ({ url }) => {
 				const canOpen = await Linking.canOpenURL(url);
 				if (canOpen) await Linking.openURL(url);
-				else Alert.alert("Could not open", "No app available to open the PDF.");
+				else toast.error("No app on this device can open a PDF.");
 			},
-			onError: (error) =>
-				Alert.alert("Could not download", apiErrorMessage(error)),
+			onError: (error) => toast.error(apiErrorMessage(error)),
 		});
 	};
 

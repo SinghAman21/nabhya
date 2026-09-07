@@ -34,6 +34,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { focusable } from "@/lib/focus";
 import { formatDateRange, formatRelative } from "@/lib/format";
+import { verticalScrollbar } from "@/lib/scroll";
 
 /*
  * Everything the volunteer has done, in one timeline.
@@ -286,7 +287,7 @@ export default function Activity() {
 				/>
 			) : (
 				<ScrollView
-					showsVerticalScrollIndicator={false}
+					{...verticalScrollbar}
 					contentContainerStyle={{
 						paddingBottom: spacing[10],
 						gap: spacing[6],

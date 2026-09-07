@@ -5,8 +5,8 @@ import type {
 	ApplicationQuery,
 	ApplyToEventInput,
 	AuditLogQuery,
-	CompleteOrgOnboardingInput,
-	CompleteVolunteerOnboardingInput,
+	CompleteOrgOnboardingPayload,
+	CompleteVolunteerOnboardingPayload,
 	CreateEventInput,
 	CreateFeedCommentInput,
 	CreateFeedMediaIntentsInput,
@@ -101,9 +101,13 @@ export const usersApi = {
 
 export const onboardingApi = {
 	status: () => http.get<OnboardingStatus>(ONBOARDING.STATUS),
-	completeOrganization: (input: CompleteOrgOnboardingInput) =>
+	// The payload types are the schemas' *input* side: the wizards post raw form
+	// values and the server normalises them. Posting the client-parsed output
+	// fails validation — `optionalText` turns "" into null, and null is not
+	// valid input for it.
+	completeOrganization: (input: CompleteOrgOnboardingPayload) =>
 		http.post<{ id: string }>(ONBOARDING.ORGANIZATION, input),
-	completeVolunteer: (input: CompleteVolunteerOnboardingInput) =>
+	completeVolunteer: (input: CompleteVolunteerOnboardingPayload) =>
 		http.post<MyProfile>(ONBOARDING.VOLUNTEER, input),
 };
 

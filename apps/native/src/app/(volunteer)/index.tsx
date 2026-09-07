@@ -1,4 +1,4 @@
-import type { FeedTab, NeedType } from "@nabhya/shared";
+import type { FeedTab } from "@nabhya/shared";
 import { FlashList } from "@shopify/flash-list";
 import { useRouter } from "expo-router";
 import {
@@ -13,6 +13,7 @@ import type { ViewStyle } from "react-native";
 import {
 	ActivityIndicator,
 	RefreshControl,
+	ScrollView,
 	View,
 	type ViewToken,
 } from "react-native";
@@ -20,7 +21,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ALL_INDIA, CityPicker } from "@/components/city-picker";
 import { DiscoverRail } from "@/components/discover-rail";
 import { FeedCard, toPublicNeed } from "@/components/feed/feed-card";
-import { FeedFilterSheet, FeedTabs } from "@/components/feed/feed-filters";
+import {
+	type FeedContent,
+	FeedFilterSheet,
+	FeedTabs,
+	feedContentQuery,
+} from "@/components/feed/feed-filters";
 import { PledgeSheet } from "@/components/pledge-sheet";
 import {
 	EmptyState,
@@ -43,15 +49,25 @@ import { useDebounced } from "@/hooks/useDebounced";
 import { useMedia } from "@/hooks/useMedia";
 import { apiErrorMessage } from "@/lib/api";
 import { focusable } from "@/lib/focus";
+import { verticalScrollbar } from "@/lib/scroll";
 import type { FeedItem, FeedNeedItem } from "@/lib/types";
 import { useFeedStore } from "@/store/feed-store";
 
-const STICKY_RAIL = {
+/**
+ * The discover column.
+ *
+ * `alignSelf: "stretch"` and its own scroller, not `position: sticky`: the rail
+ * is a sibling of the feed's `FlatList`, not a child of it, so sticky has no
+ * scrolling ancestor to stick to — it only made the column size to its content
+ * and clip the bottom of "Happening soon" with no way to reach it. Same fix as
+ * `(ngo)/feed.tsx`, which is the other caller of this rail.
+ */
+const RAIL: ViewStyle = {
 	width: 320,
-	position: "sticky",
-	top: 0,
-	alignSelf: "flex-start",
-} as unknown as ViewStyle;
+	flexGrow: 0,
+	flexShrink: 0,
+	alignSelf: "stretch",
+};
 
 export default function Home() {
 	const { colors, spacing } = useTheme();
@@ -61,7 +77,7 @@ export default function Home() {
 
 	const [tab, setTab] = useState<FeedTab>("for_you");
 	const [categoryIds, setCategoryIds] = useState<string[]>([]);
-	const [needType, setNeedType] = useState<NeedType | undefined>();
+	const [content, setContent] = useState<FeedContent>("all");
 	const [filtersOpen, setFiltersOpen] = useState(false);
 	const [responding, setResponding] = useState<FeedNeedItem | null>(null);
 	const [detectedCity, setDetectedCity] = useState<string | null>(null);
@@ -82,12 +98,14 @@ export default function Home() {
 	const categories = useCategories();
 	const debouncedSearch = useDebounced(search.trim());
 
+	// One choice in the sheet, two query params: see `feedContentQuery`.
+	const contentQuery = feedContentQuery(content);
 	const feed = useFeed({
 		tab,
 		...(categoryIds.length ? { categoryIds } : {}),
 		...(city === ALL_INDIA ? {} : { city }),
 		...(debouncedSearch ? { search: debouncedSearch } : {}),
-		...(needType ? { needType } : {}),
+		...contentQuery,
 	});
 	useEffect(() => {
 		const firstPage = feed.data?.pages[0];
@@ -101,7 +119,7 @@ export default function Home() {
 			city === detectedCity &&
 			!debouncedSearch &&
 			categoryIds.length === 0 &&
-			!needType
+			content === "all"
 		) {
 			setDetectedCity(null);
 			setCity("Mumbai");
@@ -110,12 +128,12 @@ export default function Home() {
 	}, [
 		categoryIds.length,
 		city,
+		content,
 		debouncedSearch,
 		detectedCity,
 		feed.data,
 		feed.isError,
 		feed.isLoading,
-		needType,
 		setCity,
 	]);
 	const items = useMemo(
@@ -226,7 +244,7 @@ export default function Home() {
 				onTab={setTab}
 				gutter={gutter}
 				onOpenFilters={() => setFiltersOpen(true)}
-				filterActive={categoryIds.length > 0 || !!needType}
+				filterActive={categoryIds.length > 0 || content !== "all"}
 			/>
 		</View>
 	);
@@ -285,7 +303,7 @@ export default function Home() {
 			viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
 			onEndReached={loadMore}
 			onEndReachedThreshold={0.6}
-			showsVerticalScrollIndicator={false}
+			{...verticalScrollbar}
 			contentContainerStyle={{
 				paddingHorizontal: 0,
 				paddingTop: spacing[2],
@@ -313,18 +331,28 @@ export default function Home() {
 				<View
 					style={{
 						flex: 1,
+						minHeight: 0,
 						flexDirection: "row",
 						gap: spacing[6],
 						paddingRight: spacing[5],
 					}}
 				>
-					<View style={{ flex: 1 }}>
+					<View style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
 						{header}
 						{list}
 					</View>
-					<View style={STICKY_RAIL}>
+					{/* No scrollbar: this column is chrome, and a thumb on it reads
+					    as a second page competing with the feed's. */}
+					<ScrollView
+						showsVerticalScrollIndicator={false}
+						style={RAIL}
+						contentContainerStyle={{
+							paddingTop: spacing[1],
+							paddingBottom: spacing[10],
+						}}
+					>
 						<DiscoverRail />
-					</View>
+					</ScrollView>
 				</View>
 			) : (
 				<>
@@ -339,8 +367,8 @@ export default function Home() {
 				categories={categories.data ?? []}
 				categoryIds={categoryIds}
 				onCategories={setCategoryIds}
-				needType={needType}
-				onNeedType={setNeedType}
+				content={content}
+				onContent={setContent}
 			/>
 			<PledgeSheet
 				need={responding ? toPublicNeed(responding) : null}

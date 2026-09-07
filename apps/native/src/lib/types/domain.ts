@@ -342,7 +342,10 @@ export interface AdminOrgDetail {
 	mission: string | null;
 	vision: string | null;
 	website: string | null;
+	/** Object key, not a URL — resolve it with `useStoredImageUrl`. */
 	logo: string | null;
+	/** Object key, not a URL — resolve it with `useStoredImageUrl`. */
+	coverImage: string | null;
 	address: string | null;
 	city: string | null;
 	state: string | null;

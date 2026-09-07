@@ -5,7 +5,6 @@ import { View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Caption } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
-import { Alert } from "@/lib/alert";
 import { authService } from "@/lib/api/auth";
 import { apiErrorMessage } from "@/lib/api/http";
 import { useAuthStore } from "@/store/auth-store";
@@ -15,8 +14,17 @@ import { useAuthStore } from "@/store/auth-store";
  * as the same `signInWithOAuth` call, so there is no separate sign-up variant.
  * A new Google account is provisioned server-side on first token exchange the
  * same way email/password signup is.
+ *
+ * Failures are handed to `onError` rather than reported here, so they land in
+ * the host screen's own `AuthError` block above the submit button — one place
+ * on the form where anything that went wrong appears, whichever control caused
+ * it. A dismissed dialog left the form looking untouched.
  */
-export function GoogleSignInButton() {
+export function GoogleSignInButton({
+	onError,
+}: {
+	onError?: (message: string) => void;
+}) {
 	const { colors, spacing } = useTheme();
 	const setUser = useAuthStore((s) => s.setUser);
 	const queryClient = useQueryClient();
@@ -36,10 +44,14 @@ export function GoogleSignInButton() {
 				router.replace("/");
 			}
 		} catch (error) {
+			// A cancelled OAuth popup is not a failure — the person changed
+			// their mind — so it reports nothing.
 			if (error instanceof Error && error.message === "CANCELLED") return;
-			Alert.alert(
-				"Couldn't sign you in with Google",
-				apiErrorMessage(error, "Please try again."),
+			onError?.(
+				apiErrorMessage(
+					error,
+					"We couldn't sign you in with Google. Please try again.",
+				),
 			);
 		} finally {
 			setLoading(false);

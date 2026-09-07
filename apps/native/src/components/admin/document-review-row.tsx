@@ -9,12 +9,12 @@ import {
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption } from "@/components/ui/typography";
 import { useReviewDocument } from "@/hooks/use-admin";
 import { useOpenDocument } from "@/hooks/use-documents";
 import { useTheme } from "@/hooks/use-theme";
-import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { focusable } from "@/lib/focus";
 import { formatDateTime } from "@/lib/format";
@@ -57,8 +57,8 @@ export function DocumentReviewRow({
 		review.mutate(
 			{ id: document.id, input: { verificationStatus: "VERIFIED" } },
 			{
-				onError: (error) =>
-					Alert.alert("Could not approve", apiErrorMessage(error)),
+				onSuccess: () => toast.success("Document approved."),
+				onError: (error) => toast.error(apiErrorMessage(error)),
 			},
 		);
 	};
@@ -79,9 +79,9 @@ export function DocumentReviewRow({
 				onSuccess: () => {
 					setRejecting(false);
 					setRemarks("");
+					toast.success("Document rejected. The uploader has been told why.");
 				},
-				onError: (error) =>
-					Alert.alert("Could not reject", apiErrorMessage(error)),
+				onError: (error) => toast.error(apiErrorMessage(error)),
 			},
 		);
 	};

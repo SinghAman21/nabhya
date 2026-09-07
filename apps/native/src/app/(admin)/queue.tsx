@@ -24,6 +24,7 @@ import {
 } from "@/hooks/use-admin-lists";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
+import { verticalScrollbar } from "@/lib/scroll";
 
 type Kind = "organization" | "user";
 type Status = NonNullable<DocumentQueueQuery["status"]>;
@@ -103,7 +104,7 @@ function OrgDocumentQueue({ status }: { status: Status }) {
 		<FlatList
 			data={query.items}
 			keyExtractor={(item) => item.id}
-			showsVerticalScrollIndicator={false}
+			{...verticalScrollbar}
 			contentContainerStyle={{ paddingBottom: spacing[10] }}
 			ItemSeparatorComponent={() => <View style={{ height: spacing[2] }} />}
 			onEndReached={() => {
@@ -171,7 +172,7 @@ function UserDocumentQueue({ status }: { status: Status }) {
 		<FlatList
 			data={query.items}
 			keyExtractor={(item) => item.id}
-			showsVerticalScrollIndicator={false}
+			{...verticalScrollbar}
 			contentContainerStyle={{ paddingBottom: spacing[10] }}
 			ItemSeparatorComponent={() => <View style={{ height: spacing[2] }} />}
 			onEndReached={() => {

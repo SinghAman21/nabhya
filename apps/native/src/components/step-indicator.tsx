@@ -11,6 +11,15 @@ interface StepIndicatorProps {
 	currentStep: number;
 	/** When given, a 40pt back chevron sits above the steps. */
 	onBack?: () => void;
+	/**
+	 * Drops the safe-area inset, the gutters and the back slot, so the rail can
+	 * sit inside a card on a page that already has a header.
+	 *
+	 * Without this the only caller that is not a full-screen wizard had to undo
+	 * the padding with negative margins — `marginHorizontal: -spacing[6]` — which
+	 * is a component telling you it wants a variant.
+	 */
+	embedded?: boolean;
 }
 
 /**
@@ -22,6 +31,7 @@ export function StepIndicator({
 	steps,
 	currentStep,
 	onBack,
+	embedded,
 }: StepIndicatorProps) {
 	const { colors, spacing } = useTheme();
 	const insets = useSafeAreaInsets();
@@ -36,14 +46,22 @@ export function StepIndicator({
 				max: steps.length,
 				now: currentStep + 1,
 			}}
-			style={{
-				paddingHorizontal: spacing[5],
-				paddingTop: insets.top + spacing[3],
-				paddingBottom: spacing[5],
-			}}
+			style={
+				embedded
+					? {}
+					: {
+							paddingHorizontal: spacing[5],
+							paddingTop: insets.top + spacing[3],
+							paddingBottom: spacing[5],
+						}
+			}
 		>
-			<View style={{ minHeight: 40, marginBottom: spacing[3] }}>
-				{onBack && (
+			<View
+				style={
+					embedded ? { height: 0 } : { minHeight: 40, marginBottom: spacing[3] }
+				}
+			>
+				{onBack && !embedded && (
 					<Pressable
 						onPress={onBack}
 						hitSlop={8}

@@ -59,10 +59,15 @@ export function useWithdrawApplication(eventId: string) {
 
 // ─── Organisation ────────────────────────────────────────────────────────────
 
-export function useOrgEvents(query: Partial<OrgEventQuery> = {}) {
+export function useOrgEvents(
+	query: Partial<OrgEventQuery> = {},
+	/** Off for a screen that mounts a consumer it may never open. */
+	enabled = true,
+) {
 	return useQuery({
 		queryKey: queryKeys.orgEvents(query),
 		queryFn: () => orgEventsApi.list(query),
+		enabled,
 	});
 }
 
@@ -82,6 +87,11 @@ export function useCreateEvent() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.orgEvents });
 			queryClient.invalidateQueries({ queryKey: queryScopes.events });
+			// The composer can create one of these straight from the feed, and
+			// the ranking pool holds open needs, upcoming events and published
+			// announcements — so the feed is stale the moment one is written,
+			// whichever surface wrote it.
+			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
 		},
 	});
 }

@@ -2,12 +2,12 @@ import { useState } from "react";
 import { View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption, Label } from "@/components/ui/typography";
 import { useUpsertReview } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
-import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 
 /**
@@ -42,7 +42,7 @@ export function ReviewSheet({
 				onSuccess: () => {
 					setBody("");
 					onClose();
-					Alert.alert("Thanks", "Your review has been posted.");
+					toast.success("Your review has been posted.");
 				},
 				onError: (e) => setError(apiErrorMessage(e)),
 			},

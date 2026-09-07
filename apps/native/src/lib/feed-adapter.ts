@@ -62,6 +62,42 @@ export function toFeedItem(row: FeedApiItem): FeedItem {
 	};
 	const c = row.content;
 
+	/*
+	 * A posts row, whatever its tag says.
+	 *
+	 * `FeedRankingService` emits a post's candidate type straight from its tag
+	 * (`type: post.tag`), so a post tagged NEED / EVENT / ANNOUNCEMENT arrives
+	 * declaring itself one of those — while carrying a posts row's content,
+	 * which is `{ text, media }` and none of the fields the typed branches
+	 * below read. Trusting the type produced a card with an empty title, no
+	 * body at all (the text was dropped: `kind` was `need`, so `FeedCard` used
+	 * `description`, which was ""), no facts, and a primary button that
+	 * navigated to a need or event id that was really a post id.
+	 *
+	 * The composer no longer creates those — each type now writes the real row
+	 * through its own endpoint — but rows written before that change are still
+	 * in the database, and this is the client that has to render them. So the
+	 * discriminator is the content, not the label: `content.text` is present on
+	 * a posts row and on nothing else (needs and events carry
+	 * `title`/`description`, announcements `title`/`body`), which makes it an
+	 * exact test rather than a heuristic.
+	 *
+	 * Only `URGENT` keeps its urgency, because that tag means it on a post.
+	 */
+	if (typeof c.text === "string") {
+		return {
+			...base,
+			kind: "post",
+			title: "",
+			description: c.text,
+			isUrgent: row.type === "URGENT",
+			post: {
+				text: c.text,
+				media: Array.isArray(c.media) ? (c.media as FeedMedia[]) : [],
+			},
+		};
+	}
+
 	switch (row.type) {
 		case "NEED": {
 			const urgency = (row.urgency ??

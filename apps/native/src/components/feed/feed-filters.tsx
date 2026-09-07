@@ -9,10 +9,12 @@ import {
 	Boxes,
 	BriefcaseBusiness,
 	Building2,
+	CalendarDays,
 	HeartHandshake,
 	Layers3,
 	Leaf,
 	Megaphone,
+	MessageSquareText,
 	PackageOpen,
 	SlidersHorizontal,
 	Sparkles,
@@ -29,9 +31,58 @@ import { Sheet } from "@/components/ui/sheet";
 import { Caption, Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { focusable } from "@/lib/focus";
-import type { Category } from "@/lib/types";
+import type { Category, FeedKind } from "@/lib/types";
 
 export const ALL_CAUSES = "";
+
+/**
+ * What the feed is showing, as one choice.
+ *
+ * The server takes `kind` (POST / NEED / EVENT / ANNOUNCEMENT) and `needType`
+ * (WANT / OFFER) as separate filters, but they are not independent from the
+ * reader's side: "Offers" already means needs, and picking both a kind and a
+ * need type is either redundant or empty. So the sheet offers one list and
+ * `feedContentQuery` turns the choice back into the pair the hook wants.
+ *
+ * Events and updates used to be unreachable here — the section held only All,
+ * Needs and Offers, so "show me events I can turn up to", the second most
+ * common thing a volunteer wants, had no control at all.
+ */
+export type FeedContent = "all" | "want" | "offer" | "event" | "update";
+
+export function feedContentQuery(content: FeedContent): {
+	kind?: FeedKind;
+	needType?: NeedType;
+} {
+	switch (content) {
+		case "want":
+			return { needType: "WANT" };
+		case "offer":
+			return { needType: "OFFER" };
+		case "event":
+			return { kind: "event" };
+		case "update":
+			// An NGO's own writing, whichever row type carries it: an
+			// announcement is a story, a plain post is a post. The server takes
+			// one kind, and announcements are the ones written to be read, so
+			// that is the one this maps to.
+			return { kind: "story" };
+		default:
+			return {};
+	}
+}
+
+const CONTENT_OPTIONS: Array<{
+	value: FeedContent;
+	label: string;
+	icon: typeof Layers3;
+}> = [
+	{ value: "all", label: "Everything", icon: Layers3 },
+	{ value: "want", label: "Needs", icon: HeartHandshake },
+	{ value: "offer", label: "Offers", icon: PackageOpen },
+	{ value: "event", label: "Events", icon: CalendarDays },
+	{ value: "update", label: "Updates", icon: MessageSquareText },
+];
 
 const TABS = feedTabSchema.options.map((value) => ({
 	value,
@@ -191,27 +242,29 @@ export function FeedFilterSheet({
 	categories,
 	categoryIds,
 	onCategories,
-	needType,
-	onNeedType,
+	content,
+	onContent,
 }: {
 	visible: boolean;
 	onClose: () => void;
 	categories: Category[];
 	categoryIds: string[];
 	onCategories: (ids: string[]) => void;
-	needType?: NeedType;
-	onNeedType: (value: NeedType | undefined) => void;
+	content: FeedContent;
+	onContent: (value: FeedContent) => void;
 }) {
 	const { colors, spacing } = useTheme();
 	const [draftCategoryIds, setDraftCategoryIds] = useState(categoryIds);
-	const [draftNeedType, setDraftNeedType] = useState(needType);
+	const [draftContent, setDraftContent] = useState(content);
 
+	// Drafts, applied on Apply: on a phone the sheet covers the feed, so
+	// filtering live would mean tapping through a list nobody can see.
 	useEffect(() => {
 		if (visible) {
 			setDraftCategoryIds(categoryIds);
-			setDraftNeedType(needType);
+			setDraftContent(content);
 		}
-	}, [visible, categoryIds, needType]);
+	}, [visible, categoryIds, content]);
 
 	const toggleCategory = (id: string) => {
 		setDraftCategoryIds((current) =>
@@ -220,18 +273,19 @@ export function FeedFilterSheet({
 				: [...current, id],
 		);
 	};
-	const pickNeedType = (value: NeedType | undefined) => {
-		setDraftNeedType(value);
-	};
 	const apply = () => {
 		onCategories(draftCategoryIds);
-		onNeedType(draftNeedType);
+		onContent(draftContent);
 		onClose();
 	};
 	const reset = () => {
 		setDraftCategoryIds([]);
-		setDraftNeedType(undefined);
+		setDraftContent("all");
 	};
+
+	// Both halves count, so the button says how many filters are actually on.
+	const activeCount =
+		draftCategoryIds.length + (draftContent === "all" ? 0 : 1);
 
 	return (
 		<Sheet
@@ -253,8 +307,8 @@ export function FeedFilterSheet({
 						Reset
 					</Button>
 					<Button onPress={apply} style={{ flex: 1 }}>
-						{draftCategoryIds.length > 0
-							? `Apply filters (${draftCategoryIds.length})`
+						{activeCount > 0
+							? `Apply filters (${activeCount})`
 							: "Apply filters"}
 					</Button>
 				</View>
@@ -262,28 +316,21 @@ export function FeedFilterSheet({
 		>
 			<View style={{ paddingBottom: spacing[2], gap: spacing[5] }}>
 				<FilterSection title="What you want to see">
-					<FilterCard
-						label="All"
-						icon={Layers3}
-						selected={!draftNeedType}
-						onPress={() => pickNeedType(undefined)}
-					/>
-					<FilterCard
-						label="Needs"
-						icon={HeartHandshake}
-						selected={draftNeedType === "WANT"}
-						onPress={() =>
-							pickNeedType(draftNeedType === "WANT" ? undefined : "WANT")
-						}
-					/>
-					<FilterCard
-						label="Offers"
-						icon={PackageOpen}
-						selected={draftNeedType === "OFFER"}
-						onPress={() =>
-							pickNeedType(draftNeedType === "OFFER" ? undefined : "OFFER")
-						}
-					/>
+					{CONTENT_OPTIONS.map((option) => (
+						<FilterCard
+							key={option.value}
+							label={option.label}
+							icon={option.icon}
+							selected={draftContent === option.value}
+							// Tapping the selected one clears back to Everything, so
+							// the row never becomes a trap with no way out.
+							onPress={() =>
+								setDraftContent(
+									draftContent === option.value ? "all" : option.value,
+								)
+							}
+						/>
+					))}
 				</FilterSection>
 
 				<FilterSection title="Cause">

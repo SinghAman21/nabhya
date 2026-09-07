@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { TrendingUp } from "lucide-react-native";
 import { RefreshControl, ScrollView, View } from "react-native";
+import { withAppShell } from "@/components/app-shell";
 import {
 	EmptyState,
 	ErrorState,
@@ -18,6 +19,7 @@ import { useMyImpact } from "@/hooks/use-directory";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
+import { verticalScrollbar } from "@/lib/scroll";
 
 /**
  * The volunteer's contribution summary.
@@ -31,7 +33,7 @@ import { formatDate } from "@/lib/format";
  * ones under them, then the application record as plain rows. No coloured
  * tiles: the numerals are the loudest thing on the page.
  */
-export default function Impact() {
+function Impact() {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
 	const query = useMyImpact();
@@ -79,7 +81,7 @@ export default function Impact() {
 				/>
 			) : (
 				<ScrollView
-					showsVerticalScrollIndicator={false}
+					{...verticalScrollbar}
 					contentContainerStyle={{ paddingBottom: spacing[10] }}
 					refreshControl={
 						<RefreshControl
@@ -137,3 +139,5 @@ export default function Impact() {
 		</Screen>
 	);
 }
+
+export default withAppShell(Impact);

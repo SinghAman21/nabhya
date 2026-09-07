@@ -11,14 +11,24 @@ import { focusWithin } from "@/lib/focus";
 export function SearchField({
 	value,
 	onChange,
+	onSubmit,
 	pending,
 	autoFocus,
+	placeholder,
 }: {
 	value: string;
 	onChange: (next: string) => void;
+	/**
+	 * The keyboard's Search key. Results already arrive on the debounce, so
+	 * this exists for what *committing* a term means rather than for fetching:
+	 * it is what tells the recent-search list that the term was real and not a
+	 * prefix on the way to something else.
+	 */
+	onSubmit?: (value: string) => void;
 	/** True while a keystroke is still waiting on the debounce. */
 	pending: boolean;
 	autoFocus?: boolean;
+	placeholder?: string;
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
 
@@ -44,7 +54,9 @@ export function SearchField({
 				value={value}
 				onChangeText={onChange}
 				autoFocus={autoFocus}
-				placeholder="Search items, events, causes or NGOs"
+				onSubmitEditing={() => onSubmit?.(value)}
+				submitBehavior="submit"
+				placeholder={placeholder ?? "Search items, events, causes or NGOs"}
 				placeholderTextColor={colors.text.quaternary as string}
 				autoCapitalize="none"
 				returnKeyType="search"

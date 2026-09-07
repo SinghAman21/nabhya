@@ -101,33 +101,45 @@
 
 /*
  * Text fields. react-native-web renders a real <input>, which brings the
- * browser's own focus ring with it — a hard border appearing around the search
- * field the moment it is clicked, on top of whatever the design already draws.
+ * browser's own focus ring with it — a hard border snapping around the field
+ * the moment it is clicked, on top of whatever the design already draws.
  *
- * Suppressed on plain `:focus` (mouse) and kept on `:focus-visible` (keyboard),
- * so a field you clicked into looks calm and a field you tabbed into is still
- * findable.
+ * **No ring on a text field, at all.** An earlier version kept one on
+ * `:focus-visible` on the theory that plain `:focus` is the mouse and
+ * `:focus-visible` is the keyboard. That is true of buttons and false of text
+ * inputs: per spec a text field matches `:focus-visible` even when it was
+ * clicked, because the UA assumes typing is about to follow. So the "keyboard
+ * only" ring fired on every single click — which is exactly the outline that
+ * had to go.
+ *
+ * Nothing is lost for keyboard users: a focused text field shows a blinking
+ * caret, which is a stronger and more specific indicator than a border, and
+ * our fields also change fill. Buttons, links and rows keep their ring — those
+ * genuinely need one, and it is `[data-focus="ring"]` above, driven by
+ * `lib/focus.ts`, where `:focus-visible` behaves as advertised.
  */
 @layer base {
 	input,
-	textarea {
+	textarea,
+	select,
+	[contenteditable="true"] {
 		outline: none;
 	}
 
+	input:focus,
 	input:focus-visible,
-	textarea:focus-visible {
-		outline: 2px solid hsl(var(--ring));
-		outline-offset: 2px;
+	textarea:focus,
+	textarea:focus-visible,
+	select:focus,
+	select:focus-visible {
+		outline: none;
+		box-shadow: none;
 	}
 
-	/* A composed field — icon + input + clear button in one shell — shows focus on
-	   the shell, not on the bare input inside it. */
+	/* Composed fields — icon + input + clear button in one shell — used to draw
+	   the ring on the shell instead. Same problem, since `:focus-within` cannot
+	   tell a click from a tab either. */
 	[data-focus="within"]:focus-within {
-		outline: 2px solid hsl(var(--ring));
-		outline-offset: 2px;
-	}
-
-	[data-focus="within"]:focus-within input:focus-visible {
 		outline: none;
 	}
 
@@ -177,55 +189,16 @@
 		transition: background-color 5000s ease-in-out 0s;
 	}
 	/* biome-ignore-end lint/complexity/noImportantStyles: UA autofill styles cannot be overridden without it */
-
-	/*
-	 * Scrollbars.
-	 *
-	 * Thin, trackless, and translucent so one rule works on every surface — the
-	 * page, a card, a popover — without each needing its own track colour. Drawing
-	 * an opaque `--muted` track puts a grey stripe down the side of every scrolling
-	 * card, which is a lot of furniture for something that only matters while you
-	 * are actually scrolling.
-	 *
-	 * The thumb is `--foreground` at low alpha rather than a fixed grey, so it
-	 * inverts with the theme for free. No transitions: an easing scrollbar lags
-	 * behind the content it is describing.
-	 */
-	* {
-		scrollbar-width: thin;
-		scrollbar-color: hsl(var(--foreground) / 0.25) transparent;
-	}
-
-	/* Reserve the gutter on the page only, so a list becoming scrollable does not
-	   shift the layout under it. Cards keep their full width. */
-	html {
-		scrollbar-gutter: stable;
-	}
-
-	*::-webkit-scrollbar {
-		width: 10px;
-		height: 10px;
-	}
-
-	*::-webkit-scrollbar-track,
-	*::-webkit-scrollbar-corner {
-		background: transparent;
-	}
-
-	*::-webkit-scrollbar-thumb {
-		background-color: hsl(var(--foreground) / 0.25);
-		border-radius: 9999px;
-		/* Transparent border + padding-box insets the thumb to ~6px without
-		   painting a track-coloured ring around it. */
-		border: 2px solid transparent;
-		background-clip: padding-box;
-	}
-
-	*::-webkit-scrollbar-thumb:hover {
-		background-color: hsl(var(--foreground) / 0.42);
-	}
-
-	*::-webkit-scrollbar-thumb:active {
-		background-color: hsl(var(--foreground) / 0.55);
-	}
 }
+
+/*
+ * Scrollbars — and the Radix popper z-index — are **not** here.
+ *
+ * Two attempts at the scrollbar lived in this file, one inside `@layer base`
+ * and one outside it, and neither reached the browser: raw
+ * `::-webkit-scrollbar` and attribute selectors do not survive NativeWind's
+ * compilation of this stylesheet on the way to the web bundle. They are
+ * injected at runtime instead, from `src/lib/web-styles.ts` via
+ * `ThemeProvider`, which also gets the thumb colour from `design-system.ts`
+ * rather than from a CSS variable.
+ */

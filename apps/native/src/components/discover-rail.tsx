@@ -43,7 +43,15 @@ export function DiscoverRail() {
 
 /* -------------------------------------------------------------------------- */
 
-function UrgentNow() {
+/**
+ * Exported alongside `DiscoverRail` so a caller can take one section without
+ * the other. Both rails that exist today — the volunteer home's and the NGO
+ * feed's — take the pair, and an NGO wants it for the same reason a volunteer
+ * does: it is how you find out somebody two districts over needs the thing you
+ * have a surplus of. One implementation, because two copies of a ranked list
+ * drift.
+ */
+export function UrgentNow() {
 	const router = useRouter();
 	const city = useFeedStore((s) => s.city);
 	const query = useFeed(
@@ -88,7 +96,7 @@ function UrgentNow() {
  * compromise — it is what lets events appear on Discover at all without a merged
  * cursor, since two paginated endpoints cannot be interleaved client-side.
  */
-function HappeningSoon() {
+export function HappeningSoon() {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
 	const city = useFeedStore((s) => s.city);

@@ -2,11 +2,11 @@ import { useState } from "react";
 import { View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption, Label } from "@/components/ui/typography";
 import { useCreatePledge } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/use-theme";
-import { Alert } from "@/lib/alert";
 import { apiErrorMessage } from "@/lib/api";
 import { formatProgress } from "@/lib/format";
 import type { PublicNeed } from "@/lib/types";
@@ -77,11 +77,10 @@ function PledgeSheetContent({
 			{
 				onSuccess: () => {
 					onClose();
-					Alert.alert(
-						"Thank you",
+					toast.success(
 						isWant
-							? "The organisation will review your offer and get in touch."
-							: "The organisation will confirm and arrange handover.",
+							? "Offer sent — the organisation will review it and get in touch."
+							: "Claim sent — the organisation will confirm and arrange handover.",
 					);
 				},
 				onError: (e) => setError(apiErrorMessage(e)),
