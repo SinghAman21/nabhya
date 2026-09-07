@@ -15,8 +15,8 @@ import { UploadsService } from "./uploads.service";
 
 /**
  * Direct-to-storage uploads. File bytes never pass through this server: the
- * client asks for a ticket, PUTs straight to R2, then submits the returned key
- * to whichever endpoint owns the record.
+ * client asks for a ticket, PUTs straight to Supabase Storage, then submits
+ * the returned key to whichever endpoint owns the record.
  */
 @ApiTags("Uploads")
 @Controller("uploads")

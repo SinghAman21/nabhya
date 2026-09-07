@@ -63,7 +63,8 @@ Server scripts worth knowing: `pnpm --filter server test` (Vitest), `test:watch`
 
 - **Probes.** `GET /api` is liveness (process up). `GET /api/health` is readiness
   and actually queries the database, so point the load balancer at that one — and
-  check its `storage` field, which reads `stub` when R2 is unconfigured.
+  check its `storage` field, which reads `stub` when Supabase Storage is
+  unconfigured.
 - **Behind a proxy** the app calls `set("trust proxy", 1)`. Without a proxy in
   front, remove it, or every client shares one rate-limit bucket.
 - **`POST /api/admin/events/close-finished`** must run on a schedule (hourly is
@@ -144,13 +145,13 @@ Supabase wizard.
 
 - Server (`packages/env/src/server.ts`, validated at boot): `DATABASE_URL`,
   `DIRECT_URL`, `CORS_ORIGIN`, `NODE_ENV`, `SUPABASE_AUTH_JWKS_URL`,
-  optional `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`
+  optional `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (object storage)
 - Client (`apps/native/src/lib/env.ts`): `EXPO_PUBLIC_API_URL` (dev fallback
   `10.0.2.2:3000` on Android), `EXPO_PUBLIC_SUPABASE_URL` and
   `EXPO_PUBLIC_SUPABASE_ANON_KEY` (both throw at import if unset)
 
-Wired services: Supabase (Postgres + Auth), Cloudflare R2 (optional, stubbed in dev),
-Razorpay (donations, native checkout SDK). No email provider.
+Wired services: Supabase (Postgres + Auth + Storage, stubbed in dev without
+credentials), Razorpay (donations, native checkout SDK). No email provider.
 
 ## Current state
 
@@ -165,11 +166,11 @@ team management, in-app notifications and superadmin broadcast; a unified server
 For You / Trending / Following feed ranks generic posts, events, needs and
 announcements using location, category, recency, follow, urgency and engagement signals.
 It records likes, saves, shares, comments and impressions; recent impressions down-rank
-For You but do not affect Following. R2 uploads; the superadmin
+For You but do not affect Following. Supabase Storage uploads; the superadmin
 console including the cross-org document verification queue and audit log.
 Volunteer identity verification captures a government ID plus a liveness selfie
 (front camera, guided two-frame challenge via `expo-camera`/`expo-image-picker`)
-straight to R2; an account only becomes VERIFIED once a superadmin approves
+straight to Supabase Storage; an account only becomes VERIFIED once a superadmin approves
 **both** — a single document never promotes the account on its own. The rule is
 enforced by `computeUserVerificationStatus` in `@nabhya/shared`, which both the
 upload and review paths recompute from the whole document set. Monetary
@@ -309,12 +310,10 @@ AGENTS.md files; these are the repo-wide ones.
    `apps/server/src/common/database/database.module.ts`. Generated migrations exist,
    but nothing applies them automatically yet — push is still what mutates your dev
    database. Switch the boot path to `db:migrate` before real data lands.
-2. **Without R2 credentials the server uses an in-memory storage stub.** Uploads
-   appear to succeed and are discarded; a restart loses them. Set the `R2_*` vars in
-   `apps/server/.env` for real storage. The stub is refused in production.
-   The bucket also needs a CORS policy allowing the client's direct upload: methods
-   `PUT` and `GET`, the `content-type` request header, and your app origins. Native
-   `fetch` isn't CORS-gated, but Expo Web and any browser client are.
+2. **Without Supabase Storage credentials the server uses an in-memory storage
+   stub.** Uploads appear to succeed and are discarded; a restart loses them. Set
+   `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `apps/server/.env` for real
+   storage. The stub is refused in production.
 3. **No way to mint the first superadmin over HTTP.** `AdminService.grantSuperadmin`
    exists and is deliberately not routed; call it from a script or set `user_roles` by
    hand, otherwise `(admin)` is unreachable.

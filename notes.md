@@ -89,7 +89,7 @@ Cost of this choice: UI primitives (Button, Input, Card) are written twice. That
 - [ ] **Rate limiting** — `@nestjs/throttler`, strictest on auth.
 - [ ] **Structured logging** — pino (nestjs-pino), request IDs.
 - [ ] **Health check** — `GET /health` for deploy probes.
-- [ ] **File uploads** — documents/logos go to object storage (S3/R2) via **presigned URLs**; the API stores keys + metadata only, never proxies file bytes.
+- [x] **File uploads** — documents/logos go to Supabase Storage via **presigned URLs**; the API stores keys + metadata only, never proxies file bytes.
 - [ ] **Error envelope** — global exception filter already exists; keep error shapes in a shared Zod schema too.
 - [ ] **CI** — biome + typecheck + build on PR; migrations applied on deploy.
 

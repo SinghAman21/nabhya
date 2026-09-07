@@ -54,8 +54,8 @@ export interface StorageProvider {
 	}): Promise<UploadTicket>;
 
 	/**
-	 * Short-lived read URL. Documents are private, so nothing is served from a
-	 * public bucket URL unless R2_PUBLIC_BASE_URL is configured for that prefix.
+	 * Short-lived read URL. Documents are private — nothing is served from a
+	 * public bucket URL.
 	 */
 	createDownloadUrl(key: string, expiresInSeconds?: number): Promise<string>;
 
@@ -72,5 +72,5 @@ export interface StorageProvider {
 	}): Promise<void>;
 
 	/** Identifies the backing implementation, for health checks and logging. */
-	readonly name: "r2" | "stub" | "supabase";
+	readonly name: "stub" | "supabase";
 }

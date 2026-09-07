@@ -7,7 +7,7 @@ import type {
 } from "./storage.types";
 
 /**
- * In-memory stand-in used when R2 credentials are absent.
+ * In-memory stand-in used when Supabase Storage credentials are absent.
  *
  * Every upload path stays exercisable without credentials — the ticket is
  * issued, the key is recorded, and HEAD succeeds — so document flows can be

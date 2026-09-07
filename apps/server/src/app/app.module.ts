@@ -28,7 +28,7 @@ import { AppController } from "./app.controller";
 		ThrottlerModule.forRoot(throttlerConfig),
 		DatabaseModule, // global — provides db to the whole app
 		AuditModule, // global — provides the activity trail writer
-		StorageModule, // global — provides object storage (R2, or a dev stub)
+		StorageModule, // global — provides object storage (Supabase Storage, or a dev stub)
 		UploadsModule,
 		UsersModule,
 		OnboardingModule,

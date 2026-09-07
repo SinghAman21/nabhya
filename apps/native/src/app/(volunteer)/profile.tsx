@@ -374,9 +374,9 @@ export default function VolunteerProfile() {
  *
  * `profileImage` is a storage **key**, not a URL — the bucket is private — so it
  * has to be exchanged for a short-lived signed URL first, and that exchange can
- * legitimately return nothing (no photo, or a dev environment with no `R2_*`
- * credentials, where the storage stub has nothing to sign). Initials are
- * therefore the normal case, not an error state.
+ * legitimately return nothing (no photo, or a dev environment with no Supabase
+ * Storage credentials, where the storage stub has nothing to sign). Initials
+ * are therefore the normal case, not an error state.
  */
 function Avatar({
 	name,

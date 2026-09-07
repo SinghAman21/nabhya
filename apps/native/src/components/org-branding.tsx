@@ -16,8 +16,8 @@ import { focusable } from "@/lib/focus";
  * the key for a short-lived signed URL first, and every piece below falls back
  * to something designed rather than to a broken-image glyph. That fallback is
  * the normal case in two situations, not an edge one: an NGO that has not
- * uploaded anything, and any developer running without `R2_*` credentials,
- * where the storage stub has no URL to sign.
+ * uploaded anything, and any developer running without Supabase Storage
+ * credentials, where the storage stub has no URL to sign.
  *
  * The recommended sizes are stated in the UI rather than only here, because the
  * person choosing a file is the one who needs them.

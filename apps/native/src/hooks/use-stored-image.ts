@@ -22,8 +22,8 @@ const FRESH_FOR_MS = 5 * 60 * 1000;
  * Returns `undefined` for a missing key, a key that has not resolved yet, or a
  * key the storage layer refuses — every caller therefore needs a real fallback
  * (initials for a logo, a tinted panel for a cover), not a spinner. That also
- * covers development with no `R2_*` credentials, where the storage stub has
- * nothing to sign.
+ * covers development with no Supabase Storage credentials, where the storage
+ * stub has nothing to sign.
  */
 export function useStoredImageUrl(key: string | null | undefined) {
 	const query = useQuery({

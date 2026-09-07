@@ -74,9 +74,9 @@ SUPABASE_AUTH_JWKS_URL="https://<project-ref>.supabase.co/auth/v1/.well-known/jw
 ```
 
 `<project-ref>`, `<password>` and `<region>` come from the connection strings you
-copied in step 2. R2 (object storage) and Razorpay (payments) vars are optional
-— see `apps/server/.env.example` for the full list; leaving them unset falls
-back to in-memory stubs in development.
+copied in step 2. Supabase Storage (object storage) and Razorpay (payments) vars
+are optional — see `apps/server/.env.example` for the full list; leaving them
+unset falls back to in-memory stubs in development.
 
 Fastest path for this file: run `pnpm db:setup` from the repo root — an interactive
 wizard that asks for these same values and writes the file for you.

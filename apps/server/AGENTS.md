@@ -66,8 +66,9 @@ Guard order (all global `APP_GUARD`s in `app.module.ts`):
   happen inside a transaction with `SELECT … FOR UPDATE` on the parent row. Never
   update these counters outside that pattern.
 - `@Global()` modules — `DatabaseModule` (`DB_TOKEN`), `StorageModule`
-  (`STORAGE_TOKEN`: R2 or in-memory stub, stub refused in production), `AuditModule`,
-  `NotificationsModule` — inject them anywhere without imports.
+  (`STORAGE_TOKEN`: Supabase Storage or in-memory stub, stub refused in
+  production), `AuditModule`, `NotificationsModule` — inject them anywhere
+  without imports.
 - Audit writes are fire-and-forget: `void this.audit.record(...)`. An audit failure
   must never fail the business action, so never await it inside a transaction.
 - Uploads: bytes never pass through the API. `POST /uploads/intent` issues a
@@ -108,7 +109,8 @@ Guard order (all global `APP_GUARD`s in `app.module.ts`):
 ## Deploying
 
 - `GET /api` = liveness; `GET /api/health` = readiness (queries the DB; its
-  `storage` field reads `stub` when R2 is unconfigured — point the LB here).
+  `storage` field reads `stub` when Supabase Storage is unconfigured — point
+  the LB here).
 - `trust proxy` is set to 1; remove it if there is no proxy in front, or every
   client shares one rate-limit bucket.
 - Schedule `POST /api/admin/events/close-finished` (hourly is plenty).
