@@ -21,12 +21,24 @@ import { formatDateTime } from "@/lib/format";
 import type { AdminOrgDocument } from "@/lib/types";
 
 /**
- * One document in a reviewer's queue: open it, then approve or reject.
+ * One document as a card: open it, then approve or reject.
  *
- * The row is built for volume. Everything a reviewer needs before deciding —
- * type, owner, upload time, the liveness challenge, any earlier remarks — is on
- * the card, the file opens from a link, and the two decisions are real buttons
- * in a fixed order (approve first) so a hundred rows train one motion.
+ * **This is the mobile and card-view shape only.** The queue's default on
+ * desktop is `DataTable` — see the note at the top of `(admin)/queue.tsx` for
+ * why a column of 1100pt-wide cards was the wrong shape for the highest-volume
+ * screen in the console. The card survives because a 360dp phone cannot hold
+ * seven columns, and because "card view" is a legitimate choice on desktop for
+ * someone reading documents rather than clearing them.
+ *
+ * Everything a reviewer needs before deciding — type, owner, upload time, the
+ * liveness challenge, any earlier remarks — is on the card, the file opens from
+ * a link, and the two decisions are real buttons in a fixed order (approve
+ * first) so a hundred rows train one motion.
+ *
+ * **The buttons size to their labels and sit at the start of the row**, they do
+ * not each take half the width. `flex: 1` was fine on a phone and absurd in a
+ * grid cell or a full-width card: "Approve" stretched across 500pt of orange
+ * reads as a banner, not a control. Same rule as the feed card's CTA.
  *
  * Rejection collects remarks inline rather than through Alert.prompt, which
  * only exists on iOS — on Android that would silently do nothing. The server
@@ -173,7 +185,6 @@ export function DocumentReviewRow({
 						onPress={approve}
 						loading={review.isPending}
 						accessibilityLabel={`Approve ${label}`}
-						style={{ flex: 1 }}
 					>
 						Approve
 					</Button>
@@ -183,7 +194,6 @@ export function DocumentReviewRow({
 						onPress={() => setRejecting(true)}
 						disabled={review.isPending}
 						accessibilityLabel={`Reject ${label}`}
-						style={{ flex: 1 }}
 					>
 						Reject
 					</Button>
@@ -226,7 +236,6 @@ export function DocumentReviewRow({
 							variant="destructive"
 							onPress={confirmReject}
 							loading={review.isPending}
-							style={{ flex: 1 }}
 						>
 							Confirm rejection
 						</Button>
@@ -235,7 +244,6 @@ export function DocumentReviewRow({
 							variant="ghost"
 							onPress={cancelReject}
 							disabled={review.isPending}
-							style={{ flex: 1 }}
 						>
 							Cancel
 						</Button>

@@ -1,10 +1,14 @@
 import type {
 	AdminOrgQuery,
 	AdminOverview,
+	AdminTrendQuery,
+	AdminTrends,
 	AdminUserQuery,
 	ApplicationQuery,
 	ApplyToEventInput,
 	AuditLogQuery,
+	BulkReviewDocumentsInput,
+	BulkReviewResult,
 	CompleteOrgOnboardingPayload,
 	CompleteVolunteerOnboardingPayload,
 	CreateEventInput,
@@ -257,6 +261,8 @@ export const adminApi = {
 		http.patch<AdminOrgListItem>(ADMIN.organizationVerification(id), input),
 	setOrganizationStatus: (id: string, input: SetOrgStatusInput) =>
 		http.patch<AdminOrgListItem>(ADMIN.organizationStatus(id), input),
+	trends: (query: Partial<AdminTrendQuery>) =>
+		http.get<AdminTrends>(ADMIN.TRENDS, query),
 	users: (query: Partial<AdminUserQuery>) =>
 		http.getPage<AdminUserListItem>(ADMIN.USERS, query),
 	user: (id: string) => http.get<AdminUserDetail>(ADMIN.user(id)),
@@ -270,6 +276,16 @@ export const adminApi = {
 		http.patch<{ id: string }>(ADMIN.orgDocument(id), input),
 	reviewUserDocument: (id: string, input: ReviewDocumentInput) =>
 		http.patch<{ id: string }>(ADMIN.userDocument(id), input),
+	bulkReviewDocuments: (
+		kind: "organization" | "user",
+		input: BulkReviewDocumentsInput,
+	) =>
+		http.post<BulkReviewResult>(
+			kind === "organization"
+				? ADMIN.ORG_DOCUMENTS_BULK
+				: ADMIN.USER_DOCUMENTS_BULK,
+			input,
+		),
 	auditLogs: (query: Partial<AuditLogQuery>) =>
 		http.getPage<AuditLogEntry>(ADMIN.AUDIT_LOGS, query),
 };

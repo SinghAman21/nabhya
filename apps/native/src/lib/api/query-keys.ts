@@ -34,6 +34,7 @@ export const queryKeys = {
 	storedImage: (key: string) => ["uploads", "download-url", key] as const,
 
 	adminOverview: ["admin", "overview"] as const,
+	adminTrends: (days: number) => ["admin", "overview", "trends", days] as const,
 	adminOrganizations: (params?: unknown) =>
 		["admin", "organizations", params] as const,
 	adminOrganization: (id: string) => ["admin", "organizations", id] as const,

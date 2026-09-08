@@ -2,14 +2,38 @@ import type {
 	AdminOrgQuery,
 	AdminUserQuery,
 	AuditLogQuery,
+	BulkReviewDocumentsInput,
 	DocumentQueueQuery,
 	ReviewDocumentInput,
 	ReviewOrganizationInput,
 	SetOrgStatusInput,
 	SetUserStatusInput,
+	TrendWindow,
 } from "@nabhya/shared";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	keepPreviousData,
+	useMutation,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import { adminApi, queryKeys, queryScopes } from "@/lib/api";
+
+/**
+ * The Overview's time series.
+ *
+ * Keyed by the window so switching 7/30/90 is a cache hit after the first look
+ * rather than a refetch, and `placeholderData: keepPreviousData` holds the last
+ * chart up while the next window loads — a skeleton flash on a chart that is
+ * about to be nearly identical is worse than a moment of stale data, and it
+ * jumps the page's layout.
+ */
+export function useAdminTrends(days: TrendWindow) {
+	return useQuery({
+		queryKey: queryKeys.adminTrends(days),
+		queryFn: () => adminApi.trends({ days }),
+		placeholderData: keepPreviousData,
+	});
+}
 
 export function useAdminOverview() {
 	return useQuery({
@@ -119,6 +143,28 @@ export function useReviewDocument(kind: "organization" | "user") {
 			kind === "organization"
 				? adminApi.reviewOrgDocument(id, input)
 				: adminApi.reviewUserDocument(id, input),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.admin });
+		},
+	});
+}
+
+/**
+ * Approving or rejecting a whole selection.
+ *
+ * The server reports per-document outcomes rather than a count, so the caller
+ * can tell the reviewer which rows are still waiting — see
+ * `bulkReviewDocumentsSchema` in `@nabhya/shared`. Invalidating the whole
+ * `admin` scope is right here even though the single-document path does the
+ * same: a batch can move an NGO's own verification state and re-derive several
+ * volunteers' account statuses, so the queue, the directories and the overview
+ * counters are all stale afterwards.
+ */
+export function useBulkReviewDocuments(kind: "organization" | "user") {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (input: BulkReviewDocumentsInput) =>
+			adminApi.bulkReviewDocuments(kind, input),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.admin });
 		},

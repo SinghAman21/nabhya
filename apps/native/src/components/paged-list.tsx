@@ -6,17 +6,18 @@ import {
 } from "@tanstack/react-query";
 import { useMemo } from "react";
 import {
-	ActivityIndicator,
 	FlatList,
 	type FlatListProps,
 	RefreshControl,
 	View,
 } from "react-native";
+import { LoadMoreFooter } from "@/components/load-more-footer";
 import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
 import { Caption } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
+import { verticalScrollbar } from "@/lib/scroll";
 
 /**
  * Real paging for every `Paginated<T>` endpoint.
@@ -87,6 +88,12 @@ export type PagedQuery = UseInfiniteQueryResult<
  * `grouped` draws the rows inside one `Surface` divided by hairlines — the
  * `ListGroup` look for a list too long to render eagerly. The card hugs its
  * content when short and scrolls inside itself when tall.
+ *
+ * The scroll indicator comes from `verticalScrollbar`, never hard-coded off:
+ * react-native-web compiles `showsVerticalScrollIndicator={false}` to
+ * `scrollbar-width: none`, which Chrome honours, and every list in the app was
+ * therefore a pane with no thumb and no clue there was more below the fold.
+ * See `lib/scroll.ts`.
  */
 export function PagedList<T>({
 	query,
@@ -99,6 +106,7 @@ export function PagedList<T>({
 	grouped,
 	header,
 	numColumns,
+	noun,
 	extraBottomPadding = 0,
 }: {
 	query: PagedQuery;
@@ -113,6 +121,8 @@ export function PagedList<T>({
 	header?: React.ReactElement;
 	/** A grid on wide screens. Ignored when `grouped`. */
 	numColumns?: number;
+	/** Plural noun for the footer's closing line, e.g. "organizations". */
+	noun?: string;
 	extraBottomPadding?: number;
 }) {
 	const { colors, spacing } = useTheme();
@@ -150,14 +160,13 @@ export function PagedList<T>({
 		);
 	}
 
-	const footer = query.isFetchingNextPage ? (
-		<View style={{ paddingVertical: spacing[5], alignItems: "center" }}>
-			<ActivityIndicator
-				size="small"
-				color={colors.text.quaternary as string}
-			/>
-		</View>
-	) : query.isError ? (
+	// A failed *next* page is its own case — the rows already on screen are
+	// fine, so it is a line at the end rather than an ErrorState over the list.
+	// Everything else is `LoadMoreFooter`, which is also what the non-paged
+	// lists use: one spinner, one explicit "Load more" (`onEndReached` is
+	// unreliable on web and never fires on a first page shorter than the
+	// viewport), one closing line.
+	const footer = query.isError ? (
 		<View style={{ paddingVertical: spacing[4], alignItems: "center" }}>
 			<Caption color="tertiary">Couldn't load more.</Caption>
 			<Button
@@ -169,7 +178,15 @@ export function PagedList<T>({
 				Try again
 			</Button>
 		</View>
-	) : null;
+	) : (
+		<LoadMoreFooter
+			hasMore={!!query.hasNextPage}
+			loading={query.isFetchingNextPage}
+			onLoadMore={loadMore}
+			count={items.length}
+			{...(noun ? { noun } : {})}
+		/>
+	);
 
 	const columns = grouped ? 1 : (numColumns ?? 1);
 
@@ -185,7 +202,7 @@ export function PagedList<T>({
 				renderItem(item)
 			),
 		numColumns: columns,
-		showsVerticalScrollIndicator: false,
+		...verticalScrollbar,
 		onEndReached: loadMore,
 		onEndReachedThreshold: 0.6,
 		ListFooterComponent: footer,

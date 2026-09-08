@@ -55,10 +55,16 @@ export const ORG_NEEDS = {
 
 export const ADMIN = {
 	OVERVIEW: `${API_PREFIX}/admin/overview`,
+	TRENDS: `${API_PREFIX}/admin/overview/trends`,
 	ORGANIZATIONS: `${API_PREFIX}/admin/organizations`,
 	USERS: `${API_PREFIX}/admin/users`,
 	ORG_DOCUMENTS: `${API_PREFIX}/admin/documents/organizations`,
 	USER_DOCUMENTS: `${API_PREFIX}/admin/documents/users`,
+	// POST, not PATCH: the body names its own targets, so there is no single
+	// resource being patched. Literal segments, so they cannot collide with the
+	// `:id` routes.
+	ORG_DOCUMENTS_BULK: `${API_PREFIX}/admin/documents/organizations/bulk`,
+	USER_DOCUMENTS_BULK: `${API_PREFIX}/admin/documents/users/bulk`,
 	AUDIT_LOGS: `${API_PREFIX}/admin/audit-logs`,
 	organization: (id: string) => `${API_PREFIX}/admin/organizations/${id}`,
 	organizationVerification: (id: string) =>

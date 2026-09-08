@@ -305,6 +305,7 @@ export function ListRow({
 	value,
 	onPress,
 	chevron = true,
+	accessibilityLabel,
 }: {
 	icon?: LucideIcon;
 	label: string;
@@ -314,6 +315,13 @@ export function ListRow({
 	onPress?: () => void;
 	/** Set false for an action row (sign out) that does not navigate anywhere. */
 	chevron?: boolean;
+	/**
+	 * Override the spoken label. The row's own label is announced instead of
+	 * its children, so a `value` that carries meaning — a queue's waiting
+	 * count — has to be spelled into the sentence here or it is simply not
+	 * read out.
+	 */
+	accessibilityLabel?: string;
 }) {
 	const { colors, spacing } = useTheme();
 
@@ -355,7 +363,9 @@ export function ListRow({
 		<Pressable
 			onPress={onPress}
 			accessibilityRole="button"
-			accessibilityLabel={hint ? `${label}. ${hint}` : label}
+			accessibilityLabel={
+				accessibilityLabel ?? (hint ? `${label}. ${hint}` : label)
+			}
 			{...focusable}
 			style={(state) => {
 				const { pressed, hovered } = state as PressState;
@@ -411,11 +421,23 @@ export interface Fact {
  * be, and reads the same at every column width.
  *
  * Empty facts are dropped rather than shown blank, so a sparse organisation
- * gets a short card instead of a column of dashes.
+ * gets a short card instead of a column of dashes — unless `showEmpty` says
+ * otherwise. The one audience it is wrong for is a reviewer: a missing
+ * registration number is *the* finding on an NGO awaiting verification, and
+ * dropping the row hides it. So the admin dossiers ask for the dashes.
  */
-export function FactList({ facts }: { facts: Fact[] }) {
+export function FactList({
+	facts,
+	showEmpty,
+}: {
+	facts: Fact[];
+	/** Keep absent facts as an em dash. For a reviewer, a gap is a fact. */
+	showEmpty?: boolean;
+}) {
 	const { colors, spacing } = useTheme();
-	const present = facts.filter((fact) => Boolean(fact.value));
+	const present = showEmpty
+		? facts
+		: facts.filter((fact) => Boolean(fact.value));
 
 	if (present.length === 0) return null;
 
@@ -440,16 +462,26 @@ export function FactList({ facts }: { facts: Fact[] }) {
 						}}
 					>
 						<Caption color="tertiary">{fact.label}</Caption>
+						{/* Selectable: half of these are an email, a phone number or a
+						    registration number that someone is about to copy. */}
 						{typeof fact.value === "string" ? (
-							<Body>{fact.value}</Body>
+							fact.value ? (
+								<Body selectable>{fact.value}</Body>
+							) : (
+								<Dash />
+							)
 						) : (
-							fact.value
+							fact.value || <Dash />
 						)}
 					</View>
 				</View>
 			))}
 		</Surface>
 	);
+}
+
+function Dash() {
+	return <Body color="quaternary">—</Body>;
 }
 
 /* -------------------------------------------------------------------------- */

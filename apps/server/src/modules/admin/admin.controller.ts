@@ -1,7 +1,9 @@
 import type {
 	AdminOrgQuery,
+	AdminTrendQuery,
 	AdminUserQuery,
 	AuditLogQuery,
+	BulkReviewDocumentsInput,
 	DocumentQueueQuery,
 	ReviewDocumentInput,
 	ReviewOrganizationInput,
@@ -10,8 +12,10 @@ import type {
 } from "@nabhya/shared";
 import {
 	adminOrgQuerySchema,
+	adminTrendQuerySchema,
 	adminUserQuerySchema,
 	auditLogQuerySchema,
+	bulkReviewDocumentsSchema,
 	documentQueueQuerySchema,
 	reviewDocumentSchema,
 	reviewOrganizationSchema,
@@ -26,6 +30,7 @@ import {
 	Param,
 	ParseUUIDPipe,
 	Patch,
+	Post,
 	Query,
 } from "@nestjs/common";
 import {
@@ -58,6 +63,18 @@ export class AdminController {
 		return this.adminService.getOverview();
 	}
 
+	@Get("overview/trends")
+	@ApiOperation({
+		summary: "Daily signups, events and applications over a 7/30/90-day window",
+	})
+	@ApiQuery({ name: "days", required: false, enum: [7, 30, 90] })
+	getTrends(
+		@Query(new ZodValidationPipe(adminTrendQuerySchema))
+		query: AdminTrendQuery,
+	) {
+		return this.adminService.getTrends(query.days);
+	}
+
 	// ─── Organizations ───────────────────────────────────────────────────────
 
 	@Get("organizations")
@@ -69,6 +86,19 @@ export class AdminController {
 		enum: ["PENDING", "UNDER_REVIEW", "VERIFIED", "REJECTED"],
 	})
 	@ApiQuery({ name: "status", required: false, enum: ["ACTIVE", "SUSPENDED"] })
+	@ApiQuery({
+		name: "sort",
+		required: false,
+		enum: [
+			"createdAt",
+			"name",
+			"city",
+			"verificationStatus",
+			"pendingDocuments",
+			"events",
+		],
+	})
+	@ApiQuery({ name: "dir", required: false, enum: ["asc", "desc"] })
 	listOrganizations(
 		@Query(new ZodValidationPipe(adminOrgQuerySchema)) query: AdminOrgQuery,
 	) {
@@ -162,6 +192,27 @@ export class AdminController {
 		return this.adminService.listOrganizationDocuments(query);
 	}
 
+	/**
+	 * Bulk routes are `POST`, not `PATCH`: the body names its own targets rather
+	 * than the URL naming one, so there is no single resource being patched.
+	 * They sit above the `:id` routes for the same reason every Nest controller
+	 * puts literals before parameters — `documents/organizations/bulk` would
+	 * otherwise be matched by `:id` and rejected by `ParseUUIDPipe`.
+	 */
+	@Post("documents/organizations/bulk")
+	@ApiOperation({ summary: "Approve or reject many organization documents" })
+	bulkReviewOrgDocuments(
+		@CurrentUser() admin: AuthUser,
+		@Body(new ZodValidationPipe(bulkReviewDocumentsSchema))
+		body: BulkReviewDocumentsInput,
+	) {
+		return this.adminService.bulkReviewDocuments(
+			admin.id,
+			"organization",
+			body,
+		);
+	}
+
 	@Patch("documents/organizations/:id")
 	@ApiOperation({ summary: "Approve or reject an organization document" })
 	reviewOrgDocument(
@@ -185,6 +236,16 @@ export class AdminController {
 		query: DocumentQueueQuery,
 	) {
 		return this.adminService.listUserDocuments(query);
+	}
+
+	@Post("documents/users/bulk")
+	@ApiOperation({ summary: "Approve or reject many identity documents" })
+	bulkReviewUserDocuments(
+		@CurrentUser() admin: AuthUser,
+		@Body(new ZodValidationPipe(bulkReviewDocumentsSchema))
+		body: BulkReviewDocumentsInput,
+	) {
+		return this.adminService.bulkReviewDocuments(admin.id, "user", body);
 	}
 
 	@Patch("documents/users/:id")

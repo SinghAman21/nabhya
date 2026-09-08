@@ -376,11 +376,17 @@ for any text, icon or 1px border. Use the tokens instead of reaching for `main`:
   these; a pill drawn in `<tone>.main` on its own tint is unreadable.
 - `text.quaternary` is the muted floor (4.61:1). Nothing lighter for real content.
 - `accent` is the fifth tone (violet), for a *category* that is neither a status
-  nor an action — today only the "Story" pill on a feed card. It exists because
-  that pill, and five others beside it, were hardcoded light-mode hexes:
-  correct on white, bright white-tinted blocks on a near-black card. **A
-  hardcoded hex in a component is a dark-mode bug that light mode cannot show
-  you.**
+  nor an action. It has **no caller today** — the feed card's "Story" pill was
+  the last one, and the card is now near-monochrome (see `components/feed/card/`
+  in the root guide). It stays defined because the tone it replaced was six
+  hardcoded light-mode hexes: correct on white, bright white-tinted blocks on a
+  near-black card. **A hardcoded hex in a component is a dark-mode bug that
+  light mode cannot show you.**
+- **A tinted block is an expensive way to say one word.** Every `<tone>.bg`
+  panel is a full-width coloured rectangle competing with the content inside it,
+  and a screen that draws three of them has no hierarchy left. Reach for type
+  weight and colour first, a rule second, and a filled surface only when the
+  thing genuinely is a distinct surface.
 
 The type ramp lives in `components/ui/typography.tsx` and owns its own sizes,
 optical tracking and Dynamic Type ceilings. Don't override `fontSize` at call
@@ -393,6 +399,216 @@ worked examples. Focus rings matter on web: RNW renders none for `Pressable`, so
 read `focused` from the style callback and draw an `outline*` — `Button` and
 `Surface` show the pattern.
 
+## The superadmin console
+
+`(admin)/*` is a **data console**, and it is the one part of the app that is not
+built out of the feed's shapes. The five screens share four components in
+`components/admin/`, and the reasons live in those files at length — read them
+before changing a screen. In short:
+
+- **`list-chrome.tsx` — the page is the scroller, and it is full width.**
+  `AdminScreen` owns one `ScrollView` at full window width with **no content
+  cap**: a cap is right for reading and wrong for a table, whose columns are
+  fixed except one, so the width a monitor offers goes to the identity column
+  that wants it. It used to be the other way round (a capped `Screen` holding a
+  fixed header over a list that owned a `FlatList`), which produced a scrollbar
+  at x=1040 down the middle of the window, a second one inside the audit log's
+  card, and a table header with nothing to stick to. **Consequence: nothing
+  inside a console page may own a vertical scroller** — no `FlatList`, no nested
+  `ScrollView`. `DataTable`'s horizontal scroller is fine; a different axis
+  cannot compete. Infinite paging is `onNearEnd` on the page, since a list with
+  no scroller has no `onEndReached` to give.
+- **Chrome is two tiers, and the toolbar is the tier that pins.** `AdminScreen`
+  takes `title` / `subtitle` / `action` / `toolbar` as props rather than letting
+  screens render a `ScreenHeader`, because it has to own the stickiness. The
+  title scrolls away; the command bar stays and picks the title up *inside*
+  itself once the big one is gone. Pinning the whole header instead would spend
+  96pt of every screen restating a title the reader picked from the rail two
+  seconds ago, while the controls they actually reach for scroll off.
+  **`DataTable`'s sticky header must therefore offset its `top`** by the bar's
+  measured height, published through `useStickyOffset()` — at `top: 0` the
+  column labels pin *underneath* the toolbar and vanish. A hard-coded number
+  drifts the moment the toolbar wraps to two lines. **`Toolbar` carries no
+  margin of its own** for the same reason the bar sets `minHeight: 40`: a
+  `marginBottom` on the toolbar tipped the row and left the controls visibly
+  low against the collapsed title beside them.
+- **`data-table.tsx` — the console's default shape.** A card is right when a row
+  is a thing you *look at*; a table is right when it is a record you *compare*,
+  which is the whole job here. Sticky header, sortable headers, an optional tick
+  column with a tri-state header, fixed columns plus one that flexes,
+  `wideOnly` columns dropped under 1240. No zebra striping and no tinted header:
+  hairlines and type, so the `StatusPill`s stay the only colour. **Rows are 64pt,
+  not 52** — a row carries two lines in its identity column plus a pill, and at
+  52 the pill touched the hairlines above and below it: fitting, but cramped, and
+  tiring over forty rows.
+- **Two populations, two screens, and no role filter spanning them.** `NGOs` is
+  the `organizations` table; `Volunteers` is `users` **hard-filtered to
+  `role: "volunteer"`**, with no Role select at all. It used to be "People" with
+  a Role select covering volunteers, NGO accounts and superadmins, so an NGO
+  showed up twice — as an account here and as an organisation next door — with
+  nothing on either screen saying which to use. An NGO's own account is now
+  reached through its organisation: the dossier's Owner section has
+  "Manage this account", which the *screen* handles by closing the org drawer
+  and opening the user one. **Sequentially, never nested** — a drawer inside a
+  drawer is a `Modal` inside a `Modal`, and the inner `OverlayHost` fights the
+  outer one for every toast. That handoff is also the better route: nobody
+  should suspend an NGO's login without having just read its record.
+- **The table is a card, and the rows sit inside it.** `background.card`,
+  `borderRadius.xl`, the light-mode shadow, and a 16pt `CELL_INSET` shared by
+  the header and every row. It was naked rows on the page background separated
+  from the toolbar by a margin, which read as loose text with rules through it
+  and ran the first column against the page gutter. **Never put
+  `overflow: hidden` on that card** — it would become a scroll container and
+  kill the sticky header; the top corners are rounded on the header row itself
+  and the last row drops its hairline so nothing paints across the bottom two.
+  The whole row is the pressable (tick gutter included) so the hover tint spans
+  it edge to edge; the tick is a nested `Pressable` and still wins its own
+  presses.
+- **The card grid sizes the *card*, not the column count.** `useGridColumns()`
+  caps at three, which was right while pages were capped at 1180; full width, 3
+  cards on a 2560 monitor are 760pt each. `ConsoleList`'s `Cards` measures its
+  container and fits as many ~380pt cards as it holds. The table wants the
+  opposite — one column absorbing the slack — which is why this is not shared.
+- **The title handover is animated.** As a bare boolean the pinned title and its
+  divider popped in mid-scroll and shoved the toolbar sideways in one frame. One
+  `Animated.Value` drives the title's opacity, a 6pt rise and the divider's
+  colour, 180ms in / 140ms out; the heading stays mounted and is faded rather
+  than mounted on the threshold, so the bar never re-measures under the reader.
+  `useNativeDriver: false`, because `borderBottomColor` is neither a transform
+  nor an opacity.
+- **The table must never own a scroller — not even a horizontal one.** It had a
+  `ScrollView horizontal` wrapper, to push sideways when the columns needed more
+  room than the window had, and that wrapper caused both of the bugs it was
+  meant to prevent:
+  1. **The table stopped being full width.** A horizontal scroller sizes its
+     content to the content, so the flexing column collapsed to its `minWidth`
+     and the table ended at the sum of the minimums with empty page beside it.
+  2. **The sticky header pinned across the middle of the rows.** `position:
+     sticky` resolves against the *nearest* scrolling ancestor — that wrapper,
+     not the page — so `top: <toolbar height>` was measured from the top of the
+     table's own box and the header floated over row four.
+
+  The table is a plain `View` at `width: "100%"` with `minWidth` as a floor.
+  Narrow windows drop columns (`wideOnly`), and below the mobile breakpoint
+  `ConsoleList` renders cards instead. There is no width at which a nested
+  scroller was the right answer.
+- **Sorting is a server round trip, never a client re-sort.** Every list is
+  paged at 20, so sorting in the browser sorts twenty of three hundred rows.
+  `sort` + `dir` are on all four admin query schemas in `@nabhya/shared`, each
+  key maps to a column or a correlated subquery in `AdminService.orderFor`, and
+  every list adds its default column as a **tiebreaker** — without one, paging a
+  list sorted by a low-cardinality column (verification status) repeats and
+  skips rows. Guarded by "pages deterministically when every row shares the sort
+  key" in `apps/server/test/admin.spec.ts`.
+- **`toolbar.tsx` + `select-menu.tsx` — filters are selects, not chips.** Chips
+  are right for three or four peers you flick between and wrong as a filter bar:
+  two stacked rows of eleven of them pushed the first row of data 200pt down
+  every page, and they cannot express two independent axes (an NGO can be
+  verified *and* suspended). `SelectMenu` does not portal — same reasoning as
+  `ui/tooltip.tsx`, see the note at the top of `ui/sheet.tsx` — so it works on a
+  page, in a sheet and in the drawer. `useTableView(screen)` remembers table vs
+  cards per screen in `lib/storage`.
+- **`console-list.tsx` — three shapes, one component.** Desktop + table →
+  `DataTable`; desktop + grid → cards two or three across; mobile → always
+  cards. It renders rows inline rather than using `PagedList`, and pays the
+  virtualisation cost knowingly: a console page is 20 rows of type with no
+  media, while the volunteer feed has images, video and no end and keeps
+  `PagedList`.
+- **The audit log is a table and only a table** (no view switch, no selection,
+  no row press). Nobody *recognises* an audit entry, there is nothing to do to
+  one, and the reason to open the page is to compare a column. Its "When" column
+  is an absolute timestamp, not "23 hours ago" — a ledger is read to answer
+  "before or after", which forty rows of "23 hours ago" cannot.
+- **A record opens in a `Drawer` with `xl`, never a centred dialog.** Opening an
+  NGO or an account is not leaving the list: the reviewer is working *down* a
+  filtered directory, and the row they came from plus the ten after it stay
+  visible on the left while they decide — which a modal covers exactly. 720
+  rather than the drawer's usual 520 because a dossier is fact tables and
+  document cards, not a column of short fields. `FactGroup` pairs its facts
+  two-across above 560 (nine org facts stacked is a screen of scrolling before
+  the documents, which are what the panel was opened for) and stays
+  single-column below it. On a phone `Drawer` *is* a `Sheet`, so nothing
+  changes there.
+- **The decision is pinned in the drawer's footer, sized to its labels.** It was
+  four full-width buttons at the bottom of the scroll — reachable only after
+  scrolling past every fact, and a stack of four 100%-wide buttons reads as a
+  menu rather than a decision. Suspension sits at the far end of the row, apart
+  from the verification buttons: it is the one action that is not part of that
+  decision, and a destructive button beside "Approve" invites the wrong tap. The
+  **reason field stays in the body**, directly above them — it is a field, and a
+  field has to survive being read and corrected, which is what a pinned footer
+  does not do.
+- **The queue is the only screen with bulk actions, deliberately.** Approving a
+  routine document is repetitive and reversible; suspending an NGO is neither
+  and belongs in a dossier with the whole record on screen. **Approve is one
+  press, Reject asks** — the server requires remarks, so a single row and a
+  selection both open `RejectDocumentsSheet`. The server reports per-document
+  outcomes rather than a count (`BulkReviewResult`), because one id in forty can
+  fail on its own and "39 approved" leaves the fortieth unexplained.
+- **`stat-list.tsx`, not `MetricRow`, in the console aside.** Four `H2`
+  numerals at 320pt wrap 3 + 1, so "Suspended" lands alone under a 28px zero;
+  and the numeral gets top billing whether or not the number means anything.
+  Label left, number right, hairlines between, and a tone only on a figure that
+  needs acting on.
+
+### The dashboard, and its charts
+
+`charts.tsx` + `viz-tokens.ts`. **Read `viz-tokens.ts` before touching a
+colour** — every value in it was validated, not chosen, and its header records
+the numbers.
+
+- **Form follows the data's job, and most of this data's job is not a chart.**
+  A single current count is a `StatTile`; drawing "12 documents pending" as a
+  bar is a picture of a number. The platform counters stay as tiles and
+  `StatList` rows for the same reason — they have no dimension to plot against.
+  The dashboard was a stack of `MetricRow`s precisely because nobody asked what
+  form the numbers wanted.
+- **The two real charts exist because the API gained a time series.**
+  `GET /api/admin/overview/trends?days=7|30|90` returns per-day signups, events
+  and applications, plus the window's totals *and the previous window's*, so a
+  delta needs no second request. The server **zero-fills every day**: a
+  `GROUP BY date` returns only days that had a row, and a line drawn straight
+  across the gaps claims steady activity where there was none. Guarded by
+  "zero-fills every day in the window" in `apps/server/test/admin.spec.ts`.
+- **The day bucket is `to_char(column, 'YYYY-MM-DD')` with no timezone
+  conversion.** Every `created_at` here is `timestamp` *without* time zone
+  already holding UTC; `date_trunc('day', column at time zone 'UTC')` on such a
+  column casts naive to `timestamptz` and then truncates in the **session** zone,
+  which silently produced an all-zero series. Don't reintroduce it.
+- **The chart palette is not the brand palette.** `#FF7E40` is a fill (2.53:1 on
+  white) and fails the 3:1 a 2px line mark needs, and `success` / `error` /
+  `warning` are **status** colours with reserved meaning — spending `error.main`
+  on "new volunteers" makes a growth line read as a problem. Series slots come
+  from a palette validated in both modes against these exact surfaces: worst
+  all-pairs CVD ΔE 9.2 light / 9.4 dark, normal-vision 24.0 / 20.9. **Never add
+  a fourth series hue** — a generated one is indistinguishable from an existing
+  slot under simulated CVD; the answer is fewer series, a facet, or a table.
+- **The pipeline bar is *ordinal*, not categorical.** Pending → In review →
+  Verified is a funnel, so it takes one hue stepping light to dark and the order
+  carries the meaning; Rejected is terminal rather than further along, so it
+  takes the neutral. Not a pie: comparing two close slices by angle is what pies
+  are worst at, and a 2-slice pie is a stat tile with extra steps.
+- **One window switch above both charts**, never a picker per card, so the page
+  cannot show a 7-day line beside a 30-day one. `keepPreviousData` holds the old
+  chart up while the next window loads — a skeleton flash on a chart about to
+  look nearly identical jumps the layout for nothing.
+- **Every value is readable without hovering.** The crosshair is an enhancement;
+  the legend carries each series' window total and a marker sits on the last
+  point. Hit zones are one full-height column per point, so a 4px dot is never
+  the target.
+- Mark specs, all fixed: 2px lines, 8px+ markers with a **2px surface ring**,
+  area wash at ~10% opacity (never a saturated block), bars 24pt or thinner, a
+  **2px surface gap** between stacked segments (a gap, not a border — a stroke
+  is ink that is not data), and **solid** hairline gridlines. Dashed reads as
+  "projection" when it is just a grid.
+- **Text never wears the series colour.** Values, labels and legends use text
+  tokens; a coloured swatch beside the text carries identity. A light hue is
+  illegible as type on the surface.
+- **One hero figure per view, at most.** And no display or serif face on it —
+  that reads as off-brand decoration rather than data.
+
+---
+
 ## Traps
 
 - **Import `Pressable` from `@/components/ui/pressable`, never from `react-native`.**
@@ -403,18 +619,44 @@ read `focused` from the style callback and draw an `outline*` — `Button` and
   which nothing in the app needs.
 - `expo-env.d.ts` is gitignored and generated — a fresh clone fails `tsc` on the
   `global.css` import until `expo start` (or equivalent) creates it.
-- Env: `EXPO_PUBLIC_API_URL` falls back to `10.0.2.2:3000` on Android in dev;
-  `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` both throw at
-  import if unset (`src/lib/env.ts`).
+- **The dev API host follows the packager; do not hardcode it again.**
+  `resolveApiUrl()` in `src/lib/env.ts` reads `Constants.expoConfig?.hostUri`
+  (`host:port`, null in a production build) and points the API at that host on
+  port 3000, mapping `localhost` to `10.0.2.2` on Android. The LAN IP therefore
+  lives in exactly one file, `REACT_NATIVE_PACKAGER_HOSTNAME` in `.env.local`.
+  It used to live there *and* in `EXPO_PUBLIC_API_URL`, and the pair drifted
+  every time the network changed — which fails in the least diagnosable way
+  available: Metro still serves the bundle, so the app boots and signs in, and
+  only data requests hang until the 30s client timeout. Nobody traces "the feed
+  says Building the feed forever" back to an env file. Tunnelled hosts are
+  excluded (`TUNNEL_HOST`) because the API is not tunnelled with the packager.
+  `EXPO_PUBLIC_API_URL` still wins when set and is required in production.
+- Env: `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` both throw
+  at import if unset (`src/lib/env.ts`).
 - **Paged lists go through `components/paged-list.tsx`.** `usePagedQuery` +
   `PagedList` turn a `Paginated<T>` endpoint into an infinite list (flattened
-  pages, `loadMore`, refresh, and the loading/error/empty states in one place).
-  Two deliberate exceptions, both of which say so in the file: `(ngo)/team.tsx`
-  (the endpoint returns the whole team) and `(volunteer)/activity.tsx` (five
-  endpoints merged client-side — a true merged cursor is server work). Never
-  hand-roll a `useQuery` list hook that only ever reads page 1; nine of those
-  existed unused beside the paged screens and were deleted for exactly that
-  reason.
+  pages, `loadMore`, refresh, and the loading/error/empty states in one place),
+  ending in the app's one `LoadMoreFooter` and scrolling with
+  `verticalScrollbar` — never a hard-coded `showsVerticalScrollIndicator={false}`,
+  which on the web is a pane with no thumb. Two deliberate exceptions, both of
+  which say so in the file: `(ngo)/team.tsx` (the endpoint returns the whole
+  team) and `(volunteer)/activity.tsx` (five endpoints merged client-side — a
+  true merged cursor is server work). Never hand-roll a `useQuery` list hook
+  that only ever reads page 1; nine of those existed unused beside the paged
+  screens and were deleted for exactly that reason. **`(admin)` is not exempt.**
+  It had a parallel stack — its own `useInfiniteQuery` in `use-admin-lists.ts`,
+  its own `PAGE_SIZE`, its own search field, its own paging footer, and the same
+  50-line `FlatList` written out five times (twice in `queue.tsx` alone) — which
+  is precisely how a console drifts into being a second design system. The admin
+  hooks now return `{ query, items, total, loadMore }` from `usePagedQuery` and
+  the screens render `PagedList`; `components/admin/list-chrome.tsx` is down to
+  the one thing that is genuinely admin-only, the 1040 desktop cap.
+- **One search control: `components/search-field.tsx`.** It was three — the
+  feed's search route, the desktop top bar, and the admin lists — all the same
+  44pt inset well with the same icon at the same weight, and all three drifted:
+  two clear-button treatments, two heights, one `accessibilityRole="search"`
+  between them. `compact` and `maxWidth` cover the top bar's 40pt/440 variant;
+  `pending` dims the clear button while a keystroke waits on the debounce.
 - Role vocabulary is `volunteer` / `organisation` / `superadmin` from
   `@nabhya/shared` `roles.ts` — do not reintroduce the old `ngo` alias, and do not
   reintroduce `setGuestMode()` in `auth-store.ts`.

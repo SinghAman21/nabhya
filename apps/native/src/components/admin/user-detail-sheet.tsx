@@ -2,7 +2,11 @@ import { USER_DOCUMENT_LABELS } from "@nabhya/shared";
 import { useState } from "react";
 import { View } from "react-native";
 import { DocumentReviewRow } from "@/components/admin/document-review-row";
-import { FactGroup, ReasonField } from "@/components/admin/sheet-parts";
+import {
+	FactGroup,
+	ReasonField,
+	Section,
+} from "@/components/admin/sheet-parts";
 import {
 	Banner,
 	ErrorState,
@@ -19,8 +23,8 @@ import {
 	verificationTone,
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import { Drawer } from "@/components/ui/drawer";
 import { confirm, toast } from "@/components/ui/overlay";
-import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption } from "@/components/ui/typography";
 import { useAdminUser, useSetUserStatus } from "@/hooks/use-admin";
 import { useTheme } from "@/hooks/use-theme";
@@ -29,8 +33,14 @@ import { formatDate } from "@/lib/format";
 
 /**
  * Per-user dossier. State first, then the identity documents — the thing a
- * reviewer most often opens this for — then the participation record that
- * tells them whether this is a real volunteer, then the one decision.
+ * reviewer most often opens this for — then the participation record that tells
+ * them whether this is a real volunteer, then the one decision.
+ *
+ * A `Drawer` with `xl`, and the decision pinned in the footer, for the same
+ * reasons as the NGO dossier — see the note at the top of
+ * `org-detail-sheet.tsx`. The short version: the reviewer is working down a
+ * filtered list and it should stay visible; and an action reachable only after
+ * scrolling past a participation history is an action nobody reaches.
  */
 export function UserDetailSheet({
 	userId,
@@ -101,11 +111,23 @@ export function UserDetailSheet({
 	};
 
 	return (
-		<Sheet
+		<Drawer
 			visible={!!userId}
 			onClose={close}
+			xl
 			title={user?.fullName ?? "Account"}
 			subtitle={user?.email}
+			footer={
+				user ? (
+					<Button
+						variant={suspended ? "outline" : "destructive"}
+						onPress={toggleSuspension}
+						loading={setStatus.isPending}
+					>
+						{suspended ? "Reinstate account" : "Suspend account"}
+					</Button>
+				) : undefined
+			}
 		>
 			{query.isLoading ? (
 				<LoadingState />
@@ -310,33 +332,8 @@ export function UserDetailSheet({
 						requiredFor="suspend"
 						error={reasonError}
 					/>
-					<View style={{ paddingBottom: spacing[2] }}>
-						<Button
-							variant={suspended ? "outline" : "destructive"}
-							onPress={toggleSuspension}
-							loading={setStatus.isPending}
-						>
-							{suspended ? "Reinstate account" : "Suspend account"}
-						</Button>
-					</View>
 				</>
 			)}
-		</Sheet>
-	);
-}
-
-function Section({
-	title,
-	children,
-}: {
-	title: string;
-	children: React.ReactNode;
-}) {
-	const { spacing } = useTheme();
-	return (
-		<View style={{ marginBottom: spacing[5] }}>
-			<SectionTitle>{title}</SectionTitle>
-			{children}
-		</View>
+		</Drawer>
 	);
 }

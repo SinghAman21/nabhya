@@ -15,14 +15,19 @@ import {
 import {
 	type AdminOrgQuery,
 	type AdminOverview,
+	type AdminTrendPoint,
+	type AdminTrends,
 	type AdminUserQuery,
 	type AuditLogQuery,
+	type BulkReviewDocumentsInput,
+	type BulkReviewResult,
 	computeUserVerificationStatus,
-	type PaginationQuery,
+	type DocumentQueueQuery,
 	type ReviewDocumentInput,
 	type ReviewOrganizationInput,
 	type SetOrgStatusInput,
 	type SetUserStatusInput,
+	type SortDir,
 } from "@nabhya/shared";
 import {
 	BadRequestException,
@@ -32,6 +37,7 @@ import {
 } from "@nestjs/common";
 import {
 	and,
+	asc,
 	count,
 	desc,
 	eq,
@@ -42,9 +48,51 @@ import {
 	type SQL,
 	sql,
 } from "drizzle-orm";
+import type { PgColumn } from "drizzle-orm/pg-core";
 import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import { paginate, toOffset } from "../../common/utils";
+
+/**
+ * Turns a validated sort key into an `ORDER BY`.
+ *
+ * Sorting is server-side across the whole result set, not client-side over the
+ * loaded pages — see the note on the sort schemas in `@nabhya/shared`. The
+ * column comes from a lookup table keyed by the Zod enum, so an unmapped key
+ * cannot reach SQL: the enum rejects it at the boundary, and `?? fallback`
+ * covers the impossible case rather than emitting an unordered query, which
+ * would silently make paging non-deterministic.
+ *
+ * Every list adds its own default column as a tiebreaker. Postgres gives no
+ * stable order for rows equal on the sort key, so without one, paging a list
+ * sorted by (say) verification status can show the same row twice and skip
+ * another.
+ */
+function orderFor<K extends string>(
+	sort: K,
+	dir: SortDir,
+	columns: Record<K, PgColumn | SQL>,
+	tiebreak: PgColumn,
+): Array<SQL> {
+	const direction = dir === "asc" ? asc : desc;
+	const column = columns[sort];
+	if (!column) return [desc(tiebreak)];
+	// Only add the tiebreaker when it is not already the sort key.
+	return column === tiebreak
+		? [direction(column)]
+		: [direction(column), desc(tiebreak)];
+}
+
+/**
+ * Midnight UTC for a moment. The trend buckets are UTC days, so the window's
+ * edges have to be too — using local midnight would shift every bucket the day
+ * the deploy region changed.
+ */
+function startOfUtcDay(at: Date): Date {
+	const day = new Date(at);
+	day.setUTCHours(0, 0, 0, 0);
+	return day;
+}
 
 @Injectable()
 export class AdminService {
@@ -167,6 +215,124 @@ export class AdminService {
 		};
 	}
 
+	/**
+	 * The Overview's time series: new NGOs, new volunteers, events created and
+	 * applications made, per day, over the window — plus the totals for it and
+	 * for the window immediately before, so the client can show a delta without
+	 * a second request.
+	 *
+	 * Four `GROUP BY date` scans rather than one query. A single query would
+	 * need four FULL OUTER JOINs on a generated date series, which is both
+	 * harder to read and no faster: each of these is an index-friendly range
+	 * scan over one table's `created_at`.
+	 *
+	 * **The day key is `to_char(column, 'YYYY-MM-DD')` with no timezone
+	 * conversion, and that is load-bearing.** Every `created_at` in this schema
+	 * is `timestamp` *without* time zone (see `packages/db/src/schema`), already
+	 * holding UTC. Writing `date_trunc('day', column at time zone 'UTC')` on
+	 * such a column casts naive → `timestamptz` and then truncates in the
+	 * **session** zone, so the bucket a row lands in depends on the database's
+	 * `TimeZone` setting — which silently produced all-zero series here. The
+	 * window bounds are compared against the same naive column, so both sides
+	 * agree without either knowing a zone.
+	 */
+	async getTrends(days: number): Promise<AdminTrends> {
+		const start = startOfUtcDay(new Date());
+		start.setUTCDate(start.getUTCDate() - (days - 1));
+		const previousStart = new Date(start);
+		previousStart.setUTCDate(previousStart.getUTCDate() - days);
+
+		const perDay = async (
+			table: typeof organizations | typeof events | typeof eventApplications,
+			column: PgColumn,
+			from: Date,
+			extra?: SQL,
+		) => {
+			const where = extra ? and(gte(column, from), extra) : gte(column, from);
+			return this.db
+				.select({
+					day: sql<string>`to_char(${column}, 'YYYY-MM-DD')`,
+					value: sql<number>`count(*)::int`,
+				})
+				.from(table as never)
+				.where(where)
+				.groupBy(sql`1`);
+		};
+
+		// Volunteers are a role, which lives in a join table; EXISTS keeps the
+		// count right for an account holding more than one role.
+		const volunteerFilter = sql`exists (
+			select 1 from ${userRoles}
+			join ${roles} on ${roles.id} = ${userRoles.roleId}
+			where ${userRoles.userId} = ${users.id} and ${roles.name} = 'volunteer'
+		)`;
+
+		const [orgRows, volunteerRows, eventRows, applicationRows] =
+			await Promise.all([
+				perDay(organizations, organizations.createdAt, previousStart),
+				this.db
+					.select({
+						day: sql<string>`to_char(${users.createdAt}, 'YYYY-MM-DD')`,
+						value: sql<number>`count(*)::int`,
+					})
+					.from(users)
+					.where(and(gte(users.createdAt, previousStart), volunteerFilter))
+					.groupBy(sql`1`),
+				perDay(events, events.createdAt, previousStart),
+				perDay(eventApplications, eventApplications.appliedAt, previousStart),
+			]);
+
+		const index = (
+			rows: Array<{ day: string; value: number }>,
+		): Map<string, number> => new Map(rows.map((r) => [r.day, r.value]));
+
+		const byDay = {
+			organizations: index(orgRows),
+			volunteers: index(volunteerRows),
+			events: index(eventRows),
+			applications: index(applicationRows),
+		};
+
+		// Zero-fill. A GROUP BY only returns days that had a row, and a line
+		// drawn straight across the gaps claims steady activity where there was
+		// none. See the note on `AdminTrends` in @nabhya/shared.
+		const points: AdminTrendPoint[] = [];
+		const zero = () => ({
+			organizations: 0,
+			volunteers: 0,
+			events: 0,
+			applications: 0,
+		});
+		const totals = zero();
+		const previousTotals = zero();
+
+		for (let offset = -days; offset < days; offset += 1) {
+			const day = new Date(start);
+			day.setUTCDate(day.getUTCDate() + offset);
+			const key = day.toISOString().slice(0, 10);
+
+			const point: AdminTrendPoint = {
+				date: key,
+				organizations: byDay.organizations.get(key) ?? 0,
+				volunteers: byDay.volunteers.get(key) ?? 0,
+				events: byDay.events.get(key) ?? 0,
+				applications: byDay.applications.get(key) ?? 0,
+			};
+
+			const bucket = offset < 0 ? previousTotals : totals;
+			bucket.organizations += point.organizations;
+			bucket.volunteers += point.volunteers;
+			bucket.events += point.events;
+			bucket.applications += point.applications;
+
+			// Only the current window is plotted; the previous one exists to be
+			// summed for the delta.
+			if (offset >= 0) points.push(point);
+		}
+
+		return { days, points, totals, previousTotals };
+	}
+
 	// ─── Organization monitoring ─────────────────────────────────────────────
 
 	async listOrganizations(query: AdminOrgQuery) {
@@ -233,7 +399,28 @@ export class AdminService {
 				.from(organizations)
 				.innerJoin(users, eq(organizations.ownerUserId, users.id))
 				.where(where)
-				.orderBy(desc(organizations.createdAt))
+				.orderBy(
+					...orderFor(
+						query.sort,
+						query.dir,
+						{
+							createdAt: organizations.createdAt,
+							name: organizations.organizationName,
+							city: organizations.city,
+							verificationStatus: organizations.verificationStatus,
+							pendingDocuments: sql`(
+								select count(*)::int from organization_documents od
+								where od.organization_id = organizations.id
+								  and od.verification_status = 'PENDING'
+							)`,
+							events: sql`(
+								select count(*)::int from events e
+								where e.organization_id = organizations.id
+							)`,
+						},
+						organizations.createdAt,
+					),
+				)
 				.limit(limit)
 				.offset(offset),
 			this.db.select({ value: count() }).from(organizations).where(where),
@@ -490,7 +677,27 @@ export class AdminService {
 				})
 				.from(users)
 				.where(where)
-				.orderBy(desc(users.createdAt))
+				.orderBy(
+					...orderFor(
+						query.sort,
+						query.dir,
+						{
+							createdAt: users.createdAt,
+							name: users.fullName,
+							email: users.email,
+							verificationStatus: users.verificationStatus,
+							applications: sql`(
+								select count(*)::int from event_applications ea
+								where ea.volunteer_id = users.id
+							)`,
+							pledges: sql`(
+								select count(*)::int from need_pledges np
+								where np.user_id = users.id
+							)`,
+						},
+						users.createdAt,
+					),
+				)
 				.limit(limit)
 				.offset(offset),
 			this.db.select({ value: count() }).from(users).where(where),
@@ -641,9 +848,7 @@ export class AdminService {
 
 	// ─── Document verification ───────────────────────────────────────────────
 
-	async listOrganizationDocuments(
-		query: PaginationQuery & { status?: "PENDING" | "VERIFIED" | "REJECTED" },
-	) {
+	async listOrganizationDocuments(query: DocumentQueueQuery) {
 		const where = query.status
 			? eq(organizationDocuments.verificationStatus, query.status)
 			: undefined;
@@ -670,7 +875,18 @@ export class AdminService {
 					eq(organizationDocuments.organizationId, organizations.id),
 				)
 				.where(where)
-				.orderBy(desc(organizationDocuments.uploadedAt))
+				.orderBy(
+					...orderFor(
+						query.sort,
+						query.dir,
+						{
+							uploadedAt: organizationDocuments.uploadedAt,
+							documentType: organizationDocuments.documentType,
+							owner: organizations.organizationName,
+						},
+						organizationDocuments.uploadedAt,
+					),
+				)
 				.limit(limit)
 				.offset(offset),
 			this.db
@@ -718,9 +934,7 @@ export class AdminService {
 		return updated;
 	}
 
-	async listUserDocuments(
-		query: PaginationQuery & { status?: "PENDING" | "VERIFIED" | "REJECTED" },
-	) {
+	async listUserDocuments(query: DocumentQueueQuery) {
 		const where = query.status
 			? eq(userDocuments.verificationStatus, query.status)
 			: undefined;
@@ -746,7 +960,18 @@ export class AdminService {
 				.from(userDocuments)
 				.innerJoin(users, eq(userDocuments.userId, users.id))
 				.where(where)
-				.orderBy(desc(userDocuments.uploadedAt))
+				.orderBy(
+					...orderFor(
+						query.sort,
+						query.dir,
+						{
+							uploadedAt: userDocuments.uploadedAt,
+							documentType: userDocuments.documentType,
+							owner: users.fullName,
+						},
+						userDocuments.uploadedAt,
+					),
+				)
 				.limit(limit)
 				.offset(offset),
 			this.db.select({ value: count() }).from(userDocuments).where(where),
@@ -819,6 +1044,62 @@ export class AdminService {
 		return updated;
 	}
 
+	/**
+	 * Reviews many documents in one request.
+	 *
+	 * Sequential rather than one big `UPDATE ... WHERE id IN (...)`, and that is
+	 * deliberate on both counts. Each decision has to be audited on its own —
+	 * an audit log that records "38 documents approved" cannot answer "who
+	 * approved *this* certificate", which is the only question anyone ever asks
+	 * of it. And an identity document additionally re-derives its owner's
+	 * account status from that owner's whole document set inside a transaction,
+	 * which is per-user work a set update cannot express.
+	 *
+	 * One id failing does not fail the batch: the reviewer selected rows from a
+	 * list that may be seconds stale, so "already reviewed" and "deleted
+	 * underneath you" are normal, and rolling back thirty-nine good decisions
+	 * because of one is the wrong trade. The result names both sides so the
+	 * client can say which rows are still waiting.
+	 */
+	async bulkReviewDocuments(
+		adminId: string,
+		kind: "organization" | "user",
+		input: BulkReviewDocumentsInput,
+	): Promise<BulkReviewResult> {
+		const review =
+			kind === "organization"
+				? (id: string) =>
+						this.reviewOrganizationDocument(adminId, id, {
+							verificationStatus: input.verificationStatus,
+							...(input.remarks ? { remarks: input.remarks } : {}),
+						})
+				: (id: string) =>
+						this.reviewUserDocument(adminId, id, {
+							verificationStatus: input.verificationStatus,
+							...(input.remarks ? { remarks: input.remarks } : {}),
+						});
+
+		const reviewed: string[] = [];
+		const failed: BulkReviewResult["failed"] = [];
+
+		// Deduplicated: a selection built from several loaded pages can repeat an
+		// id, and reviewing one twice writes two audit rows for one decision.
+		for (const id of [...new Set(input.ids)]) {
+			try {
+				await review(id);
+				reviewed.push(id);
+			} catch (error) {
+				failed.push({
+					id,
+					reason:
+						error instanceof Error ? error.message : "Could not be reviewed",
+				});
+			}
+		}
+
+		return { reviewed, failed };
+	}
+
 	// ─── Audit trail ─────────────────────────────────────────────────────────
 
 	async listAuditLogs(query: AuditLogQuery) {
@@ -852,7 +1133,17 @@ export class AdminService {
 				.from(auditLogs)
 				.leftJoin(users, eq(auditLogs.performedBy, users.id))
 				.where(where)
-				.orderBy(desc(auditLogs.createdAt))
+				.orderBy(
+					...orderFor(
+						query.sort,
+						query.dir,
+						{
+							createdAt: auditLogs.createdAt,
+							action: auditLogs.action,
+						},
+						auditLogs.createdAt,
+					),
+				)
 				.limit(limit)
 				.offset(offset),
 			this.db.select({ value: count() }).from(auditLogs).where(where),
