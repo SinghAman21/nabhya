@@ -493,6 +493,7 @@ export default function NgoFeed() {
 				}
 			/>
 			<PostComposer
+				key={composer?.tag ?? "POST"}
 				visible={!!composer}
 				onClose={() => setComposer(null)}
 				{...(composer?.tag ? { initialTag: composer.tag } : {})}

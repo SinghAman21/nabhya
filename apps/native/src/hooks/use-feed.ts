@@ -73,6 +73,38 @@ export function useFeed(filters: FeedFilters, enabled = true) {
 }
 
 /**
+ * Feed items the caller has saved (the reaction-bar bookmark on a card, not
+ * the NGO-level bookmark behind `useToggleBookmark` / `/bookmarks`). One
+ * endpoint, so — unlike `useFeed` — there is no lens to pick; it still takes
+ * the shared filters so a future "Saved → Needs only" chip has somewhere to
+ * plug in. Included in the same `queryKeys.feed` family as the other lenses,
+ * so liking/saving/unsaving anywhere (`useFeedReaction`'s
+ * `queryScopes.feed` invalidation) refreshes this list too.
+ */
+export function useSavedFeed(filters: Omit<FeedFilters, "tab"> = {}) {
+	const query: Partial<FeedFilterQuery> = {
+		...(filters.kind ? { kind: KIND_TO_TYPE[filters.kind] } : {}),
+		...(filters.categoryIds?.length
+			? { categoryIds: filters.categoryIds }
+			: {}),
+		...(filters.city ? { city: filters.city } : {}),
+		...(filters.search ? { search: filters.search } : {}),
+		...(filters.needType
+			? { kind: "NEED" as const, needType: filters.needType }
+			: {}),
+		...(filters.needUrgency ? { needUrgency: filters.needUrgency } : {}),
+	};
+	return useInfiniteQuery({
+		queryKey: queryKeys.feed({ tab: "saved", ...query }),
+		queryFn: ({ pageParam }) =>
+			feedApi.saved({ ...query, page: pageParam, limit: PAGE_SIZE }),
+		initialPageParam: 1,
+		getNextPageParam: (last) =>
+			last.meta.hasMore ? last.meta.page + 1 : undefined,
+	});
+}
+
+/**
  * Publish a post: upload the attachments, then create the row.
  *
  * The two steps are one mutation because they are one user action and they
@@ -91,25 +123,34 @@ export function useCreateFeedPost() {
 	return useMutation({
 		mutationFn: async ({
 			text,
-			tag,
+			type,
+			isUrgent,
 			media,
 			onMediaChange,
+			uploaded,
 		}: {
 			text: string;
-			tag: PostTag;
+			type: PostTag;
+			isUrgent: boolean;
 			media: ComposerMedia[];
 			onMediaChange: (id: string, patch: Partial<ComposerMedia>) => void;
+			uploaded?: { mediaFolder: string; mediaKeys: string[] } | null;
 		}) => {
-			const uploaded =
-				media.length > 0 ? await uploadFeedMedia(media, onMediaChange) : null;
+			const uploadedMedia =
+				uploaded !== undefined
+					? uploaded
+					: media.length > 0
+						? await uploadFeedMedia(media, onMediaChange)
+						: null;
 
 			return feedApi.create({
 				text,
-				tag,
-				mediaKeys: uploaded?.mediaKeys ?? [],
+				type,
+				isUrgent,
+				mediaKeys: uploadedMedia?.mediaKeys ?? [],
 				// The schema refuses media keys without their folder, so this pair
 				// is set together or not at all.
-				...(uploaded ? { mediaFolder: uploaded.mediaFolder } : {}),
+				...(uploadedMedia ? { mediaFolder: uploadedMedia.mediaFolder } : {}),
 			});
 		},
 		onSuccess: () => {
@@ -258,26 +299,19 @@ export function useFeedReaction(action: "like" | "save") {
 }
 
 /**
- * Records a share or an impression.
- *
- * Impressions fire from the list's viewability callback — one per row as it
- * scrolls past — so this must never invalidate: a feed that refetched itself
- * every time a card came into view would rebuild under the reader continuously.
- * Neither signal is drawn on the card, so there is nothing on screen to update.
- * A share bumps its counter locally for the one card that has it.
+ * Record a share or an impression. Neither shows up anywhere in the UI (no
+ * screen renders a share count, and an impression is invisible by
+ * definition), so unlike `useFeedReaction` this must not invalidate the feed
+ * scope — impressions fire once per card per scroll (`onViewableItemsChanged`
+ * dedupes per session, not per request), and invalidating an active
+ * `useInfiniteQuery` refetches every page already loaded. That refetch storm
+ * is what was blowing through the default rate-limit bucket on `/feed/*`
+ * while scrolling.
  */
 export function useRecordFeedInteraction(action: "share" | "impression") {
-	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: ({ item }: { item: FeedItem }) =>
 			feedApi.interact(KIND_TO_TYPE[item.kind], item.id, action),
-		onMutate: ({ item }) => {
-			if (action !== "share") return;
-			patchFeedRow(queryClient, item, (row) => ({
-				...row,
-				engagement: { ...row.engagement, shares: row.engagement.shares + 1 },
-			}));
-		},
 	});
 }
 

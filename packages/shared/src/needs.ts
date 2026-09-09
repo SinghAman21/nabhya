@@ -40,6 +40,7 @@ const needBaseSchema = z.object({
 		.trim()
 		.min(10, "Add at least 10 characters of detail")
 		.max(2000, "Description must be under 2000 characters"),
+	coverImage: optionalText(500),
 	quantity: z.coerce
 		.number()
 		.int("Must be a whole number")

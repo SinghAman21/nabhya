@@ -19,6 +19,7 @@ export const upsertAnnouncementSchema = z.object({
 	coverImageKey: optionalText(400),
 	status: announcementStatusSchema.default("PUBLISHED"),
 	isPinned: z.boolean().default(false),
+	isUrgent: z.boolean().default(false),
 });
 
 export type UpsertAnnouncementInput = z.infer<typeof upsertAnnouncementSchema>;

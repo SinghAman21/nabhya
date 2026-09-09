@@ -1,7 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
+	boolean,
 	decimal,
-	foreignKey,
 	index,
 	integer,
 	pgEnum,
@@ -17,13 +17,15 @@ import { organizations } from "./organizations";
 import { users } from "./users";
 
 export const postMediaTypeEnum = pgEnum("post_media_type", ["IMAGE", "VIDEO"]);
-export const postTagEnum = pgEnum("post_tag", [
+export const feedItemTypeEnum = pgEnum("feed_item_type", [
 	"POST",
 	"EVENT",
 	"NEED",
 	"ANNOUNCEMENT",
-	"URGENT",
 ]);
+
+// Backward-compatible export name for code that still imports postTagEnum.
+export const postTagEnum = feedItemTypeEnum;
 
 /** A shared feed item written by volunteers and organisations. */
 export const posts = pgTable(
@@ -36,7 +38,8 @@ export const posts = pgTable(
 		organizationId: uuid("organization_id").references(() => organizations.id, {
 			onDelete: "set null",
 		}),
-		tag: postTagEnum("tag").notNull().default("POST"),
+		type: feedItemTypeEnum("type").notNull().default("POST"),
+		isUrgent: boolean("is_urgent").notNull().default(false),
 		city: varchar("city"),
 		state: varchar("state"),
 		latitude: decimal("latitude"),
@@ -47,13 +50,14 @@ export const posts = pgTable(
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 	},
 	(table) => [
-		unique("posts_id_tag_unique").on(table.id, table.tag),
+		unique("posts_id_type_unique").on(table.id, table.type),
 		index("posts_created_at_idx").on(table.createdAt),
 		index("posts_organization_created_idx").on(
 			table.organizationId,
 			table.createdAt,
 		),
-		index("posts_tag_created_idx").on(table.tag, table.createdAt),
+		index("posts_type_created_idx").on(table.type, table.createdAt),
+		index("posts_urgent_created_idx").on(table.isUrgent, table.createdAt),
 		index("posts_city_idx").on(table.city),
 	],
 );
@@ -109,32 +113,26 @@ export const postInteractions = pgTable(
 		userId: uuid("user_id")
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
-		tag: postTagEnum("tag").notNull(),
+		targetType: feedItemTypeEnum("target_type").notNull(),
 		postId: uuid("post_id").notNull(),
 		interactionType: postInteractionTypeEnum("interaction_type").notNull(),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 	},
 	(table) => [
 		uniqueIndex("post_interactions_user_post_like_save_unique")
-			.on(table.userId, table.postId, table.interactionType)
+			.on(table.userId, table.targetType, table.postId, table.interactionType)
 			.where(sql`${table.interactionType} in ('LIKE', 'SAVE')`),
-		index("post_interactions_post_tag_created_idx").on(
+		index("post_interactions_post_type_created_idx").on(
 			table.postId,
-			table.tag,
+			table.targetType,
 			table.createdAt,
 		),
 		index("post_interactions_user_created_idx").on(
 			table.userId,
 			table.createdAt,
 		),
-		// Guards against an interaction being tagged for a different post kind
-		// than the post it points at — enforced via the composite unique on
-		// posts(id, tag), not a plain single-column FK to posts.id.
-		foreignKey({
-			columns: [table.postId, table.tag],
-			foreignColumns: [posts.id, posts.tag],
-			name: "post_interactions_post_tag_posts_fk",
-		}).onDelete("cascade"),
+		// `post_id` is a polymorphic feed item id. `target_type` tells the
+		// service whether to resolve it from posts, events, needs, or announcements.
 	],
 );
 
@@ -145,24 +143,20 @@ export const postComments = pgTable(
 		userId: uuid("user_id")
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
-		tag: postTagEnum("tag").notNull(),
+		targetType: feedItemTypeEnum("target_type").notNull(),
 		postId: uuid("post_id").notNull(),
 		body: text("body").notNull(),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},
 	(table) => [
-		index("post_comments_post_tag_created_idx").on(
+		index("post_comments_post_type_created_idx").on(
 			table.postId,
-			table.tag,
+			table.targetType,
 			table.createdAt,
 		),
 		index("post_comments_user_idx").on(table.userId),
-		foreignKey({
-			columns: [table.postId, table.tag],
-			foreignColumns: [posts.id, posts.tag],
-			name: "post_comments_post_tag_posts_fk",
-		}).onDelete("cascade"),
+		// Polymorphic target; visibility and existence are enforced in the service.
 	],
 );
 

@@ -323,7 +323,7 @@ export default function VolunteerOnboarding() {
 			exit={
 				step === 0 ? (
 					<TextAction
-						label="Not you? Sign out"
+						label={signOut.isPending ? "Signing out…" : "Not you? Sign out"}
 						onPress={() => signOut.mutate()}
 						disabled={signOut.isPending}
 					/>

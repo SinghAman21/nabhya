@@ -1,5 +1,8 @@
 import type { db as dbType } from "@nabhya/db";
 import {
+	announcements,
+	events,
+	needs,
 	organizations,
 	postComments,
 	postInteractions,
@@ -36,7 +39,7 @@ export class FeedEngagementService {
 				.insert(postInteractions)
 				.values({
 					userId,
-					tag: target.tag,
+					targetType: target.targetType,
 					postId: target.postId,
 					interactionType,
 				})
@@ -44,7 +47,7 @@ export class FeedEngagementService {
 		} else {
 			await this.db.insert(postInteractions).values({
 				userId,
-				tag: target.tag,
+				targetType: target.targetType,
 				postId: target.postId,
 				interactionType,
 			});
@@ -62,7 +65,7 @@ export class FeedEngagementService {
 			.where(
 				and(
 					eq(postInteractions.userId, userId),
-					eq(postInteractions.tag, target.tag),
+					eq(postInteractions.targetType, target.targetType),
 					eq(postInteractions.postId, target.postId),
 					eq(postInteractions.interactionType, interactionType),
 				),
@@ -77,7 +80,7 @@ export class FeedEngagementService {
 				.insert(postComments)
 				.values({
 					userId,
-					tag: input.tag,
+					targetType: input.targetType,
 					postId: input.postId,
 					body: input.body,
 				})
@@ -89,7 +92,7 @@ export class FeedEngagementService {
 	async listComments(target: PostTarget, query: FeedCommentsQuery) {
 		await this.assertVisible(target);
 		const where = and(
-			eq(postComments.tag, target.tag),
+			eq(postComments.targetType, target.targetType),
 			eq(postComments.postId, target.postId),
 		);
 		const { limit, offset } = toOffset(query);
@@ -133,10 +136,41 @@ export class FeedEngagementService {
 			});
 			if (!organization) throw new NotFoundException("Feed item not found");
 		};
-		const post = await this.db.query.posts.findFirst({
-			where: and(eq(posts.id, target.postId), eq(posts.tag, target.tag)),
-		});
-		if (!post) throw new NotFoundException("Feed item not found");
-		return visibleOrganization(post.organizationId);
+		switch (target.targetType) {
+			case "POST": {
+				const post = await this.db.query.posts.findFirst({
+					where: and(eq(posts.id, target.postId), eq(posts.type, "POST")),
+				});
+				if (!post) throw new NotFoundException("Feed item not found");
+				return visibleOrganization(post.organizationId);
+			}
+			case "EVENT": {
+				const event = await this.db.query.events.findFirst({
+					where: and(
+						eq(events.id, target.postId),
+						eq(events.status, "PUBLISHED"),
+					),
+				});
+				if (!event) throw new NotFoundException("Feed item not found");
+				return visibleOrganization(event.organizationId);
+			}
+			case "NEED": {
+				const need = await this.db.query.needs.findFirst({
+					where: and(eq(needs.id, target.postId), eq(needs.status, "OPEN")),
+				});
+				if (!need) throw new NotFoundException("Feed item not found");
+				return visibleOrganization(need.organizationId);
+			}
+			case "ANNOUNCEMENT": {
+				const announcement = await this.db.query.announcements.findFirst({
+					where: and(
+						eq(announcements.id, target.postId),
+						eq(announcements.status, "PUBLISHED"),
+					),
+				});
+				if (!announcement) throw new NotFoundException("Feed item not found");
+				return visibleOrganization(announcement.organizationId);
+			}
+		}
 	}
 }

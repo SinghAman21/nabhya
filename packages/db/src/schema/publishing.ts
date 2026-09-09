@@ -38,6 +38,7 @@ export const announcements = pgTable(
 		status: announcementStatusEnum("status").notNull().default("PUBLISHED"),
 		/** Kept at the top of the org's profile until unpinned. */
 		isPinned: boolean("is_pinned").notNull().default(false),
+		isUrgent: boolean("is_urgent").notNull().default(false),
 		publishedAt: timestamp("published_at").defaultNow(),
 		createdBy: uuid("created_by").references(() => users.id, {
 			onDelete: "set null",
@@ -51,6 +52,10 @@ export const announcements = pgTable(
 			table.publishedAt,
 		),
 		index("announcements_status_idx").on(table.status),
+		index("announcements_urgent_published_idx").on(
+			table.isUrgent,
+			table.publishedAt,
+		),
 	],
 );
 

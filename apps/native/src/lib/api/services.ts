@@ -39,6 +39,7 @@ import type {
 	ReviewDocumentInput,
 	ReviewOrganizationInput,
 	ReviewPledgeInput,
+	SavedFeedQuery,
 	SearchQuery,
 	SelectableRole,
 	SetOrgStatusInput,
@@ -152,6 +153,7 @@ export const feedApi = {
 		feedPage(FEED.TRENDING, query),
 	following: (query: Partial<FollowingFeedQuery>) =>
 		feedPage(FEED.FOLLOWING, query),
+	saved: (query: Partial<SavedFeedQuery>) => feedPage(FEED.SAVED, query),
 	/** Chronological posts only — the composer's own list. */
 	list: (query: Partial<FeedQuery>) =>
 		http.getPage<FeedPostRecord>(FEED.LIST, query),

@@ -60,6 +60,7 @@ import {
 	formatBytes,
 	type RejectedMedia,
 	toComposerMedia,
+	uploadFeedMedia,
 } from "@/lib/feed-media";
 import { focusable } from "@/lib/focus";
 import { formatDateRange, formatProgress, formatRelative } from "@/lib/format";
@@ -194,7 +195,7 @@ const emptyEvent = (): EventFieldsValue => {
 
 const EMPTY_ANNOUNCEMENT: AnnouncementFieldsValue = { pinned: false };
 
-function toComposerType(tag: PostTag | undefined): ComposerType {
+function toComposerType(tag: PostTag | "URGENT" | undefined): ComposerType {
 	switch (tag) {
 		case "NEED":
 			return "NEED";
@@ -207,8 +208,7 @@ function toComposerType(tag: PostTag | undefined): ComposerType {
 	}
 }
 
-/** URGENT is a POST with the switch on — not a separate type. */
-function toComposerUrgent(tag: PostTag | undefined): boolean {
+function toComposerUrgent(tag: PostTag | "URGENT" | undefined): boolean {
 	return tag === "URGENT";
 }
 
@@ -307,7 +307,7 @@ export function PostComposer({
 		createEvent.isPending ||
 		createAnnouncement.isPending;
 	const canPost = hasTitle && hasBody && remaining >= 0 && !saving;
-	const uploading = publish.isPending && media.length > 0;
+	const uploading = saving && media.length > 0;
 	const uploadedCount = media.filter(
 		(file) => file.status === "uploaded",
 	).length;
@@ -383,7 +383,8 @@ export function PostComposer({
 		if (type !== "POST") return;
 		const draft: PostDraft = {
 			id: draftId.current,
-			tag: urgent ? "URGENT" : "POST",
+			tag: "POST",
+			isUrgent: urgent,
 			title: headline,
 			body: text,
 			savedAt: new Date().toISOString(),
@@ -394,7 +395,7 @@ export function PostComposer({
 	const restoreDraft = (draft: PostDraft) => {
 		draftId.current = draft.id;
 		setType(toComposerType(draft.tag));
-		setUrgent(toComposerUrgent(draft.tag));
+		setUrgent(draft.isUrgent ?? toComposerUrgent(draft.tag));
 		setHeadline(draft.title);
 		setText(draft.body);
 		setPanel("none");
@@ -412,13 +413,11 @@ export function PostComposer({
 			setRejected([]);
 			setPanel(openDraftsOnMount ? "drafts" : "none");
 			setErrors({});
-			if (initialTag) {
-				setType(toComposerType(initialTag));
-				if (initialTag === "URGENT") setUrgent(true);
-			}
 			setCity((c) => c || (org.data?.city ?? ""));
 			setState((s) => s || (org.data?.state ?? ""));
-			if (openPickerOnMount && isVerified) void pickMedia();
+			if (openPickerOnMount && isVerified) {
+				queueMicrotask(() => void pickMedia());
+			}
 			void loadDrafts().then(setDrafts);
 			return;
 		}
@@ -498,7 +497,7 @@ export function PostComposer({
 		return next;
 	};
 
-	const onSubmit = () => {
+	const onSubmit = async () => {
 		if (!canPost) return;
 		setFormError(null);
 		setErrors({});
@@ -512,6 +511,25 @@ export function PostComposer({
 			? (org.data?.state ?? "").trim()
 			: state.trim();
 
+		// Retry re-uploads the whole set: intent folders are minted per attempt.
+		const fresh = media.map((file) => ({
+			...file,
+			status: "ready" as const,
+			progress: 0,
+			objectKey: undefined,
+			error: undefined,
+		}));
+		setMedia(fresh);
+		let uploaded: Awaited<ReturnType<typeof uploadFeedMedia>> | null = null;
+		try {
+			uploaded =
+				fresh.length > 0 ? await uploadFeedMedia(fresh, patchMedia) : null;
+		} catch (error) {
+			onError(error);
+			return;
+		}
+		const coverImage = uploaded?.mediaKeys[0];
+
 		if (type === "NEED") {
 			// "0" is the bar's resting state for "unspecified" — never sent.
 			const quantity =
@@ -522,6 +540,7 @@ export function PostComposer({
 				type: need.needType,
 				title,
 				description: body,
+				...(coverImage ? { coverImage } : {}),
 				...(quantity !== undefined ? { quantity } : {}),
 				unit: need.unit.trim(),
 				urgency: urgent ? "HIGH" : "MEDIUM",
@@ -551,10 +570,12 @@ export function PostComposer({
 				startAt: event.startAt,
 				endAt: event.endAt,
 				...(event.deadline ? { applicationDeadline: event.deadline } : {}),
+				...(coverImage ? { coverImage } : {}),
 				volunteersNeeded: event.volunteers
 					? Number(event.volunteers)
 					: undefined,
 				status: "PUBLISHED",
+				isUrgent: urgent,
 			});
 			if (!parsed.success) {
 				const next = applyIssues(parsed.error.issues);
@@ -578,6 +599,8 @@ export function PostComposer({
 				body,
 				status: "PUBLISHED",
 				isPinned: announcement.pinned,
+				isUrgent: urgent,
+				...(coverImage ? { coverImageKey: coverImage } : {}),
 			});
 			if (!parsed.success) {
 				setErrors(applyIssues(parsed.error.issues));
@@ -597,22 +620,14 @@ export function PostComposer({
 			return;
 		}
 
-		// Retry re-uploads the whole set: intent folders are minted per attempt.
-		const fresh = media.map((file) => ({
-			...file,
-			status: "ready" as const,
-			progress: 0,
-			objectKey: undefined,
-			error: undefined,
-		}));
-		setMedia(fresh);
-
 		publish.mutate(
 			{
 				text: composed,
-				tag: urgent ? "URGENT" : "POST",
+				type: "POST",
+				isUrgent: urgent,
 				media: fresh,
 				onMediaChange: patchMedia,
+				uploaded,
 			},
 			{ onSuccess: () => void finish(), onError },
 		);
@@ -796,12 +811,12 @@ export function PostComposer({
 
 				{/* 3 · Details */}
 				<SectionTitle>Details</SectionTitle>
-				{type === "POST" && (
+				{type !== "NEED" && (
 					<SwitchRow
 						icon={AlertTriangle}
 						tone="error"
 						title="Mark as urgent"
-						hint="Urgent updates rank higher and appear in the Urgent lens. Use sparingly."
+						hint="Urgent posts rank higher and appear in the Urgent lens. Use sparingly."
 						value={urgent}
 						onChange={setUrgent}
 						disabled={saving}
@@ -846,8 +861,8 @@ export function PostComposer({
 					/>
 				)}
 
-				{/* 4 · Media (Updates only) */}
-				{isUpdate && media.length > 0 && (
+				{/* 4 · Media */}
+				{media.length > 0 && (
 					<View style={{ marginTop: spacing[5] }}>
 						<SectionTitle
 							action={
@@ -1098,7 +1113,7 @@ function DraftsPanel({
 									{draftPreview(draft) || "Untitled"}
 								</Label>
 								<Caption color="quaternary" numberOfLines={1}>
-									{draft.tag === "URGENT" ? "Urgent · " : ""}
+									{draft.isUrgent || draft.tag === "URGENT" ? "Urgent · " : ""}
 									{formatRelative(draft.savedAt)}
 								</Caption>
 							</Pressable>
@@ -1183,27 +1198,17 @@ function ComposerFooter({
 			>
 				<Tool
 					icon={ImagePlus}
-					tip={!isUpdate ? "Photos go on an Update" : "Add photos"}
-					label={
-						!isUpdate
-							? "Add photos — only an Update carries them"
-							: atMediaCap
-								? "Add photos — limit reached"
-								: "Add photos"
-					}
-					disabled={!isUpdate || atMediaCap || saving}
+					tip="Add photos"
+					label={atMediaCap ? "Add photos — limit reached" : "Add photos"}
+					disabled={atMediaCap || saving}
 					busy={pickerBusy}
 					onPress={onPickAll}
 				/>
 				<Tool
 					icon={Video}
-					tip={!isUpdate ? "Video goes on an Update" : "Add a video"}
-					label={
-						!isUpdate
-							? "Add a video — only an Update carries one"
-							: "Add a video"
-					}
-					disabled={!isUpdate || atMediaCap || saving}
+					tip="Add a video"
+					label="Add a video"
+					disabled={atMediaCap || saving}
 					onPress={onPickVideo}
 				/>
 				<Tool

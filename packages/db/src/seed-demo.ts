@@ -638,7 +638,8 @@ async function main() {
 				.values({
 					authorUserId: owner.id,
 					organizationId: org.id,
-					tag: postIndex === 1 ? "URGENT" : "POST",
+					type: "POST",
+					isUrgent: postIndex === 1,
 					city: ngo.city,
 					state: ngo.state,
 					mediaFolder: `demo-${String(index + 1).padStart(2, "0")}-${postIndex + 1}-${Date.now()}`,

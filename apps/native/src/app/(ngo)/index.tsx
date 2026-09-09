@@ -347,6 +347,7 @@ export default function NgoDashboard() {
 	const sheets = (
 		<>
 			<PostComposer
+				key={composerTag ?? "POST"}
 				visible={!!composerTag}
 				onClose={() => setComposerTag(null)}
 				{...(composerTag ? { initialTag: composerTag } : {})}

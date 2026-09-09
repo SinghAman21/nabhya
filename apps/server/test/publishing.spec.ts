@@ -71,6 +71,7 @@ describe("PublishingService", () => {
 		body: "We are collecting blankets across three wards this month.",
 		status: "PUBLISHED" as const,
 		isPinned: false,
+		isUrgent: false,
 	};
 
 	describe("announcements", () => {

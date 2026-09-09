@@ -49,6 +49,23 @@ AppState.addEventListener("change", (state) => {
 	}
 });
 
+/** Rejects if `promise` has not settled within `ms` — the promise itself keeps running. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+	return new Promise<T>((resolve, reject) => {
+		const timer = setTimeout(() => reject(new Error("timed out")), ms);
+		promise.then(
+			(value) => {
+				clearTimeout(timer);
+				resolve(value);
+			},
+			(error) => {
+				clearTimeout(timer);
+				reject(error);
+			},
+		);
+	});
+}
+
 export class AuthService {
 	async signup(input: SignUpInput): Promise<AuthResponse> {
 		const result = await supabase.auth.signUp({
@@ -153,7 +170,16 @@ export class AuthService {
 
 	async logout(): Promise<void> {
 		try {
-			await supabase.auth.signOut();
+			// Supabase's default `scope: "global"` calls its Auth server to revoke
+			// the session everywhere, which is a network request with no timeout
+			// of its own — on a flaky connection it can hang well past what
+			// anyone waits for a "sign out" tap. Race it: server-side revocation
+			// still wins when the network cooperates, but a stalled request can
+			// never trap the device sign-out below it, which is the part the
+			// person actually asked for and the part `finally` cannot skip.
+			await withTimeout(supabase.auth.signOut(), 5000);
+		} catch {
+			// Revocation failed or timed out — the device still signs out below.
 		} finally {
 			await this.clearToken();
 		}

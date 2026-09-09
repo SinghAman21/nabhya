@@ -19,10 +19,14 @@ async function bootstrap() {
 	// Global prefix for all routes — e.g. /api/users/me
 	app.setGlobalPrefix("api");
 
-	// Behind a load balancer the socket address is the proxy's. Without this
-	// every request looks like one client and rate limiting would throttle the
-	// entire user base together.
-	app.set("trust proxy", 1);
+	// Behind a load balancer the socket address is the proxy's, and without
+	// this every request looks like one client, throttling the entire user
+	// base together. But the inverse trap is just as real: turned on with no
+	// proxy actually in front — true of every local/LAN dev run — it has the
+	// same effect for the opposite reason, trusting a forwarded-for chain
+	// nothing is providing. Only turn it on where `Deploying` in AGENTS.md
+	// says a load balancer is assumed.
+	if (env.NODE_ENV === "production") app.set("trust proxy", 1);
 
 	// Give in-flight requests a chance to finish on SIGTERM instead of dropping
 	// them mid-transaction during a rolling deploy.
