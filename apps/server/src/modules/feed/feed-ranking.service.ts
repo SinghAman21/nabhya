@@ -20,6 +20,7 @@ import type {
 	FollowingFeedQuery,
 	ForYouFeedQuery,
 	PostTag,
+	SavedFeedQuery,
 	TrendingFeedQuery,
 } from "@nabhya/shared";
 import { Inject, Injectable } from "@nestjs/common";
@@ -65,7 +66,6 @@ type Candidate = {
 };
 
 const SOURCE_LIMIT = 150;
-const RECENT_INTERACTION_DAYS = 14;
 
 @Injectable()
 export class FeedRankingService {
@@ -115,6 +115,23 @@ export class FeedRankingService {
 				(candidate) =>
 					candidate.organizationId && following.has(candidate.organizationId),
 			)
+			.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+		return this.page(selected, selected.length, query, user.id);
+	}
+
+	/**
+	 * Feed items the caller has saved — the reaction-bar bookmark, not the
+	 * NGO-level `bookmarks` table behind `/engagement/bookmarks`. Same
+	 * candidate pool as every other lens (so a saved item that has since gone
+	 * unpublished or dropped off the source window quietly stops appearing,
+	 * same as `following`), filtered down to `viewer.saved` — already computed
+	 * by `hydrate()` — and ordered newest-first by the item's own `createdAt`,
+	 * same as `following`.
+	 */
+	async saved(user: AuthUser, query: SavedFeedQuery) {
+		const candidates = applyFilters(await this.candidates(user), query);
+		const selected = candidates
+			.filter((candidate) => candidate.viewer?.saved)
 			.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 		return this.page(selected, selected.length, query, user.id);
 	}
@@ -345,15 +362,15 @@ export class FeedRankingService {
 							inArray(organizationCategories.organizationId, organizationIds),
 						)
 				: [],
-			this.db
-				.select()
-				.from(postInteractions)
-				.where(
-					gte(
-						postInteractions.createdAt,
-						new Date(Date.now() - RECENT_INTERACTION_DAYS * 86_400_000),
-					),
-				),
+			// All-time, not windowed: this is the source for the displayed like/save
+			// count and for `viewer.liked`/`viewer.saved` below, not just a scoring
+			// signal. A 14-day recency cutoff used to live here, which meant a like
+			// older than that silently dropped out of the count and the heart
+			// stopped showing filled for the user who made it — while the unique
+			// index still blocked them from liking it again, so the client had no
+			// way to recover. The impression window in `viewerContext` below is a
+			// separate, intentionally recent-only signal — don't conflate the two.
+			this.db.select().from(postInteractions),
 			this.db
 				.select({
 					targetType: postComments.targetType,

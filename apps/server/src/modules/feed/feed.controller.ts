@@ -6,6 +6,7 @@ import type {
 	FeedQuery,
 	FollowingFeedQuery,
 	ForYouFeedQuery,
+	SavedFeedQuery,
 	TrendingFeedQuery,
 } from "@nabhya/shared";
 import {
@@ -17,6 +18,7 @@ import {
 	followingFeedQuerySchema,
 	forYouFeedQuerySchema,
 	postTargetSchema,
+	savedFeedQuerySchema,
 	trendingFeedQuerySchema,
 } from "@nabhya/shared";
 import {
@@ -90,6 +92,17 @@ export class FeedController {
 		query: FollowingFeedQuery,
 	) {
 		return this.ranking.following(user, query);
+	}
+
+	@Get("saved")
+	@Roles("volunteer", "organisation", "superadmin")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({ summary: "Feed items the caller has saved" })
+	saved(
+		@CurrentUser() user: AuthUser,
+		@Query(new ZodValidationPipe(savedFeedQuerySchema)) query: SavedFeedQuery,
+	) {
+		return this.ranking.saved(user, query);
 	}
 
 	@Post("upload-intents")

@@ -5,6 +5,7 @@ import {
 	Award,
 	Bell,
 	Bookmark,
+	BookmarkCheck,
 	ChevronRight,
 	HandCoins,
 	Moon,
@@ -227,6 +228,11 @@ export default function VolunteerProfile() {
 					icon={Bookmark}
 					label="NGOs you follow"
 					onPress={() => router.push("/bookmarks")}
+				/>
+				<ListRow
+					icon={BookmarkCheck}
+					label="Saved posts"
+					onPress={() => router.push("/saved")}
 				/>
 			</ListGroup>
 		</View>

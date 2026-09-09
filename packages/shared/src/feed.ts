@@ -162,6 +162,11 @@ export const followingFeedQuerySchema = paginationQuerySchema.extend(
 );
 export type FollowingFeedQuery = z.infer<typeof followingFeedQuerySchema>;
 
+export const savedFeedQuerySchema = paginationQuerySchema.extend(
+	feedFilterSchema.shape,
+);
+export type SavedFeedQuery = z.infer<typeof savedFeedQuerySchema>;
+
 export const feedQuerySchema = paginationQuerySchema;
 export type FeedQuery = z.infer<typeof feedQuerySchema>;
 

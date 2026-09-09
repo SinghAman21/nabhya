@@ -418,27 +418,6 @@ export function FeedCard({
 						/>
 					</View>
 				</View>
-
-				{/* ENGAGEMENT SUMMARY */}
-				{item.engagement.likes > 0 && (
-					<View
-						style={{
-							paddingHorizontal: spacing[4],
-							paddingBottom: spacing[3],
-						}}
-					>
-						<Caption color="tertiary" weight="medium">
-							{item.engagement.likes === 1
-								? "1 like"
-								: `${item.engagement.likes} likes`}
-							{item.engagement.comments > 0
-								? `  ·  ${item.engagement.comments} comment${
-										item.engagement.comments === 1 ? "" : "s"
-									}`
-								: ""}
-						</Caption>
-					</View>
-				)}
 			</View>
 			{viewer && (
 				<FeedMediaViewer

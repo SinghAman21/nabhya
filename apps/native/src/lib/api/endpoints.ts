@@ -85,6 +85,7 @@ export const FEED = {
 	FOR_YOU: `${API_PREFIX}/feed/for-you`,
 	TRENDING: `${API_PREFIX}/feed/trending`,
 	FOLLOWING: `${API_PREFIX}/feed/following`,
+	SAVED: `${API_PREFIX}/feed/saved`,
 	UPLOAD_INTENTS: `${API_PREFIX}/feed/upload-intents`,
 	detail: (id: string) => `${API_PREFIX}/feed/${id}`,
 	interaction: (

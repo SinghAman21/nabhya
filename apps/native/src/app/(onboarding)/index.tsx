@@ -398,7 +398,9 @@ export default function OrgOnboarding() {
 			exit={
 				step === 0 ? (
 					<TextAction
-						label="Not your NGO? Sign out"
+						label={
+							signOut.isPending ? "Signing out…" : "Not your NGO? Sign out"
+						}
 						onPress={() => signOut.mutate()}
 						disabled={signOut.isPending}
 					/>

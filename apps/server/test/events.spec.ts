@@ -262,6 +262,7 @@ describe("EventsService", () => {
 					endAt: new Date(Date.now() + 90_000_000),
 					volunteersNeeded: 5,
 					status: "PUBLISHED",
+					isUrgent: false,
 				}),
 			).rejects.toBeInstanceOf(ForbiddenException);
 		});
@@ -281,6 +282,7 @@ describe("EventsService", () => {
 				endAt: new Date(Date.now() + 90_000_000),
 				volunteersNeeded: 5,
 				status: "DRAFT",
+				isUrgent: false,
 			});
 
 			expect(event.status).toBe("DRAFT");
