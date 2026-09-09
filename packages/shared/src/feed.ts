@@ -37,19 +37,22 @@ export interface FeedMediaIntentsResponse {
 	tickets: UploadTicketResponse[];
 }
 
-export const postTagSchema = z.enum([
+export const feedItemTypeSchema = z.enum([
 	"POST",
 	"EVENT",
 	"NEED",
 	"ANNOUNCEMENT",
-	"URGENT",
 ]);
-export type PostTag = z.infer<typeof postTagSchema>;
+
+// Backward-compatible names while call sites migrate from “tag” vocabulary.
+export const postTagSchema = feedItemTypeSchema;
+export type PostTag = z.infer<typeof feedItemTypeSchema>;
 
 export const createFeedPostSchema = z
 	.object({
 		text: z.string().trim().min(1, "Write something to share").max(5000),
-		tag: postTagSchema.default("POST"),
+		type: feedItemTypeSchema.default("POST"),
+		isUrgent: z.boolean().default(false),
 		mediaFolder: z
 			.string()
 			.trim()
@@ -76,7 +79,7 @@ export const feedInteractionTypeSchema = z.enum([
 export type FeedInteractionType = z.infer<typeof feedInteractionTypeSchema>;
 
 export const postTargetSchema = z.object({
-	tag: postTagSchema,
+	targetType: feedItemTypeSchema,
 	postId: z.uuid("Invalid post identifier"),
 });
 
@@ -128,7 +131,7 @@ export type FeedCommentsQuery = z.infer<typeof feedCommentsQuerySchema>;
  * - `urgent`     — HIGH-urgency needs, urgent posts, events within three days.
  */
 export const feedFilterSchema = z.object({
-	kind: postTagSchema.optional(),
+	kind: feedItemTypeSchema.optional(),
 	categoryIds: z
 		.union([z.uuid(), z.array(z.uuid()).min(1)])
 		.transform((value) => (Array.isArray(value) ? value : [value]))
@@ -180,7 +183,7 @@ export const FEED_TAB_LABELS: Record<FeedTab, string> = {
 };
 
 // Backward-compatible type/schema aliases during API migration.
-export const feedItemTypeSchema = postTagSchema;
+export const feedItemTypeSchemaAlias = feedItemTypeSchema;
 export const feedItemTargetSchema = postTargetSchema;
 export type FeedItemType = PostTag;
 export type FeedItemTarget = PostTarget;

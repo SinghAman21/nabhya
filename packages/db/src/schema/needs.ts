@@ -52,6 +52,7 @@ export const needs = pgTable(
 		type: needTypeEnum("type").notNull(),
 		title: varchar("title").notNull(),
 		description: text("description").notNull(),
+		coverImage: text("cover_image"),
 
 		// Quantity is optional — "volunteer tutors, as many as possible" is a
 		// legitimate post. When present, fulfilledQuantity tracks progress and is

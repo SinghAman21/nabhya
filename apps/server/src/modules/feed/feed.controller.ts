@@ -236,10 +236,10 @@ export class FeedController {
 		@Param("id", ParseUUIDPipe) id: string,
 		@Body(
 			new ZodValidationPipe(
-				createFeedCommentSchema.omit({ tag: true, postId: true }),
+				createFeedCommentSchema.omit({ targetType: true, postId: true }),
 			),
 		)
-		body: Omit<CreateFeedCommentInput, "tag" | "postId">,
+		body: Omit<CreateFeedCommentInput, "targetType" | "postId">,
 	) {
 		return this.engagement.createComment(
 			user.id,
@@ -275,7 +275,7 @@ export class FeedController {
 
 	private target(type: string, id: string) {
 		return postTargetSchema.parse({
-			tag: type.toUpperCase(),
+			targetType: type.toUpperCase(),
 			postId: id,
 		});
 	}

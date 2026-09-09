@@ -30,7 +30,8 @@ import { storage } from "@/lib/storage";
 
 export interface PostDraft {
 	id: string;
-	tag: PostTag;
+	tag: PostTag | "URGENT";
+	isUrgent?: boolean;
 	title: string;
 	body: string;
 	/** ISO. Sorted on this, newest first. */
@@ -67,6 +68,7 @@ function isDraft(value: unknown): value is PostDraft {
 	return (
 		typeof row.id === "string" &&
 		typeof row.tag === "string" &&
+		(row.isUrgent === undefined || typeof row.isUrgent === "boolean") &&
 		typeof row.title === "string" &&
 		typeof row.body === "string" &&
 		typeof row.savedAt === "string"

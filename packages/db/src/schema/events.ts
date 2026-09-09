@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import {
+	boolean,
 	decimal,
 	index,
 	integer,
@@ -64,6 +65,7 @@ export const events = pgTable(
 		acceptedCount: integer("accepted_count").notNull().default(0),
 
 		status: eventStatusEnum("status").notNull().default("DRAFT"),
+		isUrgent: boolean("is_urgent").notNull().default(false),
 		createdBy: uuid("created_by").references(() => users.id, {
 			onDelete: "set null",
 		}),
@@ -75,6 +77,7 @@ export const events = pgTable(
 		// Drives the public feed: status filter + chronological ordering.
 		index("events_status_start_idx").on(table.status, table.startAt),
 		index("events_city_idx").on(table.city),
+		index("events_urgent_start_idx").on(table.isUrgent, table.startAt),
 	],
 );
 

@@ -6,7 +6,7 @@ import {
 } from "./storage.keys";
 
 describe("storage keys", () => {
-	it("puts each purpose under its own bucket and a readable org folder", () => {
+	it("puts document uploads directly under the owner id", () => {
 		const key = buildStorageKey({
 			purpose: "ORG_DOCUMENT",
 			ownerId: "org-123",
@@ -15,12 +15,9 @@ describe("storage keys", () => {
 			createdAt: new Date("2026-09-06T10:11:12Z"),
 		});
 
-		expect(
-			key.startsWith(
-				"ngo_verification/org-documents/sakhi-trust-060926/org-123/",
-			),
-		).toBe(true);
-		expect(key.endsWith("-060926101112.pdf")).toBe(true);
+		expect(key).toBe(
+			"ngo_verification/org-documents/org-123/pan-060926101112.pdf",
+		);
 	});
 
 	it("round-trips the owner, which is what authorises downloads", () => {
@@ -47,10 +44,8 @@ describe("storage keys", () => {
 
 		// What actually matters: the name cannot introduce a new path segment,
 		// so it can never escape the owner's prefix.
-		expect(
-			key.startsWith("ngo_verification/org-documents/test-org-060926/org-1/"),
-		).toBe(true);
-		expect(key.split("/")).toHaveLength(5);
+		expect(key.startsWith("ngo_verification/org-documents/org-1/")).toBe(true);
+		expect(key.split("/")).toHaveLength(4);
 		expect(key).not.toContain("..");
 	});
 

@@ -62,6 +62,7 @@ export class PublishingService {
 					coverImageKey: input.coverImageKey ?? null,
 					status: input.status,
 					isPinned: input.isPinned,
+					isUrgent: input.isUrgent,
 					publishedAt: input.status === "PUBLISHED" ? new Date() : null,
 					createdBy: userId,
 				})
@@ -105,6 +106,7 @@ export class PublishingService {
 				coverImageKey: input.coverImageKey ?? null,
 				status: input.status,
 				isPinned: input.isPinned,
+				isUrgent: input.isUrgent,
 				// Going from draft to published stamps the date; an edit to an
 				// already-published post keeps its original publish time.
 				publishedAt:

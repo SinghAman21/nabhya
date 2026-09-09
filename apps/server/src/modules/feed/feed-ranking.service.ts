@@ -32,6 +32,7 @@ import { paginate, toOffset } from "../../common/utils";
 type Candidate = {
 	id: string;
 	type: PostTag;
+	isUrgent: boolean;
 	organizationId: string | null;
 	organization: { id: string; name: string; logo: string | null } | null;
 	author: {
@@ -196,7 +197,8 @@ export class FeedRankingService {
 			...(await Promise.all(
 				postRows.map(async ({ post, org, author }) => ({
 					id: post.id,
-					type: post.tag,
+					type: post.type,
+					isUrgent: post.isUrgent,
 					organizationId: post.organizationId,
 					organization: org ? await orgSummary(org, this.storage) : null,
 					author: userSummary(author),
@@ -205,7 +207,7 @@ export class FeedRankingService {
 					state: post.state ?? org?.state ?? null,
 					latitude: numberOrNull(post.latitude ?? org?.latitude),
 					longitude: numberOrNull(post.longitude ?? org?.longitude),
-					urgency: post.tag === "URGENT" ? ("HIGH" as const) : null,
+					urgency: post.isUrgent ? ("HIGH" as const) : null,
 					categoryIds: [],
 					engagement: emptyEngagement(),
 					viewer: null,
@@ -226,6 +228,7 @@ export class FeedRankingService {
 				eventRows.map(async ({ event, org, author }) => ({
 					id: event.id,
 					type: "EVENT" as const,
+					isUrgent: event.isUrgent,
 					organizationId: event.organizationId,
 					organization: await orgSummary(org, this.storage),
 					author: author ? userSummary(author) : null,
@@ -234,7 +237,7 @@ export class FeedRankingService {
 					state: event.state ?? org.state,
 					latitude: numberOrNull(event.latitude ?? org.latitude),
 					longitude: numberOrNull(event.longitude ?? org.longitude),
-					urgency: null,
+					urgency: event.isUrgent ? ("HIGH" as const) : null,
 					categoryIds: [],
 					engagement: emptyEngagement(),
 					viewer: null,
@@ -256,6 +259,7 @@ export class FeedRankingService {
 				needRows.map(async ({ need, org, author }) => ({
 					id: need.id,
 					type: "NEED" as const,
+					isUrgent: need.urgency === "HIGH",
 					organizationId: need.organizationId,
 					organization: await orgSummary(org, this.storage),
 					author: author ? userSummary(author) : null,
@@ -272,6 +276,9 @@ export class FeedRankingService {
 						type: need.type,
 						title: need.title,
 						description: need.description,
+						coverImage: need.coverImage
+							? await this.storage.createDownloadUrl(need.coverImage)
+							: null,
 						quantity: need.quantity,
 						unit: need.unit,
 						fulfilledQuantity: need.fulfilledQuantity,
@@ -283,6 +290,7 @@ export class FeedRankingService {
 				announcementRows.map(async ({ announcement, org, author }) => ({
 					id: announcement.id,
 					type: "ANNOUNCEMENT" as const,
+					isUrgent: announcement.isUrgent,
 					organizationId: announcement.organizationId,
 					organization: await orgSummary(org, this.storage),
 					author: author ? userSummary(author) : null,
@@ -291,7 +299,7 @@ export class FeedRankingService {
 					state: org.state,
 					latitude: numberOrNull(org.latitude),
 					longitude: numberOrNull(org.longitude),
-					urgency: null,
+					urgency: announcement.isUrgent ? ("HIGH" as const) : null,
 					categoryIds: [],
 					engagement: emptyEngagement(),
 					viewer: null,
@@ -348,7 +356,7 @@ export class FeedRankingService {
 				),
 			this.db
 				.select({
-					tag: postComments.tag,
+					targetType: postComments.targetType,
 					postId: postComments.postId,
 				})
 				.from(postComments),
@@ -375,7 +383,7 @@ export class FeedRankingService {
 			(row) => row.organizationId,
 		);
 		const commentsByTarget = countBy(
-			commentRows.map((row) => `${row.tag}:${row.postId}`),
+			commentRows.map((row) => `${row.targetType}:${row.postId}`),
 		);
 		const applicationCounts = new Map(
 			applications.map((row) => [row.id, row.count]),
@@ -396,7 +404,7 @@ export class FeedRankingService {
 				candidate.type === "NEED" ? (pledgeCounts.get(candidate.id) ?? 0) : 0;
 			for (const interaction of interactionRows)
 				if (
-					interaction.tag === candidate.type &&
+					interaction.targetType === candidate.type &&
 					interaction.postId === candidate.id
 				) {
 					if (interaction.interactionType === "LIKE")
@@ -414,14 +422,14 @@ export class FeedRankingService {
 					liked: interactionRows.some(
 						(item) =>
 							item.userId === viewerId &&
-							item.tag === candidate.type &&
+							item.targetType === candidate.type &&
 							item.postId === candidate.id &&
 							item.interactionType === "LIKE",
 					),
 					saved: interactionRows.some(
 						(item) =>
 							item.userId === viewerId &&
-							item.tag === candidate.type &&
+							item.targetType === candidate.type &&
 							item.postId === candidate.id &&
 							item.interactionType === "SAVE",
 					),
@@ -452,7 +460,7 @@ export class FeedRankingService {
 				.where(eq(follows.userId, userId)),
 			this.db
 				.select({
-					tag: postInteractions.tag,
+					targetType: postInteractions.targetType,
 					postId: postInteractions.postId,
 				})
 				.from(postInteractions)
@@ -474,7 +482,9 @@ export class FeedRankingService {
 			longitude: numberOrNull(viewer?.longitude),
 			categoryIds: new Set(interests.map((row) => row.categoryId)),
 			following: new Set(following.map((row) => row.organizationId)),
-			seen: new Set(impressions.map((row) => `${row.tag}:${row.postId}`)),
+			seen: new Set(
+				impressions.map((row) => `${row.targetType}:${row.postId}`),
+			),
 		};
 	}
 
@@ -628,11 +638,7 @@ function applyFilters(candidates: Candidate[], query: FeedFilterQuery) {
 	const city = query.city?.toLowerCase();
 	const now = Date.now();
 	return candidates.filter((candidate) => {
-		if (query.kind) {
-			// Urgent posts are still posts to a reader asking for posts.
-			const type = candidate.type === "URGENT" ? "POST" : candidate.type;
-			if (type !== query.kind && candidate.type !== query.kind) return false;
-		}
+		if (query.kind && candidate.type !== query.kind) return false;
 		if (
 			query.categoryIds &&
 			!query.categoryIds.some((categoryId) =>
@@ -672,7 +678,7 @@ function applyFilters(candidates: Candidate[], query: FeedFilterQuery) {
 
 /** HIGH-urgency needs, urgent posts, and events that start within three days. */
 function isUrgent(candidate: Candidate, now: number) {
-	if (candidate.type === "URGENT") return true;
+	if (candidate.isUrgent) return true;
 	if (candidate.type === "NEED") return candidate.urgency === "HIGH";
 	if (candidate.type === "EVENT") {
 		const startAt = candidate.content.startAt;

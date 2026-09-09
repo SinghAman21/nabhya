@@ -96,6 +96,7 @@ export interface PublicEvent {
 	volunteersNeeded: number;
 	acceptedCount: number;
 	status: EventStatus;
+	isUrgent: boolean;
 	createdAt: string;
 	organization: OrganizationSummary;
 }
@@ -120,6 +121,7 @@ export interface OrgEventListItem {
 	startAt: string;
 	endAt: string;
 	status: EventStatus;
+	isUrgent: boolean;
 	volunteersNeeded: number;
 	acceptedCount: number;
 	coverImage: string | null;
@@ -143,6 +145,7 @@ export interface OrgEventDetail {
 	startAt: string;
 	endAt: string;
 	status: EventStatus;
+	isUrgent: boolean;
 	volunteersNeeded: number;
 }
 
@@ -202,6 +205,7 @@ export interface PublicNeed {
 	type: NeedType;
 	title: string;
 	description: string;
+	coverImage: string | null;
 	quantity: number | null;
 	unit: string | null;
 	fulfilledQuantity: number;
@@ -219,6 +223,7 @@ export interface OrgNeedListItem {
 	type: NeedType;
 	title: string;
 	description: string;
+	coverImage: string | null;
 	quantity: number | null;
 	unit: string | null;
 	fulfilledQuantity: number;
@@ -653,12 +658,7 @@ export interface AuditLogEntry {
 // ─── Feed ────────────────────────────────────────────────────────────────────
 
 /** Item type vocabulary the server uses for feed rows and interactions. */
-export type FeedApiItemType =
-	| "POST"
-	| "URGENT"
-	| "EVENT"
-	| "NEED"
-	| "ANNOUNCEMENT";
+export type FeedApiItemType = "POST" | "EVENT" | "NEED" | "ANNOUNCEMENT";
 
 /** One row exactly as `GET /api/feed/{for-you,trending,following}` returns it. */
 export interface FeedApiItem {
@@ -672,6 +672,7 @@ export interface FeedApiItem {
 		profileImage: string | null;
 	} | null;
 	createdAt: string;
+	isUrgent: boolean;
 	city: string | null;
 	state: string | null;
 	latitude: number | null;
@@ -717,6 +718,8 @@ export interface FeedMedia {
 /** A row of `GET /api/feed` (chronological posts) and of `POST /api/feed`. */
 export interface FeedPostRecord {
 	id: string;
+	type: FeedApiItemType;
+	isUrgent: boolean;
 	text: string;
 	createdAt: string;
 	author: { id: string; fullName: string | null };
@@ -752,6 +755,7 @@ export interface FeedNeedItem extends FeedItemBase {
 	kind: "need";
 	need: {
 		type: NeedType;
+		coverImage: string | null;
 		quantity: number | null;
 		unit: string | null;
 		fulfilledQuantity: number;

@@ -91,25 +91,34 @@ export function useCreateFeedPost() {
 	return useMutation({
 		mutationFn: async ({
 			text,
-			tag,
+			type,
+			isUrgent,
 			media,
 			onMediaChange,
+			uploaded,
 		}: {
 			text: string;
-			tag: PostTag;
+			type: PostTag;
+			isUrgent: boolean;
 			media: ComposerMedia[];
 			onMediaChange: (id: string, patch: Partial<ComposerMedia>) => void;
+			uploaded?: { mediaFolder: string; mediaKeys: string[] } | null;
 		}) => {
-			const uploaded =
-				media.length > 0 ? await uploadFeedMedia(media, onMediaChange) : null;
+			const uploadedMedia =
+				uploaded !== undefined
+					? uploaded
+					: media.length > 0
+						? await uploadFeedMedia(media, onMediaChange)
+						: null;
 
 			return feedApi.create({
 				text,
-				tag,
-				mediaKeys: uploaded?.mediaKeys ?? [],
+				type,
+				isUrgent,
+				mediaKeys: uploadedMedia?.mediaKeys ?? [],
 				// The schema refuses media keys without their folder, so this pair
 				// is set together or not at all.
-				...(uploaded ? { mediaFolder: uploaded.mediaFolder } : {}),
+				...(uploadedMedia ? { mediaFolder: uploadedMedia.mediaFolder } : {}),
 			});
 		},
 		onSuccess: () => {

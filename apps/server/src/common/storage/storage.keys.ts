@@ -96,13 +96,6 @@ function buildReadableDocumentName(input: {
 	return `${base}-${dateTime}${ext}`;
 }
 
-function buildReadableFolderName(input: {
-	label: string;
-	createdAt?: Date;
-}): string {
-	return `${readableSegment(input.label, "folder")}-${formatDate(input.createdAt ?? new Date())}`;
-}
-
 /**
  * Builds a bucketed object key. `ownerId` scopes the object to the organization
  * or user it belongs to, which is what makes ownership checkable on download:
@@ -119,16 +112,12 @@ export function buildStorageKey(input: {
 	const target = PURPOSE_TARGETS[input.purpose];
 
 	if (input.purpose === "ORG_DOCUMENT" || input.purpose === "USER_DOCUMENT") {
-		const folder = buildReadableFolderName({
-			label: input.ownerLabel ?? input.ownerId,
-			createdAt: input.createdAt,
-		});
 		const documentName = buildReadableDocumentName({
 			label: input.documentLabel ?? input.fileName,
 			fileName: input.fileName,
 			createdAt: input.createdAt,
 		});
-		return `${target.bucket}/${target.prefix}/${folder}/${input.ownerId}/${documentName}`;
+		return `${target.bucket}/${target.prefix}/${input.ownerId}/${documentName}`;
 	}
 
 	return `${target.bucket}/${target.prefix}/${input.ownerId}/${randomUUID()}-${safeFileName(input.fileName)}`;
@@ -158,11 +147,9 @@ export function parseStorageKey(
 	);
 	if (!purpose) return null;
 
-	if (purpose === "ORG_DOCUMENT" || purpose === "USER_DOCUMENT") {
-		const ownerId = segments.length >= 5 ? segments[3] : segments[2];
-		return ownerId ? { purpose, ownerId } : null;
-	}
-
-	const ownerId = segments[2];
+	const ownerId =
+		purpose === "ORG_DOCUMENT" && segments.length >= 5
+			? segments[3]
+			: segments[2];
 	return ownerId ? { purpose, ownerId } : null;
 }

@@ -82,7 +82,8 @@ export function toFeedItem(row: FeedApiItem): FeedItem {
 	 * `title`/`description`, announcements `title`/`body`), which makes it an
 	 * exact test rather than a heuristic.
 	 *
-	 * Only `URGENT` keeps its urgency, because that tag means it on a post.
+	 * Urgency now travels independently as `isUrgent`; legacy `URGENT` rows are
+	 * migrated to `POST + isUrgent` on the server.
 	 */
 	if (typeof c.text === "string") {
 		return {
@@ -90,7 +91,7 @@ export function toFeedItem(row: FeedApiItem): FeedItem {
 			kind: "post",
 			title: "",
 			description: c.text,
-			isUrgent: row.type === "URGENT",
+			isUrgent: row.isUrgent,
 			post: {
 				text: c.text,
 				media: Array.isArray(c.media) ? (c.media as FeedMedia[]) : [],
@@ -108,9 +109,10 @@ export function toFeedItem(row: FeedApiItem): FeedItem {
 				kind: "need",
 				title: str(c.title) ?? "",
 				description: str(c.description) ?? "",
-				isUrgent: urgency === "HIGH",
+				isUrgent: row.isUrgent || urgency === "HIGH",
 				need: {
 					type: (str(c.type) ?? "WANT") as NeedType,
+					coverImage: str(c.coverImage),
 					quantity: num(c.quantity),
 					unit: str(c.unit),
 					fulfilledQuantity: num(c.fulfilledQuantity) ?? 0,
@@ -131,9 +133,10 @@ export function toFeedItem(row: FeedApiItem): FeedItem {
 				title: str(c.title) ?? "",
 				description: str(c.description) ?? "",
 				isUrgent:
-					Number.isFinite(start) &&
-					start >= now &&
-					start - now <= URGENT_WINDOW_MS,
+					row.isUrgent ||
+					(Number.isFinite(start) &&
+						start >= now &&
+						start - now <= URGENT_WINDOW_MS),
 				event: {
 					coverImage: str(c.coverImage),
 					venue: str(c.venue),
@@ -152,31 +155,20 @@ export function toFeedItem(row: FeedApiItem): FeedItem {
 				kind: "story",
 				title: str(c.title) ?? "",
 				description: str(c.body) ?? "",
-				isUrgent: false,
+				isUrgent: row.isUrgent,
 				story: {
 					coverImage: str(c.coverImage),
 					isPinned: c.isPinned === true,
 				},
 			};
-		case "URGENT":
-			return {
-				...base,
-				kind: "post",
-				title: "",
-				description: str(c.text) ?? "",
-				isUrgent: true,
-				post: {
-					text: str(c.text) ?? "",
-					media: Array.isArray(c.media) ? (c.media as FeedMedia[]) : [],
-				},
-			};
+
 		default:
 			return {
 				...base,
 				kind: "post",
 				title: "",
 				description: str(c.text) ?? "",
-				isUrgent: false,
+				isUrgent: row.isUrgent,
 				post: {
 					text: str(c.text) ?? "",
 					media: Array.isArray(c.media) ? (c.media as FeedMedia[]) : [],

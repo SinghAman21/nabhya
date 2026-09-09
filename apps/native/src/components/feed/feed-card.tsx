@@ -211,7 +211,9 @@ export function FeedCard({
 			? item.event.coverImage
 			: item.kind === "story"
 				? item.story.coverImage
-				: null;
+				: item.kind === "need"
+					? item.need.coverImage
+					: null;
 	const coverMedia: FeedMedia[] = coverUrl
 		? [{ id: `${item.id}-cover`, type: "IMAGE", url: coverUrl, sortOrder: 0 }]
 		: [];

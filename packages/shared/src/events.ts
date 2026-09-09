@@ -45,6 +45,7 @@ const eventBaseSchema = z.object({
 		.min(1, "At least 1 volunteer")
 		.max(10000, "That seems too high"),
 	status: z.enum(["DRAFT", "PUBLISHED"]).default("PUBLISHED"),
+	isUrgent: z.boolean().default(false),
 });
 
 /**

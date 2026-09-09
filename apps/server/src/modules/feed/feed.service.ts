@@ -49,7 +49,8 @@ export class FeedService {
 					.values({
 						authorUserId: user.id,
 						organizationId: organization?.id,
-						tag: input.tag,
+						type: input.type,
+						isUrgent: input.isUrgent,
 						city: organization?.city,
 						state: organization?.state,
 						latitude: organization?.latitude,
@@ -94,7 +95,8 @@ export class FeedService {
 			this.db
 				.select({
 					id: posts.id,
-					tag: posts.tag,
+					type: posts.type,
+					isUrgent: posts.isUrgent,
 					text: posts.text,
 					createdAt: posts.createdAt,
 					author: {
@@ -143,7 +145,8 @@ export class FeedService {
 		const post = await this.db
 			.select({
 				id: posts.id,
-				tag: posts.tag,
+				type: posts.type,
+				isUrgent: posts.isUrgent,
 				text: posts.text,
 				createdAt: posts.createdAt,
 				author: {

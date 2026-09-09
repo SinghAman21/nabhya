@@ -58,6 +58,7 @@ const publicEventColumns = {
 	volunteersNeeded: events.volunteersNeeded,
 	acceptedCount: events.acceptedCount,
 	status: events.status,
+	isUrgent: events.isUrgent,
 	createdAt: events.createdAt,
 	organization: {
 		id: organizations.id,
@@ -208,6 +209,7 @@ export class EventsService {
 					startAt: events.startAt,
 					endAt: events.endAt,
 					status: events.status,
+					isUrgent: events.isUrgent,
 					volunteersNeeded: events.volunteersNeeded,
 					acceptedCount: events.acceptedCount,
 					coverImage: events.coverImage,
@@ -253,6 +255,7 @@ export class EventsService {
 				applicationDeadline: input.applicationDeadline ?? null,
 				volunteersNeeded: input.volunteersNeeded,
 				status: input.status,
+				isUrgent: input.isUrgent,
 				createdBy: userId,
 			})
 			.returning();
