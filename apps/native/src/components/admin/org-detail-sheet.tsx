@@ -1,7 +1,9 @@
 import { ORG_DOCUMENT_LABELS } from "@nabhya/shared";
 import { useState } from "react";
 import { View } from "react-native";
+import { OrgActivityTimeline } from "@/components/admin/activity-timeline";
 import { DocumentReviewRow } from "@/components/admin/document-review-row";
+import { OrgPostsSection } from "@/components/admin/org-posts-section";
 import {
 	FactGroup,
 	ReasonField,
@@ -389,6 +391,18 @@ export function OrgDetailSheet({
 								))}
 							</View>
 						)}
+					</Section>
+
+					<Section title="Timeline">
+						{organizationId ? (
+							<OrgActivityTimeline organizationId={organizationId} />
+						) : null}
+					</Section>
+
+					<Section title="Posts">
+						{organizationId ? (
+							<OrgPostsSection organizationId={organizationId} />
+						) : null}
 					</Section>
 
 					<Section

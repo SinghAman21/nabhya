@@ -1,6 +1,7 @@
 import { USER_DOCUMENT_LABELS } from "@nabhya/shared";
 import { useState } from "react";
 import { View } from "react-native";
+import { UserActivityTimeline } from "@/components/admin/activity-timeline";
 import { DocumentReviewRow } from "@/components/admin/document-review-row";
 import {
 	FactGroup,
@@ -322,6 +323,10 @@ export function UserDetailSheet({
 								))}
 							</View>
 						)}
+					</Section>
+
+					<Section title="Timeline">
+						{userId ? <UserActivityTimeline userId={userId} /> : null}
 					</Section>
 
 					<SectionTitle>Decision</SectionTitle>

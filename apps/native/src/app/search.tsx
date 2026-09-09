@@ -10,12 +10,11 @@ import {
 	Search,
 	X,
 } from "lucide-react-native";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { View, type ViewToken } from "react-native";
 import { withAppShell } from "@/components/app-shell";
 import { BackButton } from "@/components/back-button";
 import { FeedCard, toPublicNeed } from "@/components/feed/feed-card";
-import { SearchField } from "@/components/feed/search-field";
 import { PledgeSheet } from "@/components/pledge-sheet";
 import {
 	EmptyState,
@@ -27,6 +26,7 @@ import {
 	Screen,
 	SectionTitle,
 } from "@/components/screen-shell";
+import { SearchField } from "@/components/search-field";
 import { Pressable } from "@/components/ui/pressable";
 import { Caption } from "@/components/ui/typography";
 import { useToggleFollow } from "@/hooks/use-engagement";
@@ -304,6 +304,31 @@ function SearchScreen() {
 		</View>
 	) : null;
 
+	/*
+	 * Stable handlers, so `FeedCard`'s `memo` can actually hold.
+	 *
+	 * Written inline in `renderItem` these were a new function on every render,
+	 * which fails the memo comparison for every card in the list — so a like,
+	 * which now writes straight into the query cache, re-rendered every card
+	 * and every video player in it. Each closes only over a mutation's `mutate`,
+	 * which react-query keeps stable, so these dependencies never change.
+	 */
+	const handleToggleFollow = useCallback(
+		(organizationId: string, following: boolean) =>
+			toggleFollow.mutate({ organizationId, following }),
+		[toggleFollow.mutate],
+	);
+	const handleToggleLike = useCallback(
+		(row: FeedItem, isLiked: boolean) =>
+			like.mutate({ item: row, on: !isLiked }),
+		[like.mutate],
+	);
+	const handleToggleSave = useCallback(
+		(row: FeedItem, isSaved: boolean) =>
+			save.mutate({ item: row, on: !isSaved }),
+		[save.mutate],
+	);
+
 	return (
 		<Screen style={{ paddingHorizontal: 0 }}>
 			<View
@@ -326,6 +351,7 @@ function SearchScreen() {
 						onChange={setQuery}
 						onSubmit={recent.record}
 						pending={query.trim() !== term}
+						placeholder="Search items, events, causes or NGOs"
 						autoFocus
 					/>
 				</View>
@@ -338,15 +364,9 @@ function SearchScreen() {
 					<FeedCard
 						item={item}
 						onRespond={setResponding}
-						onToggleFollow={(organizationId, following) =>
-							toggleFollow.mutate({ organizationId, following })
-						}
-						onToggleLike={(row, liked) =>
-							like.mutate({ item: row, on: !liked })
-						}
-						onToggleSave={(row, saved) =>
-							save.mutate({ item: row, on: !saved })
-						}
+						onToggleFollow={handleToggleFollow}
+						onToggleLike={handleToggleLike}
+						onToggleSave={handleToggleSave}
 					/>
 				)}
 				ListHeaderComponent={active ? resultsHeader : guide}

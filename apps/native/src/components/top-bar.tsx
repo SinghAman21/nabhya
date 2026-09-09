@@ -1,21 +1,22 @@
 import { useRouter, useSegments } from "expo-router/build/hooks";
-import { History, LogOut, Search, User, X } from "lucide-react-native";
+import { History, LogOut, User } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Platform, TextInput, View } from "react-native";
+import { Platform, View } from "react-native";
 import {
 	APPEARANCE_LABEL,
 	AppearanceSheet,
 	appearanceIcon,
 } from "@/components/appearance-row";
 import { ListRow } from "@/components/screen-shell";
+import { SearchField } from "@/components/search-field";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H5, Label } from "@/components/ui/typography";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useSignOut } from "@/hooks/use-auth";
 import { useUnreadCount } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
-import { focusable, focusWithin } from "@/lib/focus";
+import { focusable } from "@/lib/focus";
 import { useAuthStore } from "@/store/auth-store";
 import { useFeedStore } from "@/store/feed-store";
 
@@ -204,71 +205,20 @@ function UnreadBadge({ count }: { count: number }) {
 /* -------------------------------------------------------------------------- */
 
 function TopBarSearch() {
-	const { colors, spacing, borderRadius } = useTheme();
 	const search = useFeedStore((s) => s.search);
 	const setSearch = useFeedStore((s) => s.setSearch);
 
+	// 440 and 40pt: the bar is 60 tall and the field shares the row with the
+	// wordmark and the account controls, so it is the one search in the app that
+	// is chrome rather than page content.
 	return (
-		<View
-			{...focusWithin}
-			accessibilityRole="search"
-			style={{
-				flexDirection: "row",
-				alignItems: "center",
-				gap: spacing[2.5],
-				width: "100%",
-				maxWidth: 440,
-				height: 40,
-				paddingHorizontal: spacing[3.5],
-				borderRadius: borderRadius.md,
-				backgroundColor: colors.background.subtle,
-			}}
-		>
-			<Search
-				size={16}
-				color={colors.text.quaternary as string}
-				strokeWidth={1.9}
-			/>
-			<TextInput
-				value={search}
-				onChangeText={setSearch}
-				placeholder="Search items, causes or NGOs"
-				placeholderTextColor={colors.text.quaternary as string}
-				autoCapitalize="none"
-				returnKeyType="search"
-				accessibilityLabel="Search posts"
-				style={{
-					flex: 1,
-					fontFamily: "MonaSans",
-					fontSize: 15,
-					lineHeight: 20,
-					color: colors.text.primary as string,
-					borderWidth: 0,
-					paddingVertical: 0,
-				}}
-			/>
-			{search.length > 0 && (
-				<Pressable
-					onPress={() => setSearch("")}
-					accessibilityRole="button"
-					accessibilityLabel="Clear search"
-					hitSlop={10}
-					{...focusable}
-					style={({ pressed }) => ({
-						width: 28,
-						height: 28,
-						borderRadius: 999,
-						alignItems: "center",
-						justifyContent: "center",
-						backgroundColor: pressed
-							? colors.background.tertiary
-							: "transparent",
-					})}
-				>
-					<X size={15} color={colors.text.tertiary as string} strokeWidth={2} />
-				</Pressable>
-			)}
-		</View>
+		<SearchField
+			value={search}
+			onChange={setSearch}
+			placeholder="Search items, causes or NGOs"
+			maxWidth={440}
+			compact
+		/>
 	);
 }
 

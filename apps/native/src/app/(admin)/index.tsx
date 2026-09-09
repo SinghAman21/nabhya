@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { LogOut } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
+import { AnalyticsSections } from "@/components/admin/analytics-sections";
 import { AuditRow } from "@/components/admin/audit-row";
 import { BroadcastSheet } from "@/components/admin/broadcast-sheet";
 import {
@@ -376,6 +377,7 @@ export default function AdminOverviewScreen() {
 				{queues}
 				{charts}
 				{pipeline}
+				<AnalyticsSections days={window} />
 				{activity}
 			</View>
 			{/* Not sticky: the aside is now taller than a viewport on a laptop, and
@@ -393,6 +395,7 @@ export default function AdminOverviewScreen() {
 			{growth}
 			{charts}
 			{pipeline}
+			<AnalyticsSections days={window} />
 			{numbers}
 			{activity}
 			{account}
