@@ -1,7 +1,12 @@
 import type {
+	AdminActivityQuery,
+	AdminAnalyticsQuery,
+	AdminOrgPostsQuery,
 	AdminOrgQuery,
+	AdminTrendQuery,
 	AdminUserQuery,
 	AuditLogQuery,
+	BulkReviewDocumentsInput,
 	DocumentQueueQuery,
 	ReviewDocumentInput,
 	ReviewOrganizationInput,
@@ -9,9 +14,14 @@ import type {
 	SetUserStatusInput,
 } from "@nabhya/shared";
 import {
+	adminActivityQuerySchema,
+	adminAnalyticsQuerySchema,
+	adminOrgPostsQuerySchema,
 	adminOrgQuerySchema,
+	adminTrendQuerySchema,
 	adminUserQuerySchema,
 	auditLogQuerySchema,
+	bulkReviewDocumentsSchema,
 	documentQueueQuerySchema,
 	reviewDocumentSchema,
 	reviewOrganizationSchema,
@@ -21,11 +31,13 @@ import {
 import {
 	Body,
 	Controller,
+	Delete,
 	Get,
 	Inject,
 	Param,
 	ParseUUIDPipe,
 	Patch,
+	Post,
 	Query,
 } from "@nestjs/common";
 import {
@@ -37,6 +49,7 @@ import {
 import { CurrentUser, Roles } from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthUser } from "../../common/types";
+import { FeedService } from "../feed/feed.service";
 import { AdminService } from "./admin.service";
 
 /**
@@ -50,12 +63,38 @@ import { AdminService } from "./admin.service";
 export class AdminController {
 	constructor(
 		@Inject(AdminService) private readonly adminService: AdminService,
+		@Inject(FeedService) private readonly feedService: FeedService,
 	) {}
 
 	@Get("overview")
 	@ApiOperation({ summary: "Platform-wide counters for the admin dashboard" })
 	getOverview() {
 		return this.adminService.getOverview();
+	}
+
+	@Get("overview/trends")
+	@ApiOperation({
+		summary: "Daily signups, events and applications over a 7/30/90-day window",
+	})
+	@ApiQuery({ name: "days", required: false, enum: [7, 30, 90] })
+	getTrends(
+		@Query(new ZodValidationPipe(adminTrendQuerySchema))
+		query: AdminTrendQuery,
+	) {
+		return this.adminService.getTrends(query.days);
+	}
+
+	@Get("analytics")
+	@ApiOperation({
+		summary: "Chart-ready platform analytics for the admin console",
+	})
+	@ApiQuery({ name: "days", required: false, enum: [7, 30, 90] })
+	@ApiQuery({ name: "limit", required: false })
+	getAnalytics(
+		@Query(new ZodValidationPipe(adminAnalyticsQuerySchema))
+		query: AdminAnalyticsQuery,
+	) {
+		return this.adminService.getAnalytics(query);
 	}
 
 	// ─── Organizations ───────────────────────────────────────────────────────
@@ -69,6 +108,19 @@ export class AdminController {
 		enum: ["PENDING", "UNDER_REVIEW", "VERIFIED", "REJECTED"],
 	})
 	@ApiQuery({ name: "status", required: false, enum: ["ACTIVE", "SUSPENDED"] })
+	@ApiQuery({
+		name: "sort",
+		required: false,
+		enum: [
+			"createdAt",
+			"name",
+			"city",
+			"verificationStatus",
+			"pendingDocuments",
+			"events",
+		],
+	})
+	@ApiQuery({ name: "dir", required: false, enum: ["asc", "desc"] })
 	listOrganizations(
 		@Query(new ZodValidationPipe(adminOrgQuerySchema)) query: AdminOrgQuery,
 	) {
@@ -81,6 +133,30 @@ export class AdminController {
 	})
 	getOrganization(@Param("id", ParseUUIDPipe) id: string) {
 		return this.adminService.getOrganizationDetail(id);
+	}
+
+	@Get("organizations/:id/activity")
+	@ApiOperation({ summary: "Paginated mixed activity timeline for one NGO" })
+	@ApiQuery({ name: "kind", required: false })
+	listOrganizationActivity(
+		@Param("id", ParseUUIDPipe) id: string,
+		@Query(new ZodValidationPipe(adminActivityQuerySchema))
+		query: AdminActivityQuery,
+	) {
+		return this.adminService.listOrganizationActivity(id, query);
+	}
+
+	@Get("organizations/:id/posts")
+	@ApiOperation({
+		summary: "List feed posts published by one NGO for moderation",
+	})
+	@ApiQuery({ name: "tag", required: false })
+	listOrganizationPosts(
+		@Param("id", ParseUUIDPipe) id: string,
+		@Query(new ZodValidationPipe(adminOrgPostsQuerySchema))
+		query: AdminOrgPostsQuery,
+	) {
+		return this.feedService.listOrganizationPosts(id, query);
 	}
 
 	@Patch("organizations/:id/verification")
@@ -136,6 +212,17 @@ export class AdminController {
 		return this.adminService.getUserDetail(id);
 	}
 
+	@Get("users/:id/activity")
+	@ApiOperation({ summary: "Paginated mixed activity timeline for one user" })
+	@ApiQuery({ name: "kind", required: false })
+	listUserActivity(
+		@Param("id", ParseUUIDPipe) id: string,
+		@Query(new ZodValidationPipe(adminActivityQuerySchema))
+		query: AdminActivityQuery,
+	) {
+		return this.adminService.listUserActivity(id, query);
+	}
+
 	@Patch("users/:id/status")
 	@ApiOperation({ summary: "Suspend, delete or reinstate a user" })
 	setUserStatus(
@@ -160,6 +247,27 @@ export class AdminController {
 		query: DocumentQueueQuery,
 	) {
 		return this.adminService.listOrganizationDocuments(query);
+	}
+
+	/**
+	 * Bulk routes are `POST`, not `PATCH`: the body names its own targets rather
+	 * than the URL naming one, so there is no single resource being patched.
+	 * They sit above the `:id` routes for the same reason every Nest controller
+	 * puts literals before parameters — `documents/organizations/bulk` would
+	 * otherwise be matched by `:id` and rejected by `ParseUUIDPipe`.
+	 */
+	@Post("documents/organizations/bulk")
+	@ApiOperation({ summary: "Approve or reject many organization documents" })
+	bulkReviewOrgDocuments(
+		@CurrentUser() admin: AuthUser,
+		@Body(new ZodValidationPipe(bulkReviewDocumentsSchema))
+		body: BulkReviewDocumentsInput,
+	) {
+		return this.adminService.bulkReviewDocuments(
+			admin.id,
+			"organization",
+			body,
+		);
 	}
 
 	@Patch("documents/organizations/:id")
@@ -187,6 +295,16 @@ export class AdminController {
 		return this.adminService.listUserDocuments(query);
 	}
 
+	@Post("documents/users/bulk")
+	@ApiOperation({ summary: "Approve or reject many identity documents" })
+	bulkReviewUserDocuments(
+		@CurrentUser() admin: AuthUser,
+		@Body(new ZodValidationPipe(bulkReviewDocumentsSchema))
+		body: BulkReviewDocumentsInput,
+	) {
+		return this.adminService.bulkReviewDocuments(admin.id, "user", body);
+	}
+
 	@Patch("documents/users/:id")
 	@ApiOperation({ summary: "Approve or reject an identity document" })
 	reviewUserDocument(
@@ -196,6 +314,17 @@ export class AdminController {
 		body: ReviewDocumentInput,
 	) {
 		return this.adminService.reviewUserDocument(admin.id, id, body);
+	}
+
+	// ─── Post moderation ─────────────────────────────────────────────────────
+
+	@Delete("posts/:id")
+	@ApiOperation({ summary: "Delete an NGO feed post as a superadmin" })
+	deletePost(
+		@CurrentUser() admin: AuthUser,
+		@Param("id", ParseUUIDPipe) id: string,
+	) {
+		return this.feedService.remove(admin, id);
 	}
 
 	// ─── Audit ───────────────────────────────────────────────────────────────

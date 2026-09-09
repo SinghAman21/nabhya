@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { View } from "react-native";
-import { KindPill, NeedFacts, UrgentPill } from "@/components/feed/feed-card";
+import { CardKicker, NeedFacts } from "@/components/feed/feed-card";
 import { Surface } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
@@ -57,17 +57,7 @@ export function NeedPreviewDrawer({
 			}
 		>
 			<View style={{ gap: spacing[4] }}>
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						gap: spacing[2],
-						flexWrap: "wrap",
-					}}
-				>
-					<KindPill kind="need" needType={item.need.type} />
-					{item.isUrgent && <UrgentPill />}
-				</View>
+				<CardKicker item={item} />
 
 				{item.description ? (
 					<Body color="secondary">{item.description}</Body>

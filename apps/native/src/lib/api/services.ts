@@ -1,10 +1,20 @@
 import type {
+	AdminActivityItem,
+	AdminActivityQuery,
+	AdminAnalytics,
+	AdminAnalyticsQuery,
+	AdminOrgPost,
+	AdminOrgPostsQuery,
 	AdminOrgQuery,
 	AdminOverview,
+	AdminTrendQuery,
+	AdminTrends,
 	AdminUserQuery,
 	ApplicationQuery,
 	ApplyToEventInput,
 	AuditLogQuery,
+	BulkReviewDocumentsInput,
+	BulkReviewResult,
 	CompleteOrgOnboardingPayload,
 	CompleteVolunteerOnboardingPayload,
 	CreateEventInput,
@@ -259,9 +269,21 @@ export const adminApi = {
 		http.patch<AdminOrgListItem>(ADMIN.organizationVerification(id), input),
 	setOrganizationStatus: (id: string, input: SetOrgStatusInput) =>
 		http.patch<AdminOrgListItem>(ADMIN.organizationStatus(id), input),
+	organizationActivity: (id: string, query: Partial<AdminActivityQuery>) =>
+		http.getPage<AdminActivityItem>(ADMIN.organizationActivity(id), query),
+	organizationPosts: (id: string, query: Partial<AdminOrgPostsQuery>) =>
+		http.getPage<AdminOrgPost>(ADMIN.organizationPosts(id), query),
+	deletePost: (id: string) => http.delete<{ deleted: boolean }>(ADMIN.post(id)),
+	trends: (query: Partial<AdminTrendQuery>) =>
+		http.get<AdminTrends>(ADMIN.TRENDS, query),
+	analytics: (query: Partial<AdminAnalyticsQuery>) =>
+		http.get<AdminAnalytics>(ADMIN.ANALYTICS, query),
+
 	users: (query: Partial<AdminUserQuery>) =>
 		http.getPage<AdminUserListItem>(ADMIN.USERS, query),
 	user: (id: string) => http.get<AdminUserDetail>(ADMIN.user(id)),
+	userActivity: (id: string, query: Partial<AdminActivityQuery>) =>
+		http.getPage<AdminActivityItem>(ADMIN.userActivity(id), query),
 	setUserStatus: (id: string, input: SetUserStatusInput) =>
 		http.patch<AdminUserListItem>(ADMIN.userStatus(id), input),
 	orgDocuments: (query: Partial<DocumentQueueQuery>) =>
@@ -272,6 +294,16 @@ export const adminApi = {
 		http.patch<{ id: string }>(ADMIN.orgDocument(id), input),
 	reviewUserDocument: (id: string, input: ReviewDocumentInput) =>
 		http.patch<{ id: string }>(ADMIN.userDocument(id), input),
+	bulkReviewDocuments: (
+		kind: "organization" | "user",
+		input: BulkReviewDocumentsInput,
+	) =>
+		http.post<BulkReviewResult>(
+			kind === "organization"
+				? ADMIN.ORG_DOCUMENTS_BULK
+				: ADMIN.USER_DOCUMENTS_BULK,
+			input,
+		),
 	auditLogs: (query: Partial<AuditLogQuery>) =>
 		http.getPage<AuditLogEntry>(ADMIN.AUDIT_LOGS, query),
 };

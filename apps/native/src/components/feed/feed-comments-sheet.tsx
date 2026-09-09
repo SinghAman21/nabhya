@@ -1,5 +1,11 @@
+import { MessageCircle } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
+import {
+	EmptyState,
+	ErrorState,
+	LoadingState,
+} from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetFlatList } from "@/components/ui/sheet";
@@ -10,6 +16,7 @@ import {
 	useFeedComments,
 } from "@/hooks/use-feed";
 import { useTheme } from "@/hooks/use-theme";
+import { apiErrorMessage } from "@/lib/api";
 import type { FeedComment, FeedItem } from "@/lib/types";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -75,21 +82,21 @@ export function FeedCommentsSheet({
 				</View>
 			}
 		>
+			{/*
+			 * All three of these are the shared screen states, not hand-rolled
+			 * blocks. They used to be a bare "Loading comments..." caption, a
+			 * two-line error and a left-aligned empty message, each padded by hand
+			 * — so the emptiest, most common view of this sheet was a sentence
+			 * stuck to the top-left corner of a tall white area, which reads as a
+			 * rendering fault rather than as "nobody has said anything yet".
+			 */}
 			{comments.isLoading ? (
-				<Caption color="tertiary" style={{ padding: spacing[5] }}>
-					Loading comments...
-				</Caption>
+				<LoadingState label="Loading comments" />
 			) : comments.isError ? (
-				<View style={{ padding: spacing[5], gap: spacing[2] }}>
-					<Body weight="semibold">Comments couldn't load</Body>
-					<Button
-						size="sm"
-						variant="outline"
-						onPress={() => comments.refetch()}
-					>
-						Try again
-					</Button>
-				</View>
+				<ErrorState
+					message={apiErrorMessage(comments.error)}
+					onRetry={() => comments.refetch()}
+				/>
 			) : comments.data?.items.length ? (
 				<SheetFlatList
 					data={comments.data.items}
@@ -103,12 +110,15 @@ export function FeedCommentsSheet({
 					)}
 				/>
 			) : (
-				<View style={{ padding: spacing[5], gap: spacing[1] }}>
-					<Body weight="semibold">Be the first to comment</Body>
-					<Caption color="tertiary">
-						Thoughtful responses help volunteers find the right opportunity.
-					</Caption>
-				</View>
+				<EmptyState
+					icon={MessageCircle}
+					title="No comments yet"
+					description={
+						email
+							? "Ask a question, offer to help, or say what you can bring."
+							: "Sign in to start the conversation."
+					}
+				/>
 			)}
 		</Sheet>
 	);

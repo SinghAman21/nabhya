@@ -1,21 +1,16 @@
+import type { AdminOrgSort, SortDir } from "@nabhya/shared";
 import { Building2 } from "lucide-react-native";
 import { useState } from "react";
-import { FlatList, RefreshControl, View } from "react-native";
-import {
-	AdminScreen,
-	ListFooter,
-	ResultCount,
-	SearchField,
-} from "@/components/admin/list-chrome";
+import { View } from "react-native";
+import { ConsoleList } from "@/components/admin/console-list";
+import type { TableColumn } from "@/components/admin/data-table";
+import { AdminScreen } from "@/components/admin/list-chrome";
 import { OrgDetailSheet } from "@/components/admin/org-detail-sheet";
-import {
-	EmptyState,
-	ErrorState,
-	FilterChips,
-	LoadingState,
-	ScreenHeader,
-	Surface,
-} from "@/components/screen-shell";
+import { SelectMenu } from "@/components/admin/select-menu";
+import { Toolbar, useTableView } from "@/components/admin/toolbar";
+import { UserDetailSheet } from "@/components/admin/user-detail-sheet";
+import { InitialAvatar } from "@/components/initial-avatar";
+import { EmptyState, Surface } from "@/components/screen-shell";
 import {
 	humanizeStatus,
 	StatusPill,
@@ -25,134 +20,278 @@ import { Body, Caption } from "@/components/ui/typography";
 import { useAdminOrganizationsPaged } from "@/hooks/use-admin-lists";
 import { useTheme } from "@/hooks/use-theme";
 import { useDebounced } from "@/hooks/useDebounced";
-import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
-import { verticalScrollbar } from "@/lib/scroll";
 import type { AdminOrgListItem } from "@/lib/types";
 
-type Filter =
-	| "ALL"
+/**
+ * The NGO directory, and the screen the whole console pattern is set by.
+ *
+ * Two axes, not one chip row. Verification state and account state are
+ * independent — an NGO can be verified *and* suspended — and the old single
+ * row of six chips had to lie about that by making "Suspended" a seventh
+ * verification value. Two `SelectMenu`s say both at once and take one line
+ * between them.
+ */
+type Verification =
+	| "ANY"
 	| "PENDING"
 	| "UNDER_REVIEW"
 	| "VERIFIED"
-	| "REJECTED"
-	| "SUSPENDED";
+	| "REJECTED";
+type Standing = "ANY" | "ACTIVE" | "SUSPENDED";
 
-const FILTERS: Array<{ value: Filter; label: string }> = [
-	{ value: "PENDING", label: "Pending" },
-	{ value: "UNDER_REVIEW", label: "In review" },
-	{ value: "VERIFIED", label: "Verified" },
-	{ value: "REJECTED", label: "Rejected" },
-	{ value: "SUSPENDED", label: "Suspended" },
-	{ value: "ALL", label: "All" },
+const VERIFICATION = [
+	{ value: "ANY" as const, label: "Any" },
+	{ value: "PENDING" as const, label: "Pending", hint: "Never looked at" },
+	{
+		value: "UNDER_REVIEW" as const,
+		label: "In review",
+		hint: "Picked up, not decided",
+	},
+	{ value: "VERIFIED" as const, label: "Verified" },
+	{ value: "REJECTED" as const, label: "Rejected" },
 ];
 
-/** One chip row over the API's two filters: verification state, or account state. */
-function toQuery(filter: Filter, search: string) {
-	const base = search ? { search } : {};
-	if (filter === "ALL") return base;
-	if (filter === "SUSPENDED") return { ...base, status: "SUSPENDED" as const };
-	return { ...base, verificationStatus: filter };
-}
+const STANDING = [
+	{ value: "ANY" as const, label: "Any" },
+	{ value: "ACTIVE" as const, label: "Active" },
+	{ value: "SUSPENDED" as const, label: "Suspended" },
+];
 
 export default function AdminOrganizations() {
 	const { colors, spacing } = useTheme();
-	const [filter, setFilter] = useState<Filter>("PENDING");
+	const [verification, setVerification] = useState<Verification>("PENDING");
+	const [standing, setStanding] = useState<Standing>("ANY");
 	const [search, setSearch] = useState("");
+	const [sort, setSort] = useState<{ sort: AdminOrgSort; dir: SortDir }>({
+		// Oldest waiting first: the default filter is "Pending", and the NGO that
+		// has been waiting longest is the one to look at, not the newest sign-up.
+		sort: "createdAt",
+		dir: "asc",
+	});
 	const [selected, setSelected] = useState<string | null>(null);
+	/**
+	 * The owner account opened from a dossier. Held here rather than inside
+	 * `OrgDetailSheet` so the two drawers are siblings and open one after the
+	 * other — nesting a `Modal` in a `Modal` puts two `OverlayHost`s in the
+	 * stack and a toast lands on whichever registered last.
+	 */
+	const [owner, setOwner] = useState<string | null>(null);
+	const [view, setView] = useTableView("organizations");
 
 	const debouncedSearch = useDebounced(search.trim());
-	const query = useAdminOrganizationsPaged(toQuery(filter, debouncedSearch));
+	const list = useAdminOrganizationsPaged({
+		...(debouncedSearch ? { search: debouncedSearch } : {}),
+		...(verification === "ANY" ? {} : { verificationStatus: verification }),
+		...(standing === "ANY" ? {} : { status: standing }),
+		sort: sort.sort,
+		dir: sort.dir,
+	});
+
+	const columns: Array<TableColumn<AdminOrgListItem>> = [
+		{
+			key: "name",
+			header: "Organization",
+			sortKey: "name",
+			minWidth: 240,
+			render: (org) => (
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						gap: spacing[2.5],
+					}}
+				>
+					<InitialAvatar name={org.organizationName} size={28} square />
+					<View style={{ flex: 1, minWidth: 0 }}>
+						<Body weight="medium" numberOfLines={1}>
+							{org.organizationName}
+						</Body>
+						<Caption color="quaternary" numberOfLines={1}>
+							{org.email ?? humanizeStatus(org.orgType)}
+						</Caption>
+					</View>
+				</View>
+			),
+		},
+		{
+			key: "verification",
+			header: "Verification",
+			sortKey: "verificationStatus",
+			width: 128,
+			render: (org) => (
+				<StatusPill
+					label={humanizeStatus(org.verificationStatus)}
+					tone={verificationTone(org.verificationStatus)}
+				/>
+			),
+		},
+		{
+			key: "standing",
+			header: "Standing",
+			width: 96,
+			render: (org) =>
+				org.status === "SUSPENDED" ? (
+					<StatusPill label="Suspended" tone="error" />
+				) : (
+					<Caption color="quaternary">Active</Caption>
+				),
+		},
+		{
+			key: "docs",
+			header: "Docs",
+			sortKey: "pendingDocuments",
+			width: 72,
+			align: "end",
+			// The number a reviewer is actually hunting for, so it is a numeral in
+			// warning ink rather than a pill saying "3 docs to review" — at 72pt
+			// wide the sentence would not fit, and in a column the word is implied
+			// by the header anyway.
+			render: (org) => (
+				<Caption
+					weight={org.pendingDocuments > 0 ? "bold" : "normal"}
+					color={
+						org.pendingDocuments > 0
+							? colors.warning.ink
+							: (colors.text.quaternary as string)
+					}
+				>
+					{org.pendingDocuments}
+				</Caption>
+			),
+		},
+		{
+			key: "city",
+			header: "City",
+			sortKey: "city",
+			width: 120,
+			wideOnly: true,
+			render: (org) => (
+				<Caption color="tertiary" numberOfLines={1}>
+					{org.city || "—"}
+				</Caption>
+			),
+		},
+		{
+			key: "activity",
+			header: "Events · Needs",
+			sortKey: "events",
+			width: 112,
+			align: "end",
+			wideOnly: true,
+			render: (org) => (
+				<Caption color="tertiary">
+					{org.eventCount} · {org.needCount}
+				</Caption>
+			),
+		},
+		{
+			key: "joined",
+			header: "Joined",
+			sortKey: "createdAt",
+			width: 104,
+			align: "end",
+			render: (org) => (
+				<Caption color="quaternary">{formatDate(org.createdAt)}</Caption>
+			),
+		},
+	];
 
 	return (
-		<AdminScreen>
-			<ScreenHeader
-				title="NGOs"
-				subtitle="Verify organizations and keep an eye on what they publish"
+		<AdminScreen
+			title="NGOs"
+			subtitle="Verify organizations and keep an eye on what they publish"
+			toolbar={
+				<Toolbar
+					search={search}
+					onSearchChange={setSearch}
+					searchPlaceholder="Search by name, email or registration number"
+					searchPending={search.trim() !== debouncedSearch}
+					view={view}
+					onViewChange={setView}
+				>
+					<SelectMenu
+						label="Verification"
+						value={verification}
+						options={VERIFICATION}
+						onChange={setVerification}
+					/>
+					<SelectMenu
+						label="Standing"
+						value={standing}
+						options={STANDING}
+						onChange={setStanding}
+						minWidth={160}
+					/>
+				</Toolbar>
+			}
+			onNearEnd={list.loadMore}
+			refreshing={list.query.isRefetching && !list.query.isFetchingNextPage}
+			onRefresh={() => list.query.refetch()}
+		>
+			<ConsoleList
+				query={list.query}
+				items={list.items}
+				total={list.total}
+				loadMore={list.loadMore}
+				noun="organization"
+				view={view}
+				columns={columns}
+				rowKey={(org) => org.id}
+				onRowPress={(org) => setSelected(org.id)}
+				sort={sort}
+				onSortChange={setSort}
+				loadingLabel="Loading organizations"
+				renderCard={(org) => (
+					<OrgCard org={org} onPress={() => setSelected(org.id)} />
+				)}
+				empty={
+					<EmptyState
+						icon={Building2}
+						title={
+							debouncedSearch
+								? "No matching organizations"
+								: verification === "PENDING"
+									? "Nothing waiting"
+									: "Nothing here"
+						}
+						description={
+							debouncedSearch
+								? "Try a shorter name, or the registration number."
+								: verification === "PENDING"
+									? "No organizations are waiting for verification."
+									: "No organizations match these filters."
+						}
+					/>
+				}
 			/>
-
-			<SearchField
-				value={search}
-				onChangeText={setSearch}
-				placeholder="Search by name, email or registration number"
-			/>
-			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
-
-			{query.isLoading ? (
-				<LoadingState />
-			) : query.isError ? (
-				<ErrorState
-					message={apiErrorMessage(query.error)}
-					onRetry={() => query.refetch()}
-				/>
-			) : (
-				<FlatList
-					data={query.items}
-					keyExtractor={(item) => item.id}
-					{...verticalScrollbar}
-					contentContainerStyle={{ paddingBottom: spacing[10] }}
-					ItemSeparatorComponent={() => <View style={{ height: spacing[2] }} />}
-					onEndReached={() => {
-						if (query.hasNextPage && !query.isFetchingNextPage)
-							query.fetchNextPage();
-					}}
-					onEndReachedThreshold={0.6}
-					refreshControl={
-						<RefreshControl
-							refreshing={query.isRefetching && !query.isFetchingNextPage}
-							onRefresh={() => query.refetch()}
-							tintColor={colors.text.quaternary as string}
-						/>
-					}
-					ListHeaderComponent={
-						<ResultCount total={query.total} noun="organization" />
-					}
-					ListEmptyComponent={
-						<EmptyState
-							icon={Building2}
-							title={
-								debouncedSearch
-									? "No matching organizations"
-									: filter === "PENDING"
-										? "Nothing waiting"
-										: "Nothing here"
-							}
-							description={
-								debouncedSearch
-									? "Try a shorter name, or the registration number."
-									: filter === "PENDING"
-										? "No organizations are waiting for verification."
-										: "No organizations match this filter."
-							}
-						/>
-					}
-					ListFooterComponent={
-						<ListFooter
-							count={query.items.length}
-							hasMore={!!query.hasNextPage}
-							fetching={query.isFetchingNextPage}
-							onLoadMore={() => query.fetchNextPage()}
-						/>
-					}
-					renderItem={({ item }) => (
-						<OrgRow org={item} onPress={() => setSelected(item.id)} />
-					)}
-				/>
-			)}
 
 			<OrgDetailSheet
 				organizationId={selected}
 				onClose={() => setSelected(null)}
+				onOpenOwner={(userId) => {
+					setSelected(null);
+					setOwner(userId);
+				}}
 			/>
+
+			{/* Volunteers live on their own screen; an NGO's account is reached
+			    from its organisation, which is why this screen owns a user
+			    drawer too. */}
+			<UserDetailSheet userId={owner} onClose={() => setOwner(null)} />
 		</AdminScreen>
 	);
 }
 
 /**
- * Compact: name and place on the first line, state pills on the second, a
- * quiet footer with the numbers a reviewer glances at before opening.
+ * The card, for the grid and for mobile.
+ *
+ * Deliberately *not* the table row rearranged. A card is read as a block, so it
+ * leads with identity and puts state on its own line as pills — the pills are
+ * right here and wrong in the table, where the same information is a column and
+ * a pill in every row would be a stripe of colour down the page.
  */
-function OrgRow({
+function OrgCard({
 	org,
 	onPress,
 }: {
@@ -167,7 +306,7 @@ function OrgRow({
 			<View
 				style={{ flexDirection: "row", alignItems: "center", gap: spacing[3] }}
 			>
-				<Initial text={org.organizationName} />
+				<InitialAvatar name={org.organizationName} square />
 				<View style={{ flex: 1, minWidth: 0 }}>
 					<Body weight="semibold" numberOfLines={1}>
 						{org.organizationName}
@@ -200,37 +339,13 @@ function OrgRow({
 						tone="warning"
 					/>
 				)}
-				<View style={{ flex: 1 }} />
-				<Caption color="quaternary">Joined {formatDate(org.createdAt)}</Caption>
 			</View>
 
-			<Caption color="quaternary" style={{ marginTop: spacing[2] }}>
+			<Caption color="quaternary" style={{ marginTop: spacing[2.5] }}>
 				{org.eventCount} event{org.eventCount === 1 ? "" : "s"} ·{" "}
-				{org.needCount} need{org.needCount === 1 ? "" : "s"}
-				{org.owner.fullName ? ` · Owner ${org.owner.fullName}` : ""}
+				{org.needCount} need{org.needCount === 1 ? "" : "s"} · Joined{" "}
+				{formatDate(org.createdAt)}
 			</Caption>
 		</Surface>
-	);
-}
-
-function Initial({ text }: { text: string }) {
-	const { colors } = useTheme();
-	return (
-		<View
-			accessibilityElementsHidden
-			importantForAccessibility="no-hide-descendants"
-			style={{
-				width: 40,
-				height: 40,
-				borderRadius: 20,
-				backgroundColor: colors.background.subtle,
-				alignItems: "center",
-				justifyContent: "center",
-			}}
-		>
-			<Body weight="bold" color="secondary">
-				{text.trim()[0]?.toUpperCase() ?? "?"}
-			</Body>
-		</View>
 	);
 }

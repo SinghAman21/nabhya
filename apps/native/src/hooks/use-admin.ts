@@ -1,20 +1,55 @@
 import type {
+	AdminActivityQuery,
+	AdminAnalyticsQuery,
+	AdminOrgPostsQuery,
 	AdminOrgQuery,
 	AdminUserQuery,
 	AuditLogQuery,
+	BulkReviewDocumentsInput,
 	DocumentQueueQuery,
 	ReviewDocumentInput,
 	ReviewOrganizationInput,
 	SetOrgStatusInput,
 	SetUserStatusInput,
+	TrendWindow,
 } from "@nabhya/shared";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	keepPreviousData,
+	useMutation,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import { adminApi, queryKeys, queryScopes } from "@/lib/api";
+
+/**
+ * The Overview's time series.
+ *
+ * Keyed by the window so switching 7/30/90 is a cache hit after the first look
+ * rather than a refetch, and `placeholderData: keepPreviousData` holds the last
+ * chart up while the next window loads — a skeleton flash on a chart that is
+ * about to be nearly identical is worse than a moment of stale data, and it
+ * jumps the page's layout.
+ */
+export function useAdminTrends(days: TrendWindow) {
+	return useQuery({
+		queryKey: queryKeys.adminTrends(days),
+		queryFn: () => adminApi.trends({ days }),
+		placeholderData: keepPreviousData,
+	});
+}
 
 export function useAdminOverview() {
 	return useQuery({
 		queryKey: queryKeys.adminOverview,
 		queryFn: adminApi.overview,
+	});
+}
+
+export function useAdminAnalytics(query: Partial<AdminAnalyticsQuery> = {}) {
+	return useQuery({
+		queryKey: queryKeys.adminAnalytics(query),
+		queryFn: () => adminApi.analytics(query),
+		placeholderData: keepPreviousData,
 	});
 }
 
@@ -30,6 +65,30 @@ export function useAdminOrganization(id: string | undefined) {
 		queryKey: queryKeys.adminOrganization(id ?? ""),
 		queryFn: () => adminApi.organization(id as string),
 		enabled: !!id,
+	});
+}
+
+export function useAdminOrganizationActivity(
+	id: string | undefined,
+	query: Partial<AdminActivityQuery> = {},
+) {
+	return useQuery({
+		queryKey: queryKeys.adminOrganizationActivity(id ?? "", query),
+		queryFn: () => adminApi.organizationActivity(id as string, query),
+		enabled: !!id,
+		placeholderData: keepPreviousData,
+	});
+}
+
+export function useAdminOrganizationPosts(
+	id: string | undefined,
+	query: Partial<AdminOrgPostsQuery> = {},
+) {
+	return useQuery({
+		queryKey: queryKeys.adminOrganizationPosts(id ?? "", query),
+		queryFn: () => adminApi.organizationPosts(id as string, query),
+		enabled: !!id,
+		placeholderData: keepPreviousData,
 	});
 }
 
@@ -76,6 +135,18 @@ export function useAdminUser(id: string | undefined) {
 	});
 }
 
+export function useAdminUserActivity(
+	id: string | undefined,
+	query: Partial<AdminActivityQuery> = {},
+) {
+	return useQuery({
+		queryKey: queryKeys.adminUserActivity(id ?? "", query),
+		queryFn: () => adminApi.userActivity(id as string, query),
+		enabled: !!id,
+		placeholderData: keepPreviousData,
+	});
+}
+
 /**
  * Moderation mutations invalidate the whole admin scope: approving an NGO moves
  * counters on the overview, its row in the list, and its dossier at once.
@@ -107,6 +178,17 @@ export function useSetOrganizationStatus() {
 	});
 }
 
+export function useAdminDeletePost() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (id: string) => adminApi.deletePost(id),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.admin });
+			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
+		},
+	});
+}
+
 /**
  * Approving an identity document also promotes the user's own verification
  * status server-side, so the whole admin scope is invalidated rather than just
@@ -119,6 +201,28 @@ export function useReviewDocument(kind: "organization" | "user") {
 			kind === "organization"
 				? adminApi.reviewOrgDocument(id, input)
 				: adminApi.reviewUserDocument(id, input),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.admin });
+		},
+	});
+}
+
+/**
+ * Approving or rejecting a whole selection.
+ *
+ * The server reports per-document outcomes rather than a count, so the caller
+ * can tell the reviewer which rows are still waiting — see
+ * `bulkReviewDocumentsSchema` in `@nabhya/shared`. Invalidating the whole
+ * `admin` scope is right here even though the single-document path does the
+ * same: a batch can move an NGO's own verification state and re-derive several
+ * volunteers' account statuses, so the queue, the directories and the overview
+ * counters are all stale afterwards.
+ */
+export function useBulkReviewDocuments(kind: "organization" | "user") {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (input: BulkReviewDocumentsInput) =>
+			adminApi.bulkReviewDocuments(kind, input),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.admin });
 		},

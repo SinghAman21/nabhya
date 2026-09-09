@@ -84,8 +84,10 @@ client-side traps: `apps/native/AGENTS.md`.
 ### Server (`apps/server`)
 
 NestJS 11, global `/api` prefix, deny-by-default JWT guard + role guard, response
-envelope `{ success, data, timestamp }`, Swagger at `/api/docs`. 92 endpoints across
-14 feature modules (16 controllers), counting the two health probes. Architecture,
+envelope `{ success, data, timestamp }`, Swagger at `/api/docs`. 98 endpoints across
+14 feature modules (16 controllers), counting the two health probes.
+`apps/server/test/endpoints.spec.ts` asserts that count, so adding a route is a
+deliberate act that shows up in the diff. Architecture,
 guard model, module conventions and server traps: `apps/server/AGENTS.md`.
 
 ### Auth
@@ -146,16 +148,20 @@ Supabase wizard.
 - Server (`packages/env/src/server.ts`, validated at boot): `DATABASE_URL`,
   `DIRECT_URL`, `CORS_ORIGIN`, `NODE_ENV`, `SUPABASE_AUTH_JWKS_URL`,
   optional `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (object storage)
-- Client (`apps/native/src/lib/env.ts`): `EXPO_PUBLIC_API_URL` (dev fallback
-  `10.0.2.2:3000` on Android), `EXPO_PUBLIC_SUPABASE_URL` and
-  `EXPO_PUBLIC_SUPABASE_ANON_KEY` (both throw at import if unset)
+- Client (`apps/native/src/lib/env.ts`): `EXPO_PUBLIC_SUPABASE_URL` and
+  `EXPO_PUBLIC_SUPABASE_ANON_KEY` (both throw at import if unset).
+  `EXPO_PUBLIC_API_URL` is **normally unset in dev** — the API host is derived
+  from the packager's own `hostUri`, so the machine's LAN IP lives only in
+  `REACT_NATIVE_PACKAGER_HOSTNAME` (`.env.local`). Set it to override: a
+  production build (where it is required), a tunnelled packager, or a local
+  client against a deployed API.
 
 Wired services: Supabase (Postgres + Auth + Storage, stubbed in dev without
 credentials), Razorpay (donations, native checkout SDK). No email provider.
 
 ## Current state
 
-**Built:** auth end-to-end; 92 REST endpoints across `users`, `onboarding`,
+**Built:** auth end-to-end; 98 REST endpoints across `users`, `onboarding`,
 `organizations`, `categories`, `events`, `needs`, `feed`, `admin`, `uploads`,
 `engagement`, `publishing`, `certificates`, `donations` and `notifications`.
 NGO + volunteer onboarding; org events and needs management with
@@ -166,8 +172,35 @@ team management, in-app notifications and superadmin broadcast; a unified server
 For You / Trending / Following feed ranks generic posts, events, needs and
 announcements using location, category, recency, follow, urgency and engagement signals.
 It records likes, saves, shares, comments and impressions; recent impressions down-rank
-For You but do not affect Following. Supabase Storage uploads; the superadmin
-console including the cross-org document verification queue and audit log.
+For You but do not affect Following. Supabase Storage uploads.
+
+**The superadmin console is a data console**, not the feed's card shapes reused:
+full-width sortable tables with a table/cards switch and a pinned command bar,
+multi-axis select filters, the cross-org document verification queue with bulk
+review, the audit log, and a dashboard built on real charts. Its two directories
+cover **two populations with no overlap** — `NGOs` is `organizations`,
+`Volunteers` is `users` hard-filtered to the volunteer role — and an NGO's own
+user account is reached from its organisation's dossier rather than from a role
+filter spanning both screens. The design rules
+and the traps live under "The superadmin console" in `apps/native/AGENTS.md` —
+read that before touching `(admin)/*`, and read `components/admin/viz-tokens.ts`
+before touching a chart colour. Three things it relies on server-side:
+
+- **Sorting.** `sort` + `dir` on all four admin list schemas, each key mapped in
+  `AdminService.orderFor`, every list adding its default column as a tiebreaker
+  so paging a low-cardinality sort cannot repeat or skip rows.
+- **Bulk document review.**
+  `POST /api/admin/documents/{organizations,users}/bulk` reviews sequentially, so
+  each decision is audited on its own and an identity document still re-derives
+  its owner's account status; it returns per-document outcomes rather than a
+  count, because one id in forty can fail alone.
+- **A time series.** `GET /api/admin/overview/trends?days=7|30|90` — per-day
+  signups, events and applications, plus this window's totals and the previous
+  window's for a delta. Zero-filled server-side, since a `GROUP BY date` omits
+  empty days and a line drawn across the gaps claims activity that never
+  happened. Everything else on the dashboard is a point-in-time count and stays
+  a stat tile: a count has no dimension to plot against.
+
 Volunteer identity verification captures a government ID plus a liveness selfie
 (front camera, guided two-frame challenge via `expo-camera`/`expo-image-picker`)
 straight to Supabase Storage; an account only becomes VERIFIED once a superadmin approves
@@ -251,12 +284,122 @@ rules live in those files rather than being re-decided per screen:
   portalling primitive cannot clear the host modal, and every caller is inside
   a sheet or drawer. Picking a day keeps the time already entered.
 
+`components/feed/card/` holds the card, split the way `components/composer/`
+is: `index.tsx` (the shell), `card-header`, `card-meta` (the kicker),
+`card-body` (which owns the per-kind arrangement and the layout mapping),
+`card-facts` (`NeedFacts`, `EventDate`, `EventFacts`), `card-cta` and
+`card-actions`. `components/feed/feed-card.tsx` is now only the
+re-export barrel the screens already import. These rules live in those files
+rather than being re-decided:
+
+- **The card's surface is `Surface`'s recipe, exactly.** `background.card`,
+  `borderRadius.xl`, `elevation.card` **in light mode only**, and **no border**.
+  It previously carried a 1px hairline and a shadow in both schemes, which made
+  the feed a column of outlined tiles — the only thing in the app drawn that
+  way, and most of why the card read as a foreign object next to the rest of the
+  UI. If `Surface` changes, change this with it.
+- **The card is near-monochrome, and that is deliberate.** An earlier pass gave
+  every kind a tone and tinted its pill, its facts panel and its button to
+  match; the result was three saturated blocks stacked down the middle of every
+  card, and since most feed rows are needs, a column of orange rectangles. The
+  brand colour now appears exactly twice — a need's gauge and the one solid
+  button — and `error.main` once, as a 5pt dot beside "Urgent". Everything else
+  is type on the card surface. **Do not reintroduce a tinted block to carry a
+  label.**
+- **Kinds are told apart by arrangement, not colour.** `cardLayout()` in
+  `card-body` maps a row to one of four shapes. An **event** indents: its date
+  sits in a 38pt left column with title and facts beside it, so it is recognisable
+  from the card's silhouette. A **story** leads with its picture and a larger
+  title. A **need** ends with its gauge, so "how far along" and the action are
+  read together. An **update** is just words. Colour was the wrong carrier for
+  this: it costs the whole surface to say one word, it collapses in greyscale,
+  and it does nothing in a feed where forty consecutive rows are the same kind.
+- **A kind the layout already announces gets no label.** `card-meta` renders
+  *nothing* for a healthy update, story or event — printing "Event" above a card
+  with a date block on it is a caption under a photograph of a cat reading
+  "cat". What survives is only what the arrangement cannot say: a **need's
+  direction** ("Needs help" / "Giving away", the same layout and opposite
+  requests), **urgency**, and a **closed state**. That silence across most of
+  the feed is what lets the rows that do carry a kicker register at a glance.
+- **A gauge is short and thick, not full-width and thin.** `GAUGE_WIDTH` 120,
+  `GAUGE_HEIGHT` 8, sitting at the end of the line it belongs to. A hairline
+  stretched across a desktop column reads as a divider rather than a
+  measurement; a progress bar is a thing you compare two lengths in, so it wants
+  to be small enough to take in at once.
+- **The event date block has no border and no padding.** Boxed, it was a 50pt
+  tile beside a 22pt title — the tallest thing in the row, and it gave the card
+  the look of a dashboard widget. Two lines of type indent just as clearly.
+- **The primary button sizes to its label and sits at the start of the row.**
+  Full-width was the worst thing on the desktop card — "I can help" stretched
+  across an 800pt column reads as a banner, not a control. Solid uses
+  `primary.contrast` on `primary.main`, the one pairing the token file
+  guarantees on a fill (7.44:1; white there is 2.53:1). A destination that asks
+  nothing is a `quiet` text link with an arrow instead, and a **closed need gets
+  no control at all** — the kicker already says "Closed", and a disabled button
+  invites a tap that does nothing.
+- **No like count anywhere.** Not beside the heart, and no "12 likes ·
+  3 comments" summary line. A visible like count turns a feed of NGOs asking for
+  help into a leaderboard, and on a young feed nearly every row honestly reads
+  zero, which makes every post look ignored. Whether *you* liked something is
+  worth showing; how many others did is not. The comment count survives, above
+  zero only, because it promises something to read rather than scoring the post.
+- **A card's height is bounded by construction, not by a `maxHeight`.** Prose
+  clamps to 3 lines (5 for a story) with "Read more", and media is capped by
+  `MEDIA_MAX_HEIGHT` — 280 desktop / 380 mobile, and never more than 40% of the
+  window. Clipping a measured card with a fade needs a layout pass and a
+  gradient and still cuts a sentence mid-word; capping the two things that can
+  actually run long does not.
+- **Only the media block measures itself, and nothing else may.** `Media` in
+  `card-body.tsx` carries the one `onLayout`, because its observed box is a
+  plain wrapper whose width comes from the parent's fixed padding and whose
+  height cannot feed back into that width. **Do not move the measurement up to
+  the card shell.** It was there, deriving the media's height ceiling from the
+  card's own measured width, and on web that is a cycle — width sets height,
+  height sets the page's scroll extent, the scrollbar's appearance sets the
+  width back, and react-native-web's `ResizeObserver` runs it until React throws
+  *Maximum update depth exceeded* at the root `Stack`. Breakpoints (`compact`,
+  `showLabels`, the desktop media cap) come from `useMedia()`, which reads the
+  window and cannot participate in that loop.
+- **Media is capped by height, not width.** `FeedMediaCarousel` takes a
+  `maxHeight` and raises the tile's aspect to whatever ratio respects it,
+  letting `contentFit: "cover"` crop — the same trade `MIN_RATIO` already
+  makes. Uncapped, a 4:5 photo in a desktop column is taller than the viewport
+  and pushes the card's own like button below the fold.
+- **Nothing autoplays; `active` only pauses.** The carousel's `active` prop
+  never starts a video — starting one unasked spends the reader's data. Today
+  the card drives it from `viewer === null`, so the tile's muted player stops
+  while the fullscreen viewer runs its own unmuted one on the same file. It is
+  also the hook for the feed's viewability callback to pause off-screen cards,
+  which no screen passes yet. Feed video is muted with a mute toggle *on the
+  tile*, because a muted video and a silent one are otherwise identical.
+- **Likes and saves are optimistic and never invalidate.** `useFeedReaction`
+  patches every cached feed page via `patchFeedRow` and rolls back on error.
+  It used to `invalidateQueries(["feed"])` on each tap, which refetched every
+  page of every lens and re-ran the ranker — so a like could reorder the list
+  or drop the row under the reader's thumb. `useRecordFeedInteraction` must
+  never invalidate either: impressions fire from the list's viewability
+  callback. `FeedCard` is `memo`ised, so the three feed screens pass
+  `useCallback` handlers rather than inline arrows.
+- **The action bar is grouped.** Like, comment and share sit together on the
+  left (things done to the conversation); save sits alone on the right (a thing
+  done for yourself). Spread edge to edge with `space-between` they became a
+  sparse row of unrelated glyphs on a wide desktop card.
+- **Hover is read from the style callback, never held in state.** Cast the
+  argument to `PressState` from `lib/focus.ts` — RNW passes `hovered` and
+  `focused` alongside `pressed` even though RN's own type declares only the
+  last. A `useState` hover hook re-renders the component, so pointing at one of
+  four buttons on a feed card re-rendered that card and its video player; the
+  callback re-runs without a render. `notification-bell.tsx` and
+  `org-branding.tsx` are the older examples of the same cast.
+
 Attachment vetting and the upload loop live in `lib/feed-media.ts`, which is
 also where the reasons are written down: **the server derives a post's
 IMAGE-vs-VIDEO from the object key's file extension**, so a media file name
 must always carry the extension matching its content type. Deleting one's own
-post is `useDeleteFeedPost` → `DELETE /api/feed/:id`, surfaced as an overflow
-control the feed card draws only when the caller passes `onDelete`. All sheets
+post is `useDeleteFeedPost` → `DELETE /api/feed/:id`, surfaced as a delete
+control the feed card's header draws only when the caller passes `onDelete` —
+it was a `MoreHorizontal` labelled "Post options", an overflow affordance that
+opened no menu and deleted on first tap. All sheets
 go through `components/ui/sheet.tsx` (`@gorhom/bottom-sheet` in a Modal on
 native; `wide` widens the desktop dialog to 560 for a non-column body).
 

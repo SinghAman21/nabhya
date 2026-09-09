@@ -1,12 +1,13 @@
 import type { BroadcastInput } from "@nabhya/shared";
 import { useState } from "react";
 import { View } from "react-native";
-import { FilterChips } from "@/components/screen-shell";
+import { Field } from "@/components/form-field";
+import { Banner, FilterChips } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { confirm, toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
-import { Caption, Label } from "@/components/ui/typography";
+import { Label } from "@/components/ui/typography";
 import { useBroadcast } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
@@ -35,7 +36,7 @@ export function BroadcastSheet({
 	visible: boolean;
 	onClose: () => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const [title, setTitle] = useState("");
 	const [body, setBody] = useState("");
 	const [audience, setAudience] = useState<Audience>("ALL");
@@ -121,8 +122,9 @@ export function BroadcastSheet({
 				onChange={setAudience}
 				inline
 			/>
+			<View style={{ height: spacing[5] }} />
 
-			<Field label="Title" error={titleError}>
+			<Field label="Title" {...(titleError ? { error: titleError } : {})}>
 				<Input
 					placeholder="e.g. Scheduled maintenance on Sunday"
 					value={title}
@@ -133,7 +135,7 @@ export function BroadcastSheet({
 				/>
 			</Field>
 
-			<Field label="Message" error={bodyError}>
+			<Field label="Message" {...(bodyError ? { error: bodyError } : {})}>
 				<Input
 					placeholder="What people need to know"
 					value={body}
@@ -145,49 +147,13 @@ export function BroadcastSheet({
 				/>
 			</Field>
 
+			{/* The send failed and the sheet is still open with the message in it,
+			    so this is a form error and belongs on the form — a toast would
+			    vanish while the sender is still reading it. */}
 			{error && (
-				<View
-					accessibilityLiveRegion="polite"
-					style={{
-						marginTop: spacing[4],
-						padding: spacing[3],
-						borderRadius: 12,
-						backgroundColor: colors.error.bg,
-					}}
-				>
-					<Caption weight="medium" color={colors.error.ink}>
-						{error}
-					</Caption>
-				</View>
+				<Banner tone="error" title="Couldn't send" description={error} />
 			)}
 			<View style={{ height: spacing[2] }} />
 		</Sheet>
-	);
-}
-
-function Field({
-	label,
-	error,
-	children,
-}: {
-	label: string;
-	error: string | null;
-	children: React.ReactNode;
-}) {
-	const { colors, spacing } = useTheme();
-	return (
-		<View style={{ marginTop: spacing[5] }}>
-			<Label style={{ marginBottom: spacing[1.5] }}>{label}</Label>
-			{children}
-			{error && (
-				<Caption
-					color={colors.error.ink}
-					accessibilityLiveRegion="polite"
-					style={{ marginTop: spacing[1.5] }}
-				>
-					{error}
-				</Caption>
-			)}
-		</View>
 	);
 }

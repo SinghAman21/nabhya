@@ -47,10 +47,14 @@ export class DatabaseModule implements OnModuleInit {
 				cwd: process.cwd(),
 			});
 
-			let stderr = "";
-			child.stderr?.on("data", (chunk: Buffer) => {
-				stderr += chunk.toString();
-			});
+			// drizzle-kit writes its failures to stdout as often as stderr, so
+			// capture both — a warning with an empty tail is undiagnosable.
+			let output = "";
+			const collect = (chunk: Buffer) => {
+				output += chunk.toString();
+			};
+			child.stdout?.on("data", collect);
+			child.stderr?.on("data", collect);
 
 			child.on("close", (code) => {
 				if (code === 0) {
@@ -58,7 +62,7 @@ export class DatabaseModule implements OnModuleInit {
 					resolve();
 				} else {
 					this.logger.warn(
-						`drizzle-kit push exited ${code} — ${stderr.trim()}`,
+						`drizzle-kit push exited ${code} — ${output.trim()}`,
 					);
 					// Warn but don't crash the server on sync failure
 					resolve();

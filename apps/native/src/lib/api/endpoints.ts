@@ -55,21 +55,34 @@ export const ORG_NEEDS = {
 
 export const ADMIN = {
 	OVERVIEW: `${API_PREFIX}/admin/overview`,
+	TRENDS: `${API_PREFIX}/admin/overview/trends`,
+	ANALYTICS: `${API_PREFIX}/admin/analytics`,
 	ORGANIZATIONS: `${API_PREFIX}/admin/organizations`,
 	USERS: `${API_PREFIX}/admin/users`,
 	ORG_DOCUMENTS: `${API_PREFIX}/admin/documents/organizations`,
 	USER_DOCUMENTS: `${API_PREFIX}/admin/documents/users`,
+	// POST, not PATCH: the body names its own targets, so there is no single
+	// resource being patched. Literal segments, so they cannot collide with the
+	// `:id` routes.
+	ORG_DOCUMENTS_BULK: `${API_PREFIX}/admin/documents/organizations/bulk`,
+	USER_DOCUMENTS_BULK: `${API_PREFIX}/admin/documents/users/bulk`,
 	AUDIT_LOGS: `${API_PREFIX}/admin/audit-logs`,
 	organization: (id: string) => `${API_PREFIX}/admin/organizations/${id}`,
+	organizationActivity: (id: string) =>
+		`${API_PREFIX}/admin/organizations/${id}/activity`,
+	organizationPosts: (id: string) =>
+		`${API_PREFIX}/admin/organizations/${id}/posts`,
 	organizationVerification: (id: string) =>
 		`${API_PREFIX}/admin/organizations/${id}/verification`,
 	organizationStatus: (id: string) =>
 		`${API_PREFIX}/admin/organizations/${id}/status`,
 	user: (id: string) => `${API_PREFIX}/admin/users/${id}`,
+	userActivity: (id: string) => `${API_PREFIX}/admin/users/${id}/activity`,
 	userStatus: (id: string) => `${API_PREFIX}/admin/users/${id}/status`,
 	orgDocument: (id: string) =>
 		`${API_PREFIX}/admin/documents/organizations/${id}`,
 	userDocument: (id: string) => `${API_PREFIX}/admin/documents/users/${id}`,
+	post: (id: string) => `${API_PREFIX}/admin/posts/${id}`,
 } as const;
 
 export const CATEGORIES = {

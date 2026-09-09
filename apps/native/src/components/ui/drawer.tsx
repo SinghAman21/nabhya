@@ -39,12 +39,22 @@ export interface DrawerProps {
 	 * strip of media tiles — where 440 crams the measure.
 	 */
 	wide?: boolean;
+	/**
+	 * 720 instead. For a **dossier**: a record with fact tables, a document list
+	 * and a decision, read side by side with the list it was opened from. At 520
+	 * an org's two-column fact rows wrap and its document cards stack their own
+	 * buttons; at 720 both sit flat, and there is still 600px of list visible on
+	 * a 1440 window — which is the whole reason a reviewer gets a panel instead
+	 * of a page.
+	 */
+	xl?: boolean;
 }
 
 export function Drawer(props: DrawerProps) {
 	const { isDesktop } = useMedia();
 	if (!isDesktop) {
-		const { visible, onClose, title, subtitle, children, footer, wide } = props;
+		const { visible, onClose, title, subtitle, children, footer, wide, xl } =
+			props;
 		return (
 			<Sheet
 				visible={visible}
@@ -52,7 +62,9 @@ export function Drawer(props: DrawerProps) {
 				title={title}
 				subtitle={subtitle}
 				footer={footer}
-				wide={wide}
+				// `xl` has no meaning on a phone — the sheet is the window's width
+				// either way — so it collapses into the sheet's own `wide`.
+				wide={wide || xl}
 			>
 				{children}
 			</Sheet>
@@ -67,6 +79,7 @@ export function Drawer(props: DrawerProps) {
 
 const PANEL_WIDTH = 440;
 const WIDE_PANEL_WIDTH = 520;
+const XL_PANEL_WIDTH = 720;
 
 function DesktopDrawer({
 	visible,
@@ -76,13 +89,16 @@ function DesktopDrawer({
 	children,
 	footer,
 	wide,
+	xl,
 }: DrawerProps) {
 	const { colors, spacing, elevation, isDark } = useTheme();
 	const { width, height } = useWindowDimensions();
 	const [scrolled, setScrolled] = useState(false);
 
 	const panelWidth = Math.min(
-		wide ? WIDE_PANEL_WIDTH : PANEL_WIDTH,
+		xl ? XL_PANEL_WIDTH : wide ? WIDE_PANEL_WIDTH : PANEL_WIDTH,
+		// Never the whole window: the point of a slide-over is that the list it
+		// was opened from stays visible behind it.
 		Math.max(320, width - 64),
 	);
 	const slide = useRef(new Animated.Value(panelWidth)).current;

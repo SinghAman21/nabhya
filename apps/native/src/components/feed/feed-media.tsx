@@ -11,10 +11,13 @@ import {
 	RotateCcw,
 	Share2,
 	VideoOff,
+	Volume2,
+	VolumeX,
 	X,
 } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import {
+	ActivityIndicator,
 	Animated,
 	Modal,
 	PanResponder,
@@ -48,11 +51,14 @@ import type { FeedMedia } from "@/lib/types";
  * - One height per row. Every page in a multi-item carousel shares the first
  *   measured ratio, so swiping doesn't bounce the card taller/shorter per
  *   photo. A single item keeps its own ratio.
- * - Video in the feed has no chrome: tap toggles play, a small replay button
- *   appears bottom-right at the end, an expand button top-right opens the
- *   viewer. Sound stays muted in the feed; the viewer plays with sound and
- *   native controls. `autoplay` is plumbed but off — later the feed's
- *   viewability callback can drive it per card without touching this file.
+ * - Video in the feed is tap-to-play and starts muted, with the controls that
+ *   fact implies: a mute toggle on the tile (a muted video and a silent one
+ *   look identical without it), the time remaining, and a read-only progress
+ *   bar. Scrubbing and sound-on playback belong to the fullscreen viewer,
+ *   which is one tap away via the expand button.
+ * - Nothing ever autoplays. `active` only *pauses* — a card scrolled off
+ *   screen stops decoding — because starting a video unasked in a feed of
+ *   appeals spends the reader's data and their attention without being asked.
  */
 
 const MIN_RATIO = 4 / 5;
@@ -84,10 +90,24 @@ export interface MediaViewerActions {
 export function FeedMediaCarousel({
 	media,
 	pageWidth,
+	maxHeight,
+	active = true,
 	onOpenViewer,
 }: {
 	media: FeedMedia[];
 	pageWidth: number;
+	/**
+	 * Tallest the tile may draw, in points. The caller owns this because it is
+	 * a layout decision about the *card*, not about the picture: a 4:5 portrait
+	 * in a 672pt-wide desktop column is 840pt tall — taller than the window, so
+	 * the card's own actions were pushed off screen and the reader had to
+	 * scroll a phone-shaped photo to reach the like button. Capping height, not
+	 * width, is what keeps the picture as large as the column allows while
+	 * bounding it in the direction that actually hurts.
+	 */
+	maxHeight: number;
+	/** False while the card is off screen — see `CarouselVideo`. */
+	active?: boolean;
 	/** Opens the card-level fullscreen viewer at the tapped page. The viewer
 	    lives in the card (not here) so opening comments from it can first
 	    dismiss the modal — a sheet opened under a modal would be invisible. */
@@ -113,6 +133,14 @@ export function FeedMediaCarousel({
 		.find((r): r is number => typeof r === "number");
 	const pageRatio =
 		media.length > 1 ? (firstMeasured ?? FALLBACK_RATIO) : undefined;
+
+	// The narrowest aspect this tile may take before it exceeds `maxHeight`.
+	// Raising a ratio to this floor makes the tile shorter and lets
+	// `contentFit: "cover"` centre-crop, which is the same trade `MIN_RATIO`
+	// already makes for a skyscraper upload.
+	const floorRatio = maxHeight > 0 ? itemWidth / maxHeight : 0;
+	const tileRatio = (id: string, fallback: number) =>
+		Math.max(pageRatio ?? ratios[id] ?? fallback, floorRatio);
 
 	if (media.length === 0) return null;
 
@@ -149,7 +177,7 @@ export function FeedMediaCarousel({
 								url={m.url}
 								id={m.id}
 								width={itemWidth}
-								ratio={pageRatio ?? ratios[m.id]}
+								ratio={tileRatio(m.id, FALLBACK_RATIO)}
 								onRatio={onRatio}
 								onOpen={() => onOpenViewer(i)}
 							/>
@@ -158,8 +186,9 @@ export function FeedMediaCarousel({
 								uri={m.url}
 								id={m.id}
 								width={itemWidth}
-								ratio={pageRatio ?? ratios[m.id]}
+								ratio={tileRatio(m.id, VIDEO_FALLBACK_RATIO)}
 								onRatio={onRatio}
+								active={active}
 								onOpen={() => onOpenViewer(i)}
 							/>
 						)}
@@ -179,15 +208,16 @@ export function FeedMediaCarousel({
 					accessibilityLabel={`Showing ${page + 1} of ${media.length}`}
 				>
 					{media.map((m) => {
-						const active = media[page]?.id === m.id;
+						// Not `active` — that name is the carousel's viewport prop now.
+						const isCurrent = media[page]?.id === m.id;
 						return (
 							<View
 								key={m.id}
 								style={{
-									width: active ? 16 : 6,
+									width: isCurrent ? 16 : 6,
 									height: 6,
 									borderRadius: 3,
-									backgroundColor: active
+									backgroundColor: isCurrent
 										? (colors.text.primary as string)
 										: (colors.border.medium as string),
 								}}
@@ -211,7 +241,8 @@ function CarouselImage({
 	url: string;
 	id: string;
 	width: number;
-	ratio: number | undefined;
+	/** Already resolved and height-capped by the carousel. */
+	ratio: number;
 	onRatio: (id: string, ratio: number) => void;
 	onOpen: () => void;
 }) {
@@ -244,11 +275,50 @@ function CarouselImage({
 					if (s?.width && s?.height) onRatio(id, s.width / s.height);
 				}}
 				onError={() => setFailed(true)}
-				style={{
-					width,
-					aspectRatio: ratio ?? FALLBACK_RATIO,
-				}}
+				style={{ width, aspectRatio: ratio }}
 			/>
+		</Pressable>
+	);
+}
+
+function formatClock(seconds: number): string {
+	if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+	const total = Math.floor(seconds);
+	const m = Math.floor(total / 60);
+	const sec = total % 60;
+	return `${m}:${sec < 10 ? "0" : ""}${sec}`;
+}
+
+/** Round control on a scrim. The three video affordances share it exactly. */
+function VideoControl({
+	label,
+	onPress,
+	children,
+	style,
+}: {
+	label: string;
+	onPress: () => void;
+	children: React.ReactNode;
+	style: object;
+}) {
+	return (
+		<Pressable
+			onPress={onPress}
+			accessibilityRole="button"
+			accessibilityLabel={label}
+			hitSlop={8}
+			style={({ pressed }) => ({
+				position: "absolute",
+				width: 36,
+				height: 36,
+				borderRadius: 18,
+				backgroundColor: pressed ? "rgba(0,0,0,0.75)" : "rgba(0,0,0,0.55)",
+				alignItems: "center",
+				justifyContent: "center",
+				...style,
+			})}
+		>
+			{children}
 		</Pressable>
 	);
 }
@@ -260,20 +330,30 @@ function CarouselVideo({
 	ratio,
 	onRatio,
 	onOpen,
-	autoplay = false,
+	active = true,
 }: {
 	uri: string;
 	id: string;
 	width: number;
-	ratio: number | undefined;
+	/** Already resolved and height-capped by the carousel. */
+	ratio: number;
 	onRatio: (id: string, ratio: number) => void;
 	onOpen: () => void;
-	/** Driven later by feed viewability. Off by default: tap-to-play. */
-	autoplay?: boolean;
+	/**
+	 * False once the card leaves the viewport. A playing video whose card has
+	 * scrolled away keeps decoding frames and, on a long feed, keeps several
+	 * players alive at once — so this pauses rather than relying on the reader
+	 * to notice. It never *starts* playback: autoplay in a feed of NGO appeals
+	 * is a choice the reader should make, and on cellular data it is their bill.
+	 */
+	active?: boolean;
 }) {
 	const { borderRadius, spacing } = useTheme();
 	const player = useVideoPlayer(uri, (p) => {
 		p.muted = true;
+		// `timeUpdate` does not fire at all until this is non-zero. Four a second
+		// is enough for a 2pt progress bar and cheap enough to leave on.
+		p.timeUpdateEventInterval = 0.25;
 	});
 	const [ended, setEnded] = useState(false);
 	const { isPlaying } = useEvent(player, "playingChange", {
@@ -282,6 +362,12 @@ function CarouselVideo({
 	const { status } = useEvent(player, "statusChange", {
 		status: player.status,
 	});
+	const { muted } = useEvent(player, "mutedChange", { muted: player.muted });
+	// No initial value: `TimeUpdateEventPayload` carries four fields (live
+	// timestamp and buffer position among them) and supplying a partial one
+	// does not typecheck. Until the first tick the player's own clock is the
+	// answer, which is 0 on a video that has not been started.
+	const timeUpdate = useEvent(player, "timeUpdate");
 	useEventListener(player, "playToEnd", () => setEnded(true));
 
 	// Natural dimensions from one thumbnail frame, so the tile matches the
@@ -303,13 +389,8 @@ function CarouselVideo({
 	}, [player, id, onRatio]);
 
 	useEffect(() => {
-		if (autoplay) {
-			setEnded(false);
-			player.play();
-		} else {
-			player.pause();
-		}
-	}, [autoplay, player]);
+		if (!active) player.pause();
+	}, [active, player]);
 
 	const toggle = () => {
 		if (status === "error") return;
@@ -328,11 +409,18 @@ function CarouselVideo({
 		return <MediaErrorTile width={width} icon="video" />;
 	}
 
+	const duration = player.duration;
+	const currentTime = timeUpdate?.currentTime ?? player.currentTime;
+	const progress =
+		duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0;
+	const remaining = duration > 0 ? Math.max(0, duration - currentTime) : 0;
+	const loading = status === "loading";
+
 	return (
 		<View
 			style={{
 				width,
-				aspectRatio: ratio ?? VIDEO_FALLBACK_RATIO,
+				aspectRatio: ratio,
 				borderRadius: borderRadius.lg,
 				overflow: "hidden",
 				backgroundColor: "#111111",
@@ -343,9 +431,10 @@ function CarouselVideo({
 				nativeControls={false}
 				contentFit="cover"
 				style={{ flex: 1 }}
-				accessibilityLabel="Feed video. Double-tap to play or pause."
+				accessibilityLabel="Feed video"
 			/>
-			{/* Tap anywhere toggles play. The expand button sits above this. */}
+
+			{/* Tap anywhere toggles play. The round controls sit above this. */}
 			<Pressable
 				onPress={toggle}
 				accessibilityRole="button"
@@ -360,7 +449,22 @@ function CarouselVideo({
 					justifyContent: "center",
 				}}
 			>
-				{!isPlaying && !ended && (
+				{loading ? (
+					<ActivityIndicator color="#FFFFFF" />
+				) : ended ? (
+					<View
+						style={{
+							width: 56,
+							height: 56,
+							borderRadius: 28,
+							backgroundColor: "rgba(0,0,0,0.55)",
+							alignItems: "center",
+							justifyContent: "center",
+						}}
+					>
+						<RotateCcw size={24} color="#FFFFFF" strokeWidth={2} />
+					</View>
+				) : !isPlaying ? (
 					<View
 						style={{
 							width: 56,
@@ -373,50 +477,76 @@ function CarouselVideo({
 					>
 						<Play size={24} color="#FFFFFF" fill="#FFFFFF" />
 					</View>
-				)}
+				) : null}
 			</Pressable>
+
 			{/* Expand: the way into the fullscreen viewer with real controls. */}
-			<Pressable
+			<VideoControl
+				label="Open video fullscreen"
 				onPress={onOpen}
-				accessibilityRole="button"
-				accessibilityLabel="Open video fullscreen"
-				hitSlop={8}
-				style={{
-					position: "absolute",
-					top: spacing[2],
-					right: spacing[2],
-					width: 44,
-					height: 44,
-					borderRadius: 22,
-					backgroundColor: "rgba(0,0,0,0.55)",
-					alignItems: "center",
-					justifyContent: "center",
-				}}
+				style={{ top: spacing[2], right: spacing[2] }}
 			>
-				<Maximize2 size={18} color="#FFFFFF" strokeWidth={2} />
-			</Pressable>
-			{/* Replay, once the video has run to the end. */}
-			{ended && (
-				<Pressable
-					onPress={toggle}
-					accessibilityRole="button"
-					accessibilityLabel="Replay video"
-					hitSlop={8}
+				<Maximize2 size={16} color="#FFFFFF" strokeWidth={2} />
+			</VideoControl>
+
+			{/*
+			 * Sound is off in the feed and the control that says so is on the
+			 * tile, not buried in the fullscreen viewer. Without it a muted video
+			 * is indistinguishable from a video with no audio track, so a reader
+			 * who wants the narration has no way to know there is any.
+			 */}
+			<VideoControl
+				label={muted ? "Unmute video" : "Mute video"}
+				onPress={() => {
+					player.muted = !player.muted;
+				}}
+				style={{ bottom: spacing[2], left: spacing[2] }}
+			>
+				{muted ? (
+					<VolumeX size={16} color="#FFFFFF" strokeWidth={2} />
+				) : (
+					<Volume2 size={16} color="#FFFFFF" strokeWidth={2} />
+				)}
+			</VideoControl>
+
+			{/* Time left, so a tap is an informed one. */}
+			{duration > 0 && (
+				<View
 					style={{
 						position: "absolute",
-						right: spacing[2],
 						bottom: spacing[2],
-						width: 44,
-						height: 44,
-						borderRadius: 22,
+						right: spacing[2],
+						paddingHorizontal: spacing[2],
+						paddingVertical: 2,
+						borderRadius: 999,
 						backgroundColor: "rgba(0,0,0,0.55)",
-						alignItems: "center",
-						justifyContent: "center",
 					}}
 				>
-					<RotateCcw size={18} color="#FFFFFF" strokeWidth={2} />
-				</Pressable>
+					<Caption weight="semibold" style={{ color: "#FFFFFF", fontSize: 11 }}>
+						{formatClock(isPlaying || currentTime > 0 ? remaining : duration)}
+					</Caption>
+				</View>
 			)}
+
+			{/* Progress. Read-only on the tile — scrubbing belongs to the viewer. */}
+			<View
+				style={{
+					position: "absolute",
+					left: 0,
+					right: 0,
+					bottom: 0,
+					height: 2,
+					backgroundColor: "rgba(255,255,255,0.25)",
+				}}
+			>
+				<View
+					style={{
+						width: `${progress * 100}%`,
+						height: "100%",
+						backgroundColor: "#FFFFFF",
+					}}
+				/>
+			</View>
 		</View>
 	);
 }

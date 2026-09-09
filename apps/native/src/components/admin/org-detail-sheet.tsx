@@ -1,8 +1,14 @@
 import { ORG_DOCUMENT_LABELS } from "@nabhya/shared";
 import { useState } from "react";
 import { View } from "react-native";
+import { OrgActivityTimeline } from "@/components/admin/activity-timeline";
 import { DocumentReviewRow } from "@/components/admin/document-review-row";
-import { FactGroup, ReasonField } from "@/components/admin/sheet-parts";
+import { OrgPostsSection } from "@/components/admin/org-posts-section";
+import {
+	FactGroup,
+	ReasonField,
+	Section,
+} from "@/components/admin/sheet-parts";
 import {
 	Banner,
 	ErrorState,
@@ -16,9 +22,10 @@ import {
 	StatusPill,
 	verificationTone,
 } from "@/components/status-pill";
+import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
+import { Drawer } from "@/components/ui/drawer";
 import { confirm, toast } from "@/components/ui/overlay";
-import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption } from "@/components/ui/typography";
 import {
 	useAdminOrganization,
@@ -34,16 +41,39 @@ import { formatDate } from "@/lib/format";
  *
  * Read top to bottom the way a reviewer works: state, then the facts they
  * check against the documents, then the documents themselves, then the
- * decision — always in the same order (approve, under review, reject,
- * suspend) so the hand learns where each button is. The reason box sits
- * directly above the buttons that need it, and complains there, inline.
+ * decision — always in the same order (approve, under review, reject, suspend)
+ * so the hand learns where each button is.
+ *
+ * **A `Drawer`, not a `Sheet`, and `xl`.** Opening an NGO is not leaving the
+ * list — the reviewer is working *down* a filtered directory, and the row they
+ * came from, plus the ten after it, stay visible on the left while they decide.
+ * A centred dialog covers exactly that. 720 rather than the drawer's usual 520
+ * because a dossier is fact tables and document cards, not a column of short
+ * fields: at 520 the fact rows wrap and each document stacks its own two
+ * buttons. On a phone `Drawer` *is* a `Sheet`, so nothing changes there.
+ *
+ * **The decision lives in the pinned footer.** It used to be four full-width
+ * buttons at the bottom of the scroll, which meant the action was only
+ * reachable after scrolling past every fact — and a stack of four 100%-wide
+ * buttons reads as a menu, not a decision. Pinned, sized to their labels, and
+ * in a row, they are always there and the primary one is obvious. The reason
+ * box stays in the body directly above them, because it is a *field*: it has to
+ * survive being read and corrected, which is exactly what a footer does not do.
  */
 export function OrgDetailSheet({
 	organizationId,
 	onClose,
+	onOpenOwner,
 }: {
 	organizationId: string | null;
 	onClose: () => void;
+	/**
+	 * Opens the owner's own account. The caller closes this drawer first and
+	 * opens the user one — sequentially, never nested: a drawer inside a drawer
+	 * is a `Modal` inside a `Modal`, and the inner one's `OverlayHost` would end
+	 * up fighting the outer one's for every toast.
+	 */
+	onOpenOwner?: (userId: string) => void;
 }) {
 	const { spacing } = useTheme();
 	const [reason, setReason] = useState("");
@@ -141,14 +171,71 @@ export function OrgDetailSheet({
 	const suspended = org?.status === "SUSPENDED";
 
 	return (
-		<Sheet
+		<Drawer
 			visible={!!organizationId}
 			onClose={close}
+			xl
 			title={org?.organizationName ?? "Organization"}
 			subtitle={
 				org?.registrationNumber
 					? `Reg. ${org.registrationNumber}`
 					: (org?.email ?? undefined)
+			}
+			footer={
+				org ? (
+					<DecisionBar>
+						{org.verificationStatus !== "VERIFIED" && (
+							<Button
+								onPress={() => decide("VERIFIED")}
+								disabled={busy}
+								loading={
+									review.isPending &&
+									review.variables?.input.verificationStatus === "VERIFIED"
+								}
+							>
+								Approve
+							</Button>
+						)}
+						{org.verificationStatus === "PENDING" && (
+							<Button
+								variant="outline"
+								onPress={() => decide("UNDER_REVIEW")}
+								disabled={busy}
+								loading={
+									review.isPending &&
+									review.variables?.input.verificationStatus === "UNDER_REVIEW"
+								}
+							>
+								Mark under review
+							</Button>
+						)}
+						{org.verificationStatus !== "REJECTED" && (
+							<Button
+								variant="outline"
+								onPress={() => decide("REJECTED")}
+								disabled={busy}
+								loading={
+									review.isPending &&
+									review.variables?.input.verificationStatus === "REJECTED"
+								}
+							>
+								Reject
+							</Button>
+						)}
+						{/* Suspension sits apart, at the far end: it is the one action
+						    here that is not part of the verification decision, and a
+						    destructive button beside "Approve" invites the wrong tap. */}
+						<View style={{ flexGrow: 1 }} />
+						<Button
+							variant={suspended ? "outline" : "destructive"}
+							onPress={toggleSuspension}
+							disabled={busy}
+							loading={setStatus.isPending}
+						>
+							{suspended ? "Reinstate" : "Suspend"}
+						</Button>
+					</DecisionBar>
+				) : undefined
 			}
 		>
 			{query.isLoading ? (
@@ -230,6 +317,10 @@ export function OrgDetailSheet({
 						</Section>
 					)}
 
+					{/* The one route to an NGO's *account*, as opposed to its
+					    organisation: `(admin)/volunteers` is volunteers only, so this
+					    is where suspending an NGO's login lives — which is the right
+					    place for it anyway, since you have just read the record. */}
 					<Section title="Owner">
 						<FactGroup
 							facts={[
@@ -242,6 +333,18 @@ export function OrgDetailSheet({
 								},
 							]}
 						/>
+						{onOpenOwner && (
+							<View style={{ marginTop: spacing[2] }}>
+								<TextAction
+									label="Manage this account →"
+									tone="brand"
+									onPress={() => onOpenOwner(org.owner.id)}
+									accessibilityLabel={`Manage the account of ${
+										org.owner.fullName ?? org.owner.email
+									}`}
+								/>
+							</View>
+						)}
 					</Section>
 
 					<Section title="Activity">
@@ -290,6 +393,18 @@ export function OrgDetailSheet({
 						)}
 					</Section>
 
+					<Section title="Timeline">
+						{organizationId ? (
+							<OrgActivityTimeline organizationId={organizationId} />
+						) : null}
+					</Section>
+
+					<Section title="Posts">
+						{organizationId ? (
+							<OrgPostsSection organizationId={organizationId} />
+						) : null}
+					</Section>
+
 					<Section
 						title={`Documents${org.documents.length ? ` (${org.documents.length})` : ""}`}
 					>
@@ -325,72 +440,32 @@ export function OrgDetailSheet({
 						requiredFor="reject or suspend"
 						error={reasonError}
 					/>
-
-					<View style={{ gap: spacing[2], paddingBottom: spacing[2] }}>
-						{org.verificationStatus !== "VERIFIED" && (
-							<Button
-								onPress={() => decide("VERIFIED")}
-								disabled={busy}
-								loading={
-									review.isPending &&
-									review.variables?.input.verificationStatus === "VERIFIED"
-								}
-							>
-								Approve organization
-							</Button>
-						)}
-						{org.verificationStatus === "PENDING" && (
-							<Button
-								variant="outline"
-								onPress={() => decide("UNDER_REVIEW")}
-								disabled={busy}
-								loading={
-									review.isPending &&
-									review.variables?.input.verificationStatus === "UNDER_REVIEW"
-								}
-							>
-								Mark under review
-							</Button>
-						)}
-						{org.verificationStatus !== "REJECTED" && (
-							<Button
-								variant="outline"
-								onPress={() => decide("REJECTED")}
-								disabled={busy}
-								loading={
-									review.isPending &&
-									review.variables?.input.verificationStatus === "REJECTED"
-								}
-							>
-								Reject
-							</Button>
-						)}
-						<Button
-							variant={suspended ? "outline" : "destructive"}
-							onPress={toggleSuspension}
-							disabled={busy}
-							loading={setStatus.isPending}
-						>
-							{suspended ? "Reinstate organization" : "Suspend organization"}
-						</Button>
-					</View>
 				</>
 			)}
-		</Sheet>
+		</Drawer>
 	);
 }
 
-function Section({
-	title,
-	children,
-}: {
-	title: string;
-	children: React.ReactNode;
-}) {
+/**
+ * The dossier footer's button row.
+ *
+ * Buttons **size to their labels** and wrap; none of them is full width. A
+ * 100%-wide "Approve organization" in a 720pt panel is a banner, not a control
+ * — the same reason the feed card's CTA hugs its label. Wrapping rather than
+ * scrolling because on a narrow panel four buttons on two lines is readable and
+ * four buttons you have to push sideways is not.
+ */
+function DecisionBar({ children }: { children: React.ReactNode }) {
 	const { spacing } = useTheme();
 	return (
-		<View style={{ marginBottom: spacing[5] }}>
-			<SectionTitle>{title}</SectionTitle>
+		<View
+			style={{
+				flexDirection: "row",
+				alignItems: "center",
+				flexWrap: "wrap",
+				gap: spacing[2],
+			}}
+		>
 			{children}
 		</View>
 	);

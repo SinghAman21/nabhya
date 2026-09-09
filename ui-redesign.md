@@ -157,7 +157,7 @@ no categories (falls back to city + urgency, fine), and moving `Trending` off a
 
 ## Step 1 — The list pattern (19 screens) ✅ done (Sept 2026 polish pass)
 
-Every list screen now pages for real (`usePagedQuery`/`PagedList` in `components/paged-list.tsx`, `LoadMoreFooter`, admin `use-admin-lists.ts`), has EmptyState/LoadingState/ErrorState with retry and pull-to-refresh, uses ListGroup/Surface rows with StatusPill, and pushed pages use `ScreenHeader back`. New shared pieces: `form-field.tsx` (Field/FieldError), `choice-chips.tsx`, `initial-avatar.tsx`, `text-action.tsx`, `appearance-row.tsx` (theme setting; the floating ThemeToggle is gone), admin `list-chrome.tsx` / `sheet-parts.tsx` / `audit-row.tsx`. Detail pages (event, NGO) pin the primary action in a bottom bar; the NGO page wires DonateSheet (Razorpay via dev client).
+Every list screen now pages for real (`usePagedQuery`/`PagedList` in `components/paged-list.tsx`, `LoadMoreFooter`, admin `use-admin-lists.ts`), has EmptyState/LoadingState/ErrorState with retry and pull-to-refresh, uses ListGroup/Surface rows with StatusPill, and pushed pages use `ScreenHeader back`. New shared pieces: `form-field.tsx` (Field/FieldError), `choice-chips.tsx`, `initial-avatar.tsx`, `text-action.tsx`, `appearance-row.tsx` (theme setting; the floating ThemeToggle is gone), admin `list-chrome.tsx` / `sheet-parts.tsx` / `audit-row.tsx` (the first two since slimmed — see the superadmin sweep below), `search-field.tsx`. Detail pages (event, NGO) pin the primary action in a bottom bar; the NGO page wires DonateSheet (Razorpay via dev client).
 
 Biggest multiplier in the codebase. Build one composition, prove it on one
 screen, then sweep the rest.
@@ -769,10 +769,250 @@ Only after the shared shapes are done. Each is now polish, not reconstruction.
    section above); `(ngo)/profile.tsx` and `(ngo)/verification.tsx` are the
    remainder, and both are already on the shared shapes — what they want is a
    pass for content, not structure.
-3. **Superadmin** — last, and deliberately: it is internal, and it needs a
-   different structural answer rather than a restyle. `(admin)/*` wants a real
-   data table with sorting and bulk actions on desktop web, which is a bigger job
-   than the list pattern and should not block the other two.
+3. **Superadmin** — ✅ done, in two passes: swept onto the shared shapes, then
+   rebuilt as a real data console (both below).
+
+---
+
+## The superadmin sweep ✅ done
+
+`(admin)/*` was the last group still running its own copies of shapes the rest
+of the app had settled. Being internal is a reason for a console to be plain; it
+is not a reason for it to be a second design system, and it had quietly become
+one. What was replaced, and why it mattered:
+
+| Was | Is |
+|---|---|
+| `useInfiniteQuery` + a private `PAGE_SIZE` in `use-admin-lists.ts` | `usePagedQuery`, returning `{ query, items, total, loadMore }` |
+| The same 50-line `FlatList` in five screens (twice in `queue.tsx`) | `PagedList` |
+| `list-chrome.tsx`'s `SearchField` | `components/search-field.tsx` (which the top bar and the feed's search route now also use) |
+| `list-chrome.tsx`'s `ListFooter` | `LoadMoreFooter`, via `PagedList` |
+| Two hand-rolled grey initial circles | `InitialAvatar` (brand tint, ink initials) |
+| `sheet-parts.tsx`'s `FactGroup` | `FactList` + `showEmpty` |
+| A private `Section` in each dossier sheet | one in `sheet-parts.tsx` |
+| A private `Field` and a hand-rolled error box in `broadcast-sheet.tsx` | `form-field.tsx`'s `Field`, and `Banner` |
+| A 47-line pressable row on the Overview | `ListRow` with a numeral in `value` |
+| `queue.tsx`'s two near-identical 65-line queue components | one `DocumentQueue`, generic over the row type, with the hook / label map / owner as props |
+
+Three of those were live bugs rather than tidiness:
+
+- **`PagedList` hard-coded `showsVerticalScrollIndicator={false}`**, which
+  react-native-web compiles to `scrollbar-width: none` — so *every* paged list
+  in the app (six non-admin screens included) had no scrollbar and no clue there
+  was anything below the fold. It spreads `verticalScrollbar` now. It also had
+  no "Load more" control, only `onEndReached`, which never fires on a desktop
+  first page shorter than the viewport; that is why the admin footer existed
+  separately at all, and `LoadMoreFooter` now covers both.
+- **`(admin)/_layout.tsx`'s desktop shell was a bare `flex: 1`** — no `100dvh`
+  pin, no `minHeight: 0`. That is the exact chain `(ngo)/_layout.tsx` writes
+  three paragraphs about, on the group with the longest lists in the app.
+- **`ListRow` announced its label and swallowed its `value`**, so the Overview's
+  queue counts were unreadable to a screen reader. It takes an
+  `accessibilityLabel` override now.
+
+Layout, on top of the sweep:
+
+- **The two directories go two-up on desktop** (`useGridColumns` through
+  `PagedList`'s `numColumns`) inside the existing 1040 cap, rather than one row
+  per line with, as `list-chrome.tsx` already put it, "a mile of card behind
+  it". `Joined …` moved off the pill row into the footer line, since a
+  right-pushed date collides with wrapping pills in a narrower card.
+- **The queue never grids**, and says so: a row there grows a textarea and two
+  buttons when the reviewer rejects, so in two columns deciding on the left
+  jumps the right. **The audit log never grids either** — it is `grouped`, one
+  surface cut by hairlines, and a ledger has one axis.
+- **The Overview is two columns**, the NGO dashboard's split for the same
+  reason: the queues, the org numbers and what-just-happened take the wide
+  column; the people/activity counters and the account rows go in the 320
+  sticky aside. Stacked at 1040 the three metric surfaces alone were a screen
+  and a half before "Recent activity" appeared, on the one page whose whole job
+  is to be read at a glance.
+- **The Overview's broadcast control is a labelled button**, not a lone orange
+  megaphone. Icon-only outside a fixed toolbar is against the app's own rule,
+  and it is a poor place to break it: the control notifies every account on the
+  platform.
+
+### The console proper ✅ done
+
+The sweep above put `(admin)` on the app's shared shapes. It was still the wrong
+*shape*: five screens of full-width cards, each row an 1100pt rounded rectangle
+holding a name, two pills and a footnote, with two stacked rows of filter chips
+above them. Three things were wrong and all three showed up at once in a
+screenshot:
+
+- **The page did not scroll; the content container did.** `Screen` was capped at
+  1040 and centred, and the list inside it owned the `FlatList` — so the
+  scrollbar was a bar down the middle of a 1900px window with the browser's own
+  one dead at the edge. The audit log's `grouped` list added a *second* one
+  inside its card, and the Overview's aside a third.
+- **Records were drawn as cards.** A card is right when a row is a thing you
+  *look at*. Every admin row is a record you *compare* — is this NGO older, who
+  has documents waiting, who was never reviewed — and a card cannot answer any
+  of those, because the value you want sits at a different x on every row.
+- **Filters were eleven chips on two lines.** They pushed the first row of data
+  200pt down every page, and they could not express two independent axes at all:
+  an NGO can be verified *and* suspended, so "Suspended" had to masquerade as a
+  seventh verification value.
+
+What replaced it:
+
+| Piece | Does |
+|---|---|
+| `admin/list-chrome.tsx` | `AdminScreen` owns one full-width page scroller; the 1180 cap moves *inside* it. Infinite paging is `onNearEnd` on the page. |
+| `admin/data-table.tsx` | Sticky sortable header, tri-state tick column, fixed columns plus one that flexes, `wideOnly` columns under 1240, sideways scroll below the minimum width |
+| `admin/toolbar.tsx` | Search + filters + a remembered table/cards switch, one row |
+| `admin/select-menu.tsx` | The filter and sort control. Non-portalling, so it works on a page, in a sheet and in the drawer |
+| `admin/console-list.tsx` | Desktop table / desktop grid / mobile cards, from one call |
+| `admin/stat-list.tsx` | The Overview's counters as label-and-number rows |
+| `admin/reject-documents-sheet.tsx` | The remarks a rejection needs — one document or forty |
+
+And the server work the tables needed, because neither could be faked:
+
+- **Sorting is `sort` + `dir` on all four admin list schemas.** Client-side
+  sorting would have sorted twenty rows of three hundred. Each key maps to a
+  column or a correlated subquery in `AdminService.orderFor`, and every list
+  adds its default column as a tiebreaker — Postgres gives no stable order for
+  rows equal on the sort key, so without one, paging a list sorted by
+  verification status repeats and skips rows. Five new specs cover it, including
+  that one.
+- **Bulk document review** — `POST /api/admin/documents/{organizations,users}/bulk`.
+  Four documents per NGO times every NGO is the console's real grind, and the
+  shape of the work is "approve the fifteen routine ones, then look properly at
+  the three that are not". Sequential rather than one `UPDATE … IN (…)`, so each
+  decision is audited on its own and an identity document still re-derives its
+  owner's account status; one bad id does not fail the batch, and the result
+  names both sides. Four new specs.
+
+Per-screen decisions worth not re-litigating: the **queue** is the only screen
+with bulk actions (approving is repetitive and reversible; suspending an NGO is
+neither and belongs in a dossier), **approve is one press and reject asks** for
+remarks, the **audit log is a table and only a table** with an absolute
+timestamp rather than "23 hours ago", and the **Overview's counters moved to the
+aside as a `StatList`** because four `H2` numerals at 320pt wrap 3 + 1 and put a
+28px zero on its own line.
+
+### Third pass — width, density, pinned chrome, and a real dashboard ✅ done
+
+The tables were right and still read wrong, for four reasons:
+
+- **They were capped at 1180 and centred.** A cap is right for reading and wrong
+  for a table: the columns are fixed except one, so width a monitor offers goes
+  to the identity column that wants it. Capped on a 2560px screen it was a table
+  with a field of empty page beside it. The cap is gone; the rail's 264 is the
+  only inset.
+- **Rows were 52pt.** A row carries two lines in its identity column plus a
+  `StatusPill`, and at 52 the pill touched the hairlines above and below —
+  fitting, but cramped, and tiring over forty rows. Now 64.
+- **The chrome did not pin.** Scroll a three-hundred-row list and search, the
+  filters and the view switch were all gone. `AdminScreen` now takes
+  `title` / `subtitle` / `action` / `toolbar` as props and owns two tiers: the
+  title scrolls away, the command bar stays and picks the title up inside itself
+  once the big one is gone. Pinning the *whole* header instead would spend 96pt
+  of every screen restating a title picked from the rail two seconds ago while
+  the controls scroll off. `DataTable`'s own sticky header offsets its `top` by
+  the bar's measured height via `useStickyOffset()` — at 0 the column labels pin
+  underneath the toolbar and vanish.
+- **The Overview was nineteen numbers in three surfaces.** A readout, not a
+  dashboard — and no amount of restyling fixes that, because a point-in-time
+  count has no dimension to plot against. So the API gained one:
+  `GET /api/admin/overview/trends?days=7|30|90`, per-day signups / events /
+  applications with this window's totals and the previous window's for a delta,
+  **zero-filled** (a `GROUP BY date` omits empty days, and a line across the
+  gaps claims activity that never happened). Four new specs, including that one.
+
+The dashboard now reads: three queue tiles that are also the way into the list
+that clears them → two line charts over one shared window switch → the
+verification pipeline as an ordinal stacked bar → recent activity → the
+remaining counters in the aside as a `StatList`.
+
+Form was chosen per piece rather than per taste, and the reasons are in
+`charts.tsx`: a single current count is a stat tile, because a one-bar bar chart
+is a picture of a number; the pipeline is *ordinal* (one hue, light→dark) because
+Pending → In review → Verified is a funnel and the order is the meaning; it is
+not a pie, because comparing two close slices by angle is what pies are worst at.
+
+The chart palette is **not** the brand palette and `viz-tokens.ts` records why:
+`#FF7E40` is a fill at 2.53:1 on white and fails the 3:1 a 2px line mark needs,
+and the remaining tones are status colours whose meaning is reserved — a growth
+line in `error.main` reads as a problem. The series slots were validated in both
+modes against these exact surfaces (worst all-pairs CVD ΔE 9.2 light / 9.4 dark,
+normal-vision 24.0 / 20.9), as was the ordinal ramp. **Never add a fourth series
+hue.**
+
+### Fourth pass — the nested scroller, and records as slide-overs ✅ done
+
+Two of the third pass's own fixes were undone by one wrapper. `DataTable` kept a
+`ScrollView horizontal` around itself — meant to push sideways when the columns
+wanted more room than the window had — and it caused both of the things it was
+supposed to prevent:
+
+- **The table was not full width.** A horizontal scroller sizes content to the
+  content, so the flexing column collapsed to its `minWidth` and the table ended
+  at the sum of the minimums with empty page beside it.
+- **The sticky header pinned across the middle of the rows.** `position: sticky`
+  resolves against the *nearest* scrolling ancestor. That was the wrapper, not
+  the page, so `top: <toolbar height>` was measured from the top of the table's
+  own box — which is exactly what the screenshot showed: the column labels
+  floating over row four.
+
+The wrapper is gone. The table is a plain `View` at `width: 100%` with
+`minWidth` as a floor; narrow windows drop columns via `wideOnly` and the mobile
+breakpoint switches to cards, so there was no width at which a nested scroller
+was the right answer.
+
+Also this pass:
+
+- **`Toolbar` lost its own `marginBottom`.** With the toolbar pinned, a margin
+  on it tipped the bar's row and left the controls sitting visibly low against
+  the collapsed title. The bar sets `minHeight: 40` and owns the padding.
+- **The dossiers are `Drawer`s with a new `xl` (720), not `Sheet`s.** Opening an
+  NGO is not leaving the list — the reviewer works down a filtered directory,
+  and the rows they came from stay visible on the left, which a centred modal
+  covers. `FactGroup` pairs its facts two-across above 560, so nine org facts
+  are five rows instead of a screen of scrolling before the documents.
+- **The decision moved into the drawer's pinned footer**, buttons sized to their
+  labels and wrapping, with suspension at the far end apart from the
+  verification actions. Four full-width buttons at the bottom of a scroll read
+  as a menu, and were only reachable after scrolling past the whole record. The
+  reason field stays in the body: it is a field, and a field has to survive being
+  read and corrected.
+
+### Fifth pass — one population per screen, and the table as a card ✅ done
+
+- **The Role select is gone and `Volunteers` is volunteers only.** The console
+  had two screens claiming the same ground: an NGO appeared on "People" as an
+  *account* and on "NGOs" as an *organisation*, and nothing said which to use.
+  `volunteers.tsx` now hard-filters `role: "volunteer"` and drops both the
+  filter and the Role column (which printed the same word down the page). An
+  NGO's own account is reached from its organisation — the dossier's Owner
+  section has "Manage this account", and `organizations.tsx` handles it by
+  closing the org drawer and opening the user one, **sequentially, never
+  nested**: a `Modal` in a `Modal` puts two `OverlayHost`s on the stack. That is
+  the better route anyway — you should not suspend an NGO's login without having
+  just read its record. Superadmins get no screen and need none: there is no
+  action one can take on another, and minting the first is a script.
+- **The table is a `Surface` with its rows inside it.** It was naked rows on the
+  page background with a margin between them and the toolbar, which read as
+  loose text with rules through it and ran the first column hard against the
+  page gutter. Now the card recipe plus a 16pt inset shared by the header and
+  every row. `overflow: hidden` is forbidden on it — that would make it a scroll
+  container and kill the sticky header — so the top corners are rounded on the
+  header row and the last row drops its hairline. Hover now spans the row edge
+  to edge, with the tick still winning its own presses as a nested pressable.
+- **The card grid holds the card width steady, not the column count.**
+  `useGridColumns()` caps at three, which was right at 1180 and wrong at full
+  width: three cards on a 2560 monitor are 760pt each. `Cards` measures its
+  container and fits as many ~380pt cards as it holds.
+- **The title handover is animated.** It was a bare boolean, so the pinned title
+  and its divider popped in mid-scroll and shoved the toolbar sideways in one
+  frame — which reads as a glitch rather than chrome settling. One
+  `Animated.Value` drives opacity, a 6pt rise and the divider colour together,
+  180ms in / 140ms out, with the heading mounted throughout and faded so the bar
+  never re-measures under the reader.
+
+Still open: nothing structural. `useMedia` still keys desktop off
+`Platform.OS === "web"`, so a native tablet gets the phone layout and therefore
+the cards — the table would fit, and real breakpoints are the fix.
 
 ---
 
@@ -781,4 +1021,11 @@ Only after the shared shapes are done. Each is now polish, not reconstruction.
 - Skeletons instead of spinners; shared-element card → detail transition.
 - `apps/web` (Next.js) for SEO-critical public pages — see `apps/web/AGENTS.md`.
 - `useMedia` keys desktop off `Platform.OS === "web"`, so a native tablet gets
-  the phone layout. Real breakpoints belong in step 4.
+  the phone layout — and in the console, therefore the cards rather than the
+  table that would fit. Real breakpoints are the fix.
+- **`(ngo)` and `(volunteer)` still scroll the content container, not the
+  page.** Their shells cap at 1440 / 1180 and the list inside owns the scroller,
+  so the scrollbar lands at the cap rather than at the window edge — the same
+  class of bug `(admin)` just had fixed, just less visible because those screens
+  have no sticky table header depending on it. `admin/list-chrome.tsx` is the
+  worked example of the fix.

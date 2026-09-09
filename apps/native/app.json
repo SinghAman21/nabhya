@@ -63,7 +63,8 @@
 			"expo-secure-store",
 			"expo-status-bar",
 			"expo-web-browser",
-			"expo-video"
+			"expo-video",
+			"@react-native-community/datetimepicker"
 		],
 		"experiments": {
 			"typedRoutes": true,

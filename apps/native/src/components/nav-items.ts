@@ -78,6 +78,10 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
 		icon: FileCheck2,
 		section: "Review",
 	},
+	// Two populations, two screens, no overlap: `organizations` is the NGO
+	// *organisations* and `volunteers` is volunteers only. An NGO's own user
+	// account is reached from its organisation's dossier — see the note at the
+	// top of `(admin)/volunteers.tsx`.
 	{
 		label: "NGOs",
 		href: "/(admin)/organizations",

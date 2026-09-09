@@ -176,19 +176,125 @@ export function useDeleteFeedPost() {
 	});
 }
 
+/** One page as the feed cache holds it: rows already mapped to `FeedItem`. */
+interface CachedFeedPage {
+	items: FeedItem[];
+	meta: { page: number; hasMore: boolean };
+}
+interface CachedFeed {
+	pages: CachedFeedPage[];
+	pageParams: unknown[];
+}
+type FeedSnapshot = [readonly unknown[], CachedFeed | undefined];
+
+/**
+ * Rewrites one row everywhere it is cached, and hands back what was there.
+ *
+ * A row is in as many caches as there are lenses and filter combinations the
+ * reader has visited — liking something in For You has to move the same row in
+ * Trending, or switching tabs undoes the tap on screen. `queryScopes.feed` is
+ * `["feed"]`, which also matches the comment queries (`["feed","comments",…]`),
+ * so the page shape is checked rather than assumed.
+ */
+function patchFeedRow(
+	queryClient: ReturnType<typeof useQueryClient>,
+	item: FeedItem,
+	patch: (row: FeedItem) => FeedItem,
+): FeedSnapshot[] {
+	const entries = queryClient.getQueriesData<CachedFeed>({
+		queryKey: queryScopes.feed,
+	});
+	const snapshots: FeedSnapshot[] = [];
+
+	for (const [key, data] of entries) {
+		if (!data || !Array.isArray(data.pages)) continue;
+		snapshots.push([key, data]);
+		queryClient.setQueryData<CachedFeed>(key, {
+			...data,
+			pages: data.pages.map((page) =>
+				Array.isArray(page?.items)
+					? {
+							...page,
+							items: page.items.map((row) =>
+								row.id === item.id && row.kind === item.kind ? patch(row) : row,
+							),
+						}
+					: page,
+			),
+		});
+	}
+	return snapshots;
+}
+
+function restoreFeed(
+	queryClient: ReturnType<typeof useQueryClient>,
+	snapshots: FeedSnapshot[] | undefined,
+) {
+	for (const [key, data] of snapshots ?? [])
+		queryClient.setQueryData(key, data);
+}
+
+/** Applies a like or a save to a row, counter included. Idempotent. */
+function withReaction(
+	item: FeedItem,
+	action: "like" | "save",
+	on: boolean,
+): FeedItem {
+	const viewer = {
+		liked: item.viewer?.liked ?? false,
+		saved: item.viewer?.saved ?? false,
+	};
+	if (action === "like") {
+		if (viewer.liked === on) return item;
+		return {
+			...item,
+			viewer: { ...viewer, liked: on },
+			engagement: {
+				...item.engagement,
+				likes: Math.max(0, item.engagement.likes + (on ? 1 : -1)),
+			},
+		};
+	}
+	if (viewer.saved === on) return item;
+	return {
+		...item,
+		viewer: { ...viewer, saved: on },
+		engagement: {
+			...item.engagement,
+			saves: Math.max(0, item.engagement.saves + (on ? 1 : -1)),
+		},
+	};
+}
+
 /**
  * Like or save a feed row. `on` is the state the user wants, not the current
- * one, so the card passes `!liked`. Invalidates every feed query so counts and
- * the filled icon update on the next page render.
+ * one, so the card passes `!liked`.
+ *
+ * Applied optimistically and **not** invalidated afterwards, which is a
+ * deliberate reversal of what this did before. Invalidating `["feed"]` on
+ * every tap refetched every page of every lens and re-ran the ranker — so a
+ * like could reorder the list, or drop the row the thumb was still on, and the
+ * filled heart only appeared once the network came back. The server returns
+ * the same two booleans this function computes, so there is nothing to
+ * reconcile; a failure rolls the row back and surfaces itself through the
+ * caller's `onError`.
  */
 export function useFeedReaction(action: "like" | "save") {
 	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: ({ item, on }: { item: FeedItem; on: boolean }) =>
 			feedApi.react(KIND_TO_TYPE[item.kind], item.id, action, on),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
+		onMutate: async ({ item, on }) => {
+			// In flight pages would otherwise land after the patch and overwrite it.
+			await queryClient.cancelQueries({ queryKey: queryScopes.feed });
+			return {
+				snapshots: patchFeedRow(queryClient, item, (row) =>
+					withReaction(row, action, on),
+				),
+			};
 		},
+		onError: (_error, _variables, context) =>
+			restoreFeed(queryClient, context?.snapshots),
 	});
 }
 

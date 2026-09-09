@@ -1,85 +1,426 @@
+import type { TrendWindow } from "@nabhya/shared";
 import { useRouter } from "expo-router";
-import { LogOut, Megaphone } from "lucide-react-native";
+import { LogOut } from "lucide-react-native";
 import { useState } from "react";
-import { RefreshControl, ScrollView, View } from "react-native";
+import { View } from "react-native";
+import { AnalyticsSections } from "@/components/admin/analytics-sections";
 import { AuditRow } from "@/components/admin/audit-row";
 import { BroadcastSheet } from "@/components/admin/broadcast-sheet";
+import {
+	ChartCard,
+	PipelineBar,
+	RangeSwitch,
+	StatTile,
+	TrendChart,
+} from "@/components/admin/charts";
 import { AdminScreen } from "@/components/admin/list-chrome";
+import { StatList } from "@/components/admin/stat-list";
 import { AppearanceRow } from "@/components/appearance-row";
 import {
 	ErrorState,
 	ListGroup,
 	ListRow,
 	LoadingState,
-	MetricRow,
-	ScreenHeader,
 	SectionTitle,
 	Surface,
 } from "@/components/screen-shell";
-import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption, Label } from "@/components/ui/typography";
-import { useAdminOverview, useAuditLogs } from "@/hooks/use-admin";
+import { TextAction } from "@/components/text-action";
+import { Button } from "@/components/ui/button";
+import { Caption } from "@/components/ui/typography";
+import {
+	useAdminOverview,
+	useAdminTrends,
+	useAuditLogs,
+} from "@/hooks/use-admin";
 import { useSignOut } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
+import { useMedia } from "@/hooks/useMedia";
 import { apiErrorMessage } from "@/lib/api";
-import { focusable } from "@/lib/focus";
-import { verticalScrollbar } from "@/lib/scroll";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
- * The superadmin's front page, in the order the job goes:
+ * The superadmin dashboard.
  *
- * 1. What is waiting on me — three queues with counts, each a tap from the
- *    list that clears it.
- * 2. How big is the platform — numerals, quiet, no colour unless the number
- *    is itself a decision.
- * 3. What just happened — the last few audit entries, with a way to the log.
- * 4. Me — appearance and sign out, at the end where settings live.
+ * It was a stack of `MetricRow`s — nineteen numbers in three surfaces, which is
+ * a readout, not a dashboard. What it is now, top to bottom, and why each piece
+ * is the form it is:
+ *
+ * 1. **Three queue tiles.** What is waiting on me, as `StatTile`s that are also
+ *    the way into the list that clears each one. A single current value is a
+ *    stat tile, not a one-bar bar chart — drawing "12 documents" as a bar is a
+ *    picture of a number. The amber left edge and amber numeral appear only
+ *    above zero, because a status colour that is always on says nothing.
+ * 2. **Two charts, and only where there is a dimension to plot against.**
+ *    Signups per day (NGOs and volunteers) and platform activity per day
+ *    (events created, applications made). These are the *only* real time series
+ *    the API has, which is why they were worth adding server-side: everything
+ *    else on this page is a point-in-time count, and a count has nothing to
+ *    plot against. One window switch above both, so the page can never show a
+ *    7-day line beside a 30-day one.
+ * 3. **The verification pipeline**, as one ordinal stacked bar. Pending → In
+ *    review → Verified is a funnel, so the colour steps light to dark and the
+ *    order carries the meaning; Rejected is terminal, not further along, so it
+ *    takes the neutral. Not a pie — comparing two close slices by angle is the
+ *    thing pies are worst at.
+ * 4. **What just happened** — the last few audit entries, with a way to the log.
+ * 5. **The remaining counters** in the aside as a `StatList`, because they are
+ *    context rather than work: nobody opens this page to learn how many events
+ *    exist. Given the whole width as `MetricRow`s they pushed the activity feed
+ *    a screen and a half down; given the 320 aside they wrapped 3 + 1 and put a
+ *    28px zero on its own line.
+ *
+ * The chart palette is not the brand palette, and `viz-tokens.ts` says why —
+ * `#FF7E40` is a fill and fails the contrast a 2px line mark needs, and the
+ * remaining tones are status colours whose meaning is reserved.
  */
 export default function AdminOverviewScreen() {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const router = useRouter();
 	const [broadcasting, setBroadcasting] = useState(false);
+	const [window, setWindow] = useState<TrendWindow>(30);
 
+	const { isDesktop } = useMedia();
 	const query = useAdminOverview();
-	const recent = useAuditLogs({ limit: 5 });
+	const trends = useAdminTrends(window);
+	const recent = useAuditLogs({ limit: 6 });
 	const signOut = useSignOut();
 	const user = useAuthStore((s) => s.user);
 
 	const overview = query.data;
+	const points = trends.data?.points ?? [];
+	// `d MMM` — short enough that three of them fit under a 90-day axis.
+	const labels = points.map((point) =>
+		new Date(`${point.date}T00:00:00Z`).toLocaleDateString(undefined, {
+			day: "numeric",
+			month: "short",
+			timeZone: "UTC",
+		}),
+	);
 
-	const broadcastButton = (
-		<Pressable
-			onPress={() => setBroadcasting(true)}
-			accessibilityRole="button"
-			accessibilityLabel="Send a broadcast"
-			hitSlop={6}
-			{...focusable}
-			style={({ pressed }) => ({
-				width: 40,
-				height: 40,
-				borderRadius: 999,
-				alignItems: "center",
-				justifyContent: "center",
-				backgroundColor: pressed ? colors.primary.dark : colors.primary.main,
-			})}
+	const delta = (key: "organizations" | "volunteers") => {
+		const now = trends.data?.totals[key] ?? 0;
+		const before = trends.data?.previousTotals[key] ?? 0;
+		return now - before;
+	};
+
+	const queues = (
+		<View
+			style={{
+				flexDirection: "row",
+				flexWrap: "wrap",
+				gap: spacing[3],
+			}}
 		>
-			<Megaphone
-				size={18}
-				color={colors.primary.contrast as string}
-				strokeWidth={2}
+			{[
+				{
+					label: "NGOs awaiting verification",
+					hint: "Pending and under review",
+					count: overview
+						? overview.organizations.pending +
+							overview.organizations.underReview
+						: 0,
+					go: () => router.push("/(admin)/organizations"),
+				},
+				{
+					label: "NGO documents",
+					hint: "Registration, PAN, 12A and 80G",
+					count: overview?.documents.pendingOrgDocuments ?? 0,
+					go: () =>
+						router.push({
+							pathname: "/(admin)/queue",
+							params: { kind: "organization" },
+						}),
+				},
+				{
+					label: "Identity documents",
+					hint: "Volunteer IDs and liveness selfies",
+					count: overview?.documents.pendingUserDocuments ?? 0,
+					go: () =>
+						router.push({
+							pathname: "/(admin)/queue",
+							params: { kind: "user" },
+						}),
+				},
+			].map((queue) => (
+				<View
+					key={queue.label}
+					style={{ flexGrow: 1, flexBasis: 200, minWidth: 0 }}
+				>
+					<StatTile
+						label={queue.label}
+						value={queue.count}
+						hint={queue.count > 0 ? queue.hint : "Nothing waiting"}
+						onPress={queue.go}
+						{...(queue.count > 0 ? { tone: "warning" as const } : {})}
+					/>
+				</View>
+			))}
+		</View>
+	);
+
+	const charts = (
+		<View style={{ gap: spacing[4] }}>
+			<ChartCard
+				title="New accounts"
+				caption={`Per day over the last ${window} days`}
+				action={<RangeSwitch value={window} onChange={setWindow} />}
+			>
+				{trends.isLoading ? (
+					<LoadingState />
+				) : trends.isError ? (
+					<ErrorState
+						message={apiErrorMessage(trends.error)}
+						onRetry={() => trends.refetch()}
+					/>
+				) : (
+					<TrendChart
+						labels={labels}
+						series={[
+							{
+								key: "organizations",
+								label: "NGOs",
+								values: points.map((point) => point.organizations),
+							},
+							{
+								key: "volunteers",
+								label: "Volunteers",
+								values: points.map((point) => point.volunteers),
+							},
+						]}
+						totals={{
+							organizations: trends.data?.totals.organizations ?? 0,
+							volunteers: trends.data?.totals.volunteers ?? 0,
+						}}
+					/>
+				)}
+			</ChartCard>
+
+			<ChartCard
+				title="Platform activity"
+				caption={"Events created and applications made, per day"}
+			>
+				{trends.isLoading ? (
+					<LoadingState />
+				) : trends.isError ? (
+					<Caption color="tertiary">Couldn't load activity.</Caption>
+				) : (
+					<TrendChart
+						labels={labels}
+						series={[
+							{
+								key: "events",
+								label: "Events",
+								values: points.map((point) => point.events),
+							},
+							{
+								key: "applications",
+								label: "Applications",
+								values: points.map((point) => point.applications),
+							},
+						]}
+						totals={{
+							events: trends.data?.totals.events ?? 0,
+							applications: trends.data?.totals.applications ?? 0,
+						}}
+					/>
+				)}
+			</ChartCard>
+		</View>
+	);
+
+	const pipeline = overview ? (
+		<ChartCard
+			title="Verification pipeline"
+			caption="Where every registered NGO currently sits"
+		>
+			<PipelineBar
+				stages={[
+					{ label: "Pending", value: overview.organizations.pending },
+					{ label: "In review", value: overview.organizations.underReview },
+					{ label: "Verified", value: overview.organizations.verified },
+					{
+						label: "Rejected",
+						value: overview.organizations.rejected,
+						off: true,
+					},
+				]}
 			/>
-		</Pressable>
+		</ChartCard>
+	) : null;
+
+	const growth = trends.data ? (
+		<View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[3] }}>
+			<View style={{ flexGrow: 1, flexBasis: 180, minWidth: 0 }}>
+				<StatTile
+					label="New NGOs"
+					value={trends.data.totals.organizations}
+					delta={delta("organizations")}
+					deltaLabel={`vs previous ${window} days`}
+					series={points.map((point) => point.organizations)}
+				/>
+			</View>
+			<View style={{ flexGrow: 1, flexBasis: 180, minWidth: 0 }}>
+				<StatTile
+					label="New volunteers"
+					value={trends.data.totals.volunteers}
+					delta={delta("volunteers")}
+					deltaLabel={`vs previous ${window} days`}
+					series={points.map((point) => point.volunteers)}
+				/>
+			</View>
+		</View>
+	) : null;
+
+	const activity = (
+		<View>
+			<SectionTitle
+				action={
+					<TextAction
+						label="See all"
+						tone="brand"
+						onPress={() => router.push("/(admin)/audit")}
+						accessibilityLabel="See all activity"
+					/>
+				}
+			>
+				Recent activity
+			</SectionTitle>
+			{recent.isLoading ? (
+				<Surface>
+					<LoadingState />
+				</Surface>
+			) : recent.isError ? (
+				<Surface>
+					<ErrorState
+						message={apiErrorMessage(recent.error)}
+						onRetry={() => recent.refetch()}
+					/>
+				</Surface>
+			) : (recent.data?.items.length ?? 0) === 0 ? (
+				<Surface>
+					<Caption color="tertiary">
+						Moderation and lifecycle actions appear here as they happen.
+					</Caption>
+				</Surface>
+			) : (
+				<ListGroup>
+					{(recent.data?.items ?? []).map((entry) => (
+						<AuditRow key={entry.id} entry={entry} />
+					))}
+				</ListGroup>
+			)}
+		</View>
+	);
+
+	const numbers = overview ? (
+		<View style={{ gap: spacing[5] }}>
+			<View>
+				<SectionTitle>People</SectionTitle>
+				<StatList
+					stats={[
+						{ label: "Accounts", value: overview.users.total },
+						{ label: "Volunteers", value: overview.users.volunteers },
+						{ label: "NGO accounts", value: overview.users.organisations },
+						{
+							label: "Suspended",
+							value: overview.users.suspended,
+							...(overview.users.suspended === 0 ? { muted: true } : {}),
+						},
+					]}
+				/>
+			</View>
+
+			<View>
+				<SectionTitle>Programmes</SectionTitle>
+				<StatList
+					stats={[
+						{ label: "Events", value: overview.events.total },
+						{ label: "Upcoming", value: overview.events.upcoming },
+						{ label: "Open needs", value: overview.needs.open },
+						{
+							label: "Applications pending",
+							value: overview.applications.pending,
+							...(overview.applications.pending > 0
+								? { tone: "warning" as const }
+								: { muted: true }),
+						},
+					]}
+				/>
+			</View>
+		</View>
+	) : null;
+
+	const account = (
+		<View>
+			<SectionTitle>Account</SectionTitle>
+			<ListGroup>
+				<AppearanceRow />
+				<ListRow
+					icon={LogOut}
+					label="Sign out"
+					hint={user?.email ?? undefined}
+					value={<View />}
+					onPress={() => {
+						if (signOut.isPending) return;
+						signOut.mutate(undefined, {
+							onSettled: () => router.replace("/(auth)/login"),
+						});
+					}}
+				/>
+			</ListGroup>
+		</View>
+	);
+
+	const body = isDesktop ? (
+		<View style={{ flexDirection: "row", gap: spacing[6] }}>
+			<View style={{ flex: 1, minWidth: 0, gap: spacing[6] }}>
+				{queues}
+				{charts}
+				{pipeline}
+				<AnalyticsSections days={window} />
+				{activity}
+			</View>
+			{/* Not sticky: the aside is now taller than a viewport on a laptop, and
+			    a sticky column taller than the scroller just pins its own top and
+			    hides its own bottom. */}
+			<View style={{ width: 320, flexGrow: 0, flexShrink: 0, gap: spacing[6] }}>
+				{growth}
+				{numbers}
+				{account}
+			</View>
+		</View>
+	) : (
+		<View style={{ gap: spacing[6] }}>
+			{queues}
+			{growth}
+			{charts}
+			{pipeline}
+			<AnalyticsSections days={window} />
+			{numbers}
+			{activity}
+			{account}
+		</View>
 	);
 
 	return (
-		<AdminScreen>
-			<ScreenHeader
-				title="Overview"
-				subtitle="Superadmin console"
-				action={broadcastButton}
-			/>
-
+		<AdminScreen
+			title="Overview"
+			subtitle="Superadmin console"
+			action={
+				// A labelled button, not a lone megaphone. An icon-only control
+				// ships with a visible word unless it sits in a fixed toolbar of
+				// them, and this one notifies every account on the platform.
+				<Button size="sm" onPress={() => setBroadcasting(true)}>
+					Broadcast
+				</Button>
+			}
+			refreshing={query.isRefetching}
+			onRefresh={() => {
+				query.refetch();
+				trends.refetch();
+				recent.refetch();
+			}}
+		>
 			{query.isLoading ? (
 				<LoadingState />
 			) : query.isError || !overview ? (
@@ -88,169 +429,7 @@ export default function AdminOverviewScreen() {
 					onRetry={() => query.refetch()}
 				/>
 			) : (
-				<ScrollView
-					{...verticalScrollbar}
-					contentContainerStyle={{ paddingBottom: spacing[10] }}
-					refreshControl={
-						<RefreshControl
-							refreshing={query.isRefetching}
-							onRefresh={() => {
-								query.refetch();
-								recent.refetch();
-							}}
-							tintColor={colors.text.quaternary as string}
-						/>
-					}
-				>
-					{/* 1. Needs review ------------------------------------------------ */}
-					<View style={{ marginBottom: spacing[6] }}>
-						<SectionTitle>Needs review</SectionTitle>
-						<ListGroup>
-							<ReviewRow
-								label="NGOs awaiting verification"
-								hint="Pending and under review"
-								count={
-									overview.organizations.pending +
-									overview.organizations.underReview
-								}
-								onPress={() => router.push("/(admin)/organizations")}
-							/>
-							<ReviewRow
-								label="NGO documents"
-								hint="Registration, PAN, 12A and 80G"
-								count={overview.documents.pendingOrgDocuments}
-								onPress={() =>
-									router.push({
-										pathname: "/(admin)/queue",
-										params: { kind: "organization" },
-									})
-								}
-							/>
-							<ReviewRow
-								label="Identity documents"
-								hint="Volunteer IDs and liveness selfies"
-								count={overview.documents.pendingUserDocuments}
-								onPress={() =>
-									router.push({
-										pathname: "/(admin)/queue",
-										params: { kind: "user" },
-									})
-								}
-							/>
-						</ListGroup>
-					</View>
-
-					{/* 2. The platform in numbers --------------------------------------- */}
-					<View style={{ marginBottom: spacing[6] }}>
-						<SectionTitle>Organizations</SectionTitle>
-						<MetricRow
-							stats={[
-								{ label: "Total", value: overview.organizations.total },
-								{ label: "Verified", value: overview.organizations.verified },
-								{
-									label: "Pending",
-									value: overview.organizations.pending,
-									...(overview.organizations.pending > 0
-										? { tone: "warning" as const }
-										: {}),
-								},
-								{ label: "Suspended", value: overview.organizations.suspended },
-							]}
-						/>
-					</View>
-
-					<View style={{ marginBottom: spacing[6] }}>
-						<SectionTitle>People</SectionTitle>
-						<MetricRow
-							stats={[
-								{ label: "Accounts", value: overview.users.total },
-								{ label: "Volunteers", value: overview.users.volunteers },
-								{ label: "NGO accounts", value: overview.users.organisations },
-								{ label: "Suspended", value: overview.users.suspended },
-							]}
-						/>
-					</View>
-
-					<View style={{ marginBottom: spacing[6] }}>
-						<SectionTitle>Activity</SectionTitle>
-						<MetricRow
-							stats={[
-								{ label: "Events", value: overview.events.total },
-								{ label: "Upcoming", value: overview.events.upcoming },
-								{ label: "Open needs", value: overview.needs.open },
-								{
-									label: "Applications pending",
-									value: overview.applications.pending,
-								},
-							]}
-						/>
-					</View>
-
-					{/* 3. What just happened -------------------------------------------- */}
-					<View style={{ marginBottom: spacing[6] }}>
-						<SectionTitle
-							action={
-								<Pressable
-									onPress={() => router.push("/(admin)/audit")}
-									accessibilityRole="link"
-									accessibilityLabel="See all activity"
-									hitSlop={8}
-									{...focusable}
-								>
-									<Caption weight="medium" color={colors.primary.ink}>
-										See all
-									</Caption>
-								</Pressable>
-							}
-						>
-							Recent activity
-						</SectionTitle>
-						{recent.isLoading ? (
-							<Surface>
-								<LoadingState />
-							</Surface>
-						) : recent.isError ? (
-							<Surface>
-								<ErrorState
-									message={apiErrorMessage(recent.error)}
-									onRetry={() => recent.refetch()}
-								/>
-							</Surface>
-						) : (recent.data?.items.length ?? 0) === 0 ? (
-							<Surface>
-								<Caption color="tertiary">
-									Moderation and lifecycle actions appear here as they happen.
-								</Caption>
-							</Surface>
-						) : (
-							<ListGroup>
-								{(recent.data?.items ?? []).map((entry) => (
-									<AuditRow key={entry.id} entry={entry} />
-								))}
-							</ListGroup>
-						)}
-					</View>
-
-					{/* 4. Me --------------------------------------------------------------- */}
-					<View style={{ marginBottom: spacing[4] }}>
-						<SectionTitle>Account</SectionTitle>
-						<ListGroup>
-							<AppearanceRow />
-							<ListRow
-								icon={LogOut}
-								label="Sign out"
-								hint={user?.email ?? undefined}
-								value={<View />}
-								onPress={() => {
-									if (signOut.isPending) return;
-									signOut.mutate(undefined, {
-										onSettled: () => router.replace("/(auth)/login"),
-									});
-								}}
-							/>
-						</ListGroup>
-					</View>
-				</ScrollView>
+				body
 			)}
 
 			<BroadcastSheet
@@ -258,58 +437,5 @@ export default function AdminOverviewScreen() {
 				onClose={() => setBroadcasting(false)}
 			/>
 		</AdminScreen>
-	);
-}
-
-/**
- * A queue row. The count is the loudest thing on the line — in warning ink
- * while anything is waiting, quiet when the queue is clear.
- */
-function ReviewRow({
-	label,
-	hint,
-	count,
-	onPress,
-}: {
-	label: string;
-	hint: string;
-	count: number;
-	onPress: () => void;
-}) {
-	const { colors, spacing } = useTheme();
-
-	return (
-		<Pressable
-			onPress={onPress}
-			accessibilityRole="button"
-			accessibilityLabel={`${label}, ${count} waiting. ${hint}`}
-			{...focusable}
-			style={({ pressed }) => ({
-				flexDirection: "row",
-				alignItems: "center",
-				gap: spacing[3.5],
-				paddingHorizontal: spacing[4],
-				paddingVertical: spacing[3.5],
-				minHeight: 56,
-				backgroundColor: pressed ? colors.background.subtle : "transparent",
-			})}
-		>
-			<View style={{ flex: 1 }}>
-				<Body weight="medium" numberOfLines={1}>
-					{label}
-				</Body>
-				<Caption color="tertiary" numberOfLines={1}>
-					{hint}
-				</Caption>
-			</View>
-			<Label
-				weight="bold"
-				color={
-					count > 0 ? colors.warning.ink : (colors.text.quaternary as string)
-				}
-			>
-				{count}
-			</Label>
-		</Pressable>
 	);
 }
