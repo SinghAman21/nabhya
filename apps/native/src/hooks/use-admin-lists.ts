@@ -1,4 +1,5 @@
 import type {
+	AdminActivityQuery,
 	AdminOrgQuery,
 	AdminUserQuery,
 	AuditLogQuery,
@@ -79,6 +80,28 @@ export function useUserDocumentQueuePaged(
 	return usePagedAdminList(
 		queryKeys.adminUserDocuments(query),
 		adminApi.userDocuments,
+		query,
+	);
+}
+
+export function useAdminOrganizationActivityPaged(
+	id: string | undefined,
+	query: Partial<AdminActivityQuery> = {},
+) {
+	return usePagedAdminList(
+		queryKeys.adminOrganizationActivity(id ?? "", query),
+		(pageQuery) => adminApi.organizationActivity(id as string, pageQuery),
+		query,
+	);
+}
+
+export function useAdminUserActivityPaged(
+	id: string | undefined,
+	query: Partial<AdminActivityQuery> = {},
+) {
+	return usePagedAdminList(
+		queryKeys.adminUserActivity(id ?? "", query),
+		(pageQuery) => adminApi.userActivity(id as string, pageQuery),
 		query,
 	);
 }

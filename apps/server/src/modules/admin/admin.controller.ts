@@ -1,4 +1,6 @@
 import type {
+	AdminActivityQuery,
+	AdminAnalyticsQuery,
 	AdminOrgQuery,
 	AdminTrendQuery,
 	AdminUserQuery,
@@ -11,6 +13,8 @@ import type {
 	SetUserStatusInput,
 } from "@nabhya/shared";
 import {
+	adminActivityQuerySchema,
+	adminAnalyticsQuerySchema,
 	adminOrgQuerySchema,
 	adminTrendQuerySchema,
 	adminUserQuerySchema,
@@ -75,6 +79,19 @@ export class AdminController {
 		return this.adminService.getTrends(query.days);
 	}
 
+	@Get("analytics")
+	@ApiOperation({
+		summary: "Chart-ready platform analytics for the admin console",
+	})
+	@ApiQuery({ name: "days", required: false, enum: [7, 30, 90] })
+	@ApiQuery({ name: "limit", required: false })
+	getAnalytics(
+		@Query(new ZodValidationPipe(adminAnalyticsQuerySchema))
+		query: AdminAnalyticsQuery,
+	) {
+		return this.adminService.getAnalytics(query);
+	}
+
 	// ─── Organizations ───────────────────────────────────────────────────────
 
 	@Get("organizations")
@@ -111,6 +128,17 @@ export class AdminController {
 	})
 	getOrganization(@Param("id", ParseUUIDPipe) id: string) {
 		return this.adminService.getOrganizationDetail(id);
+	}
+
+	@Get("organizations/:id/activity")
+	@ApiOperation({ summary: "Paginated mixed activity timeline for one NGO" })
+	@ApiQuery({ name: "kind", required: false })
+	listOrganizationActivity(
+		@Param("id", ParseUUIDPipe) id: string,
+		@Query(new ZodValidationPipe(adminActivityQuerySchema))
+		query: AdminActivityQuery,
+	) {
+		return this.adminService.listOrganizationActivity(id, query);
 	}
 
 	@Patch("organizations/:id/verification")
@@ -164,6 +192,17 @@ export class AdminController {
 	})
 	getUser(@Param("id", ParseUUIDPipe) id: string) {
 		return this.adminService.getUserDetail(id);
+	}
+
+	@Get("users/:id/activity")
+	@ApiOperation({ summary: "Paginated mixed activity timeline for one user" })
+	@ApiQuery({ name: "kind", required: false })
+	listUserActivity(
+		@Param("id", ParseUUIDPipe) id: string,
+		@Query(new ZodValidationPipe(adminActivityQuerySchema))
+		query: AdminActivityQuery,
+	) {
+		return this.adminService.listUserActivity(id, query);
 	}
 
 	@Patch("users/:id/status")

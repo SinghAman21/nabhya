@@ -56,6 +56,7 @@ export const ORG_NEEDS = {
 export const ADMIN = {
 	OVERVIEW: `${API_PREFIX}/admin/overview`,
 	TRENDS: `${API_PREFIX}/admin/overview/trends`,
+	ANALYTICS: `${API_PREFIX}/admin/analytics`,
 	ORGANIZATIONS: `${API_PREFIX}/admin/organizations`,
 	USERS: `${API_PREFIX}/admin/users`,
 	ORG_DOCUMENTS: `${API_PREFIX}/admin/documents/organizations`,
@@ -67,11 +68,14 @@ export const ADMIN = {
 	USER_DOCUMENTS_BULK: `${API_PREFIX}/admin/documents/users/bulk`,
 	AUDIT_LOGS: `${API_PREFIX}/admin/audit-logs`,
 	organization: (id: string) => `${API_PREFIX}/admin/organizations/${id}`,
+	organizationActivity: (id: string) =>
+		`${API_PREFIX}/admin/organizations/${id}/activity`,
 	organizationVerification: (id: string) =>
 		`${API_PREFIX}/admin/organizations/${id}/verification`,
 	organizationStatus: (id: string) =>
 		`${API_PREFIX}/admin/organizations/${id}/status`,
 	user: (id: string) => `${API_PREFIX}/admin/users/${id}`,
+	userActivity: (id: string) => `${API_PREFIX}/admin/users/${id}/activity`,
 	userStatus: (id: string) => `${API_PREFIX}/admin/users/${id}/status`,
 	orgDocument: (id: string) =>
 		`${API_PREFIX}/admin/documents/organizations/${id}`,

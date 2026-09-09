@@ -1,4 +1,14 @@
 import {
+	categories,
+	donations,
+	organizationCategories,
+	organizationDocuments,
+	reviews,
+	userCategories,
+} from "@nabhya/db/schema";
+import {
+	adminActivityQuerySchema,
+	adminAnalyticsQuerySchema,
 	adminOrgQuerySchema,
 	adminUserQuerySchema,
 	auditLogQuerySchema,
@@ -16,6 +26,7 @@ import {
 	createEvent,
 	createNeed,
 	createOrganization,
+	createPledge,
 	createUser,
 	createUserDocument,
 	seedRoles,
@@ -588,6 +599,121 @@ describe("AdminService", () => {
 				auditLogQuerySchema.parse({ action: "USER_DOCUMENT_VERIFIED" }),
 			);
 			expect(trail.meta.total).toBe(1);
+		});
+	});
+
+	describe("activity timelines", () => {
+		it("returns a flat, groupable NGO activity feed with optional kind filters", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const event = await createEvent(db, org.id, { title: "Food drive" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				fullName: "Asha Volunteer",
+			});
+			await createApplication(db, event.id, volunteer.id);
+			const need = await createNeed(db, org.id);
+			await createPledge(db, need.id, volunteer.id);
+
+			const all = await service.listOrganizationActivity(
+				org.id,
+				adminActivityQuerySchema.parse({ page: 1, limit: 20 }),
+			);
+
+			expect(all.items.map((item) => item.kind)).toEqual(
+				expect.arrayContaining(["EVENT", "APPLICATION", "NEED", "PLEDGE"]),
+			);
+			expect(all.items[0]?.groupKey).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+			expect(all.meta.total).toBeGreaterThanOrEqual(4);
+
+			const applications = await service.listOrganizationActivity(
+				org.id,
+				adminActivityQuerySchema.parse({ kind: "APPLICATION" }),
+			);
+			expect(applications.items).toHaveLength(1);
+			expect(applications.items[0]?.actor?.name).toBe("Asha Volunteer");
+		});
+
+		it("returns a volunteer's mixed participation and contribution activity", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const event = await createEvent(db, org.id, { title: "Tree planting" });
+			const volunteer = await createUser(db, { role: "volunteer" });
+			await createApplication(db, event.id, volunteer.id);
+			const need = await createNeed(db, org.id);
+			await createPledge(db, need.id, volunteer.id);
+
+			const activity = await service.listUserActivity(
+				volunteer.id,
+				adminActivityQuerySchema.parse({ page: 1, limit: 20 }),
+			);
+
+			expect(activity.items.map((item) => item.kind)).toEqual(
+				expect.arrayContaining(["APPLICATION", "PLEDGE"]),
+			);
+			expect(
+				activity.items.every((item) => item.actor?.id === volunteer.id),
+			).toBe(true);
+		});
+	});
+
+	describe("analytics", () => {
+		it("returns chart-ready distribution, funnel, queue and donation aggregates", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id, {
+				name: "Analytics NGO",
+			});
+			const volunteer = await createUser(db, { role: "volunteer" });
+			const event = await createEvent(db, org.id);
+			await createApplication(db, event.id, volunteer.id, {
+				status: "ACCEPTED",
+			});
+			await db.insert(organizationDocuments).values({
+				organizationId: org.id,
+				documentType: "NGO_REGISTRATION_CERTIFICATE",
+				documentKey: `org-documents/${org.id}/registration.pdf`,
+			});
+			await db.insert(donations).values({
+				organizationId: org.id,
+				donorUserId: volunteer.id,
+				amountMinor: 50000,
+				status: "COMPLETED",
+				completedAt: new Date(),
+			});
+			await db.insert(reviews).values({
+				organizationId: org.id,
+				userId: volunteer.id,
+				rating: 5,
+				body: "Helpful team",
+			});
+			const [category] = await db
+				.insert(categories)
+				.values({ name: "Education", slug: "education" })
+				.returning();
+			if (!category) throw new Error("category insert failed");
+			await db
+				.insert(organizationCategories)
+				.values({ organizationId: org.id, categoryId: category.id });
+			await db
+				.insert(userCategories)
+				.values({ userId: volunteer.id, categoryId: category.id });
+
+			const analytics = await service.getAnalytics(
+				adminAnalyticsQuerySchema.parse({ days: 7, limit: 5 }),
+			);
+
+			expect(analytics.locations.organizations[0]?.label).toBe("Mumbai");
+			expect(analytics.categories.organizations[0]?.label).toBe("Education");
+			expect(analytics.applicationFunnel).toContainEqual({
+				label: "ACCEPTED",
+				value: 1,
+			});
+			expect(analytics.reviewQueues.pending.organizationDocuments).toBe(1);
+			expect(analytics.topOrganizations[0]?.organizationName).toBe(
+				"Analytics NGO",
+			);
+			expect(analytics.donations.totalAmountMinor).toBe(50000);
+			expect(analytics.donations.points).toHaveLength(7);
 		});
 	});
 

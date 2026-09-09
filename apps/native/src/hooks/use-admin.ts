@@ -1,4 +1,6 @@
 import type {
+	AdminActivityQuery,
+	AdminAnalyticsQuery,
 	AdminOrgQuery,
 	AdminUserQuery,
 	AuditLogQuery,
@@ -42,6 +44,14 @@ export function useAdminOverview() {
 	});
 }
 
+export function useAdminAnalytics(query: Partial<AdminAnalyticsQuery> = {}) {
+	return useQuery({
+		queryKey: queryKeys.adminAnalytics(query),
+		queryFn: () => adminApi.analytics(query),
+		placeholderData: keepPreviousData,
+	});
+}
+
 export function useAdminOrganizations(query: Partial<AdminOrgQuery> = {}) {
 	return useQuery({
 		queryKey: queryKeys.adminOrganizations(query),
@@ -54,6 +64,18 @@ export function useAdminOrganization(id: string | undefined) {
 		queryKey: queryKeys.adminOrganization(id ?? ""),
 		queryFn: () => adminApi.organization(id as string),
 		enabled: !!id,
+	});
+}
+
+export function useAdminOrganizationActivity(
+	id: string | undefined,
+	query: Partial<AdminActivityQuery> = {},
+) {
+	return useQuery({
+		queryKey: queryKeys.adminOrganizationActivity(id ?? "", query),
+		queryFn: () => adminApi.organizationActivity(id as string, query),
+		enabled: !!id,
+		placeholderData: keepPreviousData,
 	});
 }
 
@@ -97,6 +119,18 @@ export function useAdminUser(id: string | undefined) {
 		queryKey: queryKeys.adminUser(id ?? ""),
 		queryFn: () => adminApi.user(id as string),
 		enabled: !!id,
+	});
+}
+
+export function useAdminUserActivity(
+	id: string | undefined,
+	query: Partial<AdminActivityQuery> = {},
+) {
+	return useQuery({
+		queryKey: queryKeys.adminUserActivity(id ?? "", query),
+		queryFn: () => adminApi.userActivity(id as string, query),
+		enabled: !!id,
+		placeholderData: keepPreviousData,
 	});
 }
 

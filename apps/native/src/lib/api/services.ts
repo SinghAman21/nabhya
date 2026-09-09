@@ -1,4 +1,8 @@
 import type {
+	AdminActivityItem,
+	AdminActivityQuery,
+	AdminAnalytics,
+	AdminAnalyticsQuery,
 	AdminOrgQuery,
 	AdminOverview,
 	AdminTrendQuery,
@@ -261,11 +265,18 @@ export const adminApi = {
 		http.patch<AdminOrgListItem>(ADMIN.organizationVerification(id), input),
 	setOrganizationStatus: (id: string, input: SetOrgStatusInput) =>
 		http.patch<AdminOrgListItem>(ADMIN.organizationStatus(id), input),
+	organizationActivity: (id: string, query: Partial<AdminActivityQuery>) =>
+		http.getPage<AdminActivityItem>(ADMIN.organizationActivity(id), query),
 	trends: (query: Partial<AdminTrendQuery>) =>
 		http.get<AdminTrends>(ADMIN.TRENDS, query),
+	analytics: (query: Partial<AdminAnalyticsQuery>) =>
+		http.get<AdminAnalytics>(ADMIN.ANALYTICS, query),
+
 	users: (query: Partial<AdminUserQuery>) =>
 		http.getPage<AdminUserListItem>(ADMIN.USERS, query),
 	user: (id: string) => http.get<AdminUserDetail>(ADMIN.user(id)),
+	userActivity: (id: string, query: Partial<AdminActivityQuery>) =>
+		http.getPage<AdminActivityItem>(ADMIN.userActivity(id), query),
 	setUserStatus: (id: string, input: SetUserStatusInput) =>
 		http.patch<AdminUserListItem>(ADMIN.userStatus(id), input),
 	orgDocuments: (query: Partial<DocumentQueueQuery>) =>

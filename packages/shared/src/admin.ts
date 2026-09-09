@@ -197,6 +197,127 @@ export const documentQueueQuerySchema = paginationQuerySchema.extend({
 
 export type DocumentQueueQuery = z.infer<typeof documentQueueQuerySchema>;
 
+// ─── Admin activity timelines ────────────────────────────────────────────────
+
+export const adminActivityKindSchema = z.enum([
+	"EVENT",
+	"NEED",
+	"ANNOUNCEMENT",
+	"REPORT",
+	"DOCUMENT",
+	"APPLICATION",
+	"PLEDGE",
+	"DONATION",
+	"REVIEW",
+	"CERTIFICATE",
+	"POST",
+]);
+export type AdminActivityKind = z.infer<typeof adminActivityKindSchema>;
+
+export const adminActivityQuerySchema = paginationQuerySchema.extend({
+	kind: adminActivityKindSchema.optional(),
+});
+export type AdminActivityQuery = z.infer<typeof adminActivityQuerySchema>;
+
+export interface AdminActivityActor {
+	id: string;
+	name: string | null;
+	email: string | null;
+}
+
+export interface AdminActivitySubject {
+	id: string;
+	label: string;
+	type?: string | null;
+	status?: string | null;
+}
+
+/**
+ * A flat, paginated timeline item. The frontend can group by `groupKey` for
+ * day sections, by `kind` for tabs/chips, or ignore both and render it as one
+ * chronological list.
+ */
+export interface AdminActivityItem {
+	id: string;
+	kind: AdminActivityKind;
+	occurredAt: string;
+	groupKey: string;
+	groupLabel: string;
+	title: string;
+	description: string | null;
+	status: string | null;
+	amountMinor?: number | null;
+	currency?: string | null;
+	actor?: AdminActivityActor | null;
+	subject?: AdminActivitySubject | null;
+	organization?: { id: string; organizationName: string } | null;
+}
+
+// ─── Admin analytics ─────────────────────────────────────────────────────────
+
+export const adminAnalyticsQuerySchema = z.object({
+	days: z.coerce
+		.number()
+		.int()
+		.refine((v) => [7, 30, 90].includes(v), {
+			message: "Window must be 7, 30 or 90 days",
+		})
+		.default(30),
+	limit: z.coerce.number().int().min(3).max(25).default(10),
+});
+export type AdminAnalyticsQuery = z.infer<typeof adminAnalyticsQuerySchema>;
+
+export interface AdminAnalyticsPoint {
+	label: string;
+	value: number;
+}
+
+export interface AdminReviewQueueBucket {
+	label: string;
+	orgDocuments: number;
+	userDocuments: number;
+}
+
+export interface AdminTopOrganization {
+	id: string;
+	organizationName: string;
+	city: string | null;
+	state: string | null;
+	events: number;
+	needs: number;
+	applications: number;
+	donationAmountMinor: number;
+}
+
+export interface AdminDonationTrendPoint {
+	date: string;
+	amountMinor: number;
+	count: number;
+}
+
+export interface AdminAnalytics {
+	windowDays: number;
+	locations: {
+		organizations: AdminAnalyticsPoint[];
+		volunteers: AdminAnalyticsPoint[];
+	};
+	categories: {
+		organizations: AdminAnalyticsPoint[];
+		volunteers: AdminAnalyticsPoint[];
+	};
+	applicationFunnel: AdminAnalyticsPoint[];
+	reviewQueues: {
+		pending: { organizationDocuments: number; userDocuments: number };
+		ageBuckets: AdminReviewQueueBucket[];
+	};
+	topOrganizations: AdminTopOrganization[];
+	donations: {
+		totalAmountMinor: number;
+		completedCount: number;
+		points: AdminDonationTrendPoint[];
+	};
+}
+
 // ─── Dashboard payload ───────────────────────────────────────────────────────
 
 export interface AdminOverview {

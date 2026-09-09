@@ -35,11 +35,16 @@ export const queryKeys = {
 
 	adminOverview: ["admin", "overview"] as const,
 	adminTrends: (days: number) => ["admin", "overview", "trends", days] as const,
+	adminAnalytics: (params?: unknown) => ["admin", "analytics", params] as const,
 	adminOrganizations: (params?: unknown) =>
 		["admin", "organizations", params] as const,
 	adminOrganization: (id: string) => ["admin", "organizations", id] as const,
+	adminOrganizationActivity: (id: string, params?: unknown) =>
+		["admin", "organizations", id, "activity", params] as const,
 	adminUsers: (params?: unknown) => ["admin", "users", params] as const,
 	adminUser: (id: string) => ["admin", "users", id] as const,
+	adminUserActivity: (id: string, params?: unknown) =>
+		["admin", "users", id, "activity", params] as const,
 	adminOrgDocuments: (params?: unknown) =>
 		["admin", "documents", "organizations", params] as const,
 	adminUserDocuments: (params?: unknown) =>
