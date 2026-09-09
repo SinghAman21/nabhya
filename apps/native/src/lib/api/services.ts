@@ -3,6 +3,8 @@ import type {
 	AdminActivityQuery,
 	AdminAnalytics,
 	AdminAnalyticsQuery,
+	AdminOrgPost,
+	AdminOrgPostsQuery,
 	AdminOrgQuery,
 	AdminOverview,
 	AdminTrendQuery,
@@ -267,6 +269,9 @@ export const adminApi = {
 		http.patch<AdminOrgListItem>(ADMIN.organizationStatus(id), input),
 	organizationActivity: (id: string, query: Partial<AdminActivityQuery>) =>
 		http.getPage<AdminActivityItem>(ADMIN.organizationActivity(id), query),
+	organizationPosts: (id: string, query: Partial<AdminOrgPostsQuery>) =>
+		http.getPage<AdminOrgPost>(ADMIN.organizationPosts(id), query),
+	deletePost: (id: string) => http.delete<{ deleted: boolean }>(ADMIN.post(id)),
 	trends: (query: Partial<AdminTrendQuery>) =>
 		http.get<AdminTrends>(ADMIN.TRENDS, query),
 	analytics: (query: Partial<AdminAnalyticsQuery>) =>

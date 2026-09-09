@@ -1,6 +1,7 @@
 import type {
 	AdminActivityQuery,
 	AdminAnalyticsQuery,
+	AdminOrgPostsQuery,
 	AdminOrgQuery,
 	AdminTrendQuery,
 	AdminUserQuery,
@@ -15,6 +16,7 @@ import type {
 import {
 	adminActivityQuerySchema,
 	adminAnalyticsQuerySchema,
+	adminOrgPostsQuerySchema,
 	adminOrgQuerySchema,
 	adminTrendQuerySchema,
 	adminUserQuerySchema,
@@ -29,6 +31,7 @@ import {
 import {
 	Body,
 	Controller,
+	Delete,
 	Get,
 	Inject,
 	Param,
@@ -46,6 +49,7 @@ import {
 import { CurrentUser, Roles } from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthUser } from "../../common/types";
+import { FeedService } from "../feed/feed.service";
 import { AdminService } from "./admin.service";
 
 /**
@@ -59,6 +63,7 @@ import { AdminService } from "./admin.service";
 export class AdminController {
 	constructor(
 		@Inject(AdminService) private readonly adminService: AdminService,
+		@Inject(FeedService) private readonly feedService: FeedService,
 	) {}
 
 	@Get("overview")
@@ -139,6 +144,19 @@ export class AdminController {
 		query: AdminActivityQuery,
 	) {
 		return this.adminService.listOrganizationActivity(id, query);
+	}
+
+	@Get("organizations/:id/posts")
+	@ApiOperation({
+		summary: "List feed posts published by one NGO for moderation",
+	})
+	@ApiQuery({ name: "tag", required: false })
+	listOrganizationPosts(
+		@Param("id", ParseUUIDPipe) id: string,
+		@Query(new ZodValidationPipe(adminOrgPostsQuerySchema))
+		query: AdminOrgPostsQuery,
+	) {
+		return this.feedService.listOrganizationPosts(id, query);
 	}
 
 	@Patch("organizations/:id/verification")
@@ -296,6 +314,17 @@ export class AdminController {
 		body: ReviewDocumentInput,
 	) {
 		return this.adminService.reviewUserDocument(admin.id, id, body);
+	}
+
+	// ─── Post moderation ─────────────────────────────────────────────────────
+
+	@Delete("posts/:id")
+	@ApiOperation({ summary: "Delete an NGO feed post as a superadmin" })
+	deletePost(
+		@CurrentUser() admin: AuthUser,
+		@Param("id", ParseUUIDPipe) id: string,
+	) {
+		return this.feedService.remove(admin, id);
 	}
 
 	// ─── Audit ───────────────────────────────────────────────────────────────

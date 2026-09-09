@@ -70,6 +70,8 @@ export const ADMIN = {
 	organization: (id: string) => `${API_PREFIX}/admin/organizations/${id}`,
 	organizationActivity: (id: string) =>
 		`${API_PREFIX}/admin/organizations/${id}/activity`,
+	organizationPosts: (id: string) =>
+		`${API_PREFIX}/admin/organizations/${id}/posts`,
 	organizationVerification: (id: string) =>
 		`${API_PREFIX}/admin/organizations/${id}/verification`,
 	organizationStatus: (id: string) =>
@@ -80,6 +82,7 @@ export const ADMIN = {
 	orgDocument: (id: string) =>
 		`${API_PREFIX}/admin/documents/organizations/${id}`,
 	userDocument: (id: string) => `${API_PREFIX}/admin/documents/users/${id}`,
+	post: (id: string) => `${API_PREFIX}/admin/posts/${id}`,
 } as const;
 
 export const CATEGORIES = {

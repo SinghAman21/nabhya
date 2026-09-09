@@ -41,6 +41,8 @@ export const queryKeys = {
 	adminOrganization: (id: string) => ["admin", "organizations", id] as const,
 	adminOrganizationActivity: (id: string, params?: unknown) =>
 		["admin", "organizations", id, "activity", params] as const,
+	adminOrganizationPosts: (id: string, params?: unknown) =>
+		["admin", "organizations", id, "posts", params] as const,
 	adminUsers: (params?: unknown) => ["admin", "users", params] as const,
 	adminUser: (id: string) => ["admin", "users", id] as const,
 	adminUserActivity: (id: string, params?: unknown) =>

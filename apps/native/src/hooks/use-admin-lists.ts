@@ -1,5 +1,6 @@
 import type {
 	AdminActivityQuery,
+	AdminOrgPostsQuery,
 	AdminOrgQuery,
 	AdminUserQuery,
 	AuditLogQuery,
@@ -91,6 +92,17 @@ export function useAdminOrganizationActivityPaged(
 	return usePagedAdminList(
 		queryKeys.adminOrganizationActivity(id ?? "", query),
 		(pageQuery) => adminApi.organizationActivity(id as string, pageQuery),
+		query,
+	);
+}
+
+export function useAdminOrganizationPostsPaged(
+	id: string | undefined,
+	query: Partial<AdminOrgPostsQuery> = {},
+) {
+	return usePagedAdminList(
+		queryKeys.adminOrganizationPosts(id ?? "", query),
+		(pageQuery) => adminApi.organizationPosts(id as string, pageQuery),
 		query,
 	);
 }

@@ -10,6 +10,6 @@ import { FeedRankingService } from "./feed-ranking.service";
 	imports: [UploadsModule, OrganizationsModule],
 	controllers: [FeedController],
 	providers: [FeedService, FeedRankingService, FeedEngagementService],
-	exports: [FeedRankingService],
+	exports: [FeedService, FeedRankingService],
 })
 export class FeedModule {}

@@ -1,6 +1,7 @@
 import type {
 	AdminActivityQuery,
 	AdminAnalyticsQuery,
+	AdminOrgPostsQuery,
 	AdminOrgQuery,
 	AdminUserQuery,
 	AuditLogQuery,
@@ -74,6 +75,18 @@ export function useAdminOrganizationActivity(
 	return useQuery({
 		queryKey: queryKeys.adminOrganizationActivity(id ?? "", query),
 		queryFn: () => adminApi.organizationActivity(id as string, query),
+		enabled: !!id,
+		placeholderData: keepPreviousData,
+	});
+}
+
+export function useAdminOrganizationPosts(
+	id: string | undefined,
+	query: Partial<AdminOrgPostsQuery> = {},
+) {
+	return useQuery({
+		queryKey: queryKeys.adminOrganizationPosts(id ?? "", query),
+		queryFn: () => adminApi.organizationPosts(id as string, query),
 		enabled: !!id,
 		placeholderData: keepPreviousData,
 	});
@@ -161,6 +174,17 @@ export function useSetOrganizationStatus() {
 			adminApi.setOrganizationStatus(id, input),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.admin });
+		},
+	});
+}
+
+export function useAdminDeletePost() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (id: string) => adminApi.deletePost(id),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.admin });
+			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
 		},
 	});
 }

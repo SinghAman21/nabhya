@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { paginationQuerySchema } from "./common";
+import { type PostTag, postTagSchema } from "./feed";
 import { roleSchema } from "./roles";
 
 // ─── Monitoring queries ──────────────────────────────────────────────────────
@@ -251,6 +252,31 @@ export interface AdminActivityItem {
 	actor?: AdminActivityActor | null;
 	subject?: AdminActivitySubject | null;
 	organization?: { id: string; organizationName: string } | null;
+}
+
+// ─── Admin-managed NGO posts ─────────────────────────────────────────────────
+
+export const adminOrgPostsQuerySchema = paginationQuerySchema.extend({
+	tag: postTagSchema.optional(),
+});
+export type AdminOrgPostsQuery = z.infer<typeof adminOrgPostsQuerySchema>;
+
+export interface AdminOrgPost {
+	id: string;
+	tag: PostTag;
+	text: string;
+	createdAt: string;
+	author: {
+		id: string;
+		fullName: string | null;
+		profileImage: string | null;
+	};
+	media: Array<{
+		id: string;
+		type: "IMAGE" | "VIDEO";
+		url: string;
+		sortOrder: number;
+	}>;
 }
 
 // ─── Admin analytics ─────────────────────────────────────────────────────────

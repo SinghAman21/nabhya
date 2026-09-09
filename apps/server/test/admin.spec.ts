@@ -3,12 +3,15 @@ import {
 	donations,
 	organizationCategories,
 	organizationDocuments,
+	posts,
+	postsMedia,
 	reviews,
 	userCategories,
 } from "@nabhya/db/schema";
 import {
 	adminActivityQuerySchema,
 	adminAnalyticsQuerySchema,
+	adminOrgPostsQuerySchema,
 	adminOrgQuerySchema,
 	adminUserQuerySchema,
 	auditLogQuerySchema,
@@ -19,9 +22,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { AuditService } from "../src/common/audit";
 import { AdminService } from "../src/modules/admin/admin.service";
 import { EventsService } from "../src/modules/events/events.service";
+import { FeedService } from "../src/modules/feed/feed.service";
 import { NotificationsService } from "../src/modules/notifications/notifications.service";
 import { OrganizationsService } from "../src/modules/organizations/organizations.service";
 import {
+	authUserFor,
 	createApplication,
 	createEvent,
 	createNeed,
@@ -38,11 +43,22 @@ describe("AdminService", () => {
 	let close: () => Promise<void>;
 	let service: AdminService;
 	let events: EventsService;
+	let feed: FeedService;
 
 	beforeAll(async () => {
 		({ db, close } = await createTestDb());
 		const audit = new AuditService(db as never);
 		service = new AdminService(db as never, audit);
+		feed = new FeedService(
+			db as never,
+			{
+				createDownloadUrl: async (key: string) => `https://storage.test/${key}`,
+				delete: async () => undefined,
+			} as never,
+			null as never,
+			audit,
+			null as never,
+		);
 		events = new EventsService(
 			db as never,
 			audit,
@@ -599,6 +615,76 @@ describe("AdminService", () => {
 				auditLogQuerySchema.parse({ action: "USER_DOCUMENT_VERIFIED" }),
 			);
 			expect(trail.meta.total).toBe(1);
+		});
+	});
+
+	describe("admin post moderation", () => {
+		it("lists one NGO's posts with media for superadmin review", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const otherOwner = await createUser(db, { role: "organisation" });
+			const otherOrg = await createOrganization(db, otherOwner.id);
+
+			const [post] = await db
+				.insert(posts)
+				.values({
+					authorUserId: owner.id,
+					organizationId: org.id,
+					mediaFolder: "202609091700-abcd12",
+					text: "We served lunch today",
+					tag: "POST",
+				})
+				.returning();
+			if (!post) throw new Error("post insert failed");
+			await db.insert(postsMedia).values({
+				postId: post.id,
+				objectKey: "feed/example/photo.jpg",
+				mediaType: "IMAGE",
+				mimeType: "image/jpeg",
+				sortOrder: 0,
+			});
+			await db.insert(posts).values({
+				authorUserId: otherOwner.id,
+				organizationId: otherOrg.id,
+				mediaFolder: "202609091701-abcd12",
+				text: "Other org post",
+				tag: "POST",
+			});
+
+			const result = await feed.listOrganizationPosts(
+				org.id,
+				adminOrgPostsQuerySchema.parse({ page: 1, limit: 20 }),
+			);
+
+			expect(result.items).toHaveLength(1);
+			expect(result.items[0]?.text).toBe("We served lunch today");
+			expect(result.items[0]?.media[0]?.url).toBe(
+				"https://storage.test/feed/example/photo.jpg",
+			);
+		});
+
+		it("lets a superadmin delete an NGO post", async () => {
+			const admin = await createUser(db, { role: "superadmin" });
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const [post] = await db
+				.insert(posts)
+				.values({
+					authorUserId: owner.id,
+					organizationId: org.id,
+					mediaFolder: "202609091702-abcd12",
+					text: "Remove me",
+					tag: "POST",
+				})
+				.returning();
+			if (!post) throw new Error("post insert failed");
+
+			await feed.remove(authUserFor(admin, ["superadmin"]), post.id);
+
+			const remaining = await db.query.posts.findFirst({
+				where: (table, { eq }) => eq(table.id, post.id),
+			});
+			expect(remaining).toBeUndefined();
 		});
 	});
 

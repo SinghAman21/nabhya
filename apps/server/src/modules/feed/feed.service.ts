@@ -1,6 +1,7 @@
 import type { db as dbType } from "@nabhya/db";
 import { posts, postsMedia, users } from "@nabhya/db/schema";
 import type {
+	AdminOrgPostsQuery,
 	CreateFeedMediaIntentsInput,
 	CreateFeedPostInput,
 	FeedQuery,
@@ -11,7 +12,7 @@ import {
 	Injectable,
 	NotFoundException,
 } from "@nestjs/common";
-import { count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, type SQL } from "drizzle-orm";
 import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import { STORAGE_TOKEN, type StorageProvider } from "../../common/storage";
@@ -117,19 +118,58 @@ export class FeedService {
 		);
 	}
 
+	async listOrganizationPosts(
+		organizationId: string,
+		query: AdminOrgPostsQuery,
+	) {
+		const { limit, offset } = toOffset(query);
+		const conditions: SQL[] = [eq(posts.organizationId, organizationId)];
+		if (query.tag) conditions.push(eq(posts.tag, query.tag));
+		const where = and(...conditions);
+
+		const [postRows, [totals]] = await Promise.all([
+			this.db
+				.select({
+					id: posts.id,
+					tag: posts.tag,
+					text: posts.text,
+					createdAt: posts.createdAt,
+					author: {
+						id: users.id,
+						fullName: users.fullName,
+						profileImage: users.profileImage,
+					},
+				})
+				.from(posts)
+				.innerJoin(users, eq(posts.authorUserId, users.id))
+				.where(where)
+				.orderBy(desc(posts.createdAt))
+				.limit(limit)
+				.offset(offset),
+			this.db.select({ value: count() }).from(posts).where(where),
+		]);
+
+		return paginate(
+			await Promise.all(postRows.map((post) => this.withMedia(post))),
+			totals?.value ?? 0,
+			query,
+		);
+	}
+
 	async remove(user: AuthUser, postId: string) {
 		const post = await this.db.query.posts.findFirst({
 			where: eq(posts.id, postId),
-			with: { media: true },
 		});
 		if (!post) throw new NotFoundException("Post not found");
 		if (!user.roles.includes("superadmin") && post.authorUserId !== user.id) {
 			throw new ForbiddenException("You can only delete your own posts.");
 		}
+		const media = await this.db
+			.select({ objectKey: postsMedia.objectKey })
+			.from(postsMedia)
+			.where(eq(postsMedia.postId, postId));
 		await this.db.delete(posts).where(eq(posts.id, postId));
-		await Promise.all(
-			post.media.map((media) => this.storage.delete(media.objectKey)),
-		);
+		await Promise.all(media.map((item) => this.storage.delete(item.objectKey)));
 		void this.audit.record({
 			performedBy: user.id,
 			action: "DELETE_POST",
