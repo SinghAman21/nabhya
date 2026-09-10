@@ -2,6 +2,8 @@ import {
 	announcements,
 	organizationAdmins,
 	organizations,
+	teamInvites,
+	users,
 } from "@nabhya/db/schema";
 import {
 	BadRequestException,
@@ -341,7 +343,131 @@ describe("PublishingService", () => {
 
 			await service.removeAdmin(owner.id, member.id);
 
-			expect(await db.query.organizationAdmins.findMany()).toHaveLength(0);
+			const stored = await db.query.organizationAdmins.findFirst({
+				where: eq(organizationAdmins.id, member.id),
+			});
+			expect(stored?.status).toBe("REMOVED");
+			expect(stored?.leftAt).not.toBeNull();
+		});
+
+		it("creates an invite for a future account and accepts it once that email signs in", async () => {
+			const { owner } = await verifiedOrg();
+			const invite = await service.createTeamInvite(owner.id, {
+				email: "priya@example.com",
+				role: "MANAGER",
+				designation: "Field Lead – Pune",
+			});
+			expect(invite.token).toBeTruthy();
+			expect(invite.tokenHash).not.toBe(invite.token);
+
+			const priya = await createUser(db, {
+				role: "organisation",
+				fullName: "Priya",
+			});
+			await db
+				.update(users)
+				.set({ email: "priya@example.com" })
+				.where(eq(users.id, priya.id));
+
+			const member = await service.acceptTeamInvite(priya.id, invite.token);
+			expect(member.role).toBe("MANAGER");
+			expect(member.designation).toBe("Field Lead – Pune");
+
+			await expect(
+				service.acceptTeamInvite(priya.id, invite.token),
+			).rejects.toBeInstanceOf(ConflictException);
+		});
+
+		it("fails expired and revoked invites with distinct errors", async () => {
+			const { owner } = await verifiedOrg();
+			const expired = await service.createTeamInvite(owner.id, {
+				email: "old@example.com",
+				role: "MEMBER",
+			});
+			await db
+				.update(teamInvites)
+				.set({ expiresAt: new Date(Date.now() - 1000) })
+				.where(eq(teamInvites.id, expired.id));
+			const oldUser = await createUser(db, { role: "organisation" });
+			await db
+				.update(users)
+				.set({ email: "old@example.com" })
+				.where(eq(users.id, oldUser.id));
+			await expect(
+				service.acceptTeamInvite(oldUser.id, expired.token),
+			).rejects.toBeInstanceOf(BadRequestException);
+
+			const revoked = await service.createTeamInvite(owner.id, {
+				email: "revoked@example.com",
+				role: "MEMBER",
+			});
+			await service.revokeTeamInvite(owner.id, revoked.id);
+			const revokedUser = await createUser(db, { role: "organisation" });
+			await db
+				.update(users)
+				.set({ email: "revoked@example.com" })
+				.where(eq(users.id, revokedUser.id));
+			await expect(
+				service.acceptTeamInvite(revokedUser.id, revoked.token),
+			).rejects.toBeInstanceOf(BadRequestException);
+		});
+
+		it("enforces team permissions for viewer/member roles", async () => {
+			const { owner } = await verifiedOrg();
+			const viewer = await createUser(db, { role: "organisation" });
+			const viewerMember = await service.inviteAdmin(owner.id, {
+				email: viewer.email,
+				role: "VIEWER",
+			});
+
+			await expect(
+				service.createTeamInvite(viewer.id, {
+					email: "blocked@example.com",
+					role: "MEMBER",
+				}),
+			).rejects.toBeInstanceOf(ForbiddenException);
+			await expect(
+				service.removeAdmin(viewer.id, viewerMember.id),
+			).rejects.toBeInstanceOf(ForbiddenException);
+		});
+
+		it("transfers ownership to an active admin through confirmation", async () => {
+			const { owner, org } = await verifiedOrg();
+			await db.insert(organizationAdmins).values({
+				organizationId: org.id,
+				userId: owner.id,
+				role: "OWNER",
+				isOwner: true,
+			});
+			const cofounder = await createUser(db, { role: "organisation" });
+			const admin = await service.inviteAdmin(owner.id, {
+				email: cofounder.email,
+				role: "ADMIN",
+			});
+
+			const transfer = await service.requestOwnershipTransfer(
+				owner.id,
+				admin.id,
+			);
+			expect(transfer.token).toBeTruthy();
+			await service.confirmOwnershipTransfer(cofounder.id, {
+				token: transfer.token,
+			});
+
+			const rows = await db.query.organizationAdmins.findMany({
+				where: eq(organizationAdmins.organizationId, org.id),
+			});
+			expect(
+				rows.filter((row) => row.role === "OWNER" && row.status === "ACTIVE"),
+			).toHaveLength(1);
+			expect(rows.find((row) => row.userId === cofounder.id)?.role).toBe(
+				"OWNER",
+			);
+			expect(rows.find((row) => row.userId === owner.id)?.role).toBe("ADMIN");
+			const updatedOrg = await db.query.organizations.findFirst({
+				where: eq(organizations.id, org.id),
+			});
+			expect(updatedOrg?.ownerUserId).toBe(cofounder.id);
 		});
 	});
 });

@@ -219,6 +219,10 @@ export class NeedsService {
 	}
 
 	async create(userId: string, input: CreateNeedInput) {
+		await this.organizationsService.requireOrgPermission(
+			userId,
+			"content.publish",
+		);
 		const organization =
 			await this.organizationsService.requireVerifiedOrganization(userId);
 
@@ -254,6 +258,10 @@ export class NeedsService {
 	}
 
 	async update(userId: string, needId: string, input: UpdateNeedInput) {
+		await this.organizationsService.requireOrgPermission(
+			userId,
+			"content.publish",
+		);
 		const need = await this.requireOwnedNeed(userId, needId);
 
 		if (
@@ -288,6 +296,10 @@ export class NeedsService {
 	}
 
 	async remove(userId: string, needId: string) {
+		await this.organizationsService.requireOrgPermission(
+			userId,
+			"content.delete",
+		);
 		const need = await this.requireOwnedNeed(userId, needId);
 
 		// People have committed against this post — close it rather than erase
@@ -534,6 +546,10 @@ export class NeedsService {
 		pledgeId: string,
 		input: ReviewPledgeInput,
 	) {
+		await this.organizationsService.requireOrgPermission(
+			userId,
+			"people.review",
+		);
 		await this.requireOwnedNeed(userId, needId);
 
 		const result = await this.db.transaction(async (tx) => {

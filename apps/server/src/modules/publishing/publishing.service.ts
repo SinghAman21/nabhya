@@ -1,15 +1,23 @@
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { db as dbType } from "@nabhya/db";
 import {
 	announcements,
 	bookmarks,
 	financialReports,
 	organizationAdmins,
+	organizationOwnershipTransfers,
+	organizations,
+	teamInvites,
 	users,
 } from "@nabhya/db/schema";
 import type {
+	ConfirmOwnershipTransferInput,
 	CreateFinancialReportInput,
 	InviteOrgAdminInput,
+	InviteTeamMemberInput,
 	PaginationQuery,
+	TeamListQuery,
+	TeamRole,
 	UpdateOrgAdminInput,
 	UpsertAnnouncementInput,
 } from "@nabhya/shared";
@@ -21,7 +29,7 @@ import {
 	Injectable,
 	NotFoundException,
 } from "@nestjs/common";
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, ne } from "drizzle-orm";
 import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
@@ -49,6 +57,12 @@ export class PublishingService {
 	 * worth having rather than being a static blob on the profile.
 	 */
 	async createAnnouncement(userId: string, input: UpsertAnnouncementInput) {
+		if (input.status === "PUBLISHED") {
+			await this.organizationsService.requireOrgPermission(
+				userId,
+				"content.publish",
+			);
+		}
 		const organization =
 			await this.organizationsService.requireVerifiedOrganization(userId);
 
@@ -97,6 +111,12 @@ export class PublishingService {
 			userId,
 			announcementId,
 		);
+		if (input.status === "PUBLISHED") {
+			await this.organizationsService.requireOrgPermission(
+				userId,
+				"content.publish",
+			);
+		}
 
 		const [updated] = await this.db
 			.update(announcements)
@@ -122,6 +142,10 @@ export class PublishingService {
 	}
 
 	async deleteAnnouncement(userId: string, announcementId: string) {
+		await this.organizationsService.requireOrgPermission(
+			userId,
+			"content.delete",
+		);
 		await this.requireOwnedAnnouncement(userId, announcementId);
 		await this.db
 			.delete(announcements)
@@ -183,6 +207,10 @@ export class PublishingService {
 		userId: string,
 		input: CreateFinancialReportInput,
 	) {
+		await this.organizationsService.requireOrgPermission(
+			userId,
+			"reports.manage",
+		);
 		const organization =
 			await this.organizationsService.requireVerifiedOrganization(userId);
 
@@ -232,6 +260,10 @@ export class PublishingService {
 	}
 
 	async deleteFinancialReport(userId: string, reportId: string) {
+		await this.organizationsService.requireOrgPermission(
+			userId,
+			"reports.manage",
+		);
 		const organization =
 			await this.organizationsService.requireOwnedOrganization(userId);
 
@@ -252,16 +284,31 @@ export class PublishingService {
 
 	// ─── Team management ─────────────────────────────────────────────────────
 
-	async listTeam(userId: string) {
+	async listTeam(
+		userId: string,
+		query: Partial<TeamListQuery> = { status: "ACTIVE", includeLeft: false },
+	) {
 		const organization =
 			await this.organizationsService.requireOwnedOrganization(userId);
+
+		const conditions = [eq(organizationAdmins.organizationId, organization.id)];
+		if (!query.includeLeft)
+			conditions.push(ne(organizationAdmins.status, "LEFT"));
+		if (query.status)
+			conditions.push(eq(organizationAdmins.status, query.status));
 
 		return this.db
 			.select({
 				id: organizationAdmins.id,
+				userId: organizationAdmins.userId,
 				designation: organizationAdmins.designation,
+				role: organizationAdmins.role,
+				status: organizationAdmins.status,
 				isOwner: organizationAdmins.isOwner,
+				isPublic: organizationAdmins.isPublic,
 				joinedAt: organizationAdmins.joinedAt,
+				leftAt: organizationAdmins.leftAt,
+				lastActiveAt: organizationAdmins.lastActiveAt,
 				user: {
 					id: users.id,
 					fullName: users.fullName,
@@ -271,62 +318,68 @@ export class PublishingService {
 			})
 			.from(organizationAdmins)
 			.innerJoin(users, eq(organizationAdmins.userId, users.id))
-			.where(eq(organizationAdmins.organizationId, organization.id))
+			.where(and(...conditions))
 			.orderBy(
 				desc(organizationAdmins.isOwner),
 				desc(organizationAdmins.joinedAt),
 			);
 	}
 
-	/**
-	 * Adds an existing account to the organization's team.
-	 *
-	 * Deliberately requires the person to have signed up already: silently
-	 * creating an account from an email address would let anyone provision
-	 * users, and the invitee never consented.
-	 */
+	async listPublicTeam(organizationId: string) {
+		await this.organizationsService.assertPubliclyVisible(organizationId);
+
+		return this.db
+			.select({
+				fullName: users.fullName,
+				role: organizationAdmins.role,
+				designation: organizationAdmins.designation,
+				joinedAt: organizationAdmins.joinedAt,
+			})
+			.from(organizationAdmins)
+			.innerJoin(users, eq(organizationAdmins.userId, users.id))
+			.where(
+				and(
+					eq(organizationAdmins.organizationId, organizationId),
+					eq(organizationAdmins.status, "ACTIVE"),
+					eq(organizationAdmins.isPublic, true),
+				),
+			)
+			.orderBy(
+				desc(organizationAdmins.isOwner),
+				desc(organizationAdmins.joinedAt),
+			);
+	}
+
+	/** Legacy route: adds an existing account immediately for one release. */
 	async inviteAdmin(userId: string, input: InviteOrgAdminInput) {
-		const organization =
-			await this.organizationsService.requireOwnedOrganization(userId);
+		const { organization } = await this.requireTeamPermission(
+			userId,
+			"team.invite",
+		);
+		const email = input.email.toLowerCase();
 
 		const invitee = await this.db.query.users.findFirst({
-			where: eq(users.email, input.email.toLowerCase()),
+			where: eq(users.email, email),
 			columns: { id: true, email: true, fullName: true },
 		});
 
 		if (!invitee) {
 			throw new NotFoundException(
-				"No Nabhya account with that email. Ask them to sign up first.",
+				"No Nabhya account with that email. Use team invites for people who have not signed up yet.",
 			);
 		}
 
-		const existing = await this.db.query.organizationAdmins.findFirst({
-			where: and(
-				eq(organizationAdmins.organizationId, organization.id),
-				eq(organizationAdmins.userId, invitee.id),
-			),
+		const member = await this.addActiveMember({
+			organizationId: organization.id,
+			userId: invitee.id,
+			role: input.role ?? "MEMBER",
+			designation: input.designation ?? null,
+			invitedBy: userId,
 		});
-
-		if (existing) {
-			throw new ConflictException("They're already on your team.");
-		}
-
-		const member = takeFirstOrThrow(
-			await this.db
-				.insert(organizationAdmins)
-				.values({
-					organizationId: organization.id,
-					userId: invitee.id,
-					designation: input.designation ?? null,
-					isOwner: false,
-				})
-				.returning(),
-			"add organization admin",
-		);
 
 		void this.notifications.notify({
 			userId: invitee.id,
-			type: "BROADCAST",
+			type: "TEAM_INVITE_ACCEPTED",
 			title: `You were added to ${organization.organizationName}`,
 			body: input.designation
 				? `You've been added as ${input.designation}.`
@@ -340,10 +393,260 @@ export class PublishingService {
 			action: "ADD_ORG_ADMIN",
 			entityName: "ORGANIZATION_ADMIN",
 			entityId: member.id,
-			newValue: { email: invitee.email },
+			newValue: { email: invitee.email, role: member.role },
 		});
 
 		return member;
+	}
+
+	async createTeamInvite(userId: string, input: InviteTeamMemberInput) {
+		const { organization } = await this.requireTeamPermission(
+			userId,
+			"team.invite",
+		);
+		await this.assertCanGrantRole(userId, organization.id, input.role);
+		const email = input.email.toLowerCase();
+		const activeCount = await this.db
+			.select({ value: count() })
+			.from(teamInvites)
+			.where(
+				and(
+					eq(teamInvites.organizationId, organization.id),
+					eq(teamInvites.status, "PENDING"),
+				),
+			);
+		if ((activeCount[0]?.value ?? 0) >= 50) {
+			throw new BadRequestException(
+				"This organization has too many pending invites.",
+			);
+		}
+
+		const [existingMember] = await this.db
+			.select({ id: organizationAdmins.id })
+			.from(organizationAdmins)
+			.innerJoin(users, eq(organizationAdmins.userId, users.id))
+			.where(
+				and(
+					eq(organizationAdmins.organizationId, organization.id),
+					eq(organizationAdmins.status, "ACTIVE"),
+					eq(users.email, email),
+				),
+			)
+			.limit(1);
+		if (existingMember)
+			throw new ConflictException("They're already on your team.");
+
+		const token = this.generateToken();
+		const invite = takeFirstOrThrow(
+			await this.db
+				.insert(teamInvites)
+				.values({
+					organizationId: organization.id,
+					email,
+					role: input.role,
+					designation: input.designation ?? null,
+					tokenHash: this.hashToken(token),
+					invitedBy: userId,
+					expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+					lastSentAt: new Date(),
+				})
+				.returning(),
+			"create team invite",
+		);
+
+		const invitee = await this.db.query.users.findFirst({
+			where: eq(users.email, email),
+			columns: { id: true },
+		});
+		if (invitee) {
+			void this.notifications.notify({
+				userId: invitee.id,
+				type: "TEAM_INVITE",
+				title: `Invitation to join ${organization.organizationName}`,
+				body: `You've been invited as ${input.role.toLowerCase()}.`,
+				entityName: "TEAM_INVITE",
+				entityId: invite.id,
+			});
+		}
+
+		void this.audit.record({
+			performedBy: userId,
+			action: "INVITE_TEAM_MEMBER",
+			entityName: "TEAM_INVITE",
+			entityId: invite.id,
+			newValue: {
+				email,
+				role: input.role,
+				designation: input.designation ?? null,
+			},
+		});
+
+		return { ...invite, token };
+	}
+
+	async listTeamInvites(userId: string) {
+		const { organization } = await this.requireTeamPermission(
+			userId,
+			"team.invite",
+		);
+		return this.db.query.teamInvites.findMany({
+			where: and(
+				eq(teamInvites.organizationId, organization.id),
+				eq(teamInvites.status, "PENDING"),
+			),
+			orderBy: desc(teamInvites.createdAt),
+		});
+	}
+
+	async revokeTeamInvite(userId: string, inviteId: string) {
+		const { organization } = await this.requireTeamPermission(
+			userId,
+			"team.invite",
+		);
+		const invite = await this.requireInviteInOrg(inviteId, organization.id);
+		if (invite.status !== "PENDING") {
+			throw new BadRequestException("Only pending invites can be revoked.");
+		}
+
+		const revoked = takeFirstOrThrow(
+			await this.db
+				.update(teamInvites)
+				.set({
+					status: "REVOKED",
+					revokedAt: new Date(),
+					updatedAt: new Date(),
+				})
+				.where(eq(teamInvites.id, invite.id))
+				.returning(),
+			"revoke team invite",
+		);
+
+		void this.audit.record({
+			performedBy: userId,
+			action: "REVOKE_TEAM_INVITE",
+			entityName: "TEAM_INVITE",
+			entityId: invite.id,
+		});
+
+		return revoked;
+	}
+
+	async resendTeamInvite(userId: string, inviteId: string) {
+		const { organization } = await this.requireTeamPermission(
+			userId,
+			"team.invite",
+		);
+		const invite = await this.requireInviteInOrg(inviteId, organization.id);
+		this.assertPendingInvite(invite);
+
+		const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+		if (
+			invite.resentCount >= 3 &&
+			(invite.lastSentAt?.getTime() ?? 0) > oneDayAgo
+		) {
+			throw new BadRequestException("This invite was resent too recently.");
+		}
+
+		const token = this.generateToken();
+		const updated = takeFirstOrThrow(
+			await this.db
+				.update(teamInvites)
+				.set({
+					tokenHash: this.hashToken(token),
+					resentCount: invite.resentCount + 1,
+					lastSentAt: new Date(),
+					expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+					updatedAt: new Date(),
+				})
+				.where(eq(teamInvites.id, invite.id))
+				.returning(),
+			"resend team invite",
+		);
+
+		return { ...updated, token };
+	}
+
+	async acceptTeamInvite(userId: string, token: string) {
+		const user = await this.requireUser(userId);
+		const invite = await this.requireInviteByToken(token);
+		this.assertPendingInvite(invite);
+		if (user.email.toLowerCase() !== invite.email.toLowerCase()) {
+			throw new ForbiddenException(
+				"This invite was sent to a different email.",
+			);
+		}
+
+		const member = await this.db.transaction(async (tx) => {
+			const inserted = takeFirstOrThrow(
+				await tx
+					.insert(organizationAdmins)
+					.values({
+						organizationId: invite.organizationId,
+						userId,
+						designation: invite.designation,
+						role: invite.role,
+						status: "ACTIVE",
+						isOwner: false,
+						invitedBy: invite.invitedBy,
+						invitedAt: invite.createdAt,
+					})
+					.returning(),
+				"accept team invite",
+			);
+			await tx
+				.update(teamInvites)
+				.set({
+					status: "ACCEPTED",
+					acceptedBy: userId,
+					acceptedAt: new Date(),
+					updatedAt: new Date(),
+				})
+				.where(eq(teamInvites.id, invite.id));
+			return inserted;
+		});
+
+		void this.audit.record({
+			performedBy: userId,
+			action: "ACCEPT_TEAM_INVITE",
+			entityName: "ORGANIZATION_ADMIN",
+			entityId: member.id,
+			newValue: { inviteId: invite.id, role: invite.role },
+		});
+
+		return member;
+	}
+
+	async declineTeamInvite(userId: string, token: string) {
+		const user = await this.requireUser(userId);
+		const invite = await this.requireInviteByToken(token);
+		this.assertPendingInvite(invite);
+		if (user.email.toLowerCase() !== invite.email.toLowerCase()) {
+			throw new ForbiddenException(
+				"This invite was sent to a different email.",
+			);
+		}
+
+		const updated = takeFirstOrThrow(
+			await this.db
+				.update(teamInvites)
+				.set({
+					status: "DECLINED",
+					declinedAt: new Date(),
+					updatedAt: new Date(),
+				})
+				.where(eq(teamInvites.id, invite.id))
+				.returning(),
+			"decline team invite",
+		);
+
+		void this.audit.record({
+			performedBy: userId,
+			action: "DECLINE_TEAM_INVITE",
+			entityName: "TEAM_INVITE",
+			entityId: invite.id,
+		});
+
+		return updated;
 	}
 
 	async updateAdmin(
@@ -351,39 +654,215 @@ export class PublishingService {
 		memberId: string,
 		input: UpdateOrgAdminInput,
 	) {
+		const actor = await this.requireTeamPermission(userId, "team.changeRole");
 		const member = await this.requireOwnedMember(userId, memberId);
+		if (
+			(member.role === "OWNER" || member.isOwner) &&
+			(input.role || input.status)
+		) {
+			throw new BadRequestException(
+				"The owner can only be changed by ownership transfer.",
+			);
+		}
+		const changes: Partial<typeof organizationAdmins.$inferInsert> = {
+			updatedAt: new Date(),
+		};
 
-		const [updated] = await this.db
-			.update(organizationAdmins)
-			.set({ designation: input.designation ?? null })
-			.where(eq(organizationAdmins.id, member.id))
-			.returning();
+		if (input.role && input.role !== member.role) {
+			this.assertCanChangeRole(
+				"role" in actor ? actor.role : "OWNER",
+				member.role,
+				input.role,
+			);
+			changes.role = input.role;
+			changes.isOwner = false;
+		}
+		if ("designation" in input) changes.designation = input.designation ?? null;
+		if (input.isPublic !== undefined) changes.isPublic = input.isPublic;
+		if (input.status !== undefined) changes.status = input.status;
+
+		const updated = takeFirstOrThrow(
+			await this.db
+				.update(organizationAdmins)
+				.set(changes)
+				.where(eq(organizationAdmins.id, member.id))
+				.returning(),
+			"update team member",
+		);
+
+		void this.audit.record({
+			performedBy: userId,
+			action: input.role ? "CHANGE_TEAM_ROLE" : "UPDATE_ORG_ADMIN",
+			entityName: "ORGANIZATION_ADMIN",
+			entityId: member.id,
+			oldValue: {
+				role: member.role,
+				designation: member.designation,
+				isPublic: member.isPublic,
+			},
+			newValue: input,
+		});
 
 		return updated;
 	}
 
 	async removeAdmin(userId: string, memberId: string) {
+		await this.requireTeamPermission(userId, "team.remove");
 		const member = await this.requireOwnedMember(userId, memberId);
 
-		// Removing the owner would leave the organization unmanageable.
-		if (member.isOwner) {
+		if (member.role === "OWNER" || member.isOwner) {
 			throw new BadRequestException(
-				"The owner cannot be removed from the team.",
+				"The owner cannot be removed from the team. Transfer ownership first.",
 			);
 		}
+		await this.assertCanRemove(userId, member);
 
 		await this.db
-			.delete(organizationAdmins)
+			.update(organizationAdmins)
+			.set({ status: "REMOVED", leftAt: new Date(), updatedAt: new Date() })
 			.where(eq(organizationAdmins.id, member.id));
 
 		void this.audit.record({
 			performedBy: userId,
-			action: "REMOVE_ORG_ADMIN",
+			action: "REMOVE_TEAM_MEMBER",
 			entityName: "ORGANIZATION_ADMIN",
 			entityId: memberId,
+			oldValue: { role: member.role, status: member.status },
+			newValue: { status: "REMOVED" },
 		});
 
 		return { removed: true };
+	}
+
+	async leaveTeam(userId: string) {
+		const membership =
+			await this.organizationsService.getActiveMembership(userId);
+		if (!membership) throw new NotFoundException("Team membership not found.");
+		if (membership.role === "OWNER") {
+			throw new BadRequestException(
+				"The owner must transfer ownership before leaving.",
+			);
+		}
+
+		await this.db
+			.update(organizationAdmins)
+			.set({ status: "LEFT", leftAt: new Date(), updatedAt: new Date() })
+			.where(eq(organizationAdmins.id, membership.id));
+
+		void this.audit.record({
+			performedBy: userId,
+			action: "LEAVE_ORG_TEAM",
+			entityName: "ORGANIZATION_ADMIN",
+			entityId: membership.id,
+			oldValue: { status: "ACTIVE" },
+			newValue: { status: "LEFT" },
+		});
+
+		return { left: true };
+	}
+
+	async requestOwnershipTransfer(userId: string, toMemberId: string) {
+		const membership = await this.requireOwner(userId);
+		if (!("id" in membership)) {
+			throw new BadRequestException("Owner membership row is missing.");
+		}
+		const target = await this.requireOwnedMember(userId, toMemberId);
+		if (target.role !== "ADMIN" || target.status !== "ACTIVE") {
+			throw new BadRequestException(
+				"Ownership can only be transferred to an active admin.",
+			);
+		}
+
+		const token = this.generateToken();
+		const transfer = takeFirstOrThrow(
+			await this.db
+				.insert(organizationOwnershipTransfers)
+				.values({
+					organizationId: membership.organization.id,
+					fromMemberId: membership.id,
+					toMemberId: target.id,
+					requestedBy: userId,
+					tokenHash: this.hashToken(token),
+					expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+				})
+				.returning(),
+			"request ownership transfer",
+		);
+
+		void this.audit.record({
+			performedBy: userId,
+			action: "REQUEST_ORG_OWNERSHIP_TRANSFER",
+			entityName: "ORGANIZATION_OWNERSHIP_TRANSFER",
+			entityId: transfer.id,
+			newValue: { toMemberId: target.id },
+		});
+
+		return { ...transfer, token };
+	}
+
+	async confirmOwnershipTransfer(
+		userId: string,
+		input: ConfirmOwnershipTransferInput,
+	) {
+		const transfer = await this.requireTransferByToken(input.token);
+		if (transfer.status !== "PENDING") {
+			throw new ConflictException(
+				"This ownership transfer has already been used.",
+			);
+		}
+		if (transfer.expiresAt.getTime() <= Date.now()) {
+			await this.expireTransfer(transfer.id);
+			throw new BadRequestException("This ownership transfer has expired.");
+		}
+
+		const target = await this.db.query.organizationAdmins.findFirst({
+			where: eq(organizationAdmins.id, transfer.toMemberId),
+		});
+		if (
+			!target ||
+			target.userId !== userId ||
+			target.status !== "ACTIVE" ||
+			target.role !== "ADMIN"
+		) {
+			throw new ForbiddenException(
+				"Only the target active admin can confirm this transfer.",
+			);
+		}
+
+		await this.db.transaction(async (tx) => {
+			await tx
+				.update(organizations)
+				.set({ ownerUserId: target.userId, updatedAt: new Date() })
+				.where(eq(organizations.id, transfer.organizationId));
+			await tx
+				.update(organizationAdmins)
+				.set({ role: "ADMIN", isOwner: false, updatedAt: new Date() })
+				.where(eq(organizationAdmins.id, transfer.fromMemberId));
+			await tx
+				.update(organizationAdmins)
+				.set({ role: "OWNER", isOwner: true, updatedAt: new Date() })
+				.where(eq(organizationAdmins.id, transfer.toMemberId));
+			await tx
+				.update(organizationOwnershipTransfers)
+				.set({
+					status: "CONFIRMED",
+					confirmedBy: userId,
+					confirmedAt: new Date(),
+					updatedAt: new Date(),
+				})
+				.where(eq(organizationOwnershipTransfers.id, transfer.id));
+		});
+
+		void this.audit.record({
+			performedBy: userId,
+			action: "TRANSFER_ORG_OWNERSHIP",
+			entityName: "ORGANIZATION",
+			entityId: transfer.organizationId,
+			oldValue: { fromMemberId: transfer.fromMemberId },
+			newValue: { toMemberId: transfer.toMemberId },
+		});
+
+		return { transferred: true };
 	}
 
 	// ─── Internals ───────────────────────────────────────────────────────────
@@ -418,6 +897,203 @@ export class PublishingService {
 		}
 
 		return member;
+	}
+
+	private async requireTeamPermission(
+		userId: string,
+		action: Parameters<OrganizationsService["requireOrgPermission"]>[1],
+	) {
+		return this.organizationsService.requireOrgPermission(userId, action);
+	}
+
+	private async requireOwner(userId: string) {
+		const membership =
+			await this.organizationsService.getActiveMembership(userId);
+		if (!membership) {
+			const organization =
+				await this.organizationsService.requireOwnedOrganization(userId);
+			return { organization };
+		}
+		if (membership.role !== "OWNER") {
+			throw new ForbiddenException("Only the owner can transfer ownership.");
+		}
+		return membership;
+	}
+
+	private async addActiveMember(input: {
+		organizationId: string;
+		userId: string;
+		role: Exclude<TeamRole, "OWNER">;
+		designation: string | null;
+		invitedBy: string | null;
+	}) {
+		const existing = await this.db.query.organizationAdmins.findFirst({
+			where: and(
+				eq(organizationAdmins.organizationId, input.organizationId),
+				eq(organizationAdmins.userId, input.userId),
+				eq(organizationAdmins.status, "ACTIVE"),
+			),
+		});
+		if (existing) throw new ConflictException("They're already on your team.");
+
+		return takeFirstOrThrow(
+			await this.db
+				.insert(organizationAdmins)
+				.values({
+					organizationId: input.organizationId,
+					userId: input.userId,
+					designation: input.designation,
+					role: input.role,
+					status: "ACTIVE",
+					isOwner: false,
+					invitedBy: input.invitedBy,
+					invitedAt: new Date(),
+				})
+				.returning(),
+			"add organization admin",
+		);
+	}
+
+	private async assertCanGrantRole(
+		actorUserId: string,
+		organizationId: string,
+		role: TeamRole,
+	) {
+		const actor = await this.db.query.organizationAdmins.findFirst({
+			where: and(
+				eq(organizationAdmins.organizationId, organizationId),
+				eq(organizationAdmins.userId, actorUserId),
+				eq(organizationAdmins.status, "ACTIVE"),
+			),
+		});
+		const actorRole = actor?.role ?? "OWNER";
+		if (role === "OWNER") {
+			throw new BadRequestException(
+				"Ownership can only be changed by transfer.",
+			);
+		}
+		if (actorRole === "ADMIN" && role === "ADMIN") {
+			throw new ForbiddenException("Only the owner can invite another admin.");
+		}
+	}
+
+	private async assertCanChangeRole(
+		actorRole: TeamRole,
+		currentRole: TeamRole,
+		nextRole: Exclude<TeamRole, "OWNER">,
+	) {
+		if (currentRole === "OWNER") {
+			throw new BadRequestException(
+				"The owner can only be changed by transfer.",
+			);
+		}
+		if (
+			actorRole === "ADMIN" &&
+			(currentRole === "ADMIN" || nextRole === "ADMIN")
+		) {
+			throw new ForbiddenException("Only the owner can change admin roles.");
+		}
+	}
+
+	private async assertCanRemove(
+		userId: string,
+		member: typeof organizationAdmins.$inferSelect,
+	) {
+		const actor = await this.db.query.organizationAdmins.findFirst({
+			where: and(
+				eq(organizationAdmins.organizationId, member.organizationId),
+				eq(organizationAdmins.userId, userId),
+				eq(organizationAdmins.status, "ACTIVE"),
+			),
+		});
+		const actorRole = actor?.role ?? "OWNER";
+		if (actorRole === "ADMIN" && member.role === "ADMIN") {
+			throw new ForbiddenException("Only the owner can remove another admin.");
+		}
+	}
+
+	private async requireInviteInOrg(inviteId: string, organizationId: string) {
+		const invite = await this.db.query.teamInvites.findFirst({
+			where: eq(teamInvites.id, inviteId),
+		});
+		if (!invite) throw new NotFoundException("Team invite not found.");
+		if (invite.organizationId !== organizationId) {
+			throw new ForbiddenException(
+				"That invite belongs to another organization.",
+			);
+		}
+		return invite;
+	}
+
+	private async requireInviteByToken(token: string) {
+		const tokenHash = this.hashToken(token);
+		const invite = await this.db.query.teamInvites.findFirst({
+			where: eq(teamInvites.tokenHash, tokenHash),
+		});
+		if (!invite || !this.constantTimeEqual(invite.tokenHash, tokenHash)) {
+			throw new NotFoundException("Invite link not found.");
+		}
+		return invite;
+	}
+
+	private async requireTransferByToken(token: string) {
+		const tokenHash = this.hashToken(token);
+		const transfer =
+			await this.db.query.organizationOwnershipTransfers.findFirst({
+				where: eq(organizationOwnershipTransfers.tokenHash, tokenHash),
+			});
+		if (!transfer || !this.constantTimeEqual(transfer.tokenHash, tokenHash)) {
+			throw new NotFoundException("Ownership transfer link not found.");
+		}
+		return transfer;
+	}
+
+	private assertPendingInvite(invite: typeof teamInvites.$inferSelect) {
+		if (invite.status === "ACCEPTED") {
+			throw new ConflictException("This invite has already been accepted.");
+		}
+		if (invite.status === "REVOKED") {
+			throw new BadRequestException("This invite has been revoked.");
+		}
+		if (invite.status === "DECLINED") {
+			throw new BadRequestException("This invite has been declined.");
+		}
+		if (
+			invite.status === "EXPIRED" ||
+			invite.expiresAt.getTime() <= Date.now()
+		) {
+			throw new BadRequestException("This invite has expired.");
+		}
+	}
+
+	private async expireTransfer(transferId: string) {
+		await this.db
+			.update(organizationOwnershipTransfers)
+			.set({ status: "EXPIRED", updatedAt: new Date() })
+			.where(eq(organizationOwnershipTransfers.id, transferId));
+	}
+
+	private async requireUser(userId: string) {
+		const user = await this.db.query.users.findFirst({
+			where: eq(users.id, userId),
+			columns: { id: true, email: true, fullName: true },
+		});
+		if (!user) throw new NotFoundException("User not found.");
+		return user;
+	}
+
+	private generateToken() {
+		return randomBytes(32).toString("base64url");
+	}
+
+	private hashToken(token: string) {
+		return createHash("sha256").update(token).digest("hex");
+	}
+
+	private constantTimeEqual(a: string, b: string) {
+		const left = Buffer.from(a);
+		const right = Buffer.from(b);
+		return left.length === right.length && timingSafeEqual(left, right);
 	}
 
 	/** Fans an update out to everyone who bookmarked the organization. */

@@ -154,6 +154,8 @@ export class OnboardingService {
 				organizationId: created.id,
 				userId: user.id,
 				designation: "Owner",
+				role: "OWNER",
+				status: "ACTIVE",
 				isOwner: true,
 			});
 

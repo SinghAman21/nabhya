@@ -54,6 +54,11 @@ export const notificationTypeSchema = z.enum([
 	"DONATION_RECEIVED",
 	"NEW_REVIEW",
 	"BROADCAST",
+	"TEAM_INVITE",
+	"TEAM_INVITE_ACCEPTED",
+	"TEAM_ROLE_CHANGED",
+	"TEAM_REMOVED",
+	"OWNERSHIP_TRANSFERRED",
 ]);
 
 export type NotificationType = z.infer<typeof notificationTypeSchema>;

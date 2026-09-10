@@ -249,6 +249,7 @@ export class DonationsService {
 
 	/** What the receiving organization sees. Only settled money is listed. */
 	async listForMyOrganization(userId: string, query: DonationQuery) {
+		await this.organizationsService.requireOrgPermission(userId, "money.view");
 		const organization =
 			await this.organizationsService.requireOwnedOrganization(userId);
 

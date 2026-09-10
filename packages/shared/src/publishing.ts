@@ -76,19 +76,146 @@ export function formatFinancialYear(year: number): string {
 
 // ─── Organization team ───────────────────────────────────────────────────────
 
-export const inviteOrgAdminSchema = z.object({
-	/** The person must already have an account — we never create one silently. */
-	email: z.email("Enter a valid email"),
+export const teamRoleSchema = z.enum([
+	"OWNER",
+	"ADMIN",
+	"MANAGER",
+	"MEMBER",
+	"VIEWER",
+]);
+export type TeamRole = z.infer<typeof teamRoleSchema>;
+
+export const teamStatusSchema = z.enum([
+	"ACTIVE",
+	"SUSPENDED",
+	"LEFT",
+	"REMOVED",
+]);
+export type TeamStatus = z.infer<typeof teamStatusSchema>;
+
+export const teamInviteStatusSchema = z.enum([
+	"PENDING",
+	"ACCEPTED",
+	"DECLINED",
+	"REVOKED",
+	"EXPIRED",
+]);
+export type TeamInviteStatus = z.infer<typeof teamInviteStatusSchema>;
+
+export const orgPermissionActionSchema = z.enum([
+	"team.invite",
+	"team.remove",
+	"team.changeRole",
+	"content.publish",
+	"content.delete",
+	"people.review",
+	"people.attendance",
+	"certs.issue",
+	"certs.revoke",
+	"money.view",
+	"reports.manage",
+	"org.edit",
+]);
+export type OrgPermissionAction = z.infer<typeof orgPermissionActionSchema>;
+
+export const ROLE_PERMISSIONS = {
+	OWNER: orgPermissionActionSchema.options,
+	ADMIN: [
+		"team.invite",
+		"team.remove",
+		"team.changeRole",
+		"content.publish",
+		"content.delete",
+		"people.review",
+		"people.attendance",
+		"certs.issue",
+		"certs.revoke",
+		"money.view",
+		"reports.manage",
+		"org.edit",
+	],
+	MANAGER: [
+		"content.publish",
+		"content.delete",
+		"people.review",
+		"people.attendance",
+		"certs.issue",
+		"org.edit",
+	],
+	MEMBER: ["people.attendance"],
+	VIEWER: ["money.view"],
+} as const satisfies Record<TeamRole, readonly OrgPermissionAction[]>;
+
+export const canTeamRole = (
+	role: TeamRole,
+	action: OrgPermissionAction,
+): boolean =>
+	(ROLE_PERMISSIONS[role] as readonly OrgPermissionAction[]).includes(action);
+
+export const inviteTeamMemberSchema = z.object({
+	email: z
+		.email("Enter a valid email")
+		.transform((email) => email.toLowerCase()),
+	role: teamRoleSchema.exclude(["OWNER"]),
 	designation: optionalText(80),
 });
 
-export type InviteOrgAdminInput = z.infer<typeof inviteOrgAdminSchema>;
+export type InviteTeamMemberInput = z.infer<typeof inviteTeamMemberSchema>;
 
-export const updateOrgAdminSchema = z.object({
-	designation: optionalText(80),
+export const teamInviteTokenSchema = z.object({
+	token: z.string().trim().min(32).max(256),
 });
+
+export type TeamInviteTokenInput = z.infer<typeof teamInviteTokenSchema>;
+
+export const updateOrgAdminSchema = z
+	.object({
+		role: teamRoleSchema.exclude(["OWNER"]).optional(),
+		designation: optionalText(80).optional(),
+		isPublic: z.boolean().optional(),
+		status: teamStatusSchema.exclude(["LEFT", "REMOVED"]).optional(),
+	})
+	.refine((value) => Object.keys(value).length > 0, {
+		message: "Change at least one team member field",
+	});
 
 export type UpdateOrgAdminInput = z.infer<typeof updateOrgAdminSchema>;
+
+export const teamListQuerySchema = z.object({
+	status: teamStatusSchema.default("ACTIVE"),
+	includeLeft: z.coerce.boolean().default(false),
+});
+
+export type TeamListQuery = z.infer<typeof teamListQuerySchema>;
+
+export const transferOwnershipSchema = z.object({
+	toMemberId: z.uuid(),
+});
+
+export type TransferOwnershipInput = z.infer<typeof transferOwnershipSchema>;
+
+export const confirmOwnershipTransferSchema = z.object({
+	token: z.string().trim().min(32).max(256),
+});
+
+export type ConfirmOwnershipTransferInput = z.infer<
+	typeof confirmOwnershipTransferSchema
+>;
+
+/**
+ * Back-compat for the legacy POST /org/team route. It becomes a thin wrapper
+ * around invites during the migration and must never create accounts silently.
+ */
+export const inviteOrgAdminSchema = z.object({
+	/** Legacy add-member path: keep accepting existing callers without role. */
+	email: z
+		.email("Enter a valid email")
+		.transform((email) => email.toLowerCase()),
+	role: teamRoleSchema.exclude(["OWNER"]).default("MEMBER"),
+	designation: optionalText(80),
+});
+
+export type InviteOrgAdminInput = z.input<typeof inviteOrgAdminSchema>;
 
 // ─── Proximity ───────────────────────────────────────────────────────────────
 

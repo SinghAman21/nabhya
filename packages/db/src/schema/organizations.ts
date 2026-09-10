@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
 	boolean,
 	decimal,
@@ -44,6 +44,32 @@ export const orgTypeEnum = pgEnum("org_type", [
 	"SOCIETY",
 	"SECTION_8",
 	"OTHERS",
+]);
+export const teamRoleEnum = pgEnum("team_role", [
+	"OWNER",
+	"ADMIN",
+	"MANAGER",
+	"MEMBER",
+	"VIEWER",
+]);
+export const teamStatusEnum = pgEnum("team_status", [
+	"ACTIVE",
+	"SUSPENDED",
+	"LEFT",
+	"REMOVED",
+]);
+export const teamInviteStatusEnum = pgEnum("team_invite_status", [
+	"PENDING",
+	"ACCEPTED",
+	"DECLINED",
+	"REVOKED",
+	"EXPIRED",
+]);
+export const ownershipTransferStatusEnum = pgEnum("ownership_transfer_status", [
+	"PENDING",
+	"CONFIRMED",
+	"CANCELLED",
+	"EXPIRED",
 ]);
 
 // ─── Organization Table ──────────────────────────────────────────────────────
@@ -99,18 +125,129 @@ export const organizations = pgTable(
 );
 
 // ─── OrganizationAdmin Table ─────────────────────────────────────────────────
-export const organizationAdmins = pgTable("organization_admins", {
-	id: uuid("id").primaryKey().defaultRandom(),
-	organizationId: uuid("organization_id")
-		.notNull()
-		.references(() => organizations.id, { onDelete: "cascade" }),
-	userId: uuid("user_id")
-		.notNull()
-		.references(() => users.id, { onDelete: "cascade" }),
-	designation: varchar("designation"),
-	isOwner: boolean("is_owner").default(false),
-	joinedAt: timestamp("joined_at").defaultNow().notNull(),
-});
+export const organizationAdmins = pgTable(
+	"organization_admins",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		organizationId: uuid("organization_id")
+			.notNull()
+			.references(() => organizations.id, { onDelete: "cascade" }),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		designation: varchar("designation", { length: 80 }),
+		role: teamRoleEnum("role").default("MEMBER").notNull(),
+		status: teamStatusEnum("status").default("ACTIVE").notNull(),
+		isOwner: boolean("is_owner").default(false),
+		isPublic: boolean("is_public").default(false).notNull(),
+		invitedBy: uuid("invited_by").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		invitedAt: timestamp("invited_at"),
+		lastActiveAt: timestamp("last_active_at"),
+		joinedAt: timestamp("joined_at").defaultNow().notNull(),
+		leftAt: timestamp("left_at"),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(table) => [
+		uniqueIndex("organization_admins_active_member_unique")
+			.on(table.organizationId, table.userId)
+			.where(sql`${table.status} = 'ACTIVE'`),
+		uniqueIndex("organization_admins_one_active_owner_per_org")
+			.on(table.organizationId)
+			.where(sql`${table.role} = 'OWNER' and ${table.status} = 'ACTIVE'`),
+		uniqueIndex("organization_admins_one_active_owner_per_user")
+			.on(table.userId)
+			.where(sql`${table.role} = 'OWNER' and ${table.status} = 'ACTIVE'`),
+		index("organization_admins_organization_status_idx").on(
+			table.organizationId,
+			table.status,
+		),
+		index("organization_admins_user_status_idx").on(table.userId, table.status),
+	],
+);
+
+// ─── TeamInvite Table ────────────────────────────────────────────────────────
+export const teamInvites = pgTable(
+	"team_invites",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		organizationId: uuid("organization_id")
+			.notNull()
+			.references(() => organizations.id, { onDelete: "cascade" }),
+		email: varchar("email", { length: 320 }).notNull(),
+		role: teamRoleEnum("role").notNull(),
+		designation: varchar("designation", { length: 80 }),
+		tokenHash: text("token_hash").notNull(),
+		invitedBy: uuid("invited_by").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		status: teamInviteStatusEnum("status").default("PENDING").notNull(),
+		expiresAt: timestamp("expires_at").notNull(),
+		acceptedBy: uuid("accepted_by").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		acceptedAt: timestamp("accepted_at"),
+		declinedAt: timestamp("declined_at"),
+		revokedAt: timestamp("revoked_at"),
+		resentCount: integer("resent_count").default(0).notNull(),
+		lastSentAt: timestamp("last_sent_at"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(table) => [
+		uniqueIndex("team_invites_token_hash_unique").on(table.tokenHash),
+		uniqueIndex("team_invites_pending_email_per_org_unique")
+			.on(table.organizationId, table.email)
+			.where(sql`${table.status} = 'PENDING'`),
+		index("team_invites_organization_status_idx").on(
+			table.organizationId,
+			table.status,
+		),
+		index("team_invites_email_status_idx").on(table.email, table.status),
+		index("team_invites_expires_at_idx").on(table.expiresAt),
+	],
+);
+
+// ─── OwnershipTransfer Table ─────────────────────────────────────────────────
+export const organizationOwnershipTransfers = pgTable(
+	"organization_ownership_transfers",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		organizationId: uuid("organization_id")
+			.notNull()
+			.references(() => organizations.id, { onDelete: "cascade" }),
+		fromMemberId: uuid("from_member_id")
+			.notNull()
+			.references(() => organizationAdmins.id, { onDelete: "cascade" }),
+		toMemberId: uuid("to_member_id")
+			.notNull()
+			.references(() => organizationAdmins.id, { onDelete: "cascade" }),
+		requestedBy: uuid("requested_by").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		confirmedBy: uuid("confirmed_by").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		tokenHash: text("token_hash").notNull(),
+		status: ownershipTransferStatusEnum("status").default("PENDING").notNull(),
+		expiresAt: timestamp("expires_at").notNull(),
+		confirmedAt: timestamp("confirmed_at"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(table) => [
+		uniqueIndex("organization_ownership_transfers_token_hash_unique").on(
+			table.tokenHash,
+		),
+		uniqueIndex("organization_ownership_transfers_pending_org_unique")
+			.on(table.organizationId)
+			.where(sql`${table.status} = 'PENDING'`),
+		index("organization_ownership_transfers_to_member_idx").on(
+			table.toMemberId,
+		),
+	],
+);
 
 // ─── OrganizationDocument Table ──────────────────────────────────────────────
 export const organizationDocuments = pgTable("organization_documents", {
@@ -138,6 +275,8 @@ export const organizationsRelations = relations(
 			references: [users.id],
 		}),
 		admins: many(organizationAdmins),
+		teamInvites: many(teamInvites),
+		ownershipTransfers: many(organizationOwnershipTransfers),
 		documents: many(organizationDocuments),
 		events: many(events),
 		needs: many(needs),
@@ -147,7 +286,7 @@ export const organizationsRelations = relations(
 
 export const organizationAdminsRelations = relations(
 	organizationAdmins,
-	({ one }) => ({
+	({ one, many }) => ({
 		organization: one(organizations, {
 			fields: [organizationAdmins.organizationId],
 			references: [organizations.id],
@@ -155,6 +294,65 @@ export const organizationAdminsRelations = relations(
 		user: one(users, {
 			fields: [organizationAdmins.userId],
 			references: [users.id],
+			relationName: "organizationAdminUser",
+		}),
+		inviter: one(users, {
+			fields: [organizationAdmins.invitedBy],
+			references: [users.id],
+			relationName: "organizationAdminInviter",
+		}),
+		outgoingOwnershipTransfers: many(organizationOwnershipTransfers, {
+			relationName: "ownershipTransferFromMember",
+		}),
+		incomingOwnershipTransfers: many(organizationOwnershipTransfers, {
+			relationName: "ownershipTransferToMember",
+		}),
+	}),
+);
+
+export const teamInvitesRelations = relations(teamInvites, ({ one }) => ({
+	organization: one(organizations, {
+		fields: [teamInvites.organizationId],
+		references: [organizations.id],
+	}),
+	inviter: one(users, {
+		fields: [teamInvites.invitedBy],
+		references: [users.id],
+		relationName: "teamInviteInviter",
+	}),
+	acceptedByUser: one(users, {
+		fields: [teamInvites.acceptedBy],
+		references: [users.id],
+		relationName: "teamInviteAcceptedBy",
+	}),
+}));
+
+export const organizationOwnershipTransfersRelations = relations(
+	organizationOwnershipTransfers,
+	({ one }) => ({
+		organization: one(organizations, {
+			fields: [organizationOwnershipTransfers.organizationId],
+			references: [organizations.id],
+		}),
+		fromMember: one(organizationAdmins, {
+			fields: [organizationOwnershipTransfers.fromMemberId],
+			references: [organizationAdmins.id],
+			relationName: "ownershipTransferFromMember",
+		}),
+		toMember: one(organizationAdmins, {
+			fields: [organizationOwnershipTransfers.toMemberId],
+			references: [organizationAdmins.id],
+			relationName: "ownershipTransferToMember",
+		}),
+		requester: one(users, {
+			fields: [organizationOwnershipTransfers.requestedBy],
+			references: [users.id],
+			relationName: "ownershipTransferRequester",
+		}),
+		confirmer: one(users, {
+			fields: [organizationOwnershipTransfers.confirmedBy],
+			references: [users.id],
+			relationName: "ownershipTransferConfirmer",
 		}),
 	}),
 );

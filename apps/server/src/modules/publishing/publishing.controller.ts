@@ -1,14 +1,22 @@
 import type {
+	ConfirmOwnershipTransferInput,
 	CreateFinancialReportInput,
 	InviteOrgAdminInput,
+	InviteTeamMemberInput,
 	PaginationQuery,
+	TeamListQuery,
+	TransferOwnershipInput,
 	UpdateOrgAdminInput,
 	UpsertAnnouncementInput,
 } from "@nabhya/shared";
 import {
+	confirmOwnershipTransferSchema,
 	createFinancialReportSchema,
 	inviteOrgAdminSchema,
+	inviteTeamMemberSchema,
 	paginationQuerySchema,
+	teamListQuerySchema,
+	transferOwnershipSchema,
 	updateOrgAdminSchema,
 	upsertAnnouncementSchema,
 } from "@nabhya/shared";
@@ -140,16 +148,19 @@ export class PublishingController {
 	@Get("org/team")
 	@Roles("organisation")
 	@ApiBearerAuth("access-token")
-	@ApiOperation({ summary: "The organization's admins" })
-	listTeam(@CurrentUser() user: AuthUser) {
-		return this.publishing.listTeam(user.id);
+	@ApiOperation({ summary: "The organization's team members" })
+	listTeam(
+		@CurrentUser() user: AuthUser,
+		@Query(new ZodValidationPipe(teamListQuerySchema)) query: TeamListQuery,
+	) {
+		return this.publishing.listTeam(user.id, query);
 	}
 
 	@Post("org/team")
 	@Roles("organisation")
 	@ApiBearerAuth("access-token")
 	@ApiOperation({
-		summary: "Add an existing Nabhya account to the team",
+		summary: "Legacy add-existing-account team member route",
 	})
 	inviteAdmin(
 		@CurrentUser() user: AuthUser,
@@ -157,6 +168,107 @@ export class PublishingController {
 		body: InviteOrgAdminInput,
 	) {
 		return this.publishing.inviteAdmin(user.id, body);
+	}
+
+	@Post("org/team/invites")
+	@Roles("organisation")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({ summary: "Invite someone to join the organization's team" })
+	createTeamInvite(
+		@CurrentUser() user: AuthUser,
+		@Body(new ZodValidationPipe(inviteTeamMemberSchema))
+		body: InviteTeamMemberInput,
+	) {
+		return this.publishing.createTeamInvite(user.id, body);
+	}
+
+	@Get("org/team/invites")
+	@Roles("organisation")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({ summary: "List pending team invites" })
+	listTeamInvites(@CurrentUser() user: AuthUser) {
+		return this.publishing.listTeamInvites(user.id);
+	}
+
+	@Delete("org/team/invites/:id")
+	@Roles("organisation")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({ summary: "Revoke a pending team invite" })
+	revokeTeamInvite(
+		@CurrentUser() user: AuthUser,
+		@Param("id", ParseUUIDPipe) id: string,
+	) {
+		return this.publishing.revokeTeamInvite(user.id, id);
+	}
+
+	@Post("org/team/invites/:id/resend")
+	@Roles("organisation")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({ summary: "Regenerate and resend a team invite link" })
+	resendTeamInvite(
+		@CurrentUser() user: AuthUser,
+		@Param("id", ParseUUIDPipe) id: string,
+	) {
+		return this.publishing.resendTeamInvite(user.id, id);
+	}
+
+	@Post("team/invites/:token/accept")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({ summary: "Accept a team invite" })
+	acceptTeamInvite(
+		@CurrentUser() user: AuthUser,
+		@Param("token") token: string,
+	) {
+		return this.publishing.acceptTeamInvite(user.id, token);
+	}
+
+	@Post("team/invites/:token/decline")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({ summary: "Decline a team invite" })
+	declineTeamInvite(
+		@CurrentUser() user: AuthUser,
+		@Param("token") token: string,
+	) {
+		return this.publishing.declineTeamInvite(user.id, token);
+	}
+
+	@Post("org/team/leave")
+	@Roles("organisation")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({ summary: "Leave the current organization team" })
+	leaveTeam(@CurrentUser() user: AuthUser) {
+		return this.publishing.leaveTeam(user.id);
+	}
+
+	@Post("org/team/transfer")
+	@Roles("organisation")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({ summary: "Request an ownership transfer" })
+	requestOwnershipTransfer(
+		@CurrentUser() user: AuthUser,
+		@Body(new ZodValidationPipe(transferOwnershipSchema))
+		body: TransferOwnershipInput,
+	) {
+		return this.publishing.requestOwnershipTransfer(user.id, body.toMemberId);
+	}
+
+	@Post("org/team/transfer/confirm")
+	@Roles("organisation")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({ summary: "Confirm an ownership transfer" })
+	confirmOwnershipTransfer(
+		@CurrentUser() user: AuthUser,
+		@Body(new ZodValidationPipe(confirmOwnershipTransferSchema))
+		body: ConfirmOwnershipTransferInput,
+	) {
+		return this.publishing.confirmOwnershipTransfer(user.id, body);
+	}
+
+	@Public()
+	@Get("organizations/:id/team")
+	@ApiOperation({ summary: "An organization's public team members" })
+	listPublicTeam(@Param("id", ParseUUIDPipe) id: string) {
+		return this.publishing.listPublicTeam(id);
 	}
 
 	@Patch("org/team/:id")

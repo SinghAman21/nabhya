@@ -104,6 +104,11 @@ export const notificationTypeEnum = pgEnum("notification_type", [
 	"DONATION_RECEIVED",
 	"NEW_REVIEW",
 	"BROADCAST",
+	"TEAM_INVITE",
+	"TEAM_INVITE_ACCEPTED",
+	"TEAM_ROLE_CHANGED",
+	"TEAM_REMOVED",
+	"OWNERSHIP_TRANSFERRED",
 ]);
 
 /**

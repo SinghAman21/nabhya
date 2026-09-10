@@ -259,7 +259,7 @@ describe("HTTP surface", () => {
 	it("exposes the expected number of endpoints", () => {
 		// A bare count, so adding or deleting a route is a deliberate act that
 		// shows up in the diff rather than passing unnoticed.
-		expect(routes.length).toBe(103);
+		expect(routes.length).toBe(113);
 	});
 
 	it("mounts every route under the /api prefix", () => {
@@ -377,6 +377,7 @@ describe("HTTP surface", () => {
 				"GET /api/organizations/:id/impact",
 				"GET /api/organizations/:id/reports",
 				"GET /api/organizations/:id/reviews",
+				"GET /api/organizations/:id/team",
 				"GET /api/organizations/nearby",
 				"POST /api/donations/webhook",
 			].sort(),

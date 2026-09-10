@@ -233,7 +233,13 @@ export class EventsService {
 	}
 
 	async create(userId: string, input: CreateEventInput) {
-		// Drafting is always allowed; publishing to the public feed is not.
+		// Drafting is allowed for active members; publishing is permission-gated.
+		if (input.status === "PUBLISHED") {
+			await this.organizationsService.requireOrgPermission(
+				userId,
+				"content.publish",
+			);
+		}
 		const organization =
 			input.status === "PUBLISHED"
 				? await this.organizationsService.requireVerifiedOrganization(userId)
@@ -286,6 +292,10 @@ export class EventsService {
 		const { event } = await this.requireOwnedEvent(userId, eventId);
 
 		if (input.status === "PUBLISHED" && event.status !== "PUBLISHED") {
+			await this.organizationsService.requireOrgPermission(
+				userId,
+				"content.publish",
+			);
 			await this.organizationsService.requireVerifiedOrganization(userId);
 		}
 
@@ -322,6 +332,10 @@ export class EventsService {
 	}
 
 	async remove(userId: string, eventId: string) {
+		await this.organizationsService.requireOrgPermission(
+			userId,
+			"content.delete",
+		);
 		const { event } = await this.requireOwnedEvent(userId, eventId);
 
 		// Volunteers have already been told they're in — cancel, don't delete.
@@ -621,6 +635,10 @@ export class EventsService {
 		applicationId: string,
 		input: ReviewApplicationInput,
 	) {
+		await this.organizationsService.requireOrgPermission(
+			userId,
+			"people.review",
+		);
 		await this.requireOwnedEvent(userId, eventId);
 
 		const result = await this.db.transaction(async (tx) => {

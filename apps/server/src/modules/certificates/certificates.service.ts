@@ -59,6 +59,10 @@ export class CertificatesService {
 		applicationId: string,
 		input: MarkAttendanceInput,
 	) {
+		await this.organizationsService.requireOrgPermission(
+			userId,
+			"people.attendance",
+		);
 		const organization =
 			await this.organizationsService.requireOwnedOrganization(userId);
 
@@ -129,6 +133,7 @@ export class CertificatesService {
 		applicationId: string,
 		input: IssueCertificateInput,
 	) {
+		await this.organizationsService.requireOrgPermission(userId, "certs.issue");
 		const organization =
 			await this.organizationsService.requireOwnedOrganization(userId);
 
@@ -207,6 +212,10 @@ export class CertificatesService {
 		certificateId: string,
 		input: RevokeCertificateInput,
 	) {
+		await this.organizationsService.requireOrgPermission(
+			userId,
+			"certs.revoke",
+		);
 		const organization =
 			await this.organizationsService.requireOwnedOrganization(userId);
 

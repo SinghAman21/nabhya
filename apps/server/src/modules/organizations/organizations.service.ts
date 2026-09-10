@@ -1,15 +1,18 @@
 import type { db as dbType } from "@nabhya/db";
 import {
+	organizationAdmins,
 	organizationCategories,
 	organizationDocuments,
 	organizations,
 } from "@nabhya/db/schema";
 import type {
 	NearbyQuery,
+	OrgPermissionAction,
 	PaginationQuery,
 	UpdateOrganizationInput,
 	UploadOrgDocumentInput,
 } from "@nabhya/shared";
+import { canTeamRole } from "@nabhya/shared";
 import {
 	ForbiddenException,
 	Inject,
@@ -37,6 +40,27 @@ export class OrganizationsService {
 	 * funnels through here so ownership is checked in exactly one place.
 	 */
 	async requireOwnedOrganization(userId: string) {
+		const membership = await this.getActiveMembership(userId);
+
+		if (membership) {
+			return membership.organization;
+		}
+
+		const inactiveMembership = await this.db.query.organizationAdmins.findFirst(
+			{
+				where: eq(organizationAdmins.userId, userId),
+				columns: { id: true, status: true },
+			},
+		);
+		if (inactiveMembership) {
+			throw new ForbiddenException(
+				"Your team membership is not active for this organization.",
+			);
+		}
+
+		// Backward-compatible fallback for older data/tests that have an owner_user_id
+		// but no organization_admins row yet. Onboarding and the team migration both
+		// create OWNER rows, so new data should normally take the membership path above.
 		const organization = await this.db.query.organizations.findFirst({
 			where: eq(organizations.ownerUserId, userId),
 		});
@@ -54,6 +78,57 @@ export class OrganizationsService {
 		}
 
 		return organization;
+	}
+
+	async requireOrgPermission(userId: string, action: OrgPermissionAction) {
+		const membership = await this.getActiveMembership(userId);
+
+		if (!membership) {
+			const organization = await this.requireOwnedOrganization(userId);
+			return { organization, membership: null };
+		}
+
+		if (!canTeamRole(membership.role, action)) {
+			throw new ForbiddenException(
+				"You do not have permission to perform this team action.",
+			);
+		}
+
+		return membership;
+	}
+
+	async getActiveMembership(userId: string) {
+		const [membership] = await this.db
+			.select({
+				id: organizationAdmins.id,
+				organizationId: organizationAdmins.organizationId,
+				userId: organizationAdmins.userId,
+				designation: organizationAdmins.designation,
+				role: sql<
+					"OWNER" | "ADMIN" | "MANAGER" | "MEMBER" | "VIEWER"
+				>`case when ${organizationAdmins.isOwner} then 'OWNER' else ${organizationAdmins.role} end`,
+				status: organizationAdmins.status,
+				isOwner: organizationAdmins.isOwner,
+				isPublic: organizationAdmins.isPublic,
+				joinedAt: organizationAdmins.joinedAt,
+				organization: organizations,
+			})
+			.from(organizationAdmins)
+			.innerJoin(
+				organizations,
+				eq(organizationAdmins.organizationId, organizations.id),
+			)
+			.where(
+				and(
+					eq(organizationAdmins.userId, userId),
+					eq(organizationAdmins.status, "ACTIVE"),
+					eq(organizations.status, "ACTIVE"),
+				),
+			)
+			.limit(1);
+
+		if (!membership) return null;
+		return membership;
 	}
 
 	/**
@@ -254,8 +329,7 @@ export class OrganizationsService {
 			.limit(1);
 
 		if (
-			!organization ||
-			organization.verificationStatus !== "VERIFIED" ||
+			organization?.verificationStatus !== "VERIFIED" ||
 			organization.status !== "ACTIVE"
 		) {
 			throw new NotFoundException("Organization not found");
@@ -263,6 +337,7 @@ export class OrganizationsService {
 	}
 
 	async updateMyOrganization(userId: string, input: UpdateOrganizationInput) {
+		await this.requireOrgPermission(userId, "org.edit");
 		const organization = await this.requireOwnedOrganization(userId);
 		const { categoryIds, ...fields } = input;
 
@@ -320,6 +395,7 @@ export class OrganizationsService {
 	}
 
 	async uploadDocument(userId: string, input: UploadOrgDocumentInput) {
+		await this.requireOrgPermission(userId, "org.edit");
 		const organization = await this.requireOwnedOrganization(userId);
 
 		// Confirm the object landed in storage before recording its key — the
