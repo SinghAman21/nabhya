@@ -27,6 +27,7 @@ import {
 	useRevokeCertificate,
 } from "@/hooks/use-engagement";
 import { useEventApplicants, useReviewApplication } from "@/hooks/use-events";
+import { useMyTeamRole } from "@/hooks/use-my-team-role";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatRelative } from "@/lib/format";
@@ -63,6 +64,11 @@ export function ApplicantsSheet({
 		filter === "ALL" ? {} : { status: filter },
 	);
 	const review = useReviewApplication(eventId ?? "");
+
+	// Accepting or rejecting is `people.review`. Allowed while the role is
+	// still resolving; the server still 403s anything the role cannot do.
+	const teamRole = useMyTeamRole();
+	const canReview = teamRole.isLoading ? true : teamRole.can("people.review");
 
 	const close = () => {
 		setNote("");
@@ -165,6 +171,7 @@ export function ApplicantsSheet({
 							applicant={item}
 							eventId={eventId ?? ""}
 							canAccept={remainingPlaces > 0}
+							canReview={canReview}
 							busy={review.isPending}
 							deciding={
 								review.isPending && review.variables?.applicationId === item.id
@@ -184,6 +191,7 @@ function ApplicantRow({
 	applicant,
 	eventId,
 	canAccept,
+	canReview,
 	busy,
 	deciding,
 	onDecide,
@@ -191,6 +199,8 @@ function ApplicantRow({
 	applicant: EventApplicant;
 	eventId: string;
 	canAccept: boolean;
+	/** `people.review` — false only once the role has resolved as denied. */
+	canReview: boolean;
 	busy: boolean;
 	/** Which decision is in flight for *this* row, if any. */
 	deciding: "ACCEPTED" | "REJECTED" | null;
@@ -253,33 +263,40 @@ function ApplicantRow({
 			)}
 
 			{isPending && (
-				<View
-					style={{
-						flexDirection: "row",
-						gap: spacing[2],
-						marginTop: spacing[4],
-					}}
-				>
-					<Button
-						style={{ flex: 1 }}
-						disabled={busy || !canAccept}
-						loading={deciding === "ACCEPTED"}
-						onPress={() => onDecide("ACCEPTED")}
-						accessibilityLabel={`Accept ${name}`}
+				<>
+					{!canReview ? (
+						<Caption color="tertiary" style={{ marginTop: spacing[4] }}>
+							Your role doesn't allow reviews. Ask an owner or admin.
+						</Caption>
+					) : null}
+					<View
+						style={{
+							flexDirection: "row",
+							gap: spacing[2],
+							marginTop: spacing[4],
+						}}
 					>
-						Accept
-					</Button>
-					<Button
-						variant="outline"
-						style={{ flex: 1 }}
-						disabled={busy}
-						loading={deciding === "REJECTED"}
-						onPress={() => onDecide("REJECTED")}
-						accessibilityLabel={`Reject ${name}`}
-					>
-						Reject
-					</Button>
-				</View>
+						<Button
+							style={{ flex: 1 }}
+							disabled={busy || !canAccept || !canReview}
+							loading={deciding === "ACCEPTED"}
+							onPress={() => onDecide("ACCEPTED")}
+							accessibilityLabel={`Accept ${name}`}
+						>
+							Accept
+						</Button>
+						<Button
+							variant="outline"
+							style={{ flex: 1 }}
+							disabled={busy || !canReview}
+							loading={deciding === "REJECTED"}
+							onPress={() => onDecide("REJECTED")}
+							accessibilityLabel={`Reject ${name}`}
+						>
+							Reject
+						</Button>
+					</View>
+				</>
 			)}
 		</Surface>
 	);

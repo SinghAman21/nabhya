@@ -17,6 +17,7 @@ export const ORGANIZATIONS = {
 	ME: `${API_PREFIX}/organizations/me`,
 	MY_DOCUMENTS: `${API_PREFIX}/organizations/me/documents`,
 	detail: (id: string) => `${API_PREFIX}/organizations/${id}`,
+	publicTeam: (id: string) => `${API_PREFIX}/organizations/${id}/team`,
 } as const;
 
 export const EVENTS = {

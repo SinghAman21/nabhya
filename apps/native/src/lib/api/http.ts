@@ -51,11 +51,25 @@ export function apiErrorMessage(
 		const response = (error as { response?: { data?: { message?: unknown } } })
 			.response;
 		const message = response?.data?.message;
-		if (typeof message === "string") return message;
+		if (typeof message === "string") return friendlyTeamMessage(message);
 		if (Array.isArray(message) && typeof message[0] === "string") {
-			return message[0];
+			return friendlyTeamMessage(message[0]);
 		}
 	}
-	if (error instanceof Error) return error.message;
+	if (error instanceof Error) return friendlyTeamMessage(error.message);
 	return fallback;
+}
+
+/**
+ * The server's team-permission 403 names the mechanism, not the fix.
+ * A viewer or member hitting it needs the next step, not the rulebook.
+ */
+const TEAM_PERMISSION_MESSAGE =
+	"You do not have permission to perform this team action.";
+
+function friendlyTeamMessage(message: string): string {
+	if (message === TEAM_PERMISSION_MESSAGE) {
+		return "Your role doesn't allow this. Ask an owner or admin.";
+	}
+	return message;
 }

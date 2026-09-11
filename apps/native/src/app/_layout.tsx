@@ -71,6 +71,7 @@ export default function RootLayout() {
 							<Stack.Screen name="success" />
 							<Stack.Screen name="search" />
 							<Stack.Screen name="feed" />
+							<Stack.Screen name="team/invites/[token]" />
 						</Stack>
 						<PortalHost />
 						{/* Toasts and confirmations. Every open sheet mounts its own

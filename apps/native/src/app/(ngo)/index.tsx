@@ -35,6 +35,7 @@ import { Pressable } from "@/components/ui/pressable";
 import { Caption, H5, Label } from "@/components/ui/typography";
 import { useOrganizationImpact } from "@/hooks/use-directory";
 import { useOrgEvents } from "@/hooks/use-events";
+import { useMyTeamRole } from "@/hooks/use-my-team-role";
 import { useOrgNeeds } from "@/hooks/use-needs";
 import { useMyOrganization } from "@/hooks/use-organization";
 import { useTheme } from "@/hooks/use-theme";
@@ -151,6 +152,17 @@ export default function NgoDashboard() {
 	/** Shared with `(ngo)/profile.tsx`, which draws the same banner and row. */
 	const verificationCopy = orgVerificationCopy(status, org?.rejectionReason);
 
+	// Creating posts, needs and events is `content.publish`: owners, admins
+	// and managers. Allowed while the role is still resolving so permitted
+	// authors never see a flicker of denial; the server still 403s anything
+	// the role cannot do.
+	const teamRole = useMyTeamRole();
+	const canPublish = teamRole.isLoading
+		? true
+		: teamRole.can("content.publish");
+	const publishGateHint =
+		!teamRole.isLoading && !canPublish ? "Ask an admin" : null;
+
 	const verification = isVerified ? null : (
 		<Banner
 			tone={verificationCopy.tone}
@@ -175,25 +187,36 @@ export default function NgoDashboard() {
 					<ActionTile
 						icon={PenLine}
 						label="Post"
-						hint={isVerified ? "Share an update" : "Verify first"}
-						disabled={!isVerified}
+						hint={
+							isVerified
+								? (publishGateHint ?? "Share an update")
+								: "Verify first"
+						}
+						disabled={!isVerified || !canPublish}
 						first
 						onPress={() => setComposerTag("POST")}
 					/>
 					<ActionTile
 						icon={HeartHandshake}
 						label="Need"
-						hint="Ask for items"
+						hint={publishGateHint ?? "Ask for items"}
+						disabled={!canPublish}
 						onPress={() => setNeedFormOpen(true)}
 					/>
 					<ActionTile
 						icon={CalendarDays}
 						label="Event"
-						hint="Call volunteers"
+						hint={publishGateHint ?? "Call volunteers"}
+						disabled={!canPublish}
 						onPress={() => setEventFormOpen(true)}
 					/>
 				</View>
 			</Surface>
+			{publishGateHint ? (
+				<Caption color="tertiary" style={{ marginTop: spacing[2] }}>
+					Your role doesn't allow publishing. {publishGateHint} to post.
+				</Caption>
+			) : null}
 		</View>
 	);
 

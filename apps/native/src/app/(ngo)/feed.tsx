@@ -41,6 +41,7 @@ import {
 	useFeedReaction,
 	useRecordFeedInteraction,
 } from "@/hooks/use-feed";
+import { useMyTeamRole } from "@/hooks/use-my-team-role";
 import { useCategories, useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
@@ -193,6 +194,20 @@ export default function NgoFeed() {
 	const isVerified = me?.organization?.verificationStatus === "VERIFIED";
 	const myUserId = me?.id;
 
+	// Publishing is `content.publish`: owners, admins and managers. Allowed
+	// while the role is still resolving so permitted authors never see a
+	// flicker of denial; the server still 403s anything the role cannot do.
+	// Verification gates first — an unverified org cannot post at all.
+	const teamRole = useMyTeamRole();
+	const canPublish = teamRole.isLoading
+		? true
+		: teamRole.can("content.publish");
+	const composerDisabledReason = !isVerified
+		? "Get verified to post to the feed"
+		: !canPublish
+			? "Ask an admin"
+			: undefined;
+
 	const openComposer = useCallback(
 		(options?: ComposerRequest) => setComposer(options ?? {}),
 		[],
@@ -284,7 +299,7 @@ export default function NgoFeed() {
 					filterActive={categoryIds.length > 0 || content !== "all"}
 				/>
 			</View>
-			{isDesktop && (
+			{isDesktop && canPublish && (
 				<Button size="sm" onPress={() => openComposer()}>
 					New post
 				</Button>
@@ -326,9 +341,9 @@ export default function NgoFeed() {
 			<PostComposerBar
 				name={orgName}
 				onCompose={openComposer}
-				{...(isVerified
-					? {}
-					: { disabledReason: "Get verified to post to the feed" })}
+				{...(composerDisabledReason
+					? { disabledReason: composerDisabledReason }
+					: {})}
 			/>
 		</View>
 	);
@@ -356,7 +371,7 @@ export default function NgoFeed() {
 					: "Be the first thing in it — post what your team did this week."
 			}
 			action={
-				isVerified && tab !== "following" ? (
+				isVerified && canPublish && tab !== "following" ? (
 					<Button onPress={() => openComposer()}>Write a post</Button>
 				) : undefined
 			}
@@ -464,7 +479,7 @@ export default function NgoFeed() {
 				<>
 					{pinnedHeader}
 					{list}
-					{isVerified && (
+					{isVerified && canPublish && (
 						<ComposeButton
 							// Clear of the tab bar, whose height is `TAB_BAR_HEIGHT`
 							// plus the home-indicator inset. Read from the constant so

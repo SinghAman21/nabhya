@@ -8,10 +8,16 @@ import {
 	Star,
 } from "lucide-react-native";
 import { useState } from "react";
-import { ScrollView, View, type ViewStyle } from "react-native";
+import {
+	ActivityIndicator,
+	ScrollView,
+	View,
+	type ViewStyle,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BackButton } from "@/components/back-button";
 import { DonateSheet } from "@/components/donate-sheet";
+import { InitialAvatar } from "@/components/initial-avatar";
 import { OrgCover, OrgLogo } from "@/components/org-branding";
 import { PageTabs } from "@/components/page-tabs";
 import {
@@ -45,6 +51,7 @@ import {
 	useFinancialReports,
 	useOrganization,
 	useOrganizationImpact,
+	usePublicTeam,
 } from "@/hooks/use-directory";
 import { useOpenDocument } from "@/hooks/use-documents";
 import {
@@ -511,12 +518,94 @@ function AboutTab({
 				/>
 			)}
 
+			{/* Secondary content: hides itself when empty or failed, so the
+			    profile never breaks over it. */}
+			<PublicTeamSection organizationId={organization.id} />
+
 			{withFacts ? (
 				<View>
 					<SectionTitle>Details</SectionTitle>
 					<OrgFacts organization={organization} />
 				</View>
 			) : null}
+		</View>
+	);
+}
+
+/**
+ * The people an NGO chose to show publicly (`isPublic` members only).
+ *
+ * Team is secondary content: while loading it is a small inline spinner, on
+ * error it stays silent, and when the list is empty the whole section hides
+ * rather than announcing that nobody opted in. Rows match the Updates tab's
+ * `ListGroup` language — avatar, name and designation with the role as a
+ * pill (`info` for OWNER, `neutral` for everyone else).
+ */
+function PublicTeamSection({ organizationId }: { organizationId: string }) {
+	const { colors, spacing } = useTheme();
+	const team = usePublicTeam(organizationId);
+
+	// A failed team fetch must never break the profile around it.
+	if (team.isError) return null;
+	const members = team.data ?? [];
+	if (!team.isLoading && members.length === 0) return null;
+
+	return (
+		<View>
+			<SectionTitle>Team</SectionTitle>
+			<Caption color="tertiary" style={{ marginBottom: spacing[3] }}>
+				People this NGO chose to show publicly.
+			</Caption>
+			{team.isLoading ? (
+				<View
+					style={{ paddingVertical: spacing[4], alignItems: "center" }}
+					accessibilityRole="progressbar"
+					accessibilityLabel="Loading team"
+				>
+					<ActivityIndicator color={colors.text.quaternary as string} />
+				</View>
+			) : (
+				<ListGroup>
+					{members.map((member, index) => {
+						const role = member.role ?? "MEMBER";
+						const subtitle = [
+							member.designation,
+							member.joinedAt ? `Joined ${formatDate(member.joinedAt)}` : null,
+						]
+							.filter(Boolean)
+							.join(" · ");
+						return (
+							<View
+								// biome-ignore lint/suspicious/noArrayIndexKey: public rows carry no id
+								key={`${member.fullName ?? "member"}-${member.joinedAt}-${index}`}
+								style={{
+									flexDirection: "row",
+									alignItems: "center",
+									gap: spacing[3],
+									paddingHorizontal: spacing[4],
+									paddingVertical: spacing[4],
+								}}
+							>
+								<InitialAvatar name={member.fullName} />
+								<View style={{ flex: 1, minWidth: 0 }}>
+									<Body weight="bold" numberOfLines={1}>
+										{member.fullName ?? "Team member"}
+									</Body>
+									{subtitle ? (
+										<Caption color="tertiary" numberOfLines={1}>
+											{subtitle}
+										</Caption>
+									) : null}
+								</View>
+								<StatusPill
+									label={role}
+									tone={role === "OWNER" ? "info" : "neutral"}
+								/>
+							</View>
+						);
+					})}
+				</ListGroup>
+			)}
 		</View>
 	);
 }

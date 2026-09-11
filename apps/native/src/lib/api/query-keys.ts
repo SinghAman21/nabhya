@@ -78,8 +78,9 @@ export const queryKeys = {
 	myAnnouncements: (params?: unknown) =>
 		["announcements", "me", params] as const,
 	reports: (id: string) => ["reports", id] as const,
-	team: ["org", "team"] as const,
+	team: (params?: unknown) => ["org", "team", params] as const,
 	teamInvites: ["org", "team", "invites"] as const,
+	publicTeam: (orgId: string) => ["organizations", orgId, "team"] as const,
 
 	feed: (params?: unknown) => ["feed", params] as const,
 	feedComments: (id: string, params?: unknown) =>

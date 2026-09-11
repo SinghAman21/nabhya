@@ -15,7 +15,9 @@ import type {
 	NearbyOrganization,
 	OrgTeamMember,
 	PublicOrganization,
+	PublicTeamMember,
 	TeamInvite,
+	TeamListQuery,
 } from "@/lib/types";
 import { ORGANIZATIONS, PUBLISHING } from "./endpoints";
 import { http } from "./http";
@@ -52,7 +54,13 @@ export const publishingApi = {
 		http.delete<{ deleted: boolean }>(PUBLISHING.report(id)),
 
 	// Team
-	listTeam: () => http.get<OrgTeamMember[]>(PUBLISHING.TEAM),
+	listTeam: (query?: TeamListQuery) =>
+		http.get<OrgTeamMember[]>(
+			PUBLISHING.TEAM,
+			query as Record<string, unknown>,
+		),
+	listPublicTeam: (orgId: string) =>
+		http.get<PublicTeamMember[]>(ORGANIZATIONS.publicTeam(orgId)),
 	listTeamInvites: () => http.get<TeamInvite[]>(PUBLISHING.TEAM_INVITES),
 	inviteAdmin: (input: InviteOrgAdminInput) =>
 		http.post<OrgTeamMember>(PUBLISHING.TEAM, input),
@@ -73,6 +81,10 @@ export const publishingApi = {
 	leaveTeam: () => http.post<{ left: boolean }>(PUBLISHING.TEAM_LEAVE),
 	requestOwnershipTransfer: (toMemberId: string) =>
 		http.post<{ token: string }>(PUBLISHING.TEAM_TRANSFER, { toMemberId }),
+	confirmOwnershipTransfer: (token: string) =>
+		http.post<{ transferred: boolean }>(PUBLISHING.TEAM_TRANSFER_CONFIRM, {
+			token,
+		}),
 
 	// Impact
 	myImpact: () => http.get<VolunteerImpact>(PUBLISHING.MY_IMPACT),

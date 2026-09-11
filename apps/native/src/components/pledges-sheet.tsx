@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/overlay";
 import { Sheet, SheetFlatList } from "@/components/ui/sheet";
 import { Body, BodySmall, Caption } from "@/components/ui/typography";
+import { useMyTeamRole } from "@/hooks/use-my-team-role";
 import { useNeedPledges, useReviewPledge } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
@@ -57,6 +58,11 @@ export function PledgesSheet({
 
 	const query = useNeedPledges(need?.id ?? undefined);
 	const review = useReviewPledge(need?.id ?? "");
+
+	// Accepting, declining or completing is `people.review`. Allowed while the
+	// role is still resolving; the server still 403s anything denied.
+	const teamRole = useMyTeamRole();
+	const canReview = teamRole.isLoading ? true : teamRole.can("people.review");
 
 	const items = (query.data?.items ?? []).filter((pledge) =>
 		filter === "ALL" ? true : pledge.status === filter,
@@ -155,6 +161,7 @@ export function PledgesSheet({
 						<PledgeRow
 							pledge={item}
 							unit={need?.unit ?? null}
+							canReview={canReview}
 							busy={review.isPending}
 							deciding={
 								review.isPending && review.variables?.pledgeId === item.id
@@ -173,12 +180,15 @@ export function PledgesSheet({
 function PledgeRow({
 	pledge,
 	unit,
+	canReview,
 	busy,
 	deciding,
 	onDecide,
 }: {
 	pledge: NeedPledge;
 	unit: string | null;
+	/** `people.review` — false only once the role has resolved as denied. */
+	canReview: boolean;
 	busy: boolean;
 	deciding: Decision | null;
 	onDecide: (status: Decision) => void;
@@ -245,6 +255,13 @@ function PledgeRow({
 				{pledge.reviewNote ? ` · Your note: ${pledge.reviewNote}` : ""}
 			</Caption>
 
+			{!canReview &&
+			pledge.status !== "REJECTED" &&
+			pledge.status !== "COMPLETED" ? (
+				<Caption color="tertiary" style={{ marginTop: spacing[4] }}>
+					Your role doesn't allow reviews. Ask an owner or admin.
+				</Caption>
+			) : null}
 			{pledge.status === "PENDING" && (
 				<View
 					style={{
@@ -255,7 +272,7 @@ function PledgeRow({
 				>
 					<Button
 						style={{ flex: 1 }}
-						disabled={busy}
+						disabled={busy || !canReview}
 						loading={deciding === "ACCEPTED"}
 						onPress={() => onDecide("ACCEPTED")}
 						accessibilityLabel={`Accept offer from ${name}`}
@@ -265,7 +282,7 @@ function PledgeRow({
 					<Button
 						variant="outline"
 						style={{ flex: 1 }}
-						disabled={busy}
+						disabled={busy || !canReview}
 						loading={deciding === "REJECTED"}
 						onPress={() => onDecide("REJECTED")}
 						accessibilityLabel={`Decline offer from ${name}`}
@@ -277,7 +294,7 @@ function PledgeRow({
 			{pledge.status === "ACCEPTED" && (
 				<View style={{ marginTop: spacing[4] }}>
 					<Button
-						disabled={busy}
+						disabled={busy || !canReview}
 						loading={deciding === "COMPLETED"}
 						onPress={() => onDecide("COMPLETED")}
 						accessibilityLabel={`Mark ${name}'s items as received`}

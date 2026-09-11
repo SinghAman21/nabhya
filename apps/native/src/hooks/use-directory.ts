@@ -98,10 +98,21 @@ export function useDeleteFinancialReport() {
 
 // ─── Team ────────────────────────────────────────────────────────────────────
 
-export function useOrgTeam() {
+export function useOrgTeam(query?: { status?: string; includeLeft?: boolean }) {
 	return useQuery({
-		queryKey: queryKeys.team,
-		queryFn: publishingApi.listTeam,
+		queryKey: queryKeys.team(query),
+		queryFn: () =>
+			publishingApi.listTeam(
+				query as { status?: "ACTIVE" | "SUSPENDED"; includeLeft?: boolean },
+			),
+	});
+}
+
+export function usePublicTeam(organizationId: string | undefined) {
+	return useQuery({
+		queryKey: queryKeys.publicTeam(organizationId ?? ""),
+		queryFn: () => publishingApi.listPublicTeam(organizationId as string),
+		enabled: !!organizationId,
 	});
 }
 
@@ -118,7 +129,7 @@ export function useInviteAdmin() {
 		mutationFn: (input: InviteOrgAdminInput) =>
 			publishingApi.inviteAdmin(input),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: queryKeys.team });
+			queryClient.invalidateQueries({ queryKey: queryScopes.team });
 		},
 	});
 }
@@ -129,7 +140,7 @@ export function useUpdateAdmin() {
 		mutationFn: ({ id, input }: { id: string; input: UpdateOrgAdminInput }) =>
 			publishingApi.updateAdmin(id, input),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: queryKeys.team });
+			queryClient.invalidateQueries({ queryKey: queryScopes.team });
 		},
 	});
 }
@@ -190,6 +201,45 @@ export function useRequestOwnershipTransfer() {
 	return useMutation({
 		mutationFn: (toMemberId: string) =>
 			publishingApi.requestOwnershipTransfer(toMemberId),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.team });
+		},
+	});
+}
+
+export function useConfirmOwnershipTransfer() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (token: string) =>
+			publishingApi.confirmOwnershipTransfer(token),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.team });
+			queryClient.invalidateQueries({ queryKey: queryKeys.me });
+			queryClient.invalidateQueries({
+				queryKey: queryKeys.onboardingStatus,
+			});
+		},
+	});
+}
+
+export function useAcceptTeamInvite() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (token: string) => publishingApi.acceptTeamInvite(token),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.team });
+			queryClient.invalidateQueries({ queryKey: queryKeys.me });
+			queryClient.invalidateQueries({
+				queryKey: queryKeys.onboardingStatus,
+			});
+		},
+	});
+}
+
+export function useDeclineTeamInvite() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (token: string) => publishingApi.declineTeamInvite(token),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.team });
 		},

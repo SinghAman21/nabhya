@@ -657,7 +657,31 @@ export interface TeamInvite {
 	status: "PENDING" | "ACCEPTED" | "DECLINED" | "REVOKED" | "EXPIRED";
 	expiresAt: string;
 	createdAt: string;
+	/** Only present on the create/resend response — never on the list. */
 	token?: string;
+	/** Shareable link built server-side from TEAM_INVITE_URL_BASE. */
+	inviteUrl?: string;
+	resentCount?: number;
+	lastSentAt?: string | null;
+	updatedAt?: string;
+}
+
+/**
+ * One row of `GET /api/organizations/:id/team` — the public subset only.
+ * No emails, no ids, just what an NGO chose to show beside its name.
+ */
+export interface PublicTeamMember {
+	fullName: string | null;
+	role: OrgTeamMember["role"];
+	designation: string | null;
+	joinedAt: string;
+}
+
+export type TeamStatusFilter = "ACTIVE" | "SUSPENDED";
+
+export interface TeamListQuery {
+	status?: TeamStatusFilter;
+	includeLeft?: boolean;
 }
 
 export interface AuditLogEntry {
