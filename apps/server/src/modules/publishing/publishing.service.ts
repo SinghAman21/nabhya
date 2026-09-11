@@ -10,6 +10,7 @@ import {
 	teamInvites,
 	users,
 } from "@nabhya/db/schema";
+import { env } from "@nabhya/env/server";
 import type {
 	ConfirmOwnershipTransferInput,
 	CreateFinancialReportInput,
@@ -32,6 +33,7 @@ import {
 import { and, count, desc, eq, ne } from "drizzle-orm";
 import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
+import { MailService } from "../../common/mail";
 import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
 import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsService } from "../organizations/organizations.service";
@@ -47,6 +49,7 @@ export class PublishingService {
 		@Inject(OrganizationsService)
 		private readonly organizationsService: OrganizationsService,
 		@Inject(UploadsService) private readonly uploads: UploadsService,
+		@Inject(MailService) private readonly mail: MailService,
 	) {}
 
 	// ─── Announcements ───────────────────────────────────────────────────────
@@ -469,6 +472,15 @@ export class PublishingService {
 			});
 		}
 
+		void this.sendTeamInviteEmail({
+			to: email,
+			organizationName: organization.organizationName,
+			role: input.role,
+			designation: input.designation ?? null,
+			token,
+			expiresAt: invite.expiresAt,
+		});
+
 		void this.audit.record({
 			performedBy: userId,
 			action: "INVITE_TEAM_MEMBER",
@@ -481,7 +493,7 @@ export class PublishingService {
 			},
 		});
 
-		return { ...invite, token };
+		return { ...invite, token, inviteUrl: this.inviteUrl(token) };
 	}
 
 	async listTeamInvites(userId: string) {
@@ -563,7 +575,16 @@ export class PublishingService {
 			"resend team invite",
 		);
 
-		return { ...updated, token };
+		void this.sendTeamInviteEmail({
+			to: updated.email,
+			organizationName: organization.organizationName,
+			role: updated.role,
+			designation: updated.designation,
+			token,
+			expiresAt: updated.expiresAt,
+		});
+
+		return { ...updated, token, inviteUrl: this.inviteUrl(token) };
 	}
 
 	async acceptTeamInvite(userId: string, token: string) {
@@ -1080,6 +1101,38 @@ export class PublishingService {
 		});
 		if (!user) throw new NotFoundException("User not found.");
 		return user;
+	}
+
+	private async sendTeamInviteEmail(input: {
+		to: string;
+		organizationName: string;
+		role: string;
+		designation?: string | null;
+		token: string;
+		expiresAt: Date;
+	}) {
+		try {
+			await this.mail.sendTeamInvite({
+				to: input.to,
+				organizationName: input.organizationName,
+				role: input.role,
+				designation: input.designation,
+				inviteUrl: this.inviteUrl(input.token),
+				expiresAt: input.expiresAt,
+			});
+		} catch (error) {
+			console.warn(
+				`Failed to send team invite email to ${input.to}: ${
+					error instanceof Error ? error.message : String(error)
+				}`,
+			);
+		}
+	}
+
+	private inviteUrl(token: string) {
+		const base =
+			env.TEAM_INVITE_URL_BASE ?? env.CORS_ORIGIN.split(",")[0] ?? "";
+		return `${base.replace(/\/$/, "")}/team/invites/${token}`;
 	}
 
 	private generateToken() {

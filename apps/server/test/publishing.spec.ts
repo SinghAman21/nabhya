@@ -30,6 +30,7 @@ describe("PublishingService", () => {
 	let db: TestDb;
 	let close: () => Promise<void>;
 	let service: PublishingService;
+	let sentTeamInviteEmails: Array<{ to: string; inviteUrl: string }>;
 
 	beforeAll(async () => {
 		({ db, close } = await createTestDb());
@@ -40,6 +41,7 @@ describe("PublishingService", () => {
 			audit,
 			null as never,
 		);
+		sentTeamInviteEmails = [];
 		service = new PublishingService(
 			db as never,
 			audit,
@@ -47,6 +49,11 @@ describe("PublishingService", () => {
 			organizationsService,
 			// Storage is stubbed: assertUploaded is exercised in uploads.spec.
 			{ assertUploaded: async () => undefined } as never,
+			{
+				sendTeamInvite: async (input: { to: string; inviteUrl: string }) => {
+					sentTeamInviteEmails.push(input);
+				},
+			} as never,
 		);
 	});
 
@@ -56,6 +63,7 @@ describe("PublishingService", () => {
 
 	beforeEach(async () => {
 		await truncateAll(db);
+		sentTeamInviteEmails = [];
 		await seedRoles(db);
 	});
 
@@ -359,6 +367,8 @@ describe("PublishingService", () => {
 			});
 			expect(invite.token).toBeTruthy();
 			expect(invite.tokenHash).not.toBe(invite.token);
+			expect(sentTeamInviteEmails[0]?.to).toBe("priya@example.com");
+			expect(sentTeamInviteEmails[0]?.inviteUrl).toContain(invite.token);
 
 			const priya = await createUser(db, {
 				role: "organisation",

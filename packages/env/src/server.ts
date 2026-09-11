@@ -33,6 +33,13 @@ export const env = createEnv({
 		RAZORPAY_KEY_ID: z.string().min(1).optional(),
 		RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
 		RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
+
+		// Transactional email — currently used for team invites. The sender is
+		// env-driven so the verified Resend domain can be changed without code.
+		RESEND_API_KEY: z.string().min(1).optional(),
+		MAIL_FROM_EMAIL: z.email().default("noreply@graphex.me"),
+		MAIL_FROM_NAME: z.string().min(1).default("Nabhya"),
+		TEAM_INVITE_URL_BASE: z.string().url().optional(),
 	},
 	runtimeEnv: process.env,
 	emptyStringAsUndefined: true,

@@ -5,6 +5,7 @@ import { AuditModule } from "../common/audit";
 import { DatabaseModule } from "../common/database";
 import { JwtGuard, RolesGuard } from "../common/guards";
 import { throttlerConfig } from "../common/guards/throttler.config";
+import { MailModule } from "../common/mail";
 import { StorageModule } from "../common/storage";
 import { AdminModule } from "../modules/admin/admin.module";
 import { CategoriesModule } from "../modules/categories/categories.module";
@@ -29,6 +30,7 @@ import { AppController } from "./app.controller";
 		DatabaseModule, // global — provides db to the whole app
 		AuditModule, // global — provides the activity trail writer
 		StorageModule, // global — provides object storage (Supabase Storage, or a dev stub)
+		MailModule, // global — sends transactional email through Resend when configured
 		UploadsModule,
 		UsersModule,
 		OnboardingModule,
