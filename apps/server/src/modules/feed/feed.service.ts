@@ -126,14 +126,14 @@ export class FeedService {
 	) {
 		const { limit, offset } = toOffset(query);
 		const conditions: SQL[] = [eq(posts.organizationId, organizationId)];
-		if (query.tag) conditions.push(eq(posts.tag, query.tag));
+		if (query.tag) conditions.push(eq(posts.type, query.tag));
 		const where = and(...conditions);
 
 		const [postRows, [totals]] = await Promise.all([
 			this.db
 				.select({
 					id: posts.id,
-					tag: posts.tag,
+					tag: posts.type,
 					text: posts.text,
 					createdAt: posts.createdAt,
 					author: {

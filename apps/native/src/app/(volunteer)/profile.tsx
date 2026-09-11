@@ -232,7 +232,7 @@ export default function VolunteerProfile() {
 				<ListRow
 					icon={BookmarkCheck}
 					label="Saved posts"
-					onPress={() => router.push("/saved")}
+					onPress={() => router.push("/saved" as never)}
 				/>
 			</ListGroup>
 		</View>

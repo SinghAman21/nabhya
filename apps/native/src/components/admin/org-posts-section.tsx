@@ -14,7 +14,7 @@ import { apiErrorMessage } from "@/lib/api";
 import { formatDate, formatRelative } from "@/lib/format";
 import { SelectMenu } from "./select-menu";
 
-const TAGS: PostTag[] = ["POST", "EVENT", "NEED", "ANNOUNCEMENT", "URGENT"];
+const TAGS: PostTag[] = ["POST", "EVENT", "NEED", "ANNOUNCEMENT"];
 
 /**
  * An NGO's published feed posts, with superadmin moderation attached.
@@ -112,10 +112,7 @@ export function OrgPostsSection({
 										gap: spacing[2],
 									}}
 								>
-									<StatusPill
-										label={humanizeStatus(post.tag)}
-										tone={post.tag === "URGENT" ? "error" : "neutral"}
-									/>
+									<StatusPill label={humanizeStatus(post.tag)} tone="neutral" />
 									<Caption
 										color="quaternary"
 										style={{ flex: 1 }}

@@ -632,7 +632,7 @@ describe("AdminService", () => {
 					organizationId: org.id,
 					mediaFolder: "202609091700-abcd12",
 					text: "We served lunch today",
-					tag: "POST",
+					type: "POST",
 				})
 				.returning();
 			if (!post) throw new Error("post insert failed");
@@ -648,7 +648,7 @@ describe("AdminService", () => {
 				organizationId: otherOrg.id,
 				mediaFolder: "202609091701-abcd12",
 				text: "Other org post",
-				tag: "POST",
+				type: "POST",
 			});
 
 			const result = await feed.listOrganizationPosts(
@@ -674,7 +674,7 @@ describe("AdminService", () => {
 					organizationId: org.id,
 					mediaFolder: "202609091702-abcd12",
 					text: "Remove me",
-					tag: "POST",
+					type: "POST",
 				})
 				.returning();
 			if (!post) throw new Error("post insert failed");
