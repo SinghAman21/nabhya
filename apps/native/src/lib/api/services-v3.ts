@@ -1,6 +1,7 @@
 import type {
 	CreateFinancialReportInput,
 	InviteOrgAdminInput,
+	InviteTeamMemberInput,
 	NearbyQuery,
 	OrganizationImpact,
 	PaginationQuery,
@@ -14,6 +15,7 @@ import type {
 	NearbyOrganization,
 	OrgTeamMember,
 	PublicOrganization,
+	TeamInvite,
 } from "@/lib/types";
 import { ORGANIZATIONS, PUBLISHING } from "./endpoints";
 import { http } from "./http";
@@ -51,12 +53,26 @@ export const publishingApi = {
 
 	// Team
 	listTeam: () => http.get<OrgTeamMember[]>(PUBLISHING.TEAM),
+	listTeamInvites: () => http.get<TeamInvite[]>(PUBLISHING.TEAM_INVITES),
 	inviteAdmin: (input: InviteOrgAdminInput) =>
 		http.post<OrgTeamMember>(PUBLISHING.TEAM, input),
+	createTeamInvite: (input: InviteTeamMemberInput) =>
+		http.post<TeamInvite>(PUBLISHING.TEAM_INVITES, input),
+	resendTeamInvite: (id: string) =>
+		http.post<TeamInvite>(PUBLISHING.teamInviteResend(id)),
+	revokeTeamInvite: (id: string) =>
+		http.delete<TeamInvite>(PUBLISHING.teamInvite(id)),
+	acceptTeamInvite: (token: string) =>
+		http.post<OrgTeamMember>(PUBLISHING.acceptTeamInvite(token)),
+	declineTeamInvite: (token: string) =>
+		http.post<TeamInvite>(PUBLISHING.declineTeamInvite(token)),
 	updateAdmin: (id: string, input: UpdateOrgAdminInput) =>
 		http.patch<OrgTeamMember>(PUBLISHING.teamMember(id), input),
 	removeAdmin: (id: string) =>
 		http.delete<{ removed: boolean }>(PUBLISHING.teamMember(id)),
+	leaveTeam: () => http.post<{ left: boolean }>(PUBLISHING.TEAM_LEAVE),
+	requestOwnershipTransfer: (toMemberId: string) =>
+		http.post<{ token: string }>(PUBLISHING.TEAM_TRANSFER, { toMemberId }),
 
 	// Impact
 	myImpact: () => http.get<VolunteerImpact>(PUBLISHING.MY_IMPACT),

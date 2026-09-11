@@ -79,6 +79,7 @@ export const queryKeys = {
 		["announcements", "me", params] as const,
 	reports: (id: string) => ["reports", id] as const,
 	team: ["org", "team"] as const,
+	teamInvites: ["org", "team", "invites"] as const,
 
 	feed: (params?: unknown) => ["feed", params] as const,
 	feedComments: (id: string, params?: unknown) =>
@@ -104,5 +105,6 @@ export const queryScopes = {
 	organizations: ["organizations"] as const,
 	announcements: ["announcements"] as const,
 	reports: ["reports"] as const,
+	team: ["org", "team"] as const,
 	impact: ["impact"] as const,
 } as const;

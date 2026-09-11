@@ -632,15 +632,32 @@ export interface FinancialReport {
 
 export interface OrgTeamMember {
 	id: string;
+	userId?: string;
 	designation: string | null;
+	role?: "OWNER" | "ADMIN" | "MANAGER" | "MEMBER" | "VIEWER";
+	status?: "ACTIVE" | "SUSPENDED" | "LEFT" | "REMOVED";
 	isOwner: boolean;
+	isPublic?: boolean;
 	joinedAt: string;
+	leftAt?: string | null;
+	lastActiveAt?: string | null;
 	user: {
 		id: string;
 		fullName: string | null;
 		email: string;
 		profileImage: string | null;
 	};
+}
+
+export interface TeamInvite {
+	id: string;
+	email: string;
+	role: "ADMIN" | "MANAGER" | "MEMBER" | "VIEWER";
+	designation: string | null;
+	status: "PENDING" | "ACCEPTED" | "DECLINED" | "REVOKED" | "EXPIRED";
+	expiresAt: string;
+	createdAt: string;
+	token?: string;
 }
 
 export interface AuditLogEntry {

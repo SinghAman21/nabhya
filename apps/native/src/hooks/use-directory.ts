@@ -1,6 +1,7 @@
 import type {
 	CreateFinancialReportInput,
 	InviteOrgAdminInput,
+	InviteTeamMemberInput,
 	UpdateOrgAdminInput,
 	UpsertAnnouncementInput,
 } from "@nabhya/shared";
@@ -104,6 +105,13 @@ export function useOrgTeam() {
 	});
 }
 
+export function useTeamInvites() {
+	return useQuery({
+		queryKey: queryKeys.teamInvites,
+		queryFn: publishingApi.listTeamInvites,
+	});
+}
+
 export function useInviteAdmin() {
 	const queryClient = useQueryClient();
 	return useMutation({
@@ -131,7 +139,59 @@ export function useRemoveAdmin() {
 	return useMutation({
 		mutationFn: (id: string) => publishingApi.removeAdmin(id),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: queryKeys.team });
+			queryClient.invalidateQueries({ queryKey: queryScopes.team });
+		},
+	});
+}
+
+export function useCreateTeamInvite() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (input: InviteTeamMemberInput) =>
+			publishingApi.createTeamInvite(input),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.team });
+		},
+	});
+}
+
+export function useRevokeTeamInvite() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (id: string) => publishingApi.revokeTeamInvite(id),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.team });
+		},
+	});
+}
+
+export function useResendTeamInvite() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (id: string) => publishingApi.resendTeamInvite(id),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.team });
+		},
+	});
+}
+
+export function useLeaveTeam() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: publishingApi.leaveTeam,
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.team });
+		},
+	});
+}
+
+export function useRequestOwnershipTransfer() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (toMemberId: string) =>
+			publishingApi.requestOwnershipTransfer(toMemberId),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.team });
 		},
 	});
 }

@@ -156,6 +156,10 @@ export const PUBLISHING = {
 	MY_ANNOUNCEMENTS: `${API_PREFIX}/org/announcements`,
 	MY_REPORTS: `${API_PREFIX}/org/reports`,
 	TEAM: `${API_PREFIX}/org/team`,
+	TEAM_INVITES: `${API_PREFIX}/org/team/invites`,
+	TEAM_LEAVE: `${API_PREFIX}/org/team/leave`,
+	TEAM_TRANSFER: `${API_PREFIX}/org/team/transfer`,
+	TEAM_TRANSFER_CONFIRM: `${API_PREFIX}/org/team/transfer/confirm`,
 	MY_IMPACT: `${API_PREFIX}/me/impact`,
 	NEARBY: `${API_PREFIX}/organizations/nearby`,
 	announcements: (orgId: string) =>
@@ -165,4 +169,11 @@ export const PUBLISHING = {
 	announcement: (id: string) => `${API_PREFIX}/org/announcements/${id}`,
 	report: (id: string) => `${API_PREFIX}/org/reports/${id}`,
 	teamMember: (id: string) => `${API_PREFIX}/org/team/${id}`,
+	teamInvite: (id: string) => `${API_PREFIX}/org/team/invites/${id}`,
+	teamInviteResend: (id: string) =>
+		`${API_PREFIX}/org/team/invites/${id}/resend`,
+	acceptTeamInvite: (token: string) =>
+		`${API_PREFIX}/team/invites/${token}/accept`,
+	declineTeamInvite: (token: string) =>
+		`${API_PREFIX}/team/invites/${token}/decline`,
 } as const;
