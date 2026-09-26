@@ -30,6 +30,17 @@ export const reviewQuerySchema = paginationQuerySchema.extend({
 
 export type ReviewQuery = z.infer<typeof reviewQuerySchema>;
 
+/**
+ * The NGO's own reviews. `awaitingReply` is a server filter for the same
+ * reason as announcement status - a client filter over loaded pages undercounts.
+ * `stringbool`, not `coerce.boolean`: the latter reads the string "false" as true.
+ */
+export const orgReviewQuerySchema = paginationQuerySchema.extend({
+	awaitingReply: z.stringbool().optional(),
+});
+
+export type OrgReviewQuery = z.infer<typeof orgReviewQuerySchema>;
+
 export interface ReviewSummary {
 	average: number;
 	count: number;

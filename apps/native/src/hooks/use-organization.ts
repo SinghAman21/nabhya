@@ -11,6 +11,18 @@ export function useMyOrganization(enabled = true) {
 	});
 }
 
+/**
+ * Whole-org counts for the dashboard (`GET /organizations/me/overview`).
+ * Every events/needs mutation invalidates `queryKeys.orgOverview`.
+ */
+export function useOrgOverview(enabled = true) {
+	return useQuery({
+		queryKey: queryKeys.orgOverview,
+		queryFn: organizationsApi.overview,
+		enabled,
+	});
+}
+
 export function useUpdateMyOrganization() {
 	const queryClient = useQueryClient();
 	return useMutation({

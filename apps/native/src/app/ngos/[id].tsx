@@ -257,6 +257,7 @@ export default function NgoProfilePage() {
 	const metrics = impact.data ? (
 		<MetricRow
 			stats={[
+				{ label: "Followers", value: data?.followerCount ?? 0 },
 				{ label: "Volunteers", value: impact.data.volunteersEngaged },
 				{ label: "Hours given", value: impact.data.volunteerHours },
 				{ label: "Events", value: impact.data.eventsHosted },

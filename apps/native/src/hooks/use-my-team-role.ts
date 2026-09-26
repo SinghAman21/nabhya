@@ -22,16 +22,25 @@ export function useMyTeamRole() {
 		? (team.data ?? []).find((row) => (row.userId ?? row.user.id) === myId)
 		: undefined;
 
+	// No row in a team that loaded fine means an owner from before team
+	// memberships existed: the server resolves that account through
+	// `organizations.owner_user_id` and grants it everything
+	// (`requireOrgPermission`'s fallback). Reading it as "no role" locked the
+	// one person who can do everything out of every control.
+	const legacyOwner = !!myId && team.isSuccess && !member;
 	const role: TeamRole | null = member
 		? ((member.role ?? (member.isOwner ? "OWNER" : null)) as TeamRole | null)
-		: null;
+		: legacyOwner
+			? "OWNER"
+			: null;
 
 	return {
-		/** Null while loading, on error, or when the user holds no team row. */
+		/** Null while loading or on error. */
 		role,
 		isOwner: role === "OWNER",
 		can: (action: OrgPermissionAction) =>
 			role ? canTeamRole(role, action) : false,
 		isLoading: me.isLoading || team.isLoading,
+		isError: me.isError || team.isError,
 	};
 }

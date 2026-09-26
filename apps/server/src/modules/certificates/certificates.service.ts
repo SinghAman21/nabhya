@@ -103,6 +103,14 @@ export class CertificatesService {
 			.update(eventApplications)
 			.set({
 				attendedAt: input.attended ? new Date() : null,
+				// Un-marking clears the hours with the attendance they belonged to.
+				hoursServed: !input.attended
+					? null
+					: input.hours === undefined
+						? undefined
+						: input.hours === null
+							? null
+							: String(input.hours),
 				updatedAt: new Date(),
 			})
 			.where(eq(eventApplications.id, applicationId))
@@ -368,8 +376,13 @@ export class CertificatesService {
 				eventTitle: events.title,
 				eventStartAt: events.startAt,
 				eventEndAt: events.endAt,
+				hoursServed: eventApplications.hoursServed,
 			})
 			.from(certificates)
+			.innerJoin(
+				eventApplications,
+				eq(certificates.applicationId, eventApplications.id),
+			)
 			.innerJoin(users, eq(certificates.volunteerId, users.id))
 			.innerJoin(events, eq(certificates.eventId, events.id))
 			.innerJoin(
@@ -395,10 +408,14 @@ export class CertificatesService {
 				hour12: true,
 			}).format(value);
 
-		const durationHours = Math.max(
-			(row.eventEndAt.getTime() - row.eventStartAt.getTime()) / 3_600_000,
-			0,
-		);
+		// The hours the NGO recorded for this volunteer, else the event's length.
+		const durationHours =
+			row.hoursServed !== null
+				? Number(row.hoursServed)
+				: Math.max(
+						(row.eventEndAt.getTime() - row.eventStartAt.getTime()) / 3_600_000,
+						0,
+					);
 		const hoursText = formatHours(durationHours);
 
 		const pdf = await renderCertificatePdf({

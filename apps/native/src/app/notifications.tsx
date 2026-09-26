@@ -11,21 +11,9 @@ import { useTheme } from "@/hooks/use-theme";
 import { notificationsApi, queryKeys } from "@/lib/api";
 import { focusable } from "@/lib/focus";
 import { formatRelative } from "@/lib/format";
+import { notificationDestination } from "@/lib/notification-destination";
 import type { NotificationItem } from "@/lib/types";
-
-/** Where each notification type sends you when tapped. */
-function destinationFor(item: NotificationItem): string | null {
-	switch (item.entityName) {
-		case "EVENT":
-			return item.entityId ? `/events/${item.entityId}` : null;
-		case "CERTIFICATE":
-			return "/certificates";
-		case "ORGANIZATION_NEED":
-			return "/(volunteer)";
-		default:
-			return null;
-	}
-}
+import { useAuthStore } from "@/store/auth-store";
 
 /**
  * The full inbox. One grouped list, newest first, unread rows carry a dot in
@@ -35,6 +23,7 @@ function destinationFor(item: NotificationItem): string | null {
 function Notifications() {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
+	const role = useAuthStore((state) => state.role);
 	const markRead = useMarkNotificationsRead();
 
 	const { query, items, first, loadMore } = usePagedQuery({
@@ -45,7 +34,7 @@ function Notifications() {
 
 	const open = (item: NotificationItem) => {
 		if (!item.readAt) markRead.mutate({ ids: [item.id] });
-		const destination = destinationFor(item);
+		const destination = notificationDestination(item, role);
 		if (destination) router.push(destination as never);
 	};
 
@@ -82,11 +71,15 @@ function Notifications() {
 					<EmptyState
 						icon={Bell}
 						title="You're all caught up"
-						description="When an NGO reviews your application or pledge, or issues a certificate, it will show up here."
+						description={
+							role === "organisation"
+								? "New applicants, pledges, reviews and donations, and news about your verification and team, show up here."
+								: "When an NGO reviews your application or pledge, or issues a certificate, it will show up here."
+						}
 					/>
 				}
 				renderItem={(item) => {
-					const destination = destinationFor(item);
+					const destination = notificationDestination(item, role);
 					return (
 						<Pressable
 							onPress={() => open(item)}

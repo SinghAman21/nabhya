@@ -1,16 +1,13 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
 import { Star } from "lucide-react-native";
 import { useEffect, useState } from "react";
-import { FlatList, RefreshControl, View } from "react-native";
+import { View } from "react-native";
 import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
 import { InitialAvatar } from "@/components/initial-avatar";
-import { LoadMoreFooter } from "@/components/load-more-footer";
+import { PagedList, usePagedQuery } from "@/components/paged-list";
 import {
+	Banner,
 	EmptyState,
-	ErrorState,
 	FilterChips,
-	GridCell,
-	LoadingState,
 	Screen,
 	ScreenHeader,
 	Surface,
@@ -23,11 +20,11 @@ import { toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, BodySmall, Caption, H2 } from "@/components/ui/typography";
 import { useReplyToReview } from "@/hooks/use-engagement";
+import { useOrgAccess } from "@/hooks/use-org-access";
 import { useTheme } from "@/hooks/use-theme";
 import { useGridColumns } from "@/hooks/useMedia";
 import { apiErrorMessage, engagementApi, queryKeys } from "@/lib/api";
 import { formatRelative } from "@/lib/format";
-import { verticalScrollbar } from "@/lib/scroll";
 import type { ReviewItem } from "@/lib/types";
 
 type ReplyFilter = "ALL" | "UNANSWERED";
@@ -37,39 +34,26 @@ const FILTERS: Array<{ value: ReplyFilter; label: string }> = [
 	{ value: "UNANSWERED", label: "Awaiting reply" },
 ];
 
-const PAGE_SIZE = 20;
-
-/**
- * Reviews of this org, page by page. The summary rides along on every page;
- * the first page's copy is the one drawn. The reply filter is local - the API
- * has no such parameter.
- */
-function useOrgReviewPages() {
-	return useInfiniteQuery({
-		queryKey: queryKeys.orgReviews({ paged: true }),
-		queryFn: ({ pageParam }) =>
-			engagementApi.listMyOrgReviews({ page: pageParam, limit: PAGE_SIZE }),
-		initialPageParam: 1,
-		getNextPageParam: (last) =>
-			last.meta.hasMore ? last.meta.page + 1 : undefined,
-	});
-}
-
 export default function OrgReviews() {
 	const { colors, spacing } = useTheme();
 	const [filter, setFilter] = useState<ReplyFilter>("ALL");
 	const [replying, setReplying] = useState<ReviewItem | null>(null);
-	const query = useOrgReviewPages();
+	const access = useOrgAccess();
+
+	// "Awaiting reply" is a server filter, and the count is the whole org's -
+	// both used to be computed over whichever pages had loaded.
+	const params = filter === "UNANSWERED" ? { awaitingReply: true } : {};
+	const { query, items, first, loadMore } = usePagedQuery({
+		queryKey: queryKeys.orgReviews(params),
+		fetchPage: (page) =>
+			engagementApi.listMyOrgReviews({ ...params, page, limit: 20 }),
+	});
 	const columns = useGridColumns();
 
-	const summary = query.data?.pages[0]?.summary;
-	const all = query.data?.pages.flatMap((page) => page.items) ?? [];
-	const items = filter === "ALL" ? all : all.filter((review) => !review.reply);
-	const unanswered = all.filter((review) => !review.reply).length;
-
-	const loadMore = () => {
-		if (query.hasNextPage && !query.isFetchingNextPage) query.fetchNextPage();
-	};
+	const summary = first?.summary;
+	const unanswered = first?.awaitingReplyCount ?? 0;
+	// A reply is public and signed by the NGO, so it takes content.publish.
+	const replyBlocked = access.blocked("content.publish");
 
 	const summaryCard =
 		summary && summary.count > 0 ? (
@@ -148,75 +132,53 @@ export default function OrgReviews() {
 				}
 			/>
 
-			{query.isLoading ? (
-				<LoadingState />
-			) : query.isError ? (
-				<ErrorState
-					message={apiErrorMessage(query.error)}
-					onRetry={() => query.refetch()}
-				/>
-			) : (
-				<FlatList
-					key={`grid-${columns}`}
-					numColumns={columns}
-					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
-					data={items}
-					keyExtractor={(item) => item.id}
-					{...verticalScrollbar}
-					contentContainerStyle={{ paddingBottom: spacing[10] }}
-					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
-					onEndReached={loadMore}
-					onEndReachedThreshold={0.5}
-					refreshControl={
-						<RefreshControl
-							refreshing={query.isRefetching && !query.isFetchingNextPage}
-							onRefresh={() => query.refetch()}
-							tintColor={colors.text.quaternary as string}
-						/>
-					}
-					ListHeaderComponent={
-						<>
-							{summaryCard}
-							{all.length > 0 && (
-								<FilterChips
-									options={FILTERS}
-									value={filter}
-									onChange={setFilter}
-								/>
-							)}
-						</>
-					}
-					ListEmptyComponent={
-						<EmptyState
-							icon={Star}
-							title={
-								filter === "UNANSWERED"
-									? "Every review answered"
-									: "No reviews yet"
-							}
-							description={
-								filter === "UNANSWERED"
-									? "New reviews will show here until you reply."
-									: "Volunteers can review you after an event or a pledge. Each one appears here, and your reply is shown publicly beneath it."
-							}
-						/>
-					}
-					ListFooterComponent={
-						<LoadMoreFooter
-							hasMore={!!query.hasNextPage}
-							loading={query.isFetchingNextPage}
-							onLoadMore={loadMore}
-							count={items.length}
-							noun="reviews"
-						/>
-					}
-					renderItem={({ item }) => (
-						<GridCell>
-							<ReviewRow review={item} onReply={() => setReplying(item)} />
-						</GridCell>
-					)}
-				/>
+			{replyBlocked && (
+				<View style={{ marginBottom: spacing[4] }}>
+					<Banner tone="info" title="View only" description={replyBlocked} />
+				</View>
 			)}
+
+			<PagedList
+				query={query}
+				items={items}
+				loadMore={loadMore}
+				numColumns={columns}
+				noun="reviews"
+				header={
+					<>
+						{summaryCard}
+						{summary && summary.count > 0 && (
+							<FilterChips
+								options={FILTERS}
+								value={filter}
+								onChange={setFilter}
+							/>
+						)}
+					</>
+				}
+				keyExtractor={(item) => item.id}
+				renderItem={(item) => (
+					<ReviewRow
+						review={item}
+						onReply={replyBlocked ? undefined : () => setReplying(item)}
+					/>
+				)}
+				empty={
+					<EmptyState
+						icon={Star}
+						title={
+							filter === "UNANSWERED"
+								? "Every review answered"
+								: "No reviews yet"
+						}
+						description={
+							filter === "UNANSWERED"
+								? "New reviews will show here until you reply."
+								: "Volunteers can review you after an event or a pledge. Each one appears here, and your reply is shown publicly beneath it."
+						}
+					/>
+				}
+			/>
 
 			<ReplySheet review={replying} onClose={() => setReplying(null)} />
 		</Screen>
@@ -228,7 +190,8 @@ function ReviewRow({
 	onReply,
 }: {
 	review: ReviewItem;
-	onReply: () => void;
+	/** Omitted when the viewer's team role cannot reply publicly. */
+	onReply?: () => void;
 }) {
 	const { colors, spacing } = useTheme();
 	const name = review.user.fullName ?? "Volunteer";
@@ -277,11 +240,13 @@ function ReviewRow({
 							Your reply
 							{review.repliedAt ? ` · ${formatRelative(review.repliedAt)}` : ""}
 						</Caption>
-						<TextAction
-							label="Edit"
-							onPress={onReply}
-							accessibilityLabel={`Edit your reply to ${name}`}
-						/>
+						{onReply && (
+							<TextAction
+								label="Edit"
+								onPress={onReply}
+								accessibilityLabel={`Edit your reply to ${name}`}
+							/>
+						)}
 					</View>
 					<Caption color="secondary">{review.reply}</Caption>
 				</View>
@@ -298,12 +263,14 @@ function ReviewRow({
 					}}
 				>
 					<StatusPill label="Awaiting reply" tone="warning" />
-					<TextAction
-						label="Reply publicly"
-						tone="brand"
-						onPress={onReply}
-						accessibilityLabel={`Reply to ${name}`}
-					/>
+					{onReply && (
+						<TextAction
+							label="Reply publicly"
+							tone="brand"
+							onPress={onReply}
+							accessibilityLabel={`Reply to ${name}`}
+						/>
+					)}
 				</View>
 			)}
 		</Surface>
@@ -348,7 +315,7 @@ function ReplySheet({
 	review: ReviewItem | null;
 	onClose: () => void;
 }) {
-	const { spacing } = useTheme();
+	const { colors, spacing } = useTheme();
 	const textAreaStyle = useFieldInputStyle(120);
 	const [reply, setReply] = useState("");
 	const [error, setError] = useState<string | null>(null);
@@ -402,7 +369,7 @@ function ReplySheet({
 						style={{
 							paddingLeft: spacing[3],
 							borderLeftWidth: 2,
-							borderLeftColor: "transparent",
+							borderLeftColor: colors.border.dark,
 							marginBottom: spacing[4],
 						}}
 					>

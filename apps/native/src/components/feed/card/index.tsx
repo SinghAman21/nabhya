@@ -127,12 +127,16 @@ function FeedCardImpl({
 	);
 
 	const share = async () => {
+		// Needs have their own page now (`app/needs/[id].tsx`); a shared need
+		// used to open the NGO's profile and leave the reader to find it.
 		const path =
 			item.kind === "event"
 				? `/events/${item.id}`
-				: org
-					? `/ngos/${org.id}`
-					: "/";
+				: item.kind === "need"
+					? `/needs/${item.id}`
+					: org
+						? `/ngos/${org.id}`
+						: "/";
 		try {
 			await Share.share({
 				message: `${headline}${org ? ` - ${org.organizationName}` : ""} on Nabhya\n${Linking.createURL(path)}`,

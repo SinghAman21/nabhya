@@ -18,6 +18,7 @@ import { RefreshControl, ScrollView, View, type ViewStyle } from "react-native";
 import { EventFormSheet } from "@/components/event-form-sheet";
 import { InitialAvatar } from "@/components/initial-avatar";
 import { NeedFormSheet } from "@/components/need-form-sheet";
+import { NotificationBell } from "@/components/notification-bell";
 import { PostComposer } from "@/components/post-composer";
 import {
 	Banner,
@@ -34,10 +35,8 @@ import {
 import { Pressable } from "@/components/ui/pressable";
 import { Caption, H5, Label } from "@/components/ui/typography";
 import { useOrganizationImpact } from "@/hooks/use-directory";
-import { useOrgEvents } from "@/hooks/use-events";
-import { useMyTeamRole } from "@/hooks/use-my-team-role";
-import { useOrgNeeds } from "@/hooks/use-needs";
-import { useMyOrganization } from "@/hooks/use-organization";
+import { useOrgAccess } from "@/hooks/use-org-access";
+import { useMyOrganization, useOrgOverview } from "@/hooks/use-organization";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { apiErrorMessage } from "@/lib/api";
@@ -93,10 +92,9 @@ export default function NgoDashboard() {
 	const status = org?.verificationStatus;
 	const isVerified = status === "VERIFIED";
 
-	// Page-1 lists carry the per-row pending counts; summing them gives the
-	// "needs your attention" figure without a dedicated endpoint.
-	const eventsQuery = useOrgEvents();
-	const needsQuery = useOrgNeeds();
+	// Whole-org counts from the server. These used to be summed from page 1
+	// of the events and needs lists, which undercounted past 20 rows.
+	const overviewQuery = useOrgOverview();
 	const impactQuery = useOrganizationImpact(isVerified ? org?.id : undefined);
 
 	/* Creation, in place. Each sheet is the same one its own screen opens, so
@@ -105,38 +103,23 @@ export default function NgoDashboard() {
 	const [needFormOpen, setNeedFormOpen] = useState(false);
 	const [eventFormOpen, setEventFormOpen] = useState(false);
 
-	const events = eventsQuery.data?.items ?? [];
-	const needs = needsQuery.data?.items ?? [];
-	const pendingApplications = events.reduce(
-		(sum, event) => sum + (event.pendingApplications ?? 0),
-		0,
-	);
-	const eventsWithApplicants = events.filter(
-		(event) => (event.pendingApplications ?? 0) > 0,
-	).length;
-	const pendingPledges = needs.reduce(
-		(sum, need) => sum + (need.pendingPledges ?? 0),
-		0,
-	);
-	const needsWithPledges = needs.filter(
-		(need) => (need.pendingPledges ?? 0) > 0,
-	).length;
-	const openNeeds = needs.filter((need) => need.status === "OPEN").length;
-	const publishedEvents = events.filter(
-		(event) => event.status === "PUBLISHED",
-	).length;
+	const overview = overviewQuery.data;
+	const pendingApplications = overview?.pendingApplications ?? 0;
+	const eventsWithApplicants = overview?.eventsWithApplicants ?? 0;
+	const pendingPledges = overview?.pendingPledges ?? 0;
+	const needsWithPledges = overview?.needsWithPledges ?? 0;
+	const openNeeds = overview?.openNeeds ?? 0;
+	const publishedEvents = overview?.publishedEvents ?? 0;
 	const waiting = pendingApplications + pendingPledges;
 
 	const refreshing =
 		orgQuery.isRefetching ||
-		eventsQuery.isRefetching ||
-		needsQuery.isRefetching ||
+		overviewQuery.isRefetching ||
 		impactQuery.isRefetching;
 
 	const refetchAll = () => {
 		orgQuery.refetch();
-		eventsQuery.refetch();
-		needsQuery.refetch();
+		overviewQuery.refetch();
 		if (isVerified) impactQuery.refetch();
 	};
 
@@ -145,23 +128,30 @@ export default function NgoDashboard() {
 	// The counts below all default to 0, so rendering during the first load told
 	// an organisation with a dozen people waiting that it was "All caught up".
 	// Wait for the queries that feed those numbers before drawing them.
-	const isLoading =
-		orgQuery.isLoading || eventsQuery.isLoading || needsQuery.isLoading;
-	const error = orgQuery.error ?? eventsQuery.error ?? needsQuery.error;
+	const isLoading = orgQuery.isLoading || overviewQuery.isLoading;
+	const error = orgQuery.error ?? overviewQuery.error;
 
 	/** Shared with `(ngo)/profile.tsx`, which draws the same banner and row. */
 	const verificationCopy = orgVerificationCopy(status, org?.rejectionReason);
 
-	// Creating posts, needs and events is `content.publish`: owners, admins
-	// and managers. Allowed while the role is still resolving so permitted
-	// authors never see a flicker of denial; the server still 403s anything
-	// the role cannot do.
-	const teamRole = useMyTeamRole();
-	const canPublish = teamRole.isLoading
-		? true
-		: teamRole.can("content.publish");
-	const publishGateHint =
-		!teamRole.isLoading && !canPublish ? "Ask an admin" : null;
+	// Each tile asks `useOrgAccess` the same question the server will: a post
+	// and a need go public on creation, so they need verification as well as
+	// the role; an event can be drafted first, so it needs only the role.
+	const access = useOrgAccess();
+	const postBlocked = access.blocked("content.publish", { public: true });
+	const needBlocked = postBlocked;
+	const eventBlocked =
+		access.isSuspended || access.role === "VIEWER"
+			? access.blocked("content.publish")
+			: null;
+	const tileHint = (blocked: string | null, fallback: string) =>
+		!blocked
+			? fallback
+			: !access.isVerified && !access.isSuspended
+				? "Verify first"
+				: "Ask an admin";
+	const roleBlocked =
+		access.isVerified && !access.isSuspended ? postBlocked : null;
 
 	const verification = isVerified ? null : (
 		<Banner
@@ -187,34 +177,33 @@ export default function NgoDashboard() {
 					<ActionTile
 						icon={PenLine}
 						label="Post"
-						hint={
-							isVerified
-								? (publishGateHint ?? "Share an update")
-								: "Verify first"
-						}
-						disabled={!isVerified || !canPublish}
+						hint={tileHint(postBlocked, "Share an update")}
+						disabled={!!postBlocked}
 						first
 						onPress={() => setComposerTag("POST")}
 					/>
 					<ActionTile
 						icon={HeartHandshake}
 						label="Need"
-						hint={publishGateHint ?? "Ask for items"}
-						disabled={!canPublish}
+						hint={tileHint(needBlocked, "Ask for items")}
+						disabled={!!needBlocked}
 						onPress={() => setNeedFormOpen(true)}
 					/>
 					<ActionTile
 						icon={CalendarDays}
 						label="Event"
-						hint={publishGateHint ?? "Call volunteers"}
-						disabled={!canPublish}
+						hint={tileHint(
+							eventBlocked,
+							access.isVerified ? "Call volunteers" : "Draft one",
+						)}
+						disabled={!!eventBlocked}
 						onPress={() => setEventFormOpen(true)}
 					/>
 				</View>
 			</Surface>
-			{publishGateHint ? (
+			{roleBlocked ? (
 				<Caption color="tertiary" style={{ marginTop: spacing[2] }}>
-					Your role doesn't allow publishing. {publishGateHint} to post.
+					{roleBlocked}
 				</Caption>
 			) : null}
 		</View>
@@ -304,12 +293,22 @@ export default function NgoDashboard() {
 		/>
 	);
 
+	// The public page 404s until the NGO is verified and active - there is
+	// nothing public to show yet - so the row says so instead of opening it.
 	const publicProfileRow = org ? (
 		<ListRow
 			icon={Building2}
 			label="Your public page"
-			hint="Exactly what a volunteer or donor sees"
-			onPress={() => router.push(`/ngos/${org.id}`)}
+			hint={
+				isVerified && !access.isSuspended
+					? "Exactly what a volunteer or donor sees"
+					: "Goes live once you're verified"
+			}
+			onPress={
+				isVerified && !access.isSuspended
+					? () => router.push(`/ngos/${org.id}`)
+					: undefined
+			}
 		/>
 	) : null;
 
@@ -438,7 +437,15 @@ export default function NgoDashboard() {
 			<ScreenHeader
 				title="Dashboard"
 				subtitle={orgName}
-				action={<InitialAvatar name={orgName || email} square />}
+				// The rail carries Notifications on desktop; a phone has only the
+				// tab bar, which has no room for a sixth tab.
+				action={
+					isDesktop ? (
+						<InitialAvatar name={orgName || email} square />
+					) : (
+						<NotificationBell />
+					)
+				}
 			/>
 
 			<ScrollView

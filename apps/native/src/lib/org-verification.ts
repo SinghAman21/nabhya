@@ -133,3 +133,27 @@ export function orgDocumentState(state: string | null | undefined) {
 			return { label: "Not uploaded", tone: "neutral" as const };
 	}
 }
+
+/**
+ * The document that currently stands for each type.
+ *
+ * An NGO answers a rejection by uploading a new copy, which adds a row rather
+ * than replacing one, so every type can have a history. Both screens used to
+ * build `new Map(docs.map(...))`, which keeps the *last* entry per key - and
+ * the list arrives newest first, so that was the oldest copy: a corrected
+ * upload went on showing its predecessor's "Rejected" and the reviewer's old
+ * note. Sorted here rather than trusting the server's order, since that order
+ * is an implementation detail of one query.
+ */
+export function currentDocumentsByType<
+	T extends { documentType: string; uploadedAt: string },
+>(documents: readonly T[] | undefined): Map<string, T> {
+	const current = new Map<string, T>();
+	for (const document of documents ?? []) {
+		const held = current.get(document.documentType);
+		if (!held || document.uploadedAt > held.uploadedAt) {
+			current.set(document.documentType, document);
+		}
+	}
+	return current;
+}

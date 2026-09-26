@@ -1,3 +1,4 @@
+import { organizationAdmins } from "@nabhya/db/schema";
 import { ForbiddenException } from "@nestjs/common";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { AuditService } from "../src/common/audit";
@@ -37,6 +38,39 @@ describe("EngagementService", () => {
 		const org = await createOrganization(db, owner.id);
 		return { owner, org };
 	}
+
+	describe("following", () => {
+		it("lists the NGOs a volunteer follows and counts an NGO's followers", async () => {
+			// Issue #7: a Following page, and a follower count on the NGO.
+			const { org } = await verifiedOrg();
+			const { org: other } = await verifiedOrg();
+			const [a, b] = [
+				await createUser(db, { role: "volunteer" }),
+				await createUser(db, { role: "volunteer" }),
+			];
+			await service.follow(a.id, org.id);
+			await service.follow(a.id, other.id);
+			await service.follow(b.id, org.id);
+			// Idempotent: a second follow must not double-count.
+			await service.follow(b.id, org.id);
+
+			const following = await service.listFollowing(a.id, {
+				page: 1,
+				limit: 20,
+			});
+			expect(following.meta.total).toBe(2);
+			expect(following.items.map((row) => row.organization.id).sort()).toEqual(
+				[org.id, other.id].sort(),
+			);
+
+			const detail = await new OrganizationsService(
+				db as never,
+				new AuditService(db as never),
+				null as never,
+			).getById(org.id);
+			expect(detail.followerCount).toBe(2);
+		});
+	});
 
 	describe("bookmarks", () => {
 		it("toggles on and off, and is safe to repeat", async () => {
@@ -163,6 +197,66 @@ describe("EngagementService", () => {
 
 			const inbox = await db.query.notifications.findMany({});
 			expect(inbox.some((n) => n.userId === volunteer.id)).toBe(true);
+		});
+
+		it("counts and filters reviews awaiting a reply across every page", async () => {
+			const { owner, org } = await verifiedOrg();
+			const [a, b] = [
+				await createUser(db, { role: "volunteer" }),
+				await createUser(db, { role: "volunteer" }),
+			];
+			const answered = await service.upsertReview(a.id, org.id, { rating: 5 });
+			await service.upsertReview(b.id, org.id, { rating: 2 });
+			await service.replyToReview(owner.id, (answered as { id: string }).id, {
+				reply: "Thank you!",
+			});
+
+			const waiting = await service.listMyOrganizationReviews(owner.id, {
+				page: 1,
+				limit: 1,
+				awaitingReply: true,
+			});
+			expect(waiting.items).toHaveLength(1);
+			expect(waiting.items[0]?.reply).toBeNull();
+			expect(waiting.awaitingReplyCount).toBe(1);
+		});
+
+		it("lets an NGO under review open its own reviews", async () => {
+			// The public listing 404s for an unverified org, and the NGO's own
+			// tab used to go through it.
+			const owner = await createUser(db, { role: "organisation" });
+			await createOrganization(db, owner.id, {
+				verificationStatus: "PENDING",
+			});
+
+			const page = await service.listMyOrganizationReviews(owner.id, {
+				page: 1,
+				limit: 20,
+			});
+			expect(page.items).toEqual([]);
+		});
+
+		it("keeps a viewer from replying on the NGO's behalf", async () => {
+			// A reply is public and signed by the organisation, so it needs
+			// content.publish like any other public content.
+			const { org } = await verifiedOrg();
+			const volunteer = await createUser(db, { role: "volunteer" });
+			const review = await service.upsertReview(volunteer.id, org.id, {
+				rating: 3,
+			});
+			const viewer = await createUser(db, { role: "organisation" });
+			await db.insert(organizationAdmins).values({
+				organizationId: org.id,
+				userId: viewer.id,
+				role: "VIEWER",
+				status: "ACTIVE",
+			});
+
+			await expect(
+				service.replyToReview(viewer.id, (review as { id: string }).id, {
+					reply: "Thanks!",
+				}),
+			).rejects.toBeInstanceOf(ForbiddenException);
 		});
 
 		it("stops an organization replying to another's review", async () => {

@@ -8,9 +8,11 @@ import {
 } from "lucide-react-native";
 import { Platform, View, type ViewStyle } from "react-native";
 import { NGO_NAV_ITEMS } from "@/components/nav-items";
+import { OrgSuspended } from "@/components/org-suspended";
 import { Sidebar } from "@/components/sidebar";
 import { renderTabBar, useTabBarOptions } from "@/components/tab-bar";
 import { useMyOrganization } from "@/hooks/use-organization";
+import { useOnboardingStatus } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { useAuthStore } from "@/store/auth-store";
@@ -61,7 +63,14 @@ export default function NgoLayout() {
 	const tabBarOptions = useTabBarOptions();
 	const { data: org } = useMyOrganization(isDesktop);
 
+	// Status, not `/organizations/me`: the latter 403s for a suspended org.
+	const { data: status } = useOnboardingStatus(role === "organisation");
+
 	if (role !== "organisation") return <Redirect href="/" />;
+
+	if (status?.organization?.status === "SUSPENDED") {
+		return <OrgSuspended name={status.organization.organizationName} />;
+	}
 
 	if (isDesktop) {
 		return (

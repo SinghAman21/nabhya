@@ -28,6 +28,8 @@ export const queryKeys = {
 
 	organization: (id: string) => ["organizations", id] as const,
 	myOrganization: ["organizations", "me"] as const,
+	/** Whole-org dashboard counts; invalidated by every events/needs mutation. */
+	orgOverview: ["organizations", "me", "overview"] as const,
 	myOrgDocuments: ["organizations", "me", "documents"] as const,
 	myUserDocuments: ["users", "me", "documents"] as const,
 	/** Signed read URL for one stored object key. */
@@ -58,6 +60,7 @@ export const queryKeys = {
 	unreadCount: ["notifications", "unread-count"] as const,
 
 	bookmarks: (params?: unknown) => ["bookmarks", params] as const,
+	following: (params?: unknown) => ["following", params] as const,
 	reviews: (id: string, params?: unknown) => ["reviews", id, params] as const,
 	orgReviews: (params?: unknown) => ["reviews", "org", params] as const,
 
@@ -100,6 +103,7 @@ export const queryScopes = {
 	admin: ["admin"] as const,
 	notifications: ["notifications"] as const,
 	bookmarks: ["bookmarks"] as const,
+	following: ["following"] as const,
 	reviews: ["reviews"] as const,
 	certificates: ["certificates"] as const,
 	donations: ["donations"] as const,

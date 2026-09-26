@@ -21,6 +21,7 @@ import {
 	feedContentQuery,
 } from "@/components/feed/feed-filters";
 import { NeedPreviewDrawer } from "@/components/need-preview-drawer";
+import { NotificationBell } from "@/components/notification-bell";
 import { PostComposer, PostComposerBar } from "@/components/post-composer";
 import {
 	EmptyState,
@@ -41,7 +42,7 @@ import {
 	useFeedReaction,
 	useRecordFeedInteraction,
 } from "@/hooks/use-feed";
-import { useMyTeamRole } from "@/hooks/use-my-team-role";
+import { useOrgAccess } from "@/hooks/use-org-access";
 import { useCategories, useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
@@ -191,22 +192,24 @@ export default function NgoFeed() {
 
 	const items = feed.data?.pages.flatMap((page) => page.items) ?? [];
 	const orgName = me?.organization?.organizationName ?? null;
-	const isVerified = me?.organization?.verificationStatus === "VERIFIED";
 	const myUserId = me?.id;
 
-	// Publishing is `content.publish`: owners, admins and managers. Allowed
-	// while the role is still resolving so permitted authors never see a
-	// flicker of denial; the server still 403s anything the role cannot do.
-	// Verification gates first - an unverified org cannot post at all.
-	const teamRole = useMyTeamRole();
-	const canPublish = teamRole.isLoading
-		? true
-		: teamRole.can("content.publish");
-	const composerDisabledReason = !isVerified
-		? "Get verified to post to the feed"
-		: !canPublish
-			? "Ask an admin"
-			: undefined;
+	// Posting is public, so it needs verification and `content.publish`
+	// (`useOrgAccess` checks both, the same way the server does). Every entry
+	// point - the desktop button, the floating one, the prompt - reads this
+	// one value; the desktop button used to skip the verification half.
+	const access = useOrgAccess();
+	const postBlocked = access.blocked("content.publish", { public: true });
+	const canPublish = !postBlocked;
+	const composerDisabledReason = !postBlocked
+		? undefined
+		: !access.isVerified && !access.isSuspended
+			? "Get verified to post to the feed"
+			: "Ask an admin";
+	// A teammate with content.delete can take down any of the NGO's posts,
+	// not only their own (`FeedService.remove`).
+	const myOrgId = me?.organization?.id;
+	const canModerate = !access.blocked("content.delete");
 
 	const openComposer = useCallback(
 		(options?: ComposerRequest) => setComposer(options ?? {}),
@@ -316,7 +319,9 @@ export default function NgoFeed() {
 				borderBottomColor: colors.border.hairline,
 			}}
 		>
-			{!isDesktop && <ScreenHeader title="Feed" />}
+			{!isDesktop && (
+				<ScreenHeader title="Feed" action={<NotificationBell />} />
+			)}
 			{lensRow}
 		</View>
 	);
@@ -371,7 +376,7 @@ export default function NgoFeed() {
 					: "Be the first thing in it - post what your team did this week."
 			}
 			action={
-				isVerified && canPublish && tab !== "following" ? (
+				canPublish && tab !== "following" ? (
 					<Button onPress={() => openComposer()}>Write a post</Button>
 				) : undefined
 			}
@@ -400,10 +405,12 @@ export default function NgoFeed() {
 					onToggleFollow={handleToggleFollow}
 					onToggleLike={handleToggleLike}
 					onToggleSave={handleToggleSave}
-					// Only a post has a delete route, and only its own author may
-					// call it - the server enforces both, and offering the control
-					// on anything else would be a button that always fails.
-					{...(item.kind === "post" && myUserId && item.author?.id === myUserId
+					// Only a post has a delete route, and the server lets its
+					// author or a teammate with content.delete call it - offering
+					// the control on anything else would be a button that fails.
+					{...(item.kind === "post" &&
+					((myUserId && item.author?.id === myUserId) ||
+						(canModerate && !!myOrgId && item.organization?.id === myOrgId))
 						? { onDelete: confirmDelete }
 						: {})}
 				/>
@@ -479,7 +486,7 @@ export default function NgoFeed() {
 				<>
 					{pinnedHeader}
 					{list}
-					{isVerified && canPublish && (
+					{canPublish && (
 						<ComposeButton
 							// Clear of the tab bar, whose height is `TAB_BAR_HEIGHT`
 							// plus the home-indicator inset. Read from the constant so

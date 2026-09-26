@@ -1,19 +1,15 @@
 import type { EventStatus, OrgEventQuery } from "@nabhya/shared";
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { CalendarDays } from "lucide-react-native";
-import { useState } from "react";
-import { FlatList, RefreshControl, View } from "react-native";
+import { useEffect, useState } from "react";
+import { View } from "react-native";
 import { ApplicantsSheet } from "@/components/applicants-sheet";
 import { EventFormSheet } from "@/components/event-form-sheet";
-import { LoadMoreFooter } from "@/components/load-more-footer";
+import { PagedList, usePagedQuery } from "@/components/paged-list";
 import {
 	Banner,
 	EmptyState,
-	ErrorState,
 	FilterChips,
-	GridCell,
-	LoadingState,
 	Screen,
 	ScreenHeader,
 	Surface,
@@ -27,13 +23,13 @@ import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
 import { confirm, toast } from "@/components/ui/overlay";
 import { Body, Caption, Label } from "@/components/ui/typography";
-import { useDeleteEvent } from "@/hooks/use-events";
+import { useDeleteEvent, useOrgEvent } from "@/hooks/use-events";
+import { useOrgAccess } from "@/hooks/use-org-access";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useGridColumns } from "@/hooks/useMedia";
 import { apiErrorMessage, orgEventsApi, queryKeys } from "@/lib/api";
 import { formatDateRange } from "@/lib/format";
-import { verticalScrollbar } from "@/lib/scroll";
 import type { OrgEventListItem } from "@/lib/types";
 
 type StatusFilter = "ALL" | EventStatus;
@@ -43,46 +39,77 @@ const FILTERS: Array<{ value: StatusFilter; label: string }> = [
 	{ value: "PUBLISHED", label: "Published" },
 	{ value: "DRAFT", label: "Drafts" },
 	{ value: "COMPLETED", label: "Past" },
+	{ value: "CANCELLED", label: "Cancelled" },
 ];
 
-const PAGE_SIZE = 20;
-
-/**
- * The org's events, page by page. Shares the `["org","events"]` prefix with
- * `useOrgEvents` so every event mutation invalidates it too; the `paged`
- * marker keeps its cache shape apart from the page-1 query the dashboard reads.
- */
-function useOrgEventPages(filters: Partial<OrgEventQuery>) {
-	return useInfiniteQuery({
-		queryKey: queryKeys.orgEvents({ ...filters, paged: true }),
-		queryFn: ({ pageParam }) =>
-			orgEventsApi.list({ ...filters, page: pageParam, limit: PAGE_SIZE }),
-		initialPageParam: 1,
-		getNextPageParam: (last) =>
-			last.meta.hasMore ? last.meta.page + 1 : undefined,
-	});
-}
-
 export default function NgoEvents() {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const router = useRouter();
 	const [filter, setFilter] = useState<StatusFilter>("ALL");
 	const [formOpen, setFormOpen] = useState(false);
 	const [editing, setEditing] = useState<OrgEventListItem | null>(null);
 	const [reviewing, setReviewing] = useState<OrgEventListItem | null>(null);
 	const { data: me } = useMe();
+	const access = useOrgAccess();
 
-	const query = useOrgEventPages(filter === "ALL" ? {} : { status: filter });
+	const filters: Partial<OrgEventQuery> =
+		filter === "ALL" ? {} : { status: filter };
+	// Under the `["org","events"]` prefix, so every event mutation refreshes it.
+	const { query, items, first, loadMore } = usePagedQuery({
+		queryKey: queryKeys.orgEvents(filters),
+		fetchPage: (page) => orgEventsApi.list({ ...filters, page, limit: 20 }),
+	});
 	const deleteEvent = useDeleteEvent();
 	const columns = useGridColumns();
 
-	const isVerified = me?.organization?.verificationStatus === "VERIFIED";
-	const items = query.data?.pages.flatMap((page) => page.items) ?? [];
-	const total = query.data?.pages[0]?.meta.total ?? items.length;
+	const total = first?.meta.total ?? items.length;
 
-	const loadMore = () => {
-		if (query.hasNextPage && !query.isFetchingNextPage) query.fetchNextPage();
-	};
+	// `?review=<eventId>` - a "new applicant" notification opens that event's
+	// applicants straight away. The row may be past the first page, so fall
+	// back to the event's own record. The param is cleared once used, so
+	// closing the sheet does not reopen it.
+	const { review } = useLocalSearchParams<{ review?: string }>();
+	const reviewRow = review ? items.find((item) => item.id === review) : null;
+	const reviewDetail = useOrgEvent(review && !reviewRow ? review : undefined);
+	useEffect(() => {
+		if (!review) return;
+		const detail = reviewDetail.data;
+		const target: OrgEventListItem | null =
+			reviewRow ??
+			(detail
+				? {
+						id: detail.id,
+						title: detail.title,
+						city: detail.city,
+						state: detail.state,
+						startAt: detail.startAt,
+						endAt: detail.endAt,
+						status: detail.status,
+						isUrgent: detail.isUrgent,
+						volunteersNeeded: detail.volunteersNeeded,
+						acceptedCount: detail.acceptedCount,
+						coverImage: null,
+						createdAt: detail.startAt,
+						pendingApplications: 0,
+					}
+				: null);
+		if (!target) return;
+		setReviewing(target);
+		router.setParams({ review: undefined });
+	}, [review, reviewRow, reviewDetail.data, router]);
+	// The sheet's "places left" reads the row as it is now, not as it was when
+	// the sheet opened - accepting someone refetches the list.
+	const reviewingLive =
+		(reviewing && items.find((item) => item.id === reviewing.id)) ?? reviewing;
+	// Mirrors `EventsService`: drafts are open to everyone but viewers, and
+	// anything live - publishing it, or editing it once published - needs
+	// content.publish (plus verification to go public).
+	const canDraft = !access.isSuspended && access.role !== "VIEWER";
+	const publishBlocked = access.blocked("content.publish", { public: true });
+	const canEditLive = !access.blocked("content.publish");
+	const canRemove = !access.blocked("content.delete");
+	const canEdit = (event: OrgEventListItem) =>
+		event.status === "DRAFT" ? canDraft : canEditLive;
 
 	const confirmDelete = async (event: OrgEventListItem) => {
 		// An event with accepted volunteers is cancelled, not deleted - the
@@ -114,96 +141,78 @@ export default function NgoEvents() {
 					total > 0 ? `${total} event${total === 1 ? "" : "s"}` : undefined
 				}
 				action={
-					<Button size="sm" onPress={openCreate}>
+					<Button size="sm" onPress={openCreate} disabled={!canDraft}>
 						New event
 					</Button>
 				}
 			/>
 
-			{!isVerified && (
+			{publishBlocked && (
 				<View style={{ marginBottom: spacing[4] }}>
-					<Banner
-						tone="warning"
-						title="Drafts only until you're verified"
-						description="You can plan events now. Publishing them to volunteers unlocks once your documents are approved."
-						onPress={() => router.push("/(ngo)/verification")}
-					/>
+					{!access.isVerified && !access.isSuspended ? (
+						<Banner
+							tone="warning"
+							title="Drafts only until you're verified"
+							description="You can plan events now. Publishing them to volunteers unlocks once your documents are approved."
+							onPress={() => router.push("/(ngo)/verification")}
+						/>
+					) : (
+						<Banner
+							tone="info"
+							title={canDraft ? "Drafts only" : "View only"}
+							description={publishBlocked}
+						/>
+					)}
 				</View>
 			)}
 
 			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
 
-			{query.isLoading ? (
-				<LoadingState label="Loading your events" />
-			) : query.isError ? (
-				<ErrorState
-					message={apiErrorMessage(query.error)}
-					onRetry={() => query.refetch()}
-				/>
-			) : (
-				<FlatList
-					key={`grid-${columns}`}
-					numColumns={columns}
-					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
-					data={items}
-					keyExtractor={(item) => item.id}
-					{...verticalScrollbar}
-					contentContainerStyle={{ paddingBottom: spacing[10] }}
-					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
-					onEndReached={loadMore}
-					onEndReachedThreshold={0.5}
-					refreshControl={
-						<RefreshControl
-							refreshing={query.isRefetching && !query.isFetchingNextPage}
-							onRefresh={() => query.refetch()}
-							tintColor={colors.text.quaternary as string}
-						/>
-					}
-					ListEmptyComponent={
-						<EmptyState
-							icon={CalendarDays}
-							title={
-								filter === "DRAFT"
-									? "No drafts"
-									: filter === "COMPLETED"
-										? "No past events yet"
-										: filter === "PUBLISHED"
-											? "Nothing published yet"
+			<PagedList
+				query={query}
+				items={items}
+				loadMore={loadMore}
+				loadingLabel="Loading your events"
+				numColumns={columns}
+				noun="events"
+				keyExtractor={(item) => item.id}
+				renderItem={(item) => (
+					<EventRow
+						event={item}
+						onReview={() => setReviewing(item)}
+						onEdit={canEdit(item) ? () => setEditing(item) : undefined}
+						onDelete={canRemove ? () => confirmDelete(item) : undefined}
+					/>
+				)}
+				empty={
+					<EmptyState
+						icon={CalendarDays}
+						title={
+							filter === "DRAFT"
+								? "No drafts"
+								: filter === "COMPLETED"
+									? "No past events yet"
+									: filter === "PUBLISHED"
+										? "Nothing published yet"
+										: filter === "CANCELLED"
+											? "Nothing cancelled"
 											: "No events yet"
-							}
-							description={
-								filter === "COMPLETED"
-									? "Events move here once they finish. You can still mark attendance and issue certificates."
-									: "Each event lists here with how many places are filled and who is waiting for a decision."
-							}
-							action={
-								filter === "COMPLETED" ? undefined : (
-									<Button onPress={openCreate}>Create an event</Button>
-								)
-							}
-						/>
-					}
-					ListFooterComponent={
-						<LoadMoreFooter
-							hasMore={!!query.hasNextPage}
-							loading={query.isFetchingNextPage}
-							onLoadMore={loadMore}
-							count={items.length}
-							noun="events"
-						/>
-					}
-					renderItem={({ item }) => (
-						<GridCell>
-							<EventRow
-								event={item}
-								onReview={() => setReviewing(item)}
-								onEdit={() => setEditing(item)}
-								onDelete={() => confirmDelete(item)}
-							/>
-						</GridCell>
-					)}
-				/>
-			)}
+						}
+						description={
+							filter === "COMPLETED"
+								? "Events move here once they finish. You can still mark attendance and issue certificates."
+								: "Each event lists here with how many places are filled and who is waiting for a decision."
+						}
+						action={
+							filter === "COMPLETED" ||
+							filter === "CANCELLED" ||
+							!canDraft ? undefined : (
+								<Button onPress={openCreate}>Create an event</Button>
+							)
+						}
+					/>
+				}
+			/>
 
 			<EventFormSheet
 				visible={formOpen || !!editing}
@@ -214,13 +223,16 @@ export default function NgoEvents() {
 				}}
 				defaultCity={me?.organization?.city}
 				defaultState={me?.organization?.state}
+				publishBlockedReason={publishBlocked}
 			/>
 
 			<ApplicantsSheet
-				eventId={reviewing?.id ?? null}
-				eventTitle={reviewing?.title ?? ""}
+				eventId={reviewingLive?.id ?? null}
+				eventTitle={reviewingLive?.title ?? ""}
 				remainingPlaces={
-					reviewing ? reviewing.volunteersNeeded - reviewing.acceptedCount : 0
+					reviewingLive
+						? reviewingLive.volunteersNeeded - reviewingLive.acceptedCount
+						: 0
 				}
 				onClose={() => setReviewing(null)}
 			/>
@@ -241,8 +253,9 @@ function EventRow({
 }: {
 	event: OrgEventListItem;
 	onReview: () => void;
-	onEdit: () => void;
-	onDelete: () => void;
+	/** Omitted when the viewer's team role cannot change this event. */
+	onEdit?: () => void;
+	onDelete?: () => void;
 }) {
 	const { colors, spacing } = useTheme();
 	const filled = event.volunteersNeeded
@@ -331,18 +344,22 @@ function EventRow({
 					</Caption>
 				</View>
 				<View style={{ flexDirection: "row", gap: spacing[3] }}>
-					<TextAction
-						label={event.status === "DRAFT" ? "Edit & publish" : "Edit"}
-						tone={event.status === "DRAFT" ? "brand" : "default"}
-						onPress={onEdit}
-						accessibilityLabel={`Edit ${event.title}`}
-					/>
-					<TextAction
-						label="Remove"
-						tone="danger"
-						onPress={onDelete}
-						accessibilityLabel={`Remove ${event.title}`}
-					/>
+					{onEdit && (
+						<TextAction
+							label={event.status === "DRAFT" ? "Edit & publish" : "Edit"}
+							tone={event.status === "DRAFT" ? "brand" : "default"}
+							onPress={onEdit}
+							accessibilityLabel={`Edit ${event.title}`}
+						/>
+					)}
+					{onDelete && (
+						<TextAction
+							label="Remove"
+							tone="danger"
+							onPress={onDelete}
+							accessibilityLabel={`Remove ${event.title}`}
+						/>
+					)}
 				</View>
 			</View>
 		</Surface>

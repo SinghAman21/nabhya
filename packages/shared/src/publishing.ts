@@ -26,6 +26,17 @@ export type UpsertAnnouncementInput = z.infer<typeof upsertAnnouncementSchema>;
 
 export const announcementQuerySchema = paginationQuerySchema;
 
+/**
+ * The NGO's own list, which also holds drafts. Filtering by status has to
+ * happen here: filtered on the client it only ever looked through the pages
+ * loaded so far, so "Drafts" could read empty with drafts on page three.
+ */
+export const myAnnouncementQuerySchema = paginationQuerySchema.extend({
+	status: announcementStatusSchema.optional(),
+});
+
+export type MyAnnouncementQuery = z.infer<typeof myAnnouncementQuerySchema>;
+
 // ─── Financial reports ───────────────────────────────────────────────────────
 
 export const financialReportTypeSchema = z.enum([

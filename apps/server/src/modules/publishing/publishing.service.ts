@@ -7,7 +7,9 @@ import {
 	organizationAdmins,
 	organizationOwnershipTransfers,
 	organizations,
+	roles,
 	teamInvites,
+	userRoles,
 	users,
 } from "@nabhya/db/schema";
 import { env } from "@nabhya/env/server";
@@ -16,6 +18,7 @@ import type {
 	CreateFinancialReportInput,
 	InviteOrgAdminInput,
 	InviteTeamMemberInput,
+	MyAnnouncementQuery,
 	PaginationQuery,
 	TeamListQuery,
 	TeamRole,
@@ -183,11 +186,14 @@ export class PublishingService {
 	}
 
 	/** The org's own list, including drafts. */
-	async listMyAnnouncements(userId: string, query: PaginationQuery) {
+	async listMyAnnouncements(userId: string, query: MyAnnouncementQuery) {
 		const organization =
 			await this.organizationsService.requireOwnedOrganization(userId);
 
-		const where = eq(announcements.organizationId, organization.id);
+		const where = and(
+			eq(announcements.organizationId, organization.id),
+			query.status ? eq(announcements.status, query.status) : undefined,
+		);
 		const { limit, offset } = toOffset(query);
 
 		const [items, [totals]] = await Promise.all([
@@ -372,6 +378,7 @@ export class PublishingService {
 			);
 		}
 
+		await this.assertCanJoinTeam(invitee.id);
 		const member = await this.addActiveMember({
 			organizationId: organization.id,
 			userId: invitee.id,
@@ -588,8 +595,24 @@ export class PublishingService {
 	}
 
 	async acceptTeamInvite(userId: string, token: string) {
+		return this.acceptInvite(userId, await this.requireInviteByToken(token));
+	}
+
+	/**
+	 * Accept from the in-app notification, which carries the invite's id - the
+	 * token only ever travels in the email, so an invitee who never opened it
+	 * had no way in. Safe for the same reason the token path is: the invite's
+	 * email must equal the signed-in account's.
+	 */
+	async acceptTeamInviteById(userId: string, inviteId: string) {
+		return this.acceptInvite(userId, await this.requireInviteById(inviteId));
+	}
+
+	private async acceptInvite(
+		userId: string,
+		invite: typeof teamInvites.$inferSelect,
+	) {
 		const user = await this.requireUser(userId);
-		const invite = await this.requireInviteByToken(token);
 		this.assertPendingInvite(invite);
 		if (user.email.toLowerCase() !== invite.email.toLowerCase()) {
 			throw new ForbiddenException(
@@ -597,7 +620,10 @@ export class PublishingService {
 			);
 		}
 
+		await this.assertCanJoinTeam(userId);
+
 		const member = await this.db.transaction(async (tx) => {
+			await this.grantOrganisationRole(tx, userId);
 			const inserted = takeFirstOrThrow(
 				await tx
 					.insert(organizationAdmins)
@@ -634,12 +660,34 @@ export class PublishingService {
 			newValue: { inviteId: invite.id, role: invite.role },
 		});
 
+		if (invite.invitedBy) {
+			void this.notifications.notify({
+				userId: invite.invitedBy,
+				type: "TEAM_INVITE_ACCEPTED",
+				title: `${user.fullName ?? user.email} joined your team`,
+				body: `They accepted your invite as ${invite.role.toLowerCase()}.`,
+				entityName: "ORGANIZATION_ADMIN",
+				entityId: member.id,
+			});
+		}
+
 		return member;
 	}
 
 	async declineTeamInvite(userId: string, token: string) {
+		return this.declineInvite(userId, await this.requireInviteByToken(token));
+	}
+
+	/** Decline from the in-app notification - see `acceptTeamInviteById`. */
+	async declineTeamInviteById(userId: string, inviteId: string) {
+		return this.declineInvite(userId, await this.requireInviteById(inviteId));
+	}
+
+	private async declineInvite(
+		userId: string,
+		invite: typeof teamInvites.$inferSelect,
+	) {
 		const user = await this.requireUser(userId);
-		const invite = await this.requireInviteByToken(token);
 		this.assertPendingInvite(invite);
 		if (user.email.toLowerCase() !== invite.email.toLowerCase()) {
 			throw new ForbiddenException(
@@ -724,6 +772,17 @@ export class PublishingService {
 			newValue: input,
 		});
 
+		if (changes.role) {
+			void this.notifications.notify({
+				userId: member.userId,
+				type: "TEAM_ROLE_CHANGED",
+				title: `You're now ${changes.role.toLowerCase()} on the team`,
+				body: "What you can do for the organization has changed.",
+				entityName: "ORGANIZATION",
+				entityId: member.organizationId,
+			});
+		}
+
 		return updated;
 	}
 
@@ -750,6 +809,15 @@ export class PublishingService {
 			entityId: memberId,
 			oldValue: { role: member.role, status: member.status },
 			newValue: { status: "REMOVED" },
+		});
+
+		void this.notifications.notify({
+			userId: member.userId,
+			type: "TEAM_REMOVED",
+			title: "You were removed from the team",
+			body: "You no longer have access to this organization.",
+			entityName: "ORGANIZATION",
+			entityId: member.organizationId,
 		});
 
 		return { removed: true };
@@ -883,6 +951,22 @@ export class PublishingService {
 			newValue: { toMemberId: transfer.toMemberId },
 		});
 
+		// The previous owner learns the handover completed (they are an admin now).
+		const previous = await this.db.query.organizationAdmins.findFirst({
+			where: eq(organizationAdmins.id, transfer.fromMemberId),
+			columns: { userId: true },
+		});
+		if (previous) {
+			void this.notifications.notify({
+				userId: previous.userId,
+				type: "OWNERSHIP_TRANSFERRED",
+				title: "Ownership transferred",
+				body: "The new owner confirmed. You remain on the team as an admin.",
+				entityName: "ORGANIZATION",
+				entityId: transfer.organizationId,
+			});
+		}
+
 		return { transferred: true };
 	}
 
@@ -957,22 +1041,100 @@ export class PublishingService {
 		});
 		if (existing) throw new ConflictException("They're already on your team.");
 
-		return takeFirstOrThrow(
-			await this.db
-				.insert(organizationAdmins)
-				.values({
-					organizationId: input.organizationId,
-					userId: input.userId,
-					designation: input.designation,
-					role: input.role,
-					status: "ACTIVE",
-					isOwner: false,
-					invitedBy: input.invitedBy,
-					invitedAt: new Date(),
-				})
-				.returning(),
-			"add organization admin",
-		);
+		return this.db.transaction(async (tx) => {
+			await this.grantOrganisationRole(tx, input.userId);
+			return takeFirstOrThrow(
+				await tx
+					.insert(organizationAdmins)
+					.values({
+						organizationId: input.organizationId,
+						userId: input.userId,
+						designation: input.designation,
+						role: input.role,
+						status: "ACTIVE",
+						isOwner: false,
+						invitedBy: input.invitedBy,
+						invitedAt: new Date(),
+					})
+					.returning(),
+				"add organization admin",
+			);
+		});
+	}
+
+	/**
+	 * Joining a team is what makes an account an NGO account, so the checks
+	 * that role-select and onboarding make elsewhere have to be made here.
+	 *
+	 * - One team per account. `getActiveMembership` resolves the org an
+	 *   `org/*` request acts on with `limit(1)`, so a second membership would
+	 *   make every request act on whichever row Postgres returned first.
+	 * - The role must be `organisation` or not yet chosen. Roles are picked
+	 *   once (`UsersService.selectRole`) and every client route keys off the
+	 *   first one, so a volunteer account that joined a team would still land
+	 *   in the volunteer app with a membership it can never reach.
+	 */
+	private async assertCanJoinTeam(userId: string) {
+		const [membership] = await this.db
+			.select({ organizationName: organizations.organizationName })
+			.from(organizationAdmins)
+			.innerJoin(
+				organizations,
+				eq(organizationAdmins.organizationId, organizations.id),
+			)
+			.where(
+				and(
+					eq(organizationAdmins.userId, userId),
+					eq(organizationAdmins.status, "ACTIVE"),
+				),
+			)
+			.limit(1);
+		const owned = membership
+			? null
+			: await this.db.query.organizations.findFirst({
+					where: eq(organizations.ownerUserId, userId),
+					columns: { organizationName: true },
+				});
+		const current = membership ?? owned;
+		if (current) {
+			throw new ConflictException(
+				`This account is already on ${current.organizationName}'s team. An account can belong to one organization at a time.`,
+			);
+		}
+
+		const held = await this.db
+			.select({ name: roles.name })
+			.from(userRoles)
+			.innerJoin(roles, eq(userRoles.roleId, roles.id))
+			.where(eq(userRoles.userId, userId));
+		const other = held.find((role) => role.name !== "organisation");
+		if (other) {
+			throw new ForbiddenException(
+				`This is a ${other.name} account. Team members need an organisation account - sign up with the invited email as an organisation, or ask for the invite to go to another address.`,
+			);
+		}
+	}
+
+	/** Grants `organisation` to an account that has no role yet. Idempotent. */
+	private async grantOrganisationRole(
+		tx: Parameters<Parameters<typeof dbType.transaction>[0]>[0],
+		userId: string,
+	) {
+		const role = await tx.query.roles.findFirst({
+			where: eq(roles.name, "organisation"),
+			columns: { id: true },
+		});
+		if (!role) {
+			throw new NotFoundException(
+				'Role "organisation" is not configured. Run the database seed.',
+			);
+		}
+		// `user_roles` has no unique index, so idempotency is a read first.
+		const held = await tx.query.userRoles.findFirst({
+			where: and(eq(userRoles.userId, userId), eq(userRoles.roleId, role.id)),
+			columns: { id: true },
+		});
+		if (!held) await tx.insert(userRoles).values({ userId, roleId: role.id });
 	}
 
 	private async assertCanGrantRole(
@@ -1054,6 +1216,14 @@ export class PublishingService {
 		if (!invite || !this.constantTimeEqual(invite.tokenHash, tokenHash)) {
 			throw new NotFoundException("Invite link not found.");
 		}
+		return invite;
+	}
+
+	private async requireInviteById(inviteId: string) {
+		const invite = await this.db.query.teamInvites.findFirst({
+			where: eq(teamInvites.id, inviteId),
+		});
+		if (!invite) throw new NotFoundException("Team invite not found.");
 		return invite;
 	}
 

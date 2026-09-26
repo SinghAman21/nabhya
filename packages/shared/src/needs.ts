@@ -21,6 +21,13 @@ export type NeedStatus = z.infer<typeof needStatusSchema>;
 export type NeedUrgency = z.infer<typeof needUrgencySchema>;
 export type PledgeStatus = z.infer<typeof pledgeStatusSchema>;
 
+/** An NGO's pledges on one need, optionally narrowed to one state. */
+export const pledgeQuerySchema = paginationQuerySchema.extend({
+	status: pledgeStatusSchema.optional(),
+});
+
+export type PledgeQuery = z.infer<typeof pledgeQuerySchema>;
+
 export const NEED_TYPE_LABELS: Record<NeedType, string> = {
 	WANT: "We need",
 	OFFER: "We're giving",

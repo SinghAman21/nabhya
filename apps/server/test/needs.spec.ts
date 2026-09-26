@@ -5,7 +5,15 @@ import {
 	ForbiddenException,
 } from "@nestjs/common";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+	afterAll,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest";
 import { AuditService } from "../src/common/audit";
 import { NeedsService } from "../src/modules/needs/needs.service";
 import { NotificationsService } from "../src/modules/notifications/notifications.service";
@@ -51,6 +59,24 @@ describe("NeedsService", () => {
 	});
 
 	describe("pledging", () => {
+		it("tells the NGO that someone offered to help", async () => {
+			// NEW_PLEDGE existed and was never sent.
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const need = await createNeed(db, org.id, { quantity: 10 });
+			const volunteer = await createUser(db, { role: "volunteer" });
+
+			await service.pledge(volunteer.id, need.id, { quantity: 2 });
+
+			await vi.waitFor(async () => {
+				const sent = await db.query.notifications.findFirst({});
+				expect(sent?.type).toBe("NEW_PLEDGE");
+			});
+			const sent = await db.query.notifications.findFirst({});
+			expect(sent?.userId).toBe(owner.id);
+			expect(sent?.entityId).toBe(need.id);
+		});
+
 		it("requires a quantity when the need specifies one", async () => {
 			// This is the bug that made fulfilment permanently read "0 of 100":
 			// a pledge with no quantity advances the counter by zero.
@@ -112,6 +138,31 @@ describe("NeedsService", () => {
 
 			const result = await service.listPublic({ page: 1, limit: 20 });
 			expect(result.items).toHaveLength(0);
+		});
+	});
+
+	describe("listing pledges", () => {
+		it("filters by status on the server, with a matching total", async () => {
+			// The sheet filtered page 1 locally, so pending pledges past the
+			// twentieth never appeared under "Pending".
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const need = await createNeed(db, org.id, { quantity: 100 });
+			for (let i = 0; i < 3; i++) {
+				const volunteer = await createUser(db, { role: "volunteer" });
+				await createPledge(db, need.id, volunteer.id, {
+					status: i === 0 ? "ACCEPTED" : "PENDING",
+				});
+			}
+
+			const pending = await service.listPledges(owner.id, need.id, {
+				page: 1,
+				limit: 1,
+				status: "PENDING",
+			});
+			expect(pending.items).toHaveLength(1);
+			expect(pending.items[0]?.status).toBe("PENDING");
+			expect(pending.meta.total).toBe(2);
 		});
 	});
 

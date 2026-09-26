@@ -1,7 +1,7 @@
 import type {
 	CreateFinancialReportInput,
-	InviteOrgAdminInput,
 	InviteTeamMemberInput,
+	MyAnnouncementQuery,
 	NearbyQuery,
 	OrganizationImpact,
 	PaginationQuery,
@@ -36,7 +36,7 @@ export const publishingApi = {
 	// Announcements
 	listAnnouncements: (orgId: string, query: Partial<PaginationQuery>) =>
 		http.getPage<Announcement>(PUBLISHING.announcements(orgId), query),
-	listMyAnnouncements: (query: Partial<PaginationQuery>) =>
+	listMyAnnouncements: (query: Partial<MyAnnouncementQuery>) =>
 		http.getPage<Announcement>(PUBLISHING.MY_ANNOUNCEMENTS, query),
 	createAnnouncement: (input: UpsertAnnouncementInput) =>
 		http.post<Announcement>(PUBLISHING.MY_ANNOUNCEMENTS, input),
@@ -62,8 +62,6 @@ export const publishingApi = {
 	listPublicTeam: (orgId: string) =>
 		http.get<PublicTeamMember[]>(ORGANIZATIONS.publicTeam(orgId)),
 	listTeamInvites: () => http.get<TeamInvite[]>(PUBLISHING.TEAM_INVITES),
-	inviteAdmin: (input: InviteOrgAdminInput) =>
-		http.post<OrgTeamMember>(PUBLISHING.TEAM, input),
 	createTeamInvite: (input: InviteTeamMemberInput) =>
 		http.post<TeamInvite>(PUBLISHING.TEAM_INVITES, input),
 	resendTeamInvite: (id: string) =>
@@ -74,6 +72,10 @@ export const publishingApi = {
 		http.post<OrgTeamMember>(PUBLISHING.acceptTeamInvite(token)),
 	declineTeamInvite: (token: string) =>
 		http.post<TeamInvite>(PUBLISHING.declineTeamInvite(token)),
+	acceptTeamInviteById: (id: string) =>
+		http.post<OrgTeamMember>(PUBLISHING.acceptTeamInviteById(id)),
+	declineTeamInviteById: (id: string) =>
+		http.post<TeamInvite>(PUBLISHING.declineTeamInviteById(id)),
 	updateAdmin: (id: string, input: UpdateOrgAdminInput) =>
 		http.patch<OrgTeamMember>(PUBLISHING.teamMember(id), input),
 	removeAdmin: (id: string) =>

@@ -61,6 +61,7 @@ export function useCreateNeed() {
 		mutationFn: (input: CreateNeedInput) => orgNeedsApi.create(input),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.orgNeeds });
+			queryClient.invalidateQueries({ queryKey: queryKeys.orgOverview });
 			queryClient.invalidateQueries({ queryKey: queryScopes.needs });
 			// The composer can create one of these straight from the feed, and
 			// the ranking pool holds open needs, upcoming events and published
@@ -78,6 +79,7 @@ export function useUpdateNeed() {
 			orgNeedsApi.update(id, input),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.orgNeeds });
+			queryClient.invalidateQueries({ queryKey: queryKeys.orgOverview });
 			queryClient.invalidateQueries({ queryKey: queryScopes.needs });
 		},
 	});
@@ -89,19 +91,22 @@ export function useDeleteNeed() {
 		mutationFn: (id: string) => orgNeedsApi.remove(id),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.orgNeeds });
+			queryClient.invalidateQueries({ queryKey: queryKeys.orgOverview });
 			queryClient.invalidateQueries({ queryKey: queryScopes.needs });
 		},
 	});
 }
 
-export function useNeedPledges(
-	needId: string | undefined,
-	query: Partial<PaginationQuery> = {},
-) {
+/**
+ * One need as the public sees it, plus the viewer's own pledge - the need page
+ * and the NGO's "new pledge" deep link. Under the `["needs"]` scope, so
+ * pledging and withdrawing refresh it.
+ */
+export function usePublicNeed(id: string | undefined) {
 	return useQuery({
-		queryKey: queryKeys.orgNeedPledges(needId ?? "", query),
-		queryFn: () => orgNeedsApi.pledges(needId as string, query),
-		enabled: !!needId,
+		queryKey: queryKeys.publicNeed(id ?? ""),
+		queryFn: () => needsApi.detail(id as string),
+		enabled: !!id,
 	});
 }
 
@@ -117,6 +122,7 @@ export function useReviewPledge(needId: string) {
 		}) => orgNeedsApi.reviewPledge(needId, pledgeId, input),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.orgNeeds });
+			queryClient.invalidateQueries({ queryKey: queryKeys.orgOverview });
 		},
 	});
 }

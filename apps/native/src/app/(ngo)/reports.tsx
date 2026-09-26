@@ -4,6 +4,7 @@ import {
 	FINANCIAL_REPORT_LABELS,
 	formatFinancialYear,
 } from "@nabhya/shared";
+import { useRouter } from "expo-router";
 import { FileText, Upload } from "lucide-react-native";
 import { useState } from "react";
 import {
@@ -15,6 +16,7 @@ import {
 import { ChoiceChips } from "@/components/choice-chips";
 import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
 import {
+	Banner,
 	EmptyState,
 	ErrorState,
 	GridCell,
@@ -36,6 +38,7 @@ import {
 	useFinancialReports,
 } from "@/hooks/use-directory";
 import { useOpenDocument } from "@/hooks/use-documents";
+import { useOrgAccess } from "@/hooks/use-org-access";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useFileUpload } from "@/hooks/use-upload";
@@ -65,13 +68,26 @@ const TYPES: Array<{ value: ReportType; label: string }> = (
  * superadmin - everything here is public, and is what a donor reads before
  * deciding to trust the organization. The endpoint returns the full list, so
  * there is no paging here.
+ *
+ * The list is the *public* endpoint, which 404s for an NGO that is not yet
+ * verified - and such an NGO cannot have published one (`reports.manage` plus
+ * verification, server-side). So the query waits for verification and the
+ * screen says what unlocks it, instead of opening on an error.
  */
 export default function OrgReports() {
-	const { colors, spacing } = useTheme();
+	const { colors, spacing, borderRadius } = useTheme();
+	const router = useRouter();
 	const [composing, setComposing] = useState(false);
+	const access = useOrgAccess();
 
 	const me = useMe();
-	const query = useFinancialReports(me.data?.organization?.id);
+	const query = useFinancialReports(
+		access.isVerified && !access.isSuspended
+			? me.data?.organization?.id
+			: undefined,
+	);
+	const publishBlocked = access.blocked("reports.manage", { public: true });
+	const canWithdraw = !access.blocked("reports.manage");
 	const columns = useGridColumns();
 	const remove = useDeleteFinancialReport();
 	const openDocument = useOpenDocument();
@@ -100,13 +116,33 @@ export default function OrgReports() {
 				title="Reports"
 				subtitle="Public on your profile"
 				action={
-					<Button size="sm" onPress={openCreate}>
+					<Button size="sm" onPress={openCreate} disabled={!!publishBlocked}>
 						Publish
 					</Button>
 				}
 			/>
 
-			{me.isLoading || query.isLoading ? (
+			{publishBlocked && (
+				<View style={{ marginBottom: spacing[4] }}>
+					{!access.isVerified && !access.isSuspended ? (
+						<Banner
+							tone="warning"
+							title="Reports unlock once you're verified"
+							description="Everything here is public on your profile, so publishing waits for your documents to be approved."
+							onPress={() => router.push("/(ngo)/verification")}
+						/>
+					) : (
+						<Banner
+							tone="info"
+							title="View only"
+							description={publishBlocked}
+						/>
+					)}
+				</View>
+			)}
+
+			{!access.isVerified || access.isSuspended ? null : me.isLoading ||
+				query.isLoading ? (
 				<LoadingState />
 			) : me.isError || query.isError ? (
 				<ErrorState
@@ -135,7 +171,11 @@ export default function OrgReports() {
 							icon={FileText}
 							title="Nothing published yet"
 							description="Annual reports, audited statements and FCRA returns. Publishing them here is the strongest trust signal you can give a donor."
-							action={<Button onPress={openCreate}>Publish a report</Button>}
+							action={
+								publishBlocked ? undefined : (
+									<Button onPress={openCreate}>Publish a report</Button>
+								)
+							}
 						/>
 					}
 					renderItem={({ item }) => (
@@ -152,7 +192,7 @@ export default function OrgReports() {
 										style={{
 											width: 40,
 											height: 40,
-											borderRadius: 12,
+											borderRadius: borderRadius.md,
 											alignItems: "center",
 											justifyContent: "center",
 											backgroundColor: colors.background.subtle,
@@ -204,12 +244,14 @@ export default function OrgReports() {
 											onPress={() => openDocument.mutate(item.documentKey)}
 											accessibilityLabel={`View ${item.title}`}
 										/>
-										<TextAction
-											label="Withdraw"
-											tone="danger"
-											onPress={() => confirmDelete(item)}
-											accessibilityLabel={`Withdraw ${item.title}`}
-										/>
+										{canWithdraw && (
+											<TextAction
+												label="Withdraw"
+												tone="danger"
+												onPress={() => confirmDelete(item)}
+												accessibilityLabel={`Withdraw ${item.title}`}
+											/>
+										)}
 									</View>
 								</View>
 							</Surface>
@@ -237,6 +279,9 @@ function ReportSheet({
 	const [type, setType] = useState<ReportType>("ANNUAL_REPORT");
 	const [title, setTitle] = useState("");
 	const [year, setYear] = useState(String(currentYear - 1));
+	// The hint explains the convention; a half-typed year falls back to last
+	// year's rather than printing "NaN".
+	const yearForHint = /^\d{4}$/.test(year) ? Number(year) : currentYear - 1;
 	const [documentKey, setDocumentKey] = useState<string | null>(null);
 	const [fileName, setFileName] = useState<string | null>(null);
 	const [errors, setErrors] = useState<Record<string, string>>({});
@@ -340,7 +385,7 @@ function ReportSheet({
 				<Field
 					label="Financial year starting"
 					error={errors.financialYear}
-					hint={`${year || "2024"} means FY ${year || "2024"}–${String((Number(year || "2024") + 1) % 100).padStart(2, "0")}`}
+					hint={`${yearForHint} means ${formatFinancialYear(yearForHint)}`}
 				>
 					<Input
 						placeholder={String(currentYear - 1)}

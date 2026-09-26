@@ -29,7 +29,10 @@ export function useUploadOrgDocument() {
 			organizationsApi.uploadDocument(input),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryKeys.myOrgDocuments });
-			// Submitting a document can re-open review for a rejected NGO.
+			// Submitting a document re-opens review for a rejected NGO, which
+			// changes the org row itself - without this the screen went on
+			// saying "not approved" after the corrected copy was in.
+			queryClient.invalidateQueries({ queryKey: queryKeys.myOrganization });
 			queryClient.invalidateQueries({ queryKey: queryKeys.me });
 			queryClient.invalidateQueries({ queryKey: queryKeys.onboardingStatus });
 		},

@@ -47,6 +47,16 @@ Certificates
 ✔ View Certificates
 ✔ Download Certificates
 
+Needs & Pledges
+---------------
+✔ Post a need or an offer (verified NGOs)
+✔ Review pledges - accept, decline, mark received
+✔ Contact volunteers whose pledge was accepted (issue #9)
+
+Followers
+---------
+✔ Follower count on the NGO page and profile (issue #7)
+
 Reviews
 -------
 ✔ Give Rating
@@ -55,7 +65,8 @@ Reviews
 
 Notifications
 -------------
-✔ View Notifications
+✔ View Notifications (unread count in the sidebar, bell on phones)
+✔ Told when the NGO or a document is verified or rejected, with the reason
 ✔ Mark as Read
 
 
@@ -163,11 +174,23 @@ Organization
 ✔ Upload Documents
 ✔ View Verification Status
 
-Organization Admins
--------------------
-✔ Invite Admin
-✔ Remove Admin
-✔ Assign Roles
+Team (roles, invites & permissions - epic #10)
+----------------------------------------------
+✔ Invite a teammate by email, even before they sign up (7-day link)
+✔ Accepting an invite makes the account an organisation account
+✔ One team per account (a volunteer account cannot accept - use another email)
+✔ Resend / revoke pending invites
+✔ Five roles: Owner, Admin, Manager, Member, Viewer
+    Owner    - everything, including transferring ownership
+    Admin    - everything except transferring ownership
+    Manager  - posts, needs, events, applicants, attendance, certificates
+    Member   - drafts events, marks attendance
+    Viewer   - read-only, plus donations
+✔ Change a teammate's role and designation, suspend, remove
+✔ Leave the team (owners transfer ownership first)
+✔ Transfer ownership to an active admin (two-step, with a confirm token)
+✔ Opt-in public "Our team" list on the NGO page
+✔ Every rule enforced server-side (tested role x action)
 
 Events
 ------
@@ -177,13 +200,15 @@ Events
 ✔ View Applicants
 ✔ Accept Volunteers
 ✔ Reject Volunteers
-✔ Generate Certificates
+✔ Contact accepted volunteers (call, WhatsApp, email)
+✔ Mark attendance and record hours served (issue #8)
+✔ Generate Certificates (print the recorded hours)
 
 Donations
 ---------
 ✔ View Donations
 ✔ View Donor Messages
-✔ Download Reports
+✘ Download Reports (planned - no export endpoint yet)
 
 Announcements
 -------------

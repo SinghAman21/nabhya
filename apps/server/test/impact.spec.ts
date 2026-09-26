@@ -1,3 +1,5 @@
+import { eventApplications } from "@nabhya/db/schema";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ImpactService } from "../src/modules/publishing/impact.service";
 import {
@@ -75,6 +77,37 @@ describe("ImpactService", () => {
 			// The 100-hour event must not count: accepted is not attended.
 			expect(impact.hoursContributed).toBe(4);
 			expect(impact.eventsAttended).toBe(1);
+		});
+
+		it("uses the hours the NGO recorded over the event's length", async () => {
+			// Issue #8: someone who left after 2 hours of an 8-hour drive was
+			// credited with all 8.
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const volunteer = await createUser(db, { role: "volunteer" });
+			const recorded = await eventOfHours(org.id, 8);
+			const unrecorded = await eventOfHours(org.id, 3);
+
+			const application = await createApplication(
+				db,
+				recorded.id,
+				volunteer.id,
+				{ status: "ACCEPTED", attendedAt: new Date() },
+			);
+			await db
+				.update(eventApplications)
+				.set({ hoursServed: "2.5" })
+				.where(eq(eventApplications.id, application.id));
+			await createApplication(db, unrecorded.id, volunteer.id, {
+				status: "ACCEPTED",
+				attendedAt: new Date(),
+			});
+
+			// 2.5 recorded + 3 from the event with no entry, rounded.
+			const impact = await service.getVolunteerImpact(volunteer.id);
+			expect(impact.hoursContributed).toBe(6);
+			const hosting = await service.getOrganizationImpact(org.id);
+			expect(hosting.volunteerHours).toBe(6);
 		});
 
 		it("counts distinct organizations, not events", async () => {

@@ -1,12 +1,7 @@
 import type {
-	AdminActivityQuery,
 	AdminAnalyticsQuery,
-	AdminOrgPostsQuery,
-	AdminOrgQuery,
-	AdminUserQuery,
 	AuditLogQuery,
 	BulkReviewDocumentsInput,
-	DocumentQueueQuery,
 	ReviewDocumentInput,
 	ReviewOrganizationInput,
 	SetOrgStatusInput,
@@ -53,42 +48,11 @@ export function useAdminAnalytics(query: Partial<AdminAnalyticsQuery> = {}) {
 	});
 }
 
-export function useAdminOrganizations(query: Partial<AdminOrgQuery> = {}) {
-	return useQuery({
-		queryKey: queryKeys.adminOrganizations(query),
-		queryFn: () => adminApi.organizations(query),
-	});
-}
-
 export function useAdminOrganization(id: string | undefined) {
 	return useQuery({
 		queryKey: queryKeys.adminOrganization(id ?? ""),
 		queryFn: () => adminApi.organization(id as string),
 		enabled: !!id,
-	});
-}
-
-export function useAdminOrganizationActivity(
-	id: string | undefined,
-	query: Partial<AdminActivityQuery> = {},
-) {
-	return useQuery({
-		queryKey: queryKeys.adminOrganizationActivity(id ?? "", query),
-		queryFn: () => adminApi.organizationActivity(id as string, query),
-		enabled: !!id,
-		placeholderData: keepPreviousData,
-	});
-}
-
-export function useAdminOrganizationPosts(
-	id: string | undefined,
-	query: Partial<AdminOrgPostsQuery> = {},
-) {
-	return useQuery({
-		queryKey: queryKeys.adminOrganizationPosts(id ?? "", query),
-		queryFn: () => adminApi.organizationPosts(id as string, query),
-		enabled: !!id,
-		placeholderData: keepPreviousData,
 	});
 }
 
@@ -99,51 +63,11 @@ export function useAuditLogs(query: Partial<AuditLogQuery> = {}) {
 	});
 }
 
-/**
- * The cross-organization verification queues.
- *
- * The dossier screens show one NGO's documents at a time; these answer the
- * other question a reviewer has - "what is waiting on me right now?" - without
- * opening every organization in turn.
- */
-export function useOrgDocumentQueue(query: Partial<DocumentQueueQuery> = {}) {
-	return useQuery({
-		queryKey: queryKeys.adminOrgDocuments(query),
-		queryFn: () => adminApi.orgDocuments(query),
-	});
-}
-
-export function useUserDocumentQueue(query: Partial<DocumentQueueQuery> = {}) {
-	return useQuery({
-		queryKey: queryKeys.adminUserDocuments(query),
-		queryFn: () => adminApi.userDocuments(query),
-	});
-}
-
-export function useAdminUsers(query: Partial<AdminUserQuery> = {}) {
-	return useQuery({
-		queryKey: queryKeys.adminUsers(query),
-		queryFn: () => adminApi.users(query),
-	});
-}
-
 export function useAdminUser(id: string | undefined) {
 	return useQuery({
 		queryKey: queryKeys.adminUser(id ?? ""),
 		queryFn: () => adminApi.user(id as string),
 		enabled: !!id,
-	});
-}
-
-export function useAdminUserActivity(
-	id: string | undefined,
-	query: Partial<AdminActivityQuery> = {},
-) {
-	return useQuery({
-		queryKey: queryKeys.adminUserActivity(id ?? "", query),
-		queryFn: () => adminApi.userActivity(id as string, query),
-		enabled: !!id,
-		placeholderData: keepPreviousData,
 	});
 }
 

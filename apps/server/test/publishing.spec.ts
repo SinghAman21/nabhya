@@ -1,8 +1,11 @@
 import {
 	announcements,
+	notifications,
 	organizationAdmins,
 	organizations,
+	roles,
 	teamInvites,
+	userRoles,
 	users,
 } from "@nabhya/db/schema";
 import {
@@ -12,7 +15,15 @@ import {
 	NotFoundException,
 } from "@nestjs/common";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+	afterAll,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest";
 import { AuditService } from "../src/common/audit";
 import { NotificationsService } from "../src/modules/notifications/notifications.service";
 import { OrganizationsService } from "../src/modules/organizations/organizations.service";
@@ -196,6 +207,26 @@ describe("PublishingService", () => {
 			expect(inbox[0]?.userId).toBe(follower.id);
 		});
 
+		it("filters the NGO's own list by status on the server", async () => {
+			const { owner } = await verifiedOrg();
+			await service.createAnnouncement(owner.id, announcement);
+			await service.createAnnouncement(owner.id, {
+				...announcement,
+				title: "Next month's plan",
+				status: "DRAFT",
+			});
+
+			const drafts = await service.listMyAnnouncements(owner.id, {
+				page: 1,
+				limit: 20,
+				status: "DRAFT",
+			});
+			expect(drafts.items.map((row) => row.title)).toEqual([
+				"Next month's plan",
+			]);
+			expect(drafts.meta.total).toBe(1);
+		});
+
 		it("does not notify anyone about a draft", async () => {
 			const { owner, org } = await verifiedOrg();
 			const follower = await createUser(db, { role: "volunteer" });
@@ -265,7 +296,7 @@ describe("PublishingService", () => {
 				userId: owner.id,
 				isOwner: true,
 			});
-			const colleague = await createUser(db, { role: "volunteer" });
+			const colleague = await createUser(db);
 
 			await service.inviteAdmin(owner.id, {
 				email: colleague.email,
@@ -290,7 +321,7 @@ describe("PublishingService", () => {
 
 		it("matches the invitee's email case-insensitively", async () => {
 			const { owner } = await verifiedOrg();
-			const colleague = await createUser(db, { role: "volunteer" });
+			const colleague = await createUser(db);
 
 			const member = await service.inviteAdmin(owner.id, {
 				email: colleague.email.toUpperCase(),
@@ -301,7 +332,7 @@ describe("PublishingService", () => {
 
 		it("refuses to add the same person twice", async () => {
 			const { owner } = await verifiedOrg();
-			const colleague = await createUser(db, { role: "volunteer" });
+			const colleague = await createUser(db);
 
 			await service.inviteAdmin(owner.id, { email: colleague.email });
 
@@ -325,7 +356,7 @@ describe("PublishingService", () => {
 
 		it("refuses to touch a member of another organization", async () => {
 			const { owner } = await verifiedOrg();
-			const colleague = await createUser(db, { role: "volunteer" });
+			const colleague = await createUser(db);
 			const member = await service.inviteAdmin(owner.id, {
 				email: colleague.email,
 			});
@@ -344,7 +375,7 @@ describe("PublishingService", () => {
 
 		it("removes a non-owner member", async () => {
 			const { owner } = await verifiedOrg();
-			const colleague = await createUser(db, { role: "volunteer" });
+			const colleague = await createUser(db);
 			const member = await service.inviteAdmin(owner.id, {
 				email: colleague.email,
 			});
@@ -478,6 +509,144 @@ describe("PublishingService", () => {
 				where: eq(organizations.id, org.id),
 			});
 			expect(updatedOrg?.ownerUserId).toBe(cofounder.id);
+		});
+
+		/** An invite to `email`, plus the account that signs up with it. */
+		async function inviteFor(
+			email: string,
+			role?: "volunteer" | "organisation",
+		) {
+			const { owner, org } = await verifiedOrg();
+			const invite = await service.createTeamInvite(owner.id, {
+				email,
+				role: "MEMBER",
+			});
+			const invitee = await createUser(db, role ? { role } : {});
+			await db.update(users).set({ email }).where(eq(users.id, invitee.id));
+			return { owner, org, invite, invitee };
+		}
+
+		async function roleNamesOf(userId: string) {
+			const rows = await db
+				.select({ name: roles.name })
+				.from(userRoles)
+				.innerJoin(roles, eq(userRoles.roleId, roles.id))
+				.where(eq(userRoles.userId, userId));
+			return rows.map((row) => row.name);
+		}
+
+		it("makes a role-less invitee an organisation account and tells the inviter", async () => {
+			// Without the role the invitee lands on role-select, and picking
+			// "organisation" there sends them to register a second NGO.
+			const { owner, invite, invitee } = await inviteFor("new@example.com");
+
+			await service.acceptTeamInvite(invitee.id, invite.token);
+
+			expect(await roleNamesOf(invitee.id)).toEqual(["organisation"]);
+			const sent = await db.query.notifications.findMany({
+				where: eq(notifications.userId, owner.id),
+			});
+			expect(sent.map((row) => row.type)).toContain("TEAM_INVITE_ACCEPTED");
+		});
+
+		it("does not grant the role twice to an organisation account", async () => {
+			const { invite, invitee } = await inviteFor(
+				"org@example.com",
+				"organisation",
+			);
+
+			await service.acceptTeamInvite(invitee.id, invite.token);
+
+			expect(await roleNamesOf(invitee.id)).toEqual(["organisation"]);
+		});
+
+		it("refuses a volunteer account and leaves the invite pending", async () => {
+			// Roles are chosen once and the client routes on the first, so a
+			// volunteer on a team could never reach the NGO app.
+			const { invite, invitee } = await inviteFor(
+				"vol@example.com",
+				"volunteer",
+			);
+
+			await expect(
+				service.acceptTeamInvite(invitee.id, invite.token),
+			).rejects.toBeInstanceOf(ForbiddenException);
+
+			expect(await roleNamesOf(invitee.id)).toEqual(["volunteer"]);
+			const stored = await db.query.teamInvites.findFirst({
+				where: eq(teamInvites.id, invite.id),
+			});
+			expect(stored?.status).toBe("PENDING");
+		});
+
+		it("accepts and declines from the notification by invite id", async () => {
+			// The token only travels in the email; the in-app notification
+			// carries the invite id, which had nothing to call.
+			const { invite, invitee } = await inviteFor("inapp@example.com");
+			const stranger = await createUser(db);
+
+			await expect(
+				service.acceptTeamInviteById(stranger.id, invite.id),
+			).rejects.toBeInstanceOf(ForbiddenException);
+
+			await service.acceptTeamInviteById(invitee.id, invite.id);
+			expect(await roleNamesOf(invitee.id)).toEqual(["organisation"]);
+			await expect(
+				service.acceptTeamInviteById(invitee.id, invite.id),
+			).rejects.toBeInstanceOf(ConflictException);
+
+			const other = await inviteFor("declines@example.com");
+			await service.declineTeamInviteById(other.invitee.id, other.invite.id);
+			const stored = await db.query.teamInvites.findFirst({
+				where: eq(teamInvites.id, other.invite.id),
+			});
+			expect(stored?.status).toBe("DECLINED");
+		});
+
+		it("tells a teammate when their role changes and when they are removed", async () => {
+			const { owner, org } = await verifiedOrg();
+			await db.insert(organizationAdmins).values({
+				organizationId: org.id,
+				userId: owner.id,
+				role: "OWNER",
+				isOwner: true,
+			});
+			const colleague = await createUser(db);
+			const member = await service.inviteAdmin(owner.id, {
+				email: colleague.email,
+				role: "MEMBER",
+			});
+
+			await service.updateAdmin(owner.id, member.id, { role: "MANAGER" });
+			await service.removeAdmin(owner.id, member.id);
+
+			await vi.waitFor(async () => {
+				const sent = await db.query.notifications.findMany({
+					where: eq(notifications.userId, colleague.id),
+				});
+				expect(sent.map((row) => row.type)).toEqual(
+					expect.arrayContaining(["TEAM_ROLE_CHANGED", "TEAM_REMOVED"]),
+				);
+			});
+		});
+
+		it("refuses an account that already runs or belongs to another NGO", async () => {
+			// getActiveMembership picks one membership with limit(1), so a
+			// second would make org/* requests act on an arbitrary NGO.
+			const { owner: otherOwner } = await verifiedOrg();
+			const { owner } = await verifiedOrg();
+			const invite = await service.createTeamInvite(owner.id, {
+				email: "busy@example.com",
+				role: "MEMBER",
+			});
+			await db
+				.update(users)
+				.set({ email: "busy@example.com" })
+				.where(eq(users.id, otherOwner.id));
+
+			await expect(
+				service.acceptTeamInvite(otherOwner.id, invite.token),
+			).rejects.toBeInstanceOf(ConflictException);
 		});
 	});
 });

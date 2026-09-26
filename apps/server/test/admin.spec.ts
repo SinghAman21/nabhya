@@ -1,6 +1,7 @@
 import {
 	categories,
 	donations,
+	organizationAdmins,
 	organizationCategories,
 	organizationDocuments,
 	posts,
@@ -18,7 +19,15 @@ import {
 	documentQueueQuerySchema,
 } from "@nabhya/shared";
 import { BadRequestException } from "@nestjs/common";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+	afterAll,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest";
 import { AuditService } from "../src/common/audit";
 import { AdminService } from "../src/modules/admin/admin.service";
 import { EventsService } from "../src/modules/events/events.service";
@@ -48,7 +57,11 @@ describe("AdminService", () => {
 	beforeAll(async () => {
 		({ db, close } = await createTestDb());
 		const audit = new AuditService(db as never);
-		service = new AdminService(db as never, audit);
+		service = new AdminService(
+			db as never,
+			audit,
+			new NotificationsService(db as never),
+		);
 		feed = new FeedService(
 			db as never,
 			{
@@ -113,6 +126,70 @@ describe("AdminService", () => {
 			stored = await db.query.organizations.findFirst({});
 			// A stale rejection reason on a verified NGO would be shown to them.
 			expect(stored?.rejectionReason).toBeNull();
+		});
+
+		it("tells the whole team about a verification decision", async () => {
+			// ORG_VERIFIED existed in the enum and nothing emitted it, while the
+			// verification screen promised "you'll be notified either way".
+			const admin = await createUser(db, { role: "superadmin" });
+			const owner = await createUser(db, { role: "organisation" });
+			const member = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id, {
+				verificationStatus: "PENDING",
+			});
+			await db.insert(organizationAdmins).values({
+				organizationId: org.id,
+				userId: member.id,
+				role: "MEMBER",
+				status: "ACTIVE",
+			});
+
+			await service.reviewOrganization(admin.id, org.id, {
+				verificationStatus: "REJECTED",
+				reason: "Registration certificate unreadable.",
+			});
+
+			// Fire-and-forget, like the audit log, so wait for the write.
+			await vi.waitFor(async () => {
+				const sent = await db.query.notifications.findMany({});
+				expect(sent.map((row) => row.userId).sort()).toEqual(
+					[owner.id, member.id].sort(),
+				);
+			});
+			const sent = await db.query.notifications.findMany({});
+			expect(sent.every((row) => row.type === "ORG_REJECTED")).toBe(true);
+			expect(sent[0]?.body).toBe("Registration certificate unreadable.");
+		});
+
+		it("passes a document rejection's remarks on to the NGO", async () => {
+			const admin = await createUser(db, { role: "superadmin" });
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id, {
+				verificationStatus: "PENDING",
+			});
+			const [document] = await db
+				.insert(organizationDocuments)
+				.values({
+					organizationId: org.id,
+					documentType: "PAN_CARD",
+					documentKey: `org-documents/${org.id}/pan.pdf`,
+				})
+				.returning();
+			if (!document) throw new Error("document insert failed");
+
+			await service.reviewOrganizationDocument(admin.id, document.id, {
+				verificationStatus: "REJECTED",
+				remarks: "The PAN number is cut off.",
+			});
+
+			await vi.waitFor(async () => {
+				const sent = await db.query.notifications.findFirst({});
+				expect(sent?.type).toBe("DOCUMENT_REJECTED");
+			});
+			const sent = await db.query.notifications.findFirst({});
+			expect(sent?.userId).toBe(owner.id);
+			expect(sent?.title).toBe("PAN card needs another look");
+			expect(sent?.body).toBe("The PAN number is cut off.");
 		});
 
 		it("suspending an NGO pulls its content off the public feed", async () => {

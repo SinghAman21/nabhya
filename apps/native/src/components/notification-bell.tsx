@@ -14,6 +14,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { focusable } from "@/lib/focus";
 import { formatRelative } from "@/lib/format";
+import { notificationDestination } from "@/lib/notification-destination";
 import { useAuthStore } from "@/store/auth-store";
 
 type PressState = { pressed: boolean; focused?: boolean; hovered?: boolean };
@@ -148,6 +149,10 @@ export function NotificationBell() {
 						setOpen(false);
 						router.push("/notifications");
 					}}
+					onOpen={(destination) => {
+						setOpen(false);
+						router.push(destination as never);
+					}}
 				/>
 			</View>
 		</View>
@@ -155,8 +160,16 @@ export function NotificationBell() {
 }
 
 /** The popover body: latest few, then a way through to the full screen. */
-function NotificationPanel({ onSeeAll }: { onSeeAll: () => void }) {
+function NotificationPanel({
+	onSeeAll,
+	onOpen,
+}: {
+	onSeeAll: () => void;
+	/** Rows are links now - see `lib/notification-destination.ts`. */
+	onOpen: (destination: string) => void;
+}) {
 	const { colors, spacing } = useTheme();
+	const role = useAuthStore((state) => state.role);
 	const query = useNotifications({ limit: 6 });
 	const markRead = useMarkNotificationsRead();
 
@@ -233,6 +246,11 @@ function NotificationPanel({ onSeeAll }: { onSeeAll: () => void }) {
 							<ListRow
 								label={item.title}
 								hint={item.body ?? formatRelative(item.createdAt)}
+								onPress={() => {
+									if (!item.readAt) markRead.mutate({ ids: [item.id] });
+									const destination = notificationDestination(item, role);
+									if (destination) onOpen(destination);
+								}}
 								value={
 									item.readAt ? null : (
 										<View

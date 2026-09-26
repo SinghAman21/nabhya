@@ -84,7 +84,7 @@ client-side traps: `apps/native/AGENTS.md`.
 ### Server (`apps/server`)
 
 NestJS 11, global `/api` prefix, deny-by-default JWT guard + role guard, response
-envelope `{ success, data, timestamp }`, Swagger at `/api/docs`. 98 endpoints across
+envelope `{ success, data, timestamp }`, Swagger at `/api/docs`. 114 endpoints across
 14 feature modules (16 controllers), counting the two health probes.
 `apps/server/test/endpoints.spec.ts` asserts that count, so adding a route is a
 deliberate act that shows up in the diff. Architecture,
@@ -161,7 +161,7 @@ credentials), Razorpay (donations, native checkout SDK). No email provider.
 
 ## Current state
 
-**Built:** auth end-to-end; 98 REST endpoints across `users`, `onboarding`,
+**Built:** auth end-to-end; 114 REST endpoints across `users`, `onboarding`,
 `organizations`, `categories`, `events`, `needs`, `feed`, `admin`, `uploads`,
 `engagement`, `publishing`, `certificates`, `donations` and `notifications`.
 NGO + volunteer onboarding; org events and needs management with
@@ -418,6 +418,35 @@ only). Paging *is* wired: `apps/native/src/components/paged-list.tsx`
 infinite list, and the two screens that do not use it say why in the file - the
 team endpoint returns the whole team, and the volunteer activity timeline merges
 the first page of five endpoints because a true merged cursor is server work.
+
+### The NGO team, end to end
+
+An NGO account is either the org's **owner** or a **team member** who joined
+through an invite. Four rules hold that together, each guarded by a test:
+
+- **Accepting an invite makes the account an NGO account.**
+  `PublishingService.acceptTeamInvite` grants the `organisation` role to an
+  account with none, refuses a volunteer account (roles are chosen once and the
+  client routes on the first), and refuses anyone already on a team - one team
+  per account, because `getActiveMembership` resolves `org/*` with `limit(1)`.
+- **`/onboarding/status` counts membership, not just ownership**, and keeps
+  reporting a suspended org, so the gate lands its team in the NGO app, where
+  `components/org-suspended.tsx` explains the suspension once.
+- **Verification decisions notify the whole team** (`ORG_VERIFIED` /
+  `ORG_REJECTED`, `DOCUMENT_VERIFIED` / `DOCUMENT_REJECTED` with the reviewer's
+  remarks as the body), from `AdminService`. The NGO rail has a Notifications
+  row with the unread count; the phone gets the bell on Feed and Dashboard.
+- **Every public act checks the team role on the server**, including the two
+  that did not: a feed post (`content.publish`) and a review reply
+  (`content.publish`). Editing a live event needs `content.publish`; drafts are
+  open to everyone but viewers. A teammate with `content.delete` can remove any
+  of the org's posts. The client mirrors all of this through
+  `hooks/use-org-access.ts` - see `apps/native/AGENTS.md`.
+
+Lists an NGO filters are filtered by the server, never over loaded pages:
+announcements take `status`, the org's reviews take `awaitingReply` (and return
+`awaitingReplyCount`), pledges take `status`. The dashboard's numbers come from
+`GET /api/organizations/me/overview`, not from summing page 1.
 
 ### Conventions worth copying
 

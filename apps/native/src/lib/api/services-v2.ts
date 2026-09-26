@@ -9,6 +9,7 @@ import type {
 	MarkAttendanceInput,
 	MarkReadInput,
 	NotificationQuery,
+	OrgReviewQuery,
 	Paginated,
 	PaginationQuery,
 	ReplyToReviewInput,
@@ -53,6 +54,9 @@ export const engagementApi = {
 		http.post<{ bookmarked: boolean }>(ENGAGEMENT.bookmark(organizationId)),
 	listBookmarks: (query: Partial<PaginationQuery>) =>
 		http.getPage<BookmarkListItem>(ENGAGEMENT.MY_BOOKMARKS, query),
+	/** Same row shape as a bookmark: the org plus when it was followed. */
+	listFollowing: (query: Partial<PaginationQuery>) =>
+		http.getPage<BookmarkListItem>(ENGAGEMENT.MY_FOLLOWING, query),
 	/** Following is what the Following feed reads; a bookmark is a private save. */
 	follow: (organizationId: string) =>
 		http.post<{ following: boolean }>(ENGAGEMENT.follow(organizationId)),
@@ -69,11 +73,14 @@ export const engagementApi = {
 	deleteMyReview: (organizationId: string) =>
 		http.delete<{ deleted: boolean }>(ENGAGEMENT.myReview(organizationId)),
 
-	listMyOrgReviews: (query: Partial<ReviewQuery>) =>
-		http.get<Paginated<ReviewItem> & { summary: ReviewSummary }>(
-			ENGAGEMENT.ORG_REVIEWS,
-			query,
-		),
+	listMyOrgReviews: (query: Partial<OrgReviewQuery>) =>
+		http.get<
+			Paginated<ReviewItem> & {
+				summary: ReviewSummary;
+				/** Across the whole org, not just this page. */
+				awaitingReplyCount: number;
+			}
+		>(ENGAGEMENT.ORG_REVIEWS, query),
 	replyToReview: (reviewId: string, input: ReplyToReviewInput) =>
 		http.patch<ReviewItem>(ENGAGEMENT.replyToReview(reviewId), input),
 };

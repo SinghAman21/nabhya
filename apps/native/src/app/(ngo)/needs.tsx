@@ -1,19 +1,15 @@
 import type { NeedType, OrgNeedQuery } from "@nabhya/shared";
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { HeartHandshake } from "lucide-react-native";
-import { useState } from "react";
-import { FlatList, RefreshControl, View } from "react-native";
-import { LoadMoreFooter } from "@/components/load-more-footer";
+import { useEffect, useState } from "react";
+import { View } from "react-native";
 import { NeedFormSheet } from "@/components/need-form-sheet";
+import { PagedList, usePagedQuery } from "@/components/paged-list";
 import { PledgesSheet } from "@/components/pledges-sheet";
 import {
 	Banner,
 	EmptyState,
-	ErrorState,
 	FilterChips,
-	GridCell,
-	LoadingState,
 	Screen,
 	ScreenHeader,
 	Surface,
@@ -23,13 +19,13 @@ import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
 import { confirm, toast } from "@/components/ui/overlay";
 import { Body, Caption, Label } from "@/components/ui/typography";
-import { useDeleteNeed } from "@/hooks/use-needs";
+import { useDeleteNeed, usePublicNeed } from "@/hooks/use-needs";
+import { useOrgAccess } from "@/hooks/use-org-access";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useGridColumns } from "@/hooks/useMedia";
 import { apiErrorMessage, orgNeedsApi, queryKeys } from "@/lib/api";
 import { formatProgress, formatRelative } from "@/lib/format";
-import { verticalScrollbar } from "@/lib/scroll";
 import type { OrgNeedListItem } from "@/lib/types";
 
 type TypeFilter = "ALL" | NeedType;
@@ -40,44 +36,53 @@ const FILTERS: Array<{ value: TypeFilter; label: string }> = [
 	{ value: "OFFER", label: "We're giving" },
 ];
 
-const PAGE_SIZE = 20;
-
-/**
- * The org's needs, page by page. Shares the `["org","needs"]` prefix with
- * `useOrgNeeds` so every needs mutation invalidates it too; the `paged` marker
- * keeps its cache shape apart from the page-1 query the dashboard reads.
- */
-function useOrgNeedPages(filters: Partial<OrgNeedQuery>) {
-	return useInfiniteQuery({
-		queryKey: queryKeys.orgNeeds({ ...filters, paged: true }),
-		queryFn: ({ pageParam }) =>
-			orgNeedsApi.list({ ...filters, page: pageParam, limit: PAGE_SIZE }),
-		initialPageParam: 1,
-		getNextPageParam: (last) =>
-			last.meta.hasMore ? last.meta.page + 1 : undefined,
-	});
-}
-
 export default function NgoNeeds() {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const router = useRouter();
 	const [filter, setFilter] = useState<TypeFilter>("ALL");
 	const [sheetOpen, setSheetOpen] = useState(false);
 	const [editing, setEditing] = useState<OrgNeedListItem | null>(null);
 	const [reviewing, setReviewing] = useState<OrgNeedListItem | null>(null);
 	const { data: me } = useMe();
+	const access = useOrgAccess();
 
-	const query = useOrgNeedPages(filter === "ALL" ? {} : { type: filter });
+	const filters: Partial<OrgNeedQuery> =
+		filter === "ALL" ? {} : { type: filter };
+	// Under the `["org","needs"]` prefix, so every needs mutation refreshes it.
+	const { query, items, first, loadMore } = usePagedQuery({
+		queryKey: queryKeys.orgNeeds(filters),
+		fetchPage: (page) => orgNeedsApi.list({ ...filters, page, limit: 20 }),
+	});
 	const deleteNeed = useDeleteNeed();
 	const columns = useGridColumns();
 
-	const isVerified = me?.organization?.verificationStatus === "VERIFIED";
-	const items = query.data?.pages.flatMap((page) => page.items) ?? [];
-	const total = query.data?.pages[0]?.meta.total ?? items.length;
+	const total = first?.meta.total ?? items.length;
 
-	const loadMore = () => {
-		if (query.hasNextPage && !query.isFetchingNextPage) query.fetchNextPage();
-	};
+	// `?review=<needId>` - a "new pledge" notification opens that post's
+	// responses. Falls back to the need's public record (pledges only exist on
+	// a verified NGO's needs, so it is always visible) when the row is past
+	// the first page. Cleared once used.
+	const { review } = useLocalSearchParams<{ review?: string }>();
+	const reviewRow = review ? items.find((item) => item.id === review) : null;
+	const reviewDetail = usePublicNeed(review && !reviewRow ? review : undefined);
+	useEffect(() => {
+		if (!review) return;
+		const detail = reviewDetail.data;
+		const target: OrgNeedListItem | null =
+			reviewRow ?? (detail ? { ...detail, pendingPledges: 0 } : null);
+		if (!target) return;
+		setReviewing(target);
+		router.setParams({ review: undefined });
+	}, [review, reviewRow, reviewDetail.data, router]);
+	// The sheet's progress line reads the row as it is now: accepting a
+	// pledge refetches the list.
+	const reviewingLive =
+		(reviewing && items.find((item) => item.id === reviewing.id)) ?? reviewing;
+	// Posting is public and needs verification; editing and removing a post
+	// that already exists only need the role.
+	const createBlocked = access.blocked("content.publish", { public: true });
+	const canEdit = !access.blocked("content.publish");
+	const canRemove = !access.blocked("content.delete");
 
 	const confirmDelete = async (need: OrgNeedListItem) => {
 		const ok = await confirm({
@@ -102,100 +107,72 @@ export default function NgoNeeds() {
 					total > 0 ? `${total} post${total === 1 ? "" : "s"}` : undefined
 				}
 				action={
-					isVerified ? (
-						<Button size="sm" onPress={openCreate}>
-							New need
-						</Button>
-					) : undefined
+					<Button size="sm" onPress={openCreate} disabled={!!createBlocked}>
+						New need
+					</Button>
 				}
 			/>
 
-			{!isVerified && (
+			{createBlocked && (
 				<View style={{ marginBottom: spacing[4] }}>
-					<Banner
-						tone="warning"
-						title="Verification needed to post"
-						description="Needs and offers go into every volunteer's feed, so they unlock once your documents are approved."
-						onPress={() => router.push("/(ngo)/verification")}
-					/>
+					{access.isVerified || access.isSuspended ? (
+						<Banner tone="info" title="View only" description={createBlocked} />
+					) : (
+						<Banner
+							tone="warning"
+							title="Verification needed to post"
+							description="Needs and offers go into every volunteer's feed, so they unlock once your documents are approved."
+							onPress={() => router.push("/(ngo)/verification")}
+						/>
+					)}
 				</View>
 			)}
 
 			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
 
-			{query.isLoading ? (
-				<LoadingState label="Loading your posts" />
-			) : query.isError ? (
-				<ErrorState
-					message={apiErrorMessage(query.error)}
-					onRetry={() => query.refetch()}
-				/>
-			) : (
-				<FlatList
-					key={`grid-${columns}`}
-					numColumns={columns}
-					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
-					data={items}
-					keyExtractor={(item) => item.id}
-					{...verticalScrollbar}
-					contentContainerStyle={{ paddingBottom: spacing[10] }}
-					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
-					onEndReached={loadMore}
-					onEndReachedThreshold={0.5}
-					refreshControl={
-						<RefreshControl
-							refreshing={query.isRefetching && !query.isFetchingNextPage}
-							onRefresh={() => query.refetch()}
-							tintColor={colors.text.quaternary as string}
-						/>
-					}
-					ListEmptyComponent={
-						<EmptyState
-							icon={HeartHandshake}
-							title={
-								filter === "ALL"
-									? "Nothing posted yet"
-									: filter === "WANT"
-										? "No requests yet"
-										: "No offers yet"
-							}
-							description={
-								isVerified
-									? "Ask for what your programme needs, or list surplus you can pass on. Each post shows here with its pledges."
-									: "Once you're verified you'll be able to post here."
-							}
-							action={
-								isVerified ? (
-									<Button onPress={openCreate}>
-										{filter === "OFFER" ? "Offer something" : "Post a need"}
-									</Button>
-								) : undefined
-							}
-						/>
-					}
-					ListFooterComponent={
-						<LoadMoreFooter
-							hasMore={!!query.hasNextPage}
-							loading={query.isFetchingNextPage}
-							onLoadMore={loadMore}
-							count={items.length}
-							noun="posts"
-						/>
-					}
-					renderItem={({ item }) => (
-						<GridCell>
-							<NeedRow
-								need={item}
-								onReview={() => setReviewing(item)}
-								onEdit={() => setEditing(item)}
-								onDelete={() => confirmDelete(item)}
-							/>
-						</GridCell>
-					)}
-				/>
-			)}
+			<PagedList
+				query={query}
+				items={items}
+				loadMore={loadMore}
+				loadingLabel="Loading your posts"
+				numColumns={columns}
+				noun="posts"
+				keyExtractor={(item) => item.id}
+				renderItem={(item) => (
+					<NeedRow
+						need={item}
+						onReview={() => setReviewing(item)}
+						onEdit={canEdit ? () => setEditing(item) : undefined}
+						onDelete={canRemove ? () => confirmDelete(item) : undefined}
+					/>
+				)}
+				empty={
+					<EmptyState
+						icon={HeartHandshake}
+						title={
+							filter === "ALL"
+								? "Nothing posted yet"
+								: filter === "WANT"
+									? "No requests yet"
+									: "No offers yet"
+						}
+						description={
+							createBlocked
+								? "Posts your team makes will show here with their pledges."
+								: "Ask for what your programme needs, or list surplus you can pass on. Each post shows here with its pledges."
+						}
+						action={
+							createBlocked ? undefined : (
+								<Button onPress={openCreate}>
+									{filter === "OFFER" ? "Offer something" : "Post a need"}
+								</Button>
+							)
+						}
+					/>
+				}
+			/>
 
-			<PledgesSheet need={reviewing} onClose={() => setReviewing(null)} />
+			<PledgesSheet need={reviewingLive} onClose={() => setReviewing(null)} />
 
 			<NeedFormSheet
 				visible={sheetOpen || !!editing}
@@ -223,8 +200,9 @@ function NeedRow({
 }: {
 	need: OrgNeedListItem;
 	onReview: () => void;
-	onEdit: () => void;
-	onDelete: () => void;
+	/** Omitted when the viewer's team role cannot change the post. */
+	onEdit?: () => void;
+	onDelete?: () => void;
 }) {
 	const { colors, spacing } = useTheme();
 	const pending = need.pendingPledges ?? 0;
@@ -289,17 +267,21 @@ function NeedRow({
 					</Caption>
 				</View>
 				<View style={{ flexDirection: "row", gap: spacing[3] }}>
-					<TextAction
-						label="Edit"
-						onPress={onEdit}
-						accessibilityLabel={`Edit ${need.title}`}
-					/>
-					<TextAction
-						label="Remove"
-						tone="danger"
-						onPress={onDelete}
-						accessibilityLabel={`Remove ${need.title}`}
-					/>
+					{onEdit && (
+						<TextAction
+							label="Edit"
+							onPress={onEdit}
+							accessibilityLabel={`Edit ${need.title}`}
+						/>
+					)}
+					{onDelete && (
+						<TextAction
+							label="Remove"
+							tone="danger"
+							onPress={onDelete}
+							accessibilityLabel={`Remove ${need.title}`}
+						/>
+					)}
 				</View>
 			</View>
 		</Surface>

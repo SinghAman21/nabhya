@@ -1,4 +1,5 @@
 import {
+	Bell,
 	Building2,
 	CalendarDays,
 	FileCheck2,
@@ -30,6 +31,15 @@ export const NGO_NAV_ITEMS: NavItem[] = [
 	// Feed is the landing page, so it leads - unsectioned, like Dashboard.
 	{ label: "Feed", href: "/(ngo)/feed", icon: Newspaper },
 	{ label: "Dashboard", href: "/(ngo)", icon: House },
+	// An NGO's inbox is where approval, rejection, applicants and pledges
+	// arrive, so it sits with the two landing rows rather than under Account -
+	// it had no rail row at all, only a link at the bottom of Profile.
+	{
+		label: "Notifications",
+		href: "/notifications",
+		icon: Bell,
+		badge: "unread-notifications",
+	},
 	{
 		label: "Needs",
 		href: "/(ngo)/needs",

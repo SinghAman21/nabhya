@@ -35,10 +35,12 @@ export class ImpactService {
 					where ${eventApplications.attendedAt} is not null)::int`,
 				organizationsHelped: sql<number>`count(distinct ${events.organizationId})
 					filter (where ${eventApplications.attendedAt} is not null)::int`,
-				// Event duration in hours, summed across attended events only.
-				hours: sql<number>`coalesce(round(sum(
+				// Recorded hours where the NGO entered them, else the event's
+				// duration, summed across attended events only.
+				hours: sql<number>`coalesce(round(sum(coalesce(
+					${eventApplications.hoursServed},
 					extract(epoch from (${events.endAt} - ${events.startAt})) / 3600
-				) filter (where ${eventApplications.attendedAt} is not null)), 0)::int`,
+				)) filter (where ${eventApplications.attendedAt} is not null)), 0)::int`,
 				firstAttended: sql<Date | null>`min(${eventApplications.attendedAt})`,
 			})
 			.from(eventApplications)
@@ -115,9 +117,10 @@ export class ImpactService {
 					where ${events.status} in ('PUBLISHED', 'COMPLETED'))::int`,
 				volunteersEngaged: sql<number>`count(distinct ${eventApplications.volunteerId})
 					filter (where ${eventApplications.attendedAt} is not null)::int`,
-				volunteerHours: sql<number>`coalesce(round(sum(
+				volunteerHours: sql<number>`coalesce(round(sum(coalesce(
+					${eventApplications.hoursServed},
 					extract(epoch from (${events.endAt} - ${events.startAt})) / 3600
-				) filter (where ${eventApplications.attendedAt} is not null)), 0)::int`,
+				)) filter (where ${eventApplications.attendedAt} is not null)), 0)::int`,
 			})
 			.from(events)
 			.leftJoin(eventApplications, eq(eventApplications.eventId, events.id))

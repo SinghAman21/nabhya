@@ -1,14 +1,14 @@
 import type {
 	CreateNeedInput,
 	OrgNeedQuery,
-	PaginationQuery,
+	PledgeQuery,
 	ReviewPledgeInput,
 	UpdateNeedInput,
 } from "@nabhya/shared";
 import {
 	createNeedSchema,
 	orgNeedQuerySchema,
-	paginationQuerySchema,
+	pledgeQuerySchema,
 	reviewPledgeSchema,
 	updateNeedSchema,
 } from "@nabhya/shared";
@@ -95,7 +95,7 @@ export class OrgNeedsController {
 	listPledges(
 		@CurrentUser() user: AuthUser,
 		@Param("id", ParseUUIDPipe) id: string,
-		@Query(new ZodValidationPipe(paginationQuerySchema)) query: PaginationQuery,
+		@Query(new ZodValidationPipe(pledgeQuerySchema)) query: PledgeQuery,
 	) {
 		return this.needsService.listPledges(user.id, id, query);
 	}

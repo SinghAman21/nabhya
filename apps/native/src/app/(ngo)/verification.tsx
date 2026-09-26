@@ -14,11 +14,13 @@ import {
 import { StepIndicator } from "@/components/step-indicator";
 import { Body, Caption, Label } from "@/components/ui/typography";
 import { useMyOrgDocuments, useUploadOrgDocument } from "@/hooks/use-documents";
+import { useOrgAccess } from "@/hooks/use-org-access";
 import { useMyOrganization } from "@/hooks/use-organization";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { apiErrorMessage } from "@/lib/api";
 import {
+	currentDocumentsByType,
 	ORG_OPTIONAL_DOCUMENTS,
 	ORG_REQUIRED_DOCUMENTS,
 	ORG_VERIFICATION_STEPS,
@@ -71,17 +73,21 @@ export default function NgoVerification() {
 	const org = useMyOrganization();
 	const documents = useMyOrgDocuments();
 	const upload = useUploadOrgDocument();
+	const access = useOrgAccess();
+	// Uploading is `org.edit` server-side: owners, admins and managers.
+	const uploadBlocked = access.blocked("org.edit");
 
-	const byType = new Map(
-		(documents.data ?? []).map((doc) => [doc.documentType, doc]),
-	);
+	const byType = currentDocumentsByType(documents.data);
 	const requiredUploaded = ORG_REQUIRED_DOCUMENTS.filter((d) =>
 		byType.has(d.type),
 	).length;
 	const allRequired = requiredUploaded === ORG_REQUIRED_DOCUMENTS.length;
-	const rejected = (documents.data ?? []).filter(
+	// Only a document that still stands can need another look - a rejected
+	// copy that has since been replaced is history, not a to-do.
+	const rejected = [...byType.values()].filter(
 		(doc) => doc.verificationStatus === "REJECTED",
 	);
+	const requiredCount = ORG_REQUIRED_DOCUMENTS.length;
 
 	const status = org.data?.verificationStatus;
 	const isVerified = status === "VERIFIED";
@@ -103,8 +109,10 @@ export default function NgoVerification() {
 		<Banner
 			tone="error"
 			title="Verification needs another look"
+			// The org-level reason survives the re-upload that reopens review, so
+			// it is only still the answer while the org itself is REJECTED.
 			description={
-				org.data?.rejectionReason ??
+				(status === "REJECTED" ? org.data?.rejectionReason : null) ??
 				"A reviewer left notes on the documents below. Upload a corrected copy of each to reopen review."
 			}
 		/>
@@ -112,13 +120,13 @@ export default function NgoVerification() {
 		<Banner
 			tone="info"
 			title="Under review"
-			description="A reviewer is checking your documents - usually a few days. You'll be notified either way. Adding the optional documents below can speed things up."
+			description="A reviewer is checking your documents - usually a few days. You'll get a notification either way. Adding the optional documents below can speed things up."
 		/>
 	) : (
 		<Banner
 			tone="warning"
-			title={`${requiredUploaded} of ${ORG_REQUIRED_DOCUMENTS.length} required documents uploaded`}
-			description="Review starts as soon as both are in. Until you're verified, events and needs stay private."
+			title={`${requiredUploaded} of ${requiredCount} required documents uploaded`}
+			description={`Review starts as soon as ${requiredCount === 2 ? "both are" : "all are"} in. Until you're verified, events and needs stay private.`}
 		/>
 	);
 
@@ -147,6 +155,7 @@ export default function NgoVerification() {
 						existing={byType.get(doc.type)}
 						onUploaded={(key) => handleUploaded(doc.type, key)}
 						saving={isSaving(doc.type)}
+						readOnly={!!uploadBlocked}
 					/>
 				</View>
 			))}
@@ -167,6 +176,10 @@ export default function NgoVerification() {
 		<View style={{ gap: spacing[6] }}>
 			{stages}
 			{banner}
+
+			{uploadBlocked ? (
+				<Banner tone="info" title="View only" description={uploadBlocked} />
+			) : null}
 
 			{upload.isError ? (
 				<Banner
@@ -240,8 +253,8 @@ export default function NgoVerification() {
 				<View style={{ gap: spacing[1] }}>
 					<Label>How long it takes</Label>
 					<Caption color="tertiary">
-						Usually a few days once both required documents are in. You are
-						notified either way - there is nothing to keep checking.
+						Usually a few days once the required documents are in. You get a
+						notification either way - there is nothing to keep checking.
 					</Caption>
 				</View>
 			</Surface>
@@ -260,10 +273,13 @@ export default function NgoVerification() {
 
 			{documents.isLoading || org.isLoading ? (
 				<LoadingState />
-			) : documents.isError ? (
+			) : documents.isError || org.isError ? (
 				<ErrorState
-					message={apiErrorMessage(documents.error)}
-					onRetry={() => documents.refetch()}
+					message={apiErrorMessage(documents.error ?? org.error)}
+					onRetry={() => {
+						documents.refetch();
+						org.refetch();
+					}}
 				/>
 			) : (
 				<ScrollView

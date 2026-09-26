@@ -16,6 +16,7 @@ export const ORGANIZATIONS = {
 	LIST: `${API_PREFIX}/organizations`,
 	ME: `${API_PREFIX}/organizations/me`,
 	MY_DOCUMENTS: `${API_PREFIX}/organizations/me/documents`,
+	MY_OVERVIEW: `${API_PREFIX}/organizations/me/overview`,
 	detail: (id: string) => `${API_PREFIX}/organizations/${id}`,
 	publicTeam: (id: string) => `${API_PREFIX}/organizations/${id}/team`,
 } as const;
@@ -126,6 +127,7 @@ export const NOTIFICATIONS = {
 
 export const ENGAGEMENT = {
 	MY_BOOKMARKS: `${API_PREFIX}/me/bookmarks`,
+	MY_FOLLOWING: `${API_PREFIX}/me/following`,
 	ORG_REVIEWS: `${API_PREFIX}/org/reviews`,
 	bookmark: (id: string) => `${API_PREFIX}/organizations/${id}/bookmark`,
 	follow: (id: string) => `${API_PREFIX}/organizations/${id}/follow`,
@@ -173,6 +175,11 @@ export const PUBLISHING = {
 	teamInvite: (id: string) => `${API_PREFIX}/org/team/invites/${id}`,
 	teamInviteResend: (id: string) =>
 		`${API_PREFIX}/org/team/invites/${id}/resend`,
+	/** From the in-app notification, which carries the invite id, not the token. */
+	acceptTeamInviteById: (id: string) =>
+		`${API_PREFIX}/team/invites/by-id/${id}/accept`,
+	declineTeamInviteById: (id: string) =>
+		`${API_PREFIX}/team/invites/by-id/${id}/decline`,
 	acceptTeamInvite: (token: string) =>
 		`${API_PREFIX}/team/invites/${token}/accept`,
 	declineTeamInvite: (token: string) =>

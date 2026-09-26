@@ -2,8 +2,11 @@ import type { ApplicationStatus } from "@nabhya/shared";
 import { Users } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
+import { ContactActions } from "@/components/contact-actions";
 import { Field, useFieldInputStyle } from "@/components/form-field";
 import { InitialAvatar } from "@/components/initial-avatar";
+import { LoadMoreFooter } from "@/components/load-more-footer";
+import { usePagedQuery } from "@/components/paged-list";
 import {
 	EmptyState,
 	ErrorState,
@@ -26,10 +29,10 @@ import {
 	useMarkAttendance,
 	useRevokeCertificate,
 } from "@/hooks/use-engagement";
-import { useEventApplicants, useReviewApplication } from "@/hooks/use-events";
+import { useReviewApplication } from "@/hooks/use-events";
 import { useMyTeamRole } from "@/hooks/use-my-team-role";
 import { useTheme } from "@/hooks/use-theme";
-import { apiErrorMessage } from "@/lib/api";
+import { apiErrorMessage, orgEventsApi, queryKeys } from "@/lib/api";
 import { formatRelative } from "@/lib/format";
 import type { EventApplicant } from "@/lib/types";
 
@@ -59,10 +62,19 @@ export function ApplicantsSheet({
 	const [filter, setFilter] = useState<StatusFilter>("PENDING");
 	const [note, setNote] = useState("");
 
-	const query = useEventApplicants(
-		eventId ?? undefined,
-		filter === "ALL" ? {} : { status: filter },
-	);
+	// Paged: an event with more than 20 applicants used to show the first
+	// 20 and nothing to reach the rest.
+	const params = filter === "ALL" ? {} : { status: filter };
+	const { query, items, loadMore } = usePagedQuery({
+		queryKey: queryKeys.orgEventApplicants(eventId ?? "", params),
+		fetchPage: (page) =>
+			orgEventsApi.applicants(eventId as string, {
+				...params,
+				page,
+				limit: 20,
+			}),
+		enabled: !!eventId,
+	});
 	const review = useReviewApplication(eventId ?? "");
 
 	// Accepting or rejecting is `people.review`. Allowed while the role is
@@ -149,9 +161,22 @@ export function ApplicantsSheet({
 				/>
 			) : (
 				<SheetFlatList
-					data={query.data?.items ?? []}
+					data={items}
 					keyExtractor={(item) => item.id}
 					ListHeaderComponent={header}
+					onEndReached={loadMore}
+					onEndReachedThreshold={0.6}
+					ListFooterComponent={
+						items.length > 0 ? (
+							<LoadMoreFooter
+								hasMore={!!query.hasNextPage}
+								loading={query.isFetchingNextPage}
+								onLoadMore={loadMore}
+								count={items.length}
+								noun="applicants"
+							/>
+						) : null
+					}
 					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
 					ListEmptyComponent={
 						<EmptyState
@@ -210,10 +235,8 @@ function ApplicantRow({
 	const isPending = applicant.status === "PENDING";
 	const name = applicant.volunteer.fullName ?? "Unnamed volunteer";
 	const verified = applicant.volunteer.verificationStatus === "VERIFIED";
-	const meta = [
-		applicant.volunteer.city ?? applicant.volunteer.email,
-		verified ? "ID verified" : null,
-	]
+	// City only: contact details wait for acceptance (`ContactActions`).
+	const meta = [applicant.volunteer.city, verified ? "ID verified" : null]
 		.filter(Boolean)
 		.join(" · ");
 
@@ -259,7 +282,14 @@ function ApplicantRow({
 			</Caption>
 
 			{applicant.status === "ACCEPTED" && (
-				<AttendanceControls applicant={applicant} eventId={eventId} />
+				<>
+					<ContactActions
+						name={name}
+						phone={applicant.volunteer.phone}
+						email={applicant.volunteer.email}
+					/>
+					<AttendanceControls applicant={applicant} eventId={eventId} />
+				</>
 			)}
 
 			{isPending && (
@@ -328,6 +358,35 @@ function AttendanceControls({
 	const attended = !!applicant.attendedAt;
 	const certificate = applicant.certificate;
 	const busy = attendance.isPending || issue.isPending || revoke.isPending;
+
+	// Issue #8. The certificate prints these hours and is rendered once, at
+	// issue, so they are editable only until then. Blank means the whole event.
+	const recorded = applicant.hoursServed ? Number(applicant.hoursServed) : null;
+	const [hours, setHours] = useState(recorded === null ? "" : String(recorded));
+	const parsedHours = hours.trim() === "" ? null : Number(hours);
+	const hoursValid =
+		parsedHours === null ||
+		(Number.isFinite(parsedHours) &&
+			parsedHours >= 0.5 &&
+			parsedHours <= 500 &&
+			Number.isInteger(parsedHours * 2));
+	const hoursChanged = parsedHours !== recorded;
+
+	const saveHours = () => {
+		if (!hoursValid) return;
+		attendance.mutate(
+			{ applicationId: applicant.id, attended: true, hours: parsedHours },
+			{
+				onSuccess: () =>
+					toast.success(
+						parsedHours === null
+							? "Hours reset to the whole event."
+							: `${parsedHours} hours recorded.`,
+					),
+				onError: (error) => toast.error(apiErrorMessage(error)),
+			},
+		);
+	};
 
 	const confirmRevoke = async () => {
 		if (!certificate) return;
@@ -403,7 +462,11 @@ function AttendanceControls({
 								? "Certificate revoked"
 								: `Certificate ${certificate.code}`}
 						</Caption>
-						<Caption color="quaternary">Attended</Caption>
+						<Caption color="quaternary">
+							{recorded === null
+								? "Attended · whole event"
+								: `Attended · ${recorded} h`}
+						</Caption>
 					</View>
 					{!certificate.revokedAt && (
 						<Button
@@ -453,16 +516,60 @@ function AttendanceControls({
 				</View>
 			)}
 
+			{attended && !certificate && (
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "flex-end",
+						gap: spacing[3],
+						marginTop: spacing[1],
+					}}
+				>
+					<Field
+						label="Hours served"
+						optional
+						hint={
+							hoursValid
+								? "Leave blank for the whole event. Printed on the certificate."
+								: "Use half-hour steps between 0.5 and 500."
+						}
+						style={{ flex: 1, marginBottom: 0 }}
+					>
+						<Input
+							placeholder="Whole event"
+							value={hours}
+							onChangeText={(value) => setHours(value.replace(/[^\d.]/g, ""))}
+							keyboardType="decimal-pad"
+							maxLength={5}
+							accessibilityLabel={`Hours ${applicant.volunteer.fullName ?? "this volunteer"} served`}
+							style={[inputStyle, { maxWidth: 140 }]}
+						/>
+					</Field>
+					{hoursChanged && (
+						<Button
+							size="sm"
+							variant="outline"
+							onPress={saveHours}
+							disabled={busy || !hoursValid}
+							loading={attendance.isPending}
+							style={{ marginBottom: spacing[6] }}
+						>
+							Save hours
+						</Button>
+					)}
+				</View>
+			)}
+
 			{showNote && !certificate && (
 				<View style={{ marginTop: spacing[2] }}>
 					<Field
 						label="Note on the certificate"
 						optional
-						hint="e.g. 6 hours · led the registration desk"
+						hint="e.g. led the registration desk"
 						style={{ marginBottom: spacing[3] }}
 					>
 						<Input
-							placeholder="Hours contributed, role, anything worth recording"
+							placeholder="Their role, anything worth recording"
 							value={note}
 							onChangeText={setNote}
 							style={inputStyle}
@@ -470,11 +577,19 @@ function AttendanceControls({
 					</Field>
 					<Button
 						onPress={issueCertificate}
-						disabled={busy}
+						disabled={busy || hoursChanged}
 						loading={issue.isPending}
 					>
 						Confirm and issue
 					</Button>
+					{hoursChanged && (
+						<Caption
+							color="tertiary"
+							style={{ marginTop: spacing[2], textAlign: "center" }}
+						>
+							Save the hours first - they go on the certificate.
+						</Caption>
+					)}
 				</View>
 			)}
 		</View>

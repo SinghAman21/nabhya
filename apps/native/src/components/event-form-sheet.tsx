@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
+import { Caption } from "@/components/ui/typography";
 import {
 	useCreateEvent,
 	useOrgEvent,
@@ -44,6 +45,7 @@ export function EventFormSheet({
 	defaultCity,
 	defaultState,
 	event,
+	publishBlockedReason = null,
 }: {
 	visible: boolean;
 	onClose: () => void;
@@ -51,6 +53,13 @@ export function EventFormSheet({
 	defaultState?: string | null;
 	/** Omit to create; supply to edit. */
 	event?: OrgEventListItem | null;
+	/**
+	 * Why this person cannot publish (unverified NGO, or a team role without
+	 * `content.publish`) - from `useOrgAccess().blocked`. When set, the sheet
+	 * saves drafts only and says why, instead of offering a Publish button the
+	 * server would refuse.
+	 */
+	publishBlockedReason?: string | null;
 }) {
 	const { spacing } = useTheme();
 	const inputStyle = useFieldInputStyle();
@@ -184,25 +193,42 @@ export function EventFormSheet({
 			footer={
 				<View style={{ gap: spacing[2] }}>
 					<FieldError message={errors.form} />
-					<Button
-						onPress={() => submit("PUBLISHED")}
-						loading={saving}
-						disabled={blocked}
-					>
-						{isEditing && event?.status === "DRAFT"
-							? "Publish this draft"
-							: isEditing
-								? "Save changes"
-								: "Publish event"}
-					</Button>
-					{isDraft && (
-						<Button
-							variant="outline"
-							onPress={() => submit("DRAFT")}
-							disabled={blocked}
-						>
-							{isEditing ? "Keep as draft" : "Save as draft"}
-						</Button>
+					{isDraft && publishBlockedReason ? (
+						<>
+							<Button
+								onPress={() => submit("DRAFT")}
+								loading={saving}
+								disabled={blocked}
+							>
+								{isEditing ? "Save draft" : "Save as draft"}
+							</Button>
+							<Caption color="tertiary" style={{ textAlign: "center" }}>
+								Publishing: {publishBlockedReason}
+							</Caption>
+						</>
+					) : (
+						<>
+							<Button
+								onPress={() => submit("PUBLISHED")}
+								loading={saving}
+								disabled={blocked}
+							>
+								{isEditing && event?.status === "DRAFT"
+									? "Publish this draft"
+									: isEditing
+										? "Save changes"
+										: "Publish event"}
+							</Button>
+							{isDraft && (
+								<Button
+									variant="outline"
+									onPress={() => submit("DRAFT")}
+									disabled={blocked}
+								>
+									{isEditing ? "Keep as draft" : "Save as draft"}
+								</Button>
+							)}
+						</>
 					)}
 				</View>
 			}

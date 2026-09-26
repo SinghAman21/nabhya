@@ -2,18 +2,16 @@ import {
 	type UpsertAnnouncementInput,
 	upsertAnnouncementSchema,
 } from "@nabhya/shared";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import { Check, Megaphone, Pin } from "lucide-react-native";
 import { useEffect, useState } from "react";
-import { FlatList, RefreshControl, View } from "react-native";
+import { View } from "react-native";
 import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
-import { LoadMoreFooter } from "@/components/load-more-footer";
+import { PagedList, usePagedQuery } from "@/components/paged-list";
 import {
+	Banner,
 	EmptyState,
-	ErrorState,
 	FilterChips,
-	GridCell,
-	LoadingState,
 	Screen,
 	ScreenHeader,
 	Surface,
@@ -31,12 +29,12 @@ import {
 	useDeleteAnnouncement,
 	useUpdateAnnouncement,
 } from "@/hooks/use-directory";
+import { useOrgAccess } from "@/hooks/use-org-access";
 import { useTheme } from "@/hooks/use-theme";
 import { useGridColumns } from "@/hooks/useMedia";
 import { apiErrorMessage, publishingApi, queryKeys } from "@/lib/api";
 import { focusable } from "@/lib/focus";
 import { formatRelative } from "@/lib/format";
-import { verticalScrollbar } from "@/lib/scroll";
 import type { Announcement } from "@/lib/types";
 
 type StatusFilter = "ALL" | "PUBLISHED" | "DRAFT";
@@ -47,45 +45,33 @@ const FILTERS: Array<{ value: StatusFilter; label: string }> = [
 	{ value: "DRAFT", label: "Drafts" },
 ];
 
-const PAGE_SIZE = 20;
-
-/** Own announcements, page by page; the status filter is applied locally. */
-function useMyAnnouncementPages() {
-	return useInfiniteQuery({
-		queryKey: queryKeys.myAnnouncements({ paged: true }),
-		queryFn: ({ pageParam }) =>
-			publishingApi.listMyAnnouncements({
-				page: pageParam,
-				limit: PAGE_SIZE,
-			}),
-		initialPageParam: 1,
-		getNextPageParam: (last) =>
-			last.meta.hasMore ? last.meta.page + 1 : undefined,
-	});
-}
-
 /**
  * Announcements on the public profile. Distinct from "Share an update"
  * (`/feed`), which is a feed post: these are pinned, titled, and can be held
  * as drafts.
  */
 export default function OrgAnnouncements() {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
+	const router = useRouter();
 	const [filter, setFilter] = useState<StatusFilter>("ALL");
 	const [composing, setComposing] = useState(false);
 	const [editing, setEditing] = useState<Announcement | null>(null);
+	const access = useOrgAccess();
 
-	const query = useMyAnnouncementPages();
+	const params = filter === "ALL" ? {} : { status: filter };
+	// Filtered by the server: a client filter only saw the pages loaded so far.
+	const { query, items, loadMore } = usePagedQuery({
+		queryKey: queryKeys.myAnnouncements(params),
+		fetchPage: (page) =>
+			publishingApi.listMyAnnouncements({ ...params, page, limit: 20 }),
+	});
 	const columns = useGridColumns();
 	const remove = useDeleteAnnouncement();
 
-	const all = query.data?.pages.flatMap((page) => page.items) ?? [];
-	const items =
-		filter === "ALL" ? all : all.filter((item) => item.status === filter);
-
-	const loadMore = () => {
-		if (query.hasNextPage && !query.isFetchingNextPage) query.fetchNextPage();
-	};
+	// The server requires verification even to save a draft of an update.
+	const createBlocked = access.blocked("content.publish", { public: true });
+	const canEdit = !access.blocked("content.publish");
+	const canDelete = !access.blocked("content.delete");
 
 	const confirmDelete = async (announcement: Announcement) => {
 		const ok = await confirm({
@@ -109,68 +95,62 @@ export default function OrgAnnouncements() {
 				title="Updates"
 				subtitle="Shown on your public profile"
 				action={
-					<Button size="sm" onPress={openCreate}>
+					<Button size="sm" onPress={openCreate} disabled={!!createBlocked}>
 						New update
 					</Button>
 				}
 			/>
 
+			{createBlocked && (
+				<View style={{ marginBottom: spacing[4] }}>
+					{!access.isVerified && !access.isSuspended ? (
+						<Banner
+							tone="warning"
+							title="Verification needed to post updates"
+							description="Updates appear on your public profile and notify followers, so they unlock once your documents are approved."
+							onPress={() => router.push("/(ngo)/verification")}
+						/>
+					) : (
+						<Banner tone="info" title="View only" description={createBlocked} />
+					)}
+				</View>
+			)}
+
 			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
 
-			{query.isLoading ? (
-				<LoadingState />
-			) : query.isError ? (
-				<ErrorState
-					message={apiErrorMessage(query.error)}
-					onRetry={() => query.refetch()}
-				/>
-			) : (
-				<FlatList
-					key={`grid-${columns}`}
-					numColumns={columns}
-					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
-					data={items}
-					keyExtractor={(item) => item.id}
-					{...verticalScrollbar}
-					contentContainerStyle={{ paddingBottom: spacing[10] }}
-					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
-					onEndReached={loadMore}
-					onEndReachedThreshold={0.5}
-					refreshControl={
-						<RefreshControl
-							refreshing={query.isRefetching && !query.isFetchingNextPage}
-							onRefresh={() => query.refetch()}
-							tintColor={colors.text.quaternary as string}
-						/>
-					}
-					ListEmptyComponent={
-						<EmptyState
-							icon={Megaphone}
-							title={filter === "DRAFT" ? "No drafts" : "No updates yet"}
-							description="Progress reports, thank-yous, what's coming next. Published updates appear on your profile and notify people who follow you."
-							action={<Button onPress={openCreate}>Write an update</Button>}
-						/>
-					}
-					ListFooterComponent={
-						<LoadMoreFooter
-							hasMore={!!query.hasNextPage}
-							loading={query.isFetchingNextPage}
-							onLoadMore={loadMore}
-							count={items.length}
-							noun="updates"
-						/>
-					}
-					renderItem={({ item }) => (
-						<GridCell>
-							<AnnouncementRow
-								announcement={item}
-								onEdit={() => setEditing(item)}
-								onDelete={() => confirmDelete(item)}
-							/>
-						</GridCell>
-					)}
-				/>
-			)}
+			<PagedList
+				query={query}
+				items={items}
+				loadMore={loadMore}
+				numColumns={columns}
+				noun="updates"
+				keyExtractor={(item) => item.id}
+				renderItem={(item) => (
+					<AnnouncementRow
+						announcement={item}
+						onEdit={canEdit ? () => setEditing(item) : undefined}
+						onDelete={canDelete ? () => confirmDelete(item) : undefined}
+					/>
+				)}
+				empty={
+					<EmptyState
+						icon={Megaphone}
+						title={
+							filter === "DRAFT"
+								? "No drafts"
+								: filter === "PUBLISHED"
+									? "Nothing published yet"
+									: "No updates yet"
+						}
+						description="Progress reports, thank-yous, what's coming next. Published updates appear on your profile and notify people who follow you."
+						action={
+							createBlocked ? undefined : (
+								<Button onPress={openCreate}>Write an update</Button>
+							)
+						}
+					/>
+				}
+			/>
 
 			<AnnouncementSheet
 				visible={composing || !!editing}
@@ -190,8 +170,9 @@ function AnnouncementRow({
 	onDelete,
 }: {
 	announcement: Announcement;
-	onEdit: () => void;
-	onDelete: () => void;
+	/** Omitted when the viewer's team role cannot change the update. */
+	onEdit?: () => void;
+	onDelete?: () => void;
 }) {
 	const { colors, spacing } = useTheme();
 	const isDraft = announcement.status === "DRAFT";
@@ -254,18 +235,22 @@ function AnnouncementRow({
 						: `Published ${formatRelative(announcement.publishedAt ?? announcement.createdAt)}`}
 				</Caption>
 				<View style={{ flexDirection: "row", gap: spacing[3] }}>
-					<TextAction
-						label={isDraft ? "Edit & publish" : "Edit"}
-						tone={isDraft ? "brand" : "default"}
-						onPress={onEdit}
-						accessibilityLabel={`Edit ${announcement.title}`}
-					/>
-					<TextAction
-						label="Delete"
-						tone="danger"
-						onPress={onDelete}
-						accessibilityLabel={`Delete ${announcement.title}`}
-					/>
+					{onEdit && (
+						<TextAction
+							label={isDraft ? "Edit & publish" : "Edit"}
+							tone={isDraft ? "brand" : "default"}
+							onPress={onEdit}
+							accessibilityLabel={`Edit ${announcement.title}`}
+						/>
+					)}
+					{onDelete && (
+						<TextAction
+							label="Delete"
+							tone="danger"
+							onPress={onDelete}
+							accessibilityLabel={`Delete ${announcement.title}`}
+						/>
+					)}
 				</View>
 			</View>
 		</Surface>

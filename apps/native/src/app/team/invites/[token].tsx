@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Copy, LogIn, MailPlus } from "lucide-react-native";
 import { useState } from "react";
@@ -23,7 +24,9 @@ import {
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
+import { queryKeys } from "@/lib/api/query-keys";
 import { copyText } from "@/lib/clipboard";
+import { savePendingInvite } from "@/lib/pending-invite";
 import { verticalScrollbar } from "@/lib/scroll";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -31,23 +34,29 @@ import { useAuthStore } from "@/store/auth-store";
  * Accept (or decline) a team invite from its email link.
  *
  * Public route on purpose - the person tapping the link may not be signed in
- * yet. The server enforces the one rule that matters: the invite's email must
- * equal the signed-in account's email, so signing in with anything else 403s
- * with a message that names the account to switch to.
+ * yet, in which case the token is parked (`lib/pending-invite.ts`) and the
+ * entry gate brings them back here after sign-in or sign-up. The server
+ * enforces the rules that matter: the invite's email must equal the signed-in
+ * account's, the account must be an organisation account or have no role yet
+ * (accepting grants it), and an account can be on one team at a time.
  */
 function TeamInvitePage() {
-	const params = useLocalSearchParams<{ token: string }>();
+	const params = useLocalSearchParams<{ token: string; by?: string }>();
 	const raw = params.token;
 	const token = Array.isArray(raw) ? raw[0] : raw;
+	// `?by=id`: opened from the in-app notification, which carries the invite's
+	// id. The email link carries the token. Same page, same server rules.
+	const byId = params.by === "id";
 	const router = useRouter();
+	const queryClient = useQueryClient();
 	const { colors, spacing } = useTheme();
 
 	const email = useAuthStore((s) => s.email);
 	const { data: me } = useMe(!!email);
 	const accountEmail = me?.email ?? email ?? null;
 
-	const accept = useAcceptTeamInvite();
-	const decline = useDeclineTeamInvite();
+	const accept = useAcceptTeamInvite(byId);
+	const decline = useDeclineTeamInvite(byId);
 	const [error, setError] = useState<string | null>(null);
 
 	if (!token) {
@@ -70,15 +79,15 @@ function TeamInvitePage() {
 				<EmptyState
 					icon={LogIn}
 					title="Sign in to accept this invite"
-					description="Team invites are tied to your account. Sign in first - the link will still work afterwards."
+					description="Team invites are tied to your email. Sign in or create an account with the address the invite was sent to, and you'll come straight back here."
 					action={
 						<Button
-							onPress={() => {
-								toast.info("Sign in to accept your team invite.");
+							onPress={async () => {
+								await savePendingInvite(token);
 								router.replace("/(auth)/login");
 							}}
 						>
-							Sign in
+							Continue
 						</Button>
 					}
 				/>
@@ -89,9 +98,10 @@ function TeamInvitePage() {
 	const busy = accept.isPending || decline.isPending;
 
 	const failure = (err: unknown) => {
-		const status = (err as { response?: { status?: number } })?.response
-			?.status;
-		if (status === 403) {
+		const message = apiErrorMessage(err, "Could not process this invite.");
+		// The server has two 403s here - wrong email, and an account that is
+		// already a volunteer - and only the first is fixed by switching account.
+		if (message.includes("different email")) {
 			setError(
 				accountEmail
 					? `This invite was sent to a different email address - you are signed in as ${accountEmail}. Switch to the invited account and try again.`
@@ -99,7 +109,7 @@ function TeamInvitePage() {
 			);
 			return;
 		}
-		setError(apiErrorMessage(err, "Could not process this invite."));
+		setError(message);
 	};
 
 	const onAccept = () => {
@@ -107,7 +117,12 @@ function TeamInvitePage() {
 		accept.mutate(token, {
 			onSuccess: () => {
 				toast.success("Welcome to the team.");
-				router.replace("/(ngo)/team");
+				// Accepting can grant this account its role, so the cached status
+				// may still say "pick a role". Drop it rather than invalidate: the
+				// gate then waits for a fresh answer instead of routing on the old
+				// one, and lands the new member in the NGO app.
+				queryClient.removeQueries({ queryKey: queryKeys.onboardingStatus });
+				router.replace("/");
 			},
 			onError: failure,
 		});

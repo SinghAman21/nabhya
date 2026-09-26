@@ -1,10 +1,12 @@
 import type {
+	OrgReviewQuery,
 	PaginationQuery,
 	ReplyToReviewInput,
 	ReviewQuery,
 	UpsertReviewInput,
 } from "@nabhya/shared";
 import {
+	orgReviewQuerySchema,
 	paginationQuerySchema,
 	replyToReviewSchema,
 	reviewQuerySchema,
@@ -72,6 +74,17 @@ export class EngagementController {
 		return this.engagementService.unfollow(user.id, id);
 	}
 
+	@Get("me/following")
+	@Roles("volunteer")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({ summary: "The NGOs the caller follows" })
+	listFollowing(
+		@CurrentUser() user: AuthUser,
+		@Query(new ZodValidationPipe(paginationQuerySchema)) query: PaginationQuery,
+	) {
+		return this.engagementService.listFollowing(user.id, query);
+	}
+
 	@Get("me/bookmarks")
 	@Roles("volunteer")
 	@ApiBearerAuth("access-token")
@@ -125,7 +138,7 @@ export class EngagementController {
 	@ApiOperation({ summary: "Reviews left for the caller's organization" })
 	listMyReviews(
 		@CurrentUser() user: AuthUser,
-		@Query(new ZodValidationPipe(reviewQuerySchema)) query: ReviewQuery,
+		@Query(new ZodValidationPipe(orgReviewQuerySchema)) query: OrgReviewQuery,
 	) {
 		return this.engagementService.listMyOrganizationReviews(user.id, query);
 	}

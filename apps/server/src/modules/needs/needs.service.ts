@@ -5,6 +5,7 @@ import type {
 	CreatePledgeInput,
 	OrgNeedQuery,
 	PaginationQuery,
+	PledgeQuery,
 	PublicNeedQuery,
 	ReviewPledgeInput,
 	UpdateNeedInput,
@@ -358,6 +359,7 @@ export class NeedsService {
 				organizationId: needs.organizationId,
 				quantity: needs.quantity,
 				unit: needs.unit,
+				title: needs.title,
 			})
 			.from(needs)
 			.innerJoin(organizations, eq(needs.organizationId, organizations.id))
@@ -414,6 +416,7 @@ export class NeedsService {
 				})
 				.where(eq(needPledges.id, existing.id))
 				.returning();
+			this.notifyNewPledge(need);
 			return reopened;
 		}
 
@@ -438,8 +441,28 @@ export class NeedsService {
 			entityId: pledge.id,
 			newValue: { needId, quantity: input.quantity },
 		});
+		this.notifyNewPledge(need);
 
 		return pledge;
+	}
+
+	/** `NEW_PLEDGE` was in the enum and never sent. Goes to whoever reviews pledges. */
+	private notifyNewPledge(need: {
+		id: string;
+		title: string;
+		organizationId: string;
+	}) {
+		void this.notifications.notifyOrganizationTeam(
+			need.organizationId,
+			{
+				type: "NEW_PLEDGE",
+				title: `Someone offered to help: ${need.title}`,
+				body: "Review the offer from Needs.",
+				entityName: "ORGANIZATION_NEED",
+				entityId: need.id,
+			},
+			{ permission: "people.review" },
+		);
 	}
 
 	async withdrawPledge(userId: string, needId: string) {
@@ -501,10 +524,15 @@ export class NeedsService {
 		return paginate(items, totals?.value ?? 0, query);
 	}
 
-	async listPledges(userId: string, needId: string, query: PaginationQuery) {
+	async listPledges(userId: string, needId: string, query: PledgeQuery) {
 		await this.requireOwnedNeed(userId, needId);
 
-		const where = eq(needPledges.needId, needId);
+		// Filtered here, not in the sheet: a client filter over page 1 hid
+		// every pending pledge past the twentieth.
+		const where = and(
+			eq(needPledges.needId, needId),
+			query.status ? eq(needPledges.status, query.status) : undefined,
+		);
 		const { limit, offset } = toOffset(query);
 
 		const [items, [totals]] = await Promise.all([

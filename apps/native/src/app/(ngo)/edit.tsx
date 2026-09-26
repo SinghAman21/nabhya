@@ -1,10 +1,11 @@
 import type { UpdateOrganizationInput } from "@nabhya/shared";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScrollView, View, type ViewStyle } from "react-native";
 import { MultiChoiceChips } from "@/components/choice-chips";
 import { Field, useFieldInputStyle } from "@/components/form-field";
+import { LocationFields } from "@/components/onboarding/location-fields";
 import {
 	COVER_ASPECT,
 	COVER_HINT,
@@ -24,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/overlay";
 import { Caption } from "@/components/ui/typography";
+import { useOrgAccess } from "@/hooks/use-org-access";
 import {
 	useMyOrganization,
 	useUpdateMyOrganization,
@@ -87,6 +89,9 @@ interface Form {
 	city: string;
 	state: string;
 	pincode: string;
+	/** Set by "use my location" in `LocationFields`; never typed. */
+	latitude: number | undefined;
+	longitude: number | undefined;
 	teamSize: string;
 	foundingYear: string;
 	logo: string;
@@ -107,6 +112,8 @@ const EMPTY: Form = {
 	city: "",
 	state: "",
 	pincode: "",
+	latitude: undefined,
+	longitude: undefined,
 	teamSize: "",
 	foundingYear: "",
 	logo: "",
@@ -138,6 +145,7 @@ export default function EditOrganization() {
 	const addressStyle = useFieldInputStyle(80);
 
 	const org = useMyOrganization();
+	const access = useOrgAccess();
 	const categories = useCategories();
 	const update = useUpdateMyOrganization();
 
@@ -156,10 +164,15 @@ export default function EditOrganization() {
 		? { flexDirection: "row", gap: spacing[4] }
 		: {};
 
-	// Hydrate once the organization loads. Everything is a string in the form so
-	// a cleared field is distinguishable from an untouched one.
+	// Hydrate once the organization loads - once, keyed on its id. Re-running
+	// on every `org.data` change meant a background refetch (window focus,
+	// another screen's invalidation) silently replaced whatever had been typed.
+	// Everything is a string in the form so a cleared field is distinguishable
+	// from an untouched one.
+	const hydratedFor = useRef<string | null>(null);
 	useEffect(() => {
-		if (!org.data) return;
+		if (!org.data || hydratedFor.current === org.data.id) return;
+		hydratedFor.current = org.data.id;
 		setForm({
 			organizationName: org.data.organizationName ?? "",
 			registrationNumber: org.data.registrationNumber ?? "",
@@ -173,6 +186,8 @@ export default function EditOrganization() {
 			city: org.data.city ?? "",
 			state: org.data.state ?? "",
 			pincode: org.data.pincode ?? "",
+			latitude: org.data.latitude ? Number(org.data.latitude) : undefined,
+			longitude: org.data.longitude ? Number(org.data.longitude) : undefined,
 			teamSize: org.data.teamSize ? String(org.data.teamSize) : "",
 			foundingYear: org.data.foundingYear ? String(org.data.foundingYear) : "",
 			logo: org.data.logo ?? "",
@@ -264,8 +279,12 @@ export default function EditOrganization() {
 			coverImage: form.coverImage.trim(),
 			// Its schema is `url() | ""`, so the empty string is already allowed.
 			website: form.website.trim(),
-			teamSize: form.teamSize ? Number(form.teamSize) : undefined,
-			foundingYear: form.foundingYear ? Number(form.foundingYear) : undefined,
+			// null clears; the schema takes it for these two.
+			teamSize: form.teamSize ? Number(form.teamSize) : null,
+			foundingYear: form.foundingYear ? Number(form.foundingYear) : null,
+			...(form.latitude !== undefined && form.longitude !== undefined
+				? { latitude: form.latitude, longitude: form.longitude }
+				: {}),
 			categoryIds: form.categoryIds,
 		};
 
@@ -282,13 +301,14 @@ export default function EditOrganization() {
 
 	const uploadError = coverUpload.error ?? logoUpload.error;
 	const busy = coverUpload.isUploading || logoUpload.isUploading;
+	const editBlocked = access.blocked("org.edit");
 
 	const saveButton = (
 		<Button
 			size="sm"
 			onPress={save}
 			loading={update.isPending}
-			disabled={org.isLoading || org.isError || busy}
+			disabled={org.isLoading || org.isError || busy || !!editBlocked}
 		>
 			Save
 		</Button>
@@ -298,6 +318,11 @@ export default function EditOrganization() {
 		<Screen>
 			<View style={FORM}>
 				<ScreenHeader back title="Edit profile" action={saveButton} />
+				{editBlocked && (
+					<View style={{ marginBottom: spacing[4] }}>
+						<Banner tone="info" title="View only" description={editBlocked} />
+					</View>
+				)}
 			</View>
 
 			{org.isLoading ? (
@@ -501,22 +526,23 @@ export default function EditOrganization() {
 										style={addressStyle}
 									/>
 								</Field>
-								<View style={{ flexDirection: "row", gap: spacing[4] }}>
-									<Field label="City" style={{ flex: 1 }}>
-										<Input
-											value={form.city}
-											onChangeText={(v) => set("city", v)}
-											style={inputStyle}
-										/>
-									</Field>
-									<Field label="State" style={{ flex: 1 }}>
-										<Input
-											value={form.state}
-											onChangeText={(v) => set("state", v)}
-											style={inputStyle}
-										/>
-									</Field>
-								</View>
+								{/* The wizard's control, not two free-text boxes: every feed
+								    filter matches `city` exactly, and `lib/cities` is the
+								    only place that spells a city the way they expect. */}
+								<LocationFields
+									value={{
+										city: form.city,
+										state: form.state,
+										...(form.latitude !== undefined
+											? { latitude: form.latitude }
+											: {}),
+										...(form.longitude !== undefined
+											? { longitude: form.longitude }
+											: {}),
+									}}
+									onChange={(fields) => setForm((f) => ({ ...f, ...fields }))}
+									detectLede="Puts you in “NGOs near me” for volunteers around you"
+								/>
 								<Field label="Pincode" style={{ marginBottom: 0 }}>
 									<Input
 										value={form.pincode}

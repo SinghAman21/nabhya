@@ -86,6 +86,7 @@ export function useCreateEvent() {
 		mutationFn: (input: CreateEventInput) => orgEventsApi.create(input),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.orgEvents });
+			queryClient.invalidateQueries({ queryKey: queryKeys.orgOverview });
 			queryClient.invalidateQueries({ queryKey: queryScopes.events });
 			// The composer can create one of these straight from the feed, and
 			// the ranking pool holds open needs, upcoming events and published
@@ -103,6 +104,7 @@ export function useUpdateEvent() {
 			orgEventsApi.update(id, input),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.orgEvents });
+			queryClient.invalidateQueries({ queryKey: queryKeys.orgOverview });
 			queryClient.invalidateQueries({ queryKey: queryScopes.events });
 		},
 	});
@@ -114,19 +116,9 @@ export function useDeleteEvent() {
 		mutationFn: (id: string) => orgEventsApi.remove(id),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.orgEvents });
+			queryClient.invalidateQueries({ queryKey: queryKeys.orgOverview });
 			queryClient.invalidateQueries({ queryKey: queryScopes.events });
 		},
-	});
-}
-
-export function useEventApplicants(
-	eventId: string | undefined,
-	query: Partial<ApplicationQuery> = {},
-) {
-	return useQuery({
-		queryKey: queryKeys.orgEventApplicants(eventId ?? "", query),
-		queryFn: () => orgEventsApi.applicants(eventId as string, query),
-		enabled: !!eventId,
 	});
 }
 
@@ -142,6 +134,7 @@ export function useReviewApplication(eventId: string) {
 		}) => orgEventsApi.reviewApplication(eventId, applicationId, input),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.orgEvents });
+			queryClient.invalidateQueries({ queryKey: queryKeys.orgOverview });
 		},
 	});
 }

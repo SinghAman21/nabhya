@@ -95,6 +95,16 @@ export class OrganizationsController {
 		return this.organizationsService.updateMyOrganization(user.id, body);
 	}
 
+	@Get("me/overview")
+	@Roles("organisation")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({
+		summary: "Whole-org counts for the NGO dashboard",
+	})
+	getMyOverview(@CurrentUser() user: AuthUser) {
+		return this.organizationsService.getMyOverview(user.id);
+	}
+
 	@Get("me/documents")
 	@Roles("organisation")
 	@ApiBearerAuth("access-token")

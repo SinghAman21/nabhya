@@ -1,6 +1,5 @@
 import type {
 	CreateFinancialReportInput,
-	InviteOrgAdminInput,
 	InviteTeamMemberInput,
 	UpdateOrgAdminInput,
 	UpsertAnnouncementInput,
@@ -116,21 +115,12 @@ export function usePublicTeam(organizationId: string | undefined) {
 	});
 }
 
-export function useTeamInvites() {
+/** `enabled` false for roles without `team.invite`, whom the endpoint 403s. */
+export function useTeamInvites(enabled = true) {
 	return useQuery({
 		queryKey: queryKeys.teamInvites,
 		queryFn: publishingApi.listTeamInvites,
-	});
-}
-
-export function useInviteAdmin() {
-	const queryClient = useQueryClient();
-	return useMutation({
-		mutationFn: (input: InviteOrgAdminInput) =>
-			publishingApi.inviteAdmin(input),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: queryScopes.team });
-		},
+		enabled,
 	});
 }
 
@@ -222,10 +212,17 @@ export function useConfirmOwnershipTransfer() {
 	});
 }
 
-export function useAcceptTeamInvite() {
+/**
+ * `byId`: the value is the invite's id (from a notification) rather than the
+ * email link's token - see `app/team/invites/[token].tsx`.
+ */
+export function useAcceptTeamInvite(byId = false) {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (token: string) => publishingApi.acceptTeamInvite(token),
+		mutationFn: (value: string) =>
+			byId
+				? publishingApi.acceptTeamInviteById(value)
+				: publishingApi.acceptTeamInvite(value),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.team });
 			queryClient.invalidateQueries({ queryKey: queryKeys.me });
@@ -236,10 +233,13 @@ export function useAcceptTeamInvite() {
 	});
 }
 
-export function useDeclineTeamInvite() {
+export function useDeclineTeamInvite(byId = false) {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (token: string) => publishingApi.declineTeamInvite(token),
+		mutationFn: (value: string) =>
+			byId
+				? publishingApi.declineTeamInviteById(value)
+				: publishingApi.declineTeamInvite(value),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.team });
 		},

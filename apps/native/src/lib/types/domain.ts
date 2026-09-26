@@ -147,6 +147,8 @@ export interface OrgEventDetail {
 	status: EventStatus;
 	isUrgent: boolean;
 	volunteersNeeded: number;
+	/** The endpoint returns the whole row; the review deep link reads this. */
+	acceptedCount: number;
 }
 
 export interface VolunteerSummary {
@@ -167,6 +169,11 @@ export interface EventApplicant {
 	appliedAt: string;
 	/** Set once the organization confirms the volunteer turned up. */
 	attendedAt: string | null;
+	/**
+	 * Hours actually served, as the NGO recorded them (a decimal string on the
+	 * wire). Null means the whole event - what the certificate then prints.
+	 */
+	hoursServed?: string | null;
 	volunteer: VolunteerSummary;
 	/** The certificate issued for this application, if any. */
 	certificate: {
@@ -216,6 +223,17 @@ export interface PublicNeed {
 	expiresAt: string | null;
 	createdAt: string;
 	organization: OrganizationSummary;
+}
+
+/** `GET /api/needs/:id` - the need plus the signed-in viewer's own pledge. */
+export interface PublicNeedDetail extends PublicNeed {
+	myPledge: {
+		id: string;
+		status: PledgeStatus;
+		quantity: number | null;
+		message: string | null;
+		createdAt: string;
+	} | null;
 }
 
 export interface OrgNeedListItem {
@@ -355,6 +373,11 @@ export interface AdminOrgDetail {
 	city: string | null;
 	state: string | null;
 	pincode: string | null;
+	/** Volunteers following this NGO (issue #7). */
+	followerCount?: number;
+	/** Decimal columns, so strings on the wire. Set by "use my location". */
+	latitude?: string | null;
+	longitude?: string | null;
 	teamSize: number | null;
 	foundingYear: number | null;
 	verificationStatus: OrgVerificationStatus | null;
@@ -561,6 +584,8 @@ export interface OrgDonation {
 // ─── Organization directory ──────────────────────────────────────────────────
 
 export interface PublicOrganization {
+	/** Volunteers following this NGO (issue #7). */
+	followerCount?: number;
 	id: string;
 	organizationName: string;
 	orgType: string | null;

@@ -611,6 +611,15 @@ the numbers.
 
 ## Traps
 
+- **An `(ngo)` control asks `useOrgAccess()` whether it may act.**
+  `blocked(action, { public })` returns `null` or the sentence saying why -
+  suspension, then team role (`ROLE_PERMISSIONS`), then verification for
+  anything public - mirroring the server's three checks. Disable the control and
+  show the reason rather than hiding it, so a coordinator learns what unlocks
+  it; drop per-row actions (Edit, Remove) the role cannot use. Screens used to
+  check a different subset each, so the same act was offered on one and hidden
+  on the next, and every mismatch was a button that 403'd. `useMyTeamRole`
+  reads a missing team row as the legacy owner, which is what the server does.
 - **Import `Pressable` from `@/components/ui/pressable`, never from `react-native`.**
   NativeWind's native interop flattens `style` with an object spread, so a style
   *function* (`style={({ pressed }) => …}`) becomes `{}` on iOS and Android while

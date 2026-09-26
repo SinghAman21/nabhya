@@ -34,6 +34,7 @@ import { useMedia } from "@/hooks/useMedia";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import {
+	currentDocumentsByType,
 	ORG_OPTIONAL_DOCUMENTS,
 	ORG_REQUIRED_DOCUMENTS,
 	ORG_VERIFICATION_STEPS,
@@ -193,14 +194,18 @@ export default function NgoProfile() {
 	const actionStyle = isDesktop ? undefined : { flex: 1 };
 	const actions = (
 		<View style={{ flexDirection: "row", gap: spacing[2] }}>
-			<Button
-				variant="outline"
-				size="sm"
-				style={actionStyle}
-				onPress={() => router.push(`/ngos/${data.id}`)}
-			>
-				View public page
-			</Button>
+			{/* The public page 404s until the NGO is verified - there is nothing
+			    public yet - so the button only exists once there is. */}
+			{isVerified && (
+				<Button
+					variant="outline"
+					size="sm"
+					style={actionStyle}
+					onPress={() => router.push(`/ngos/${data.id}`)}
+				>
+					View public page
+				</Button>
+			)}
 			<Button size="sm" style={actionStyle} onPress={goEdit}>
 				Edit profile
 			</Button>
@@ -306,6 +311,7 @@ export default function NgoProfile() {
 		isVerified && impact.data ? (
 			<MetricRow
 				stats={[
+					{ label: "Followers", value: data.followerCount ?? 0 },
 					{ label: "Events hosted", value: impact.data.eventsHosted ?? 0 },
 					{
 						label: "Volunteers engaged",
@@ -452,9 +458,7 @@ export default function NgoProfile() {
 	/* Verification                                                           */
 	/* ---------------------------------------------------------------------- */
 
-	const byType = new Map(
-		(documents.data ?? []).map((document) => [document.documentType, document]),
-	);
+	const byType = currentDocumentsByType(documents.data);
 	const requiredUploaded = ORG_REQUIRED_DOCUMENTS.filter((spec) =>
 		byType.has(spec.type),
 	).length;
@@ -530,18 +534,7 @@ export default function NgoProfile() {
 						}}
 					>
 						<Label color="tertiary">Status</Label>
-						<StatusPill
-							label={verification.label}
-							tone={
-								isVerified
-									? "success"
-									: status === "UNDER_REVIEW"
-										? "info"
-										: status === "REJECTED"
-											? "error"
-											: "warning"
-							}
-						/>
+						<StatusPill label={verification.label} tone={verification.tone} />
 					</View>
 					<Body weight="medium">{verification.title}</Body>
 					<Caption color="tertiary">{verification.description}</Caption>

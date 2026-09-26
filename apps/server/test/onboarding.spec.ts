@@ -108,6 +108,50 @@ describe("OnboardingService", () => {
 			expect(status.verificationStatus).toBe("PENDING");
 		});
 
+		it("counts a team member as onboarded to the NGO they joined", async () => {
+			// Checking only owner_user_id sent every invited member to the
+			// registration wizard to create a second NGO.
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const member = await createUser(db, { role: "organisation" });
+			await db.insert(organizationAdmins).values({
+				organizationId: org.id,
+				userId: member.id,
+				role: "MEMBER",
+				status: "ACTIVE",
+			});
+			const auth = authUserFor(member, ["organisation"]);
+
+			const status = await service.getStatus(auth);
+			expect(status.isOnboarded).toBe(true);
+			expect(status.organization?.id).toBe(org.id);
+
+			await expect(
+				service.completeOrganizationOnboarding(auth, orgPayload),
+			).rejects.toBeInstanceOf(ConflictException);
+		});
+
+		it("still routes the team of a suspended NGO into the NGO app", async () => {
+			// The NGO app is where a suspension is explained; the wizard is not.
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id, {
+				status: "SUSPENDED",
+			});
+			await db.insert(organizationAdmins).values({
+				organizationId: org.id,
+				userId: owner.id,
+				role: "OWNER",
+				isOwner: true,
+				status: "ACTIVE",
+			});
+
+			const status = await service.getStatus(
+				authUserFor(owner, ["organisation"]),
+			);
+			expect(status.isOnboarded).toBe(true);
+			expect(status.organization?.status).toBe("SUSPENDED");
+		});
+
 		it("never asks an NGO to re-select a role once it has one", async () => {
 			// The redirect loop came from this: the gate saw no role and bounced
 			// back to role-select even though the account already had one.

@@ -1,15 +1,11 @@
-import { formatMinor } from "@nabhya/shared";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { type DonationStatus, formatMinor } from "@nabhya/shared";
 import { useRouter } from "expo-router";
-import { HandCoins } from "lucide-react-native";
-import { FlatList, RefreshControl, View } from "react-native";
+import { HandCoins, Lock } from "lucide-react-native";
+import { View } from "react-native";
 import { InitialAvatar } from "@/components/initial-avatar";
-import { LoadMoreFooter } from "@/components/load-more-footer";
+import { PagedList, usePagedQuery } from "@/components/paged-list";
 import {
 	EmptyState,
-	ErrorState,
-	GridCell,
-	LoadingState,
 	MetricRow,
 	Screen,
 	ScreenHeader,
@@ -18,26 +14,22 @@ import {
 import { StatusPill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Body, BodySmall, Caption } from "@/components/ui/typography";
+import { useOrgAccess } from "@/hooks/use-org-access";
 import { useTheme } from "@/hooks/use-theme";
 import { useGridColumns } from "@/hooks/useMedia";
-import { apiErrorMessage, donationsApi, queryKeys } from "@/lib/api";
+import { donationsApi, queryKeys } from "@/lib/api";
 import { formatDate, formatRelative } from "@/lib/format";
-import { verticalScrollbar } from "@/lib/scroll";
 import type { OrgDonation } from "@/lib/types";
 
-const PAGE_SIZE = 20;
-
-/** Donations to this org, page by page. Stats ride along on every page. */
-function useOrgDonationPages() {
-	return useInfiniteQuery({
-		queryKey: queryKeys.orgDonations({ paged: true }),
-		queryFn: ({ pageParam }) =>
-			donationsApi.listForOrg({ page: pageParam, limit: PAGE_SIZE }),
-		initialPageParam: 1,
-		getNextPageParam: (last) =>
-			last.meta.hasMore ? last.meta.page + 1 : undefined,
-	});
-}
+/** Every state but COMPLETED, which needs no pill - the amount says it. */
+const STATUS_PILL: Record<
+	Exclude<DonationStatus, "COMPLETED">,
+	{ label: string; tone: "warning" | "error" | "neutral" }
+> = {
+	PENDING: { label: "Confirming", tone: "warning" },
+	FAILED: { label: "Failed", tone: "error" },
+	REFUNDED: { label: "Refunded", tone: "neutral" },
+};
 
 /**
  * Money received through Nabhya. Read-only by design: a donation only becomes
@@ -45,17 +37,20 @@ function useOrgDonationPages() {
  * the organisation to approve - just to see, thank, and reconcile.
  */
 export default function OrgDonations() {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const router = useRouter();
-	const query = useOrgDonationPages();
+	const access = useOrgAccess();
+	// Money is visible to owners, admins and viewers only (`money.view`); for
+	// anyone else the endpoint 403s, which used to surface as an error screen.
+	const moneyBlocked = access.blocked("money.view");
+	const { query, items, first, loadMore } = usePagedQuery({
+		queryKey: queryKeys.orgDonations({}),
+		fetchPage: (page) => donationsApi.listForOrg({ page, limit: 20 }),
+		enabled: !moneyBlocked,
+	});
 
-	const stats = query.data?.pages[0]?.stats;
-	const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+	const stats = first?.stats;
 	const columns = useGridColumns();
-
-	const loadMore = () => {
-		if (query.hasNextPage && !query.isFetchingNextPage) query.fetchNextPage();
-	};
 
 	const numbers =
 		stats && (stats.completedCount > 0 || stats.pendingCount > 0) ? (
@@ -84,34 +79,27 @@ export default function OrgDonations() {
 				subtitle="Money received through Nabhya"
 			/>
 
-			{query.isLoading ? (
-				<LoadingState />
-			) : query.isError ? (
-				<ErrorState
-					message={apiErrorMessage(query.error)}
-					onRetry={() => query.refetch()}
+			{moneyBlocked ? (
+				<EmptyState
+					icon={Lock}
+					title={
+						access.isSuspended
+							? "Unavailable while suspended"
+							: "Donations are visible to owners, admins and viewers"
+					}
+					description={moneyBlocked}
 				/>
 			) : (
-				<FlatList
-					key={`grid-${columns}`}
+				<PagedList
+					query={query}
+					items={items}
+					loadMore={loadMore}
 					numColumns={columns}
-					columnWrapperStyle={columns > 1 ? { gap: spacing[3] } : undefined}
-					data={items}
+					noun="donations"
+					header={numbers ?? undefined}
 					keyExtractor={(item) => item.id}
-					{...verticalScrollbar}
-					contentContainerStyle={{ paddingBottom: spacing[10] }}
-					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
-					onEndReached={loadMore}
-					onEndReachedThreshold={0.5}
-					refreshControl={
-						<RefreshControl
-							refreshing={query.isRefetching && !query.isFetchingNextPage}
-							onRefresh={() => query.refetch()}
-							tintColor={colors.text.quaternary as string}
-						/>
-					}
-					ListHeaderComponent={numbers}
-					ListEmptyComponent={
+					renderItem={(item) => <DonationRow donation={item} />}
+					empty={
 						<EmptyState
 							icon={HandCoins}
 							title="No donations yet"
@@ -129,20 +117,6 @@ export default function OrgDonations() {
 							}
 						/>
 					}
-					ListFooterComponent={
-						<LoadMoreFooter
-							hasMore={!!query.hasNextPage}
-							loading={query.isFetchingNextPage}
-							onLoadMore={loadMore}
-							count={items.length}
-							noun="donations"
-						/>
-					}
-					renderItem={({ item }) => (
-						<GridCell>
-							<DonationRow donation={item} />
-						</GridCell>
-					)}
 				/>
 			)}
 		</Screen>
@@ -170,12 +144,10 @@ function DonationRow({ donation }: { donation: OrgDonation }) {
 						{formatRelative(donation.completedAt ?? donation.createdAt)}
 					</Caption>
 				</View>
-				{!completed && (
+				{donation.status !== "COMPLETED" && (
 					<StatusPill
-						label={
-							donation.status === "PENDING" ? "Confirming" : donation.status
-						}
-						tone={donation.status === "PENDING" ? "warning" : "neutral"}
+						label={STATUS_PILL[donation.status].label}
+						tone={STATUS_PILL[donation.status].tone}
 					/>
 				)}
 			</View>

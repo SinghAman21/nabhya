@@ -99,6 +99,7 @@ export function useToggleFollow() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
 			queryClient.invalidateQueries({ queryKey: queryScopes.organizations });
+			queryClient.invalidateQueries({ queryKey: queryScopes.following });
 		},
 	});
 }
@@ -172,12 +173,20 @@ export function useMarkAttendance(eventId: string) {
 		mutationFn: ({
 			applicationId,
 			attended,
+			hours,
 		}: {
 			applicationId: string;
 			attended: boolean;
-		}) => certificatesApi.markAttendance(eventId, applicationId, { attended }),
+			/** Omit to keep what is recorded; null clears (= whole event). */
+			hours?: number | null;
+		}) =>
+			certificatesApi.markAttendance(eventId, applicationId, {
+				attended,
+				...(hours !== undefined ? { hours } : {}),
+			}),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.orgEvents });
+			queryClient.invalidateQueries({ queryKey: queryKeys.orgOverview });
 		},
 	});
 }
@@ -194,6 +203,7 @@ export function useIssueCertificate(eventId: string) {
 		}) => certificatesApi.issue(eventId, applicationId, { note }),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.orgEvents });
+			queryClient.invalidateQueries({ queryKey: queryKeys.orgOverview });
 		},
 	});
 }
@@ -211,6 +221,7 @@ export function useRevokeCertificate() {
 			certificatesApi.revoke(id, { reason }),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.orgEvents });
+			queryClient.invalidateQueries({ queryKey: queryKeys.orgOverview });
 			queryClient.invalidateQueries({ queryKey: queryScopes.certificates });
 		},
 	});

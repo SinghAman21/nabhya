@@ -11,7 +11,7 @@ import {
 	ORG_TYPE_TO_ENUM,
 } from "@nabhya/shared";
 import { ConflictException, Inject, Injectable } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import type { AuthUser } from "../../common/types";
@@ -53,22 +53,15 @@ export class OnboardingService {
 		const role = user.roles[0] ?? null;
 
 		if (role === "organisation") {
-			const organization = await this.db.query.organizations.findFirst({
-				where: eq(organizations.ownerUserId, user.id),
-				columns: {
-					id: true,
-					organizationName: true,
-					verificationStatus: true,
-					status: true,
-				},
-			});
+			const organization = await this.findOrganizationFor(user.id);
 
 			return {
 				role,
 				needsRoleSelection: false,
-				// For an NGO the organization row itself is the completion signal.
+				// For an NGO account the organization is the completion signal -
+				// one it owns, or one whose team it joined through an invite.
 				isOnboarded: !!organization,
-				organization: organization ?? null,
+				organization,
 				verificationStatus: organization?.verificationStatus ?? null,
 			};
 		}
@@ -94,14 +87,13 @@ export class OnboardingService {
 		user: AuthUser,
 		input: CompleteOrgOnboardingInput,
 	) {
-		const existing = await this.db.query.organizations.findFirst({
-			where: eq(organizations.ownerUserId, user.id),
-			columns: { id: true },
-		});
+		const existing = await this.findOrganizationFor(user.id);
 
 		if (existing) {
 			throw new ConflictException(
-				"An organization already exists for this account.",
+				existing.isOwner
+					? "An organization already exists for this account."
+					: `This account is already on ${existing.organizationName}'s team. Leave that team before registering a new organization.`,
 			);
 		}
 
@@ -224,5 +216,52 @@ export class OnboardingService {
 		});
 
 		return this.usersService.getProfile(user.id);
+	}
+
+	/**
+	 * The organization this account acts for: its active team membership
+	 * first (owners have an OWNER row too), then the legacy owner column for
+	 * data written before memberships existed. Unlike
+	 * `OrganizationsService.getActiveMembership` this does not drop a
+	 * suspended organization - the gate still has to route its team somewhere
+	 * that can say it is suspended.
+	 */
+	private async findOrganizationFor(userId: string) {
+		const [membership] = await this.db
+			.select({
+				id: organizations.id,
+				organizationName: organizations.organizationName,
+				verificationStatus: organizations.verificationStatus,
+				status: organizations.status,
+				isOwner: organizationAdmins.isOwner,
+			})
+			.from(organizationAdmins)
+			.innerJoin(
+				organizations,
+				eq(organizationAdmins.organizationId, organizations.id),
+			)
+			.where(
+				and(
+					eq(organizationAdmins.userId, userId),
+					eq(organizationAdmins.status, "ACTIVE"),
+				),
+			)
+			.limit(1);
+
+		if (membership) {
+			const { isOwner, ...organization } = membership;
+			return { ...organization, isOwner: !!isOwner };
+		}
+
+		const owned = await this.db.query.organizations.findFirst({
+			where: eq(organizations.ownerUserId, userId),
+			columns: {
+				id: true,
+				organizationName: true,
+				verificationStatus: true,
+				status: true,
+			},
+		});
+		return owned ? { ...owned, isOwner: true } : null;
 	}
 }

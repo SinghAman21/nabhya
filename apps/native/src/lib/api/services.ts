@@ -27,12 +27,13 @@ import type {
 	DownloadUrlResponse,
 	FeedCommentsQuery,
 	FeedMediaIntentsResponse,
-	FeedQuery,
 	FollowingFeedQuery,
 	ForYouFeedQuery,
 	OrgEventQuery,
 	OrgNeedQuery,
+	OrgOverview,
 	PaginationQuery,
+	PledgeQuery,
 	PublicEventQuery,
 	PublicNeedQuery,
 	ReviewApplicationInput,
@@ -81,6 +82,7 @@ import type {
 	PublicEvent,
 	PublicEventDetail,
 	PublicNeed,
+	PublicNeedDetail,
 	SearchResults,
 } from "@/lib/types";
 import {
@@ -134,6 +136,7 @@ export const searchApi = {
 
 export const organizationsApi = {
 	mine: () => http.get<AdminOrgDetail>(ORGANIZATIONS.ME),
+	overview: () => http.get<OrgOverview>(ORGANIZATIONS.MY_OVERVIEW),
 	update: (input: UpdateOrganizationInput) =>
 		http.patch<AdminOrgDetail>(ORGANIZATIONS.ME, input),
 	documents: () => http.get<AdminOrgDocument[]>(ORGANIZATIONS.MY_DOCUMENTS),
@@ -154,9 +157,6 @@ export const feedApi = {
 	following: (query: Partial<FollowingFeedQuery>) =>
 		feedPage(FEED.FOLLOWING, query),
 	saved: (query: Partial<SavedFeedQuery>) => feedPage(FEED.SAVED, query),
-	/** Chronological posts only - the composer's own list. */
-	list: (query: Partial<FeedQuery>) =>
-		http.getPage<FeedPostRecord>(FEED.LIST, query),
 	createMediaIntents: (input: CreateFeedMediaIntentsInput) =>
 		http.post<FeedMediaIntentsResponse>(FEED.UPLOAD_INTENTS, input),
 	create: (input: CreateFeedPostInput) =>
@@ -235,7 +235,7 @@ export const orgEventsApi = {
 export const needsApi = {
 	listPublic: (query: Partial<PublicNeedQuery>) =>
 		http.getPage<PublicNeed>(NEEDS.LIST, query),
-	detail: (id: string) => http.get<PublicNeed>(NEEDS.detail(id)),
+	detail: (id: string) => http.get<PublicNeedDetail>(NEEDS.detail(id)),
 	pledge: (id: string, input: CreatePledgeInput) =>
 		http.post<{ id: string }>(NEEDS.pledge(id), input),
 	withdrawPledge: (id: string) =>
@@ -253,7 +253,7 @@ export const orgNeedsApi = {
 		http.patch<OrgNeedListItem>(ORG_NEEDS.detail(id), input),
 	remove: (id: string) =>
 		http.delete<{ deleted: boolean }>(ORG_NEEDS.detail(id)),
-	pledges: (id: string, query: Partial<PaginationQuery>) =>
+	pledges: (id: string, query: Partial<PledgeQuery>) =>
 		http.getPage<NeedPledge>(ORG_NEEDS.pledges(id), query),
 	reviewPledge: (id: string, pledgeId: string, input: ReviewPledgeInput) =>
 		http.patch<NeedPledge>(ORG_NEEDS.reviewPledge(id, pledgeId), input),

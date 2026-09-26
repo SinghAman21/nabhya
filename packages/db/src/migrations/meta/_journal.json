@@ -113,6 +113,13 @@
 			"when": 1790000200000,
 			"tag": "0015_remove_legacy_post_tags",
 			"breakpoints": true
+		},
+		{
+			"idx": 16,
+			"version": "7",
+			"when": 1790000300000,
+			"tag": "0016_hours_served",
+			"breakpoints": true
 		}
 	]
 }

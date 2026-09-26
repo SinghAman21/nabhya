@@ -1,7 +1,15 @@
-import { events } from "@nabhya/db/schema";
+import { events, organizationAdmins } from "@nabhya/db/schema";
 import { ConflictException, ForbiddenException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+	afterAll,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest";
 import { AuditService } from "../src/common/audit";
 import { EventsService } from "../src/modules/events/events.service";
 import { NotificationsService } from "../src/modules/notifications/notifications.service";
@@ -103,6 +111,34 @@ describe("EventsService", () => {
 	});
 
 	describe("applying", () => {
+		it("tells the teammates who review applicants, and nobody else", async () => {
+			// NEW_APPLICATION existed and was never sent.
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const [manager, viewer] = [
+				await createUser(db, { role: "organisation" }),
+				await createUser(db, { role: "organisation" }),
+			];
+			await db.insert(organizationAdmins).values([
+				{ organizationId: org.id, userId: manager.id, role: "MANAGER" },
+				{ organizationId: org.id, userId: viewer.id, role: "VIEWER" },
+			]);
+			const event = await createEvent(db, org.id);
+			const volunteer = await createUser(db, { role: "volunteer" });
+
+			await service.apply(volunteer.id, event.id, {});
+
+			await vi.waitFor(async () => {
+				const sent = await db.query.notifications.findMany({});
+				expect(sent.map((row) => row.userId).sort()).toEqual(
+					[owner.id, manager.id].sort(),
+				);
+			});
+			const sent = await db.query.notifications.findMany({});
+			expect(sent.every((row) => row.type === "NEW_APPLICATION")).toBe(true);
+			expect(sent[0]?.entityId).toBe(event.id);
+		});
+
 		it("rejects a second application from the same volunteer", async () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
@@ -286,6 +322,63 @@ describe("EventsService", () => {
 			});
 
 			expect(event.status).toBe("DRAFT");
+		});
+
+		/** A verified NGO with one teammate in `role`, and a live event. */
+		async function liveEventWith(role: "MEMBER" | "VIEWER") {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const teammate = await createUser(db, { role: "organisation" });
+			await db.insert(organizationAdmins).values({
+				organizationId: org.id,
+				userId: teammate.id,
+				role,
+				status: "ACTIVE",
+			});
+			const event = await createEvent(db, org.id, { status: "PUBLISHED" });
+			return { teammate, event, org };
+		}
+
+		it("keeps a teammate without content.publish from editing a live event", async () => {
+			// Only the draft -> published transition used to be checked, so a
+			// member could move a live event's date under its volunteers.
+			const { teammate, event } = await liveEventWith("MEMBER");
+
+			await expect(
+				service.update(teammate.id, event.id, { title: "Moved to Sunday" }),
+			).rejects.toBeInstanceOf(ForbiddenException);
+			const stored = await db.query.events.findFirst({
+				where: eq(events.id, event.id),
+			});
+			expect(stored?.title).not.toBe("Moved to Sunday");
+		});
+
+		it("lets a member draft but keeps a viewer read-only", async () => {
+			const { teammate: member, org } = await liveEventWith("MEMBER");
+			const viewer = await createUser(db, { role: "organisation" });
+			await db.insert(organizationAdmins).values({
+				organizationId: org.id,
+				userId: viewer.id,
+				role: "VIEWER",
+				status: "ACTIVE",
+			});
+			const draft = {
+				title: "Tree planting",
+				description: "A description long enough to satisfy validation.",
+				city: "Mumbai",
+				state: "Maharashtra",
+				startAt: new Date(Date.now() + 86_400_000),
+				endAt: new Date(Date.now() + 90_000_000),
+				volunteersNeeded: 5,
+				status: "DRAFT" as const,
+				isUrgent: false,
+			};
+
+			const created = await service.create(member.id, draft);
+			expect(created.status).toBe("DRAFT");
+			await expect(service.create(viewer.id, draft)).rejects.toBeInstanceOf(
+				ForbiddenException,
+			);
 		});
 	});
 

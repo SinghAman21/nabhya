@@ -60,12 +60,13 @@ export const updateOrganizationSchema = z.object({
 	city: z.string().trim().min(2).max(80).optional(),
 	state: z.string().trim().min(2).max(80).optional(),
 	pincode: z.string().trim().min(4).max(10).optional(),
-	teamSize: z.coerce.number().int().min(1).max(100000).optional(),
-	foundingYear: z.coerce
-		.number()
-		.int()
-		.min(1900)
-		.max(new Date().getFullYear())
+	// `null` clears, `undefined` leaves alone - the same contract as
+	// `optionalText`. `z.null()` goes first because `coerce.number()` would
+	// turn null into 0 and fail the minimum instead.
+	teamSize: z.null().or(z.coerce.number().int().min(1).max(100000)).optional(),
+	foundingYear: z
+		.null()
+		.or(z.coerce.number().int().min(1900).max(new Date().getFullYear()))
 		.optional(),
 	categoryIds: z.array(z.uuid()).max(5).optional(),
 	// Set from the map picker; powers "NGOs near me".
@@ -91,3 +92,20 @@ export const uploadOrgDocumentSchema = z.object({
 });
 
 export type UploadOrgDocumentInput = z.infer<typeof uploadOrgDocumentSchema>;
+
+/**
+ * The NGO dashboard's counts, computed over the whole organization.
+ *
+ * The dashboard used to sum these from the first page (20 rows) of its events
+ * and needs lists, so an NGO with 30 events was told about the applicants on
+ * 20 of them - and "All caught up" could be false.
+ */
+export interface OrgOverview {
+	publishedEvents: number;
+	openNeeds: number;
+	pendingApplications: number;
+	/** How many events those applications are spread over. */
+	eventsWithApplicants: number;
+	pendingPledges: number;
+	needsWithPledges: number;
+}

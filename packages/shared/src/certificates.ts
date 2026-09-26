@@ -4,6 +4,11 @@ import { optionalText, paginationQuerySchema } from "./common";
 export const markAttendanceSchema = z.object({
 	/** false un-marks, which also blocks certificate issuance. */
 	attended: z.boolean(),
+	/**
+	 * Hours actually served, in half-hour steps. Omit to keep what is stored
+	 * (or to mean the whole event); `null` clears it.
+	 */
+	hours: z.null().or(z.number().min(0.5).max(500).multipleOf(0.5)).optional(),
 });
 
 export type MarkAttendanceInput = z.infer<typeof markAttendanceSchema>;

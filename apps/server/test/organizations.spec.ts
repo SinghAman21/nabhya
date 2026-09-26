@@ -4,7 +4,15 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { AuditService } from "../src/common/audit";
 import { OrganizationsService } from "../src/modules/organizations/organizations.service";
-import { createOrganization, createUser, seedRoles } from "./factories";
+import {
+	createApplication,
+	createEvent,
+	createNeed,
+	createOrganization,
+	createPledge,
+	createUser,
+	seedRoles,
+} from "./factories";
 import { createTestDb, type TestDb, truncateAll } from "./harness";
 
 /** Mumbai, Pune and Delhi - roughly 120 km and 1150 km apart respectively. */
@@ -161,6 +169,57 @@ describe("OrganizationsService", () => {
 			expect(result.meta.total).toBe(3);
 			expect(result.meta.totalPages).toBe(3);
 			expect(result.meta.hasMore).toBe(true);
+		});
+	});
+
+	describe("dashboard overview", () => {
+		it("counts across the whole org, not the first page of a list", async () => {
+			// The dashboard summed page 1 (20 rows), so the 21st event's
+			// applicants never reached "Needs your decision".
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const other = await createOrganization(
+				db,
+				(await createUser(db, { role: "organisation" })).id,
+			);
+			const volunteer = await createUser(db, { role: "volunteer" });
+
+			const published = [];
+			for (let i = 0; i < 22; i++) {
+				published.push(await createEvent(db, org.id, { status: "PUBLISHED" }));
+			}
+			await createEvent(db, org.id, { status: "DRAFT" });
+			const [firstEvent] = published;
+			const lastEvent = published.at(-1);
+			if (!firstEvent || !lastEvent) throw new Error("events not created");
+			await createApplication(db, lastEvent.id, volunteer.id);
+			await createApplication(
+				db,
+				firstEvent.id,
+				(await createUser(db, { role: "volunteer" })).id,
+			);
+			await createApplication(
+				db,
+				firstEvent.id,
+				(await createUser(db, { role: "volunteer" })).id,
+				{ status: "ACCEPTED" },
+			);
+			const need = await createNeed(db, org.id);
+			await createNeed(db, org.id, { status: "CLOSED" });
+			await createPledge(db, need.id, volunteer.id);
+			// Another NGO's rows must not leak into the counts.
+			await createEvent(db, other.id, { status: "PUBLISHED" });
+
+			const overview = await service.getMyOverview(owner.id);
+
+			expect(overview).toEqual({
+				publishedEvents: 22,
+				openNeeds: 1,
+				pendingApplications: 2,
+				eventsWithApplicants: 2,
+				pendingPledges: 1,
+				needsWithPledges: 1,
+			});
 		});
 	});
 });

@@ -19,6 +19,7 @@ import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H5 } from "@/components/ui/typography";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useSignOut } from "@/hooks/use-auth";
+import { useUnreadCount } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { focusable } from "@/lib/focus";
@@ -50,6 +51,12 @@ export interface NavItem {
 	icon: LucideIcon;
 	/** Optional group heading. Items sharing the same section are rendered together. */
 	section?: string;
+	/**
+	 * A live count shown at the row's end (a dot when the rail is collapsed).
+	 * Named rather than passed as a number so `nav-items.ts` stays static data
+	 * and the one query behind it runs only for rails that carry the row.
+	 */
+	badge?: "unread-notifications";
 }
 
 const EXPANDED_WIDTH = 264;
@@ -132,10 +139,13 @@ function RailRow({
 	collapsed,
 	role = "link",
 	accessibilityLabel,
+	dot = false,
 }: {
 	icon: LucideIcon;
 	label: string;
 	value?: string;
+	/** A marker on the icon, for a count the collapsed rail has no room to print. */
+	dot?: boolean;
 	active?: boolean;
 	onPress: () => void;
 	collapsed: boolean;
@@ -173,15 +183,33 @@ function RailRow({
 				};
 			}}
 		>
-			<Icon
-				size={ICON_SIZE}
-				strokeWidth={active ? 2.2 : 1.9}
-				color={
-					active
-						? (colors.text.primary as string)
-						: (colors.text.tertiary as string)
-				}
-			/>
+			<View>
+				<Icon
+					size={ICON_SIZE}
+					strokeWidth={active ? 2.2 : 1.9}
+					color={
+						active
+							? (colors.text.primary as string)
+							: (colors.text.tertiary as string)
+					}
+				/>
+				{dot && (
+					<View
+						pointerEvents="none"
+						style={{
+							position: "absolute",
+							top: -1,
+							right: -2,
+							width: 8,
+							height: 8,
+							borderRadius: 4,
+							backgroundColor: colors.primary.main,
+							borderWidth: 1.5,
+							borderColor: colors.background.card,
+						}}
+					/>
+				)}
+			</View>
 			<Animated.View
 				style={{
 					flex: 1,
@@ -576,6 +604,19 @@ export function Sidebar({
 
 	const sections = useMemo(() => groupBySection(navItems), [navItems]);
 
+	const email = useAuthStore((s) => s.email);
+	const wantsUnread = navItems.some(
+		(item) => item.badge === "unread-notifications",
+	);
+	const { data: unreadData } = useUnreadCount(!!email && wantsUnread);
+	const unread = unreadData?.unreadCount ?? 0;
+	const badgeFor = (item: NavItem) =>
+		item.badge === "unread-notifications" && unread > 0
+			? unread > 99
+				? "99+"
+				: String(unread)
+			: undefined;
+
 	/* ---- Collapse ---- */
 
 	const [collapsed, setCollapsed] = useState(false);
@@ -687,6 +728,13 @@ export function Sidebar({
 							active={isActive(item.href, segments)}
 							collapsed={animated ? collapsed : false}
 							onPress={() => handleNavigate(item.href)}
+							value={badgeFor(item)}
+							dot={animated && collapsed && !!badgeFor(item)}
+							accessibilityLabel={
+								badgeFor(item)
+									? `${item.label}, ${badgeFor(item)} unread`
+									: undefined
+							}
 							{...(animated ? { labelOpacity } : {})}
 						/>
 					))}

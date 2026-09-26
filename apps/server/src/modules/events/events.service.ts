@@ -239,6 +239,8 @@ export class EventsService {
 				userId,
 				"content.publish",
 			);
+		} else {
+			await this.requireCanDraft(userId);
 		}
 		const organization =
 			input.status === "PUBLISHED"
@@ -297,6 +299,16 @@ export class EventsService {
 				"content.publish",
 			);
 			await this.organizationsService.requireVerifiedOrganization(userId);
+		} else if (event.status !== "DRAFT") {
+			// Anything already in front of volunteers - its dates, its headcount,
+			// cancelling it - is publishing, whoever typed it. Only a draft may be
+			// worked on without the permission.
+			await this.organizationsService.requireOrgPermission(
+				userId,
+				"content.publish",
+			);
+		} else {
+			await this.requireCanDraft(userId);
 		}
 
 		if (
@@ -329,6 +341,21 @@ export class EventsService {
 		});
 
 		return updated;
+	}
+
+	/**
+	 * Drafts are open to the whole team except viewers, whose role is
+	 * read-only (`ROLE_PERMISSIONS.VIEWER` grants only `money.view`). There is
+	 * no `content.draft` action, so this is the one role check made by name.
+	 */
+	private async requireCanDraft(userId: string) {
+		const membership =
+			await this.organizationsService.getActiveMembership(userId);
+		if (membership?.role === "VIEWER") {
+			throw new ForbiddenException(
+				"Viewers can't create or edit events - ask an admin.",
+			);
+		}
 	}
 
 	async remove(userId: string, eventId: string) {
@@ -381,6 +408,7 @@ export class EventsService {
 				volunteersNeeded: events.volunteersNeeded,
 				acceptedCount: events.acceptedCount,
 				organizationId: events.organizationId,
+				title: events.title,
 			})
 			.from(events)
 			.innerJoin(organizations, eq(events.organizationId, organizations.id))
@@ -430,6 +458,7 @@ export class EventsService {
 					})
 					.where(eq(eventApplications.id, existing.id))
 					.returning();
+				this.notifyNewApplicant(event);
 				return reopened;
 			}
 			throw new ConflictException("You have already applied to this event.");
@@ -455,8 +484,31 @@ export class EventsService {
 			entityId: application.id,
 			newValue: { eventId },
 		});
+		this.notifyNewApplicant(event);
 
 		return application;
+	}
+
+	/**
+	 * `NEW_APPLICATION` was in the enum and never sent, so an NGO only found
+	 * applicants by opening the event. Goes to whoever can review them.
+	 */
+	private notifyNewApplicant(event: {
+		id: string;
+		title: string;
+		organizationId: string;
+	}) {
+		void this.notifications.notifyOrganizationTeam(
+			event.organizationId,
+			{
+				type: "NEW_APPLICATION",
+				title: `New applicant for ${event.title}`,
+				body: "Review them from Events.",
+				entityName: "EVENT",
+				entityId: event.id,
+			},
+			{ permission: "people.review" },
+		);
 	}
 
 	async withdraw(volunteerId: string, eventId: string) {

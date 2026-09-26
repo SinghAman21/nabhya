@@ -88,6 +88,36 @@ describe("CertificatesService", () => {
 			).rejects.toBeInstanceOf(BadRequestException);
 		});
 
+		it("stores the hours served, and clears them when un-marked", async () => {
+			const { owner, event, application } = await scenario();
+
+			await service.markAttendance(owner.id, event.id, application.id, {
+				attended: true,
+				hours: 3.5,
+			});
+			let stored = await db.query.eventApplications.findFirst({
+				where: (table, { eq }) => eq(table.id, application.id),
+			});
+			expect(stored?.hoursServed).toBe("3.5");
+
+			// Re-marking without hours keeps what was recorded.
+			await service.markAttendance(owner.id, event.id, application.id, {
+				attended: true,
+			});
+			stored = await db.query.eventApplications.findFirst({
+				where: (table, { eq }) => eq(table.id, application.id),
+			});
+			expect(stored?.hoursServed).toBe("3.5");
+
+			await service.markAttendance(owner.id, event.id, application.id, {
+				attended: false,
+			});
+			stored = await db.query.eventApplications.findFirst({
+				where: (table, { eq }) => eq(table.id, application.id),
+			});
+			expect(stored?.hoursServed).toBeNull();
+		});
+
 		it("stops one organization marking another's applicants", async () => {
 			const { event, application } = await scenario();
 			const outsider = await createUser(db, { role: "organisation" });

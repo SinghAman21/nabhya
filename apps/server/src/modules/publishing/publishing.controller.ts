@@ -3,6 +3,7 @@ import type {
 	CreateFinancialReportInput,
 	InviteOrgAdminInput,
 	InviteTeamMemberInput,
+	MyAnnouncementQuery,
 	PaginationQuery,
 	TeamListQuery,
 	TransferOwnershipInput,
@@ -14,6 +15,7 @@ import {
 	createFinancialReportSchema,
 	inviteOrgAdminSchema,
 	inviteTeamMemberSchema,
+	myAnnouncementQuerySchema,
 	paginationQuerySchema,
 	teamListQuerySchema,
 	transferOwnershipSchema,
@@ -66,7 +68,8 @@ export class PublishingController {
 	@ApiOperation({ summary: "The caller's updates, including drafts" })
 	listMyAnnouncements(
 		@CurrentUser() user: AuthUser,
-		@Query(new ZodValidationPipe(paginationQuerySchema)) query: PaginationQuery,
+		@Query(new ZodValidationPipe(myAnnouncementQuerySchema))
+		query: MyAnnouncementQuery,
 	) {
 		return this.publishing.listMyAnnouncements(user.id, query);
 	}
@@ -210,6 +213,30 @@ export class PublishingController {
 		@Param("id", ParseUUIDPipe) id: string,
 	) {
 		return this.publishing.resendTeamInvite(user.id, id);
+	}
+
+	@Post("team/invites/by-id/:id/accept")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({
+		summary: "Accept a team invite from its in-app notification",
+	})
+	acceptTeamInviteById(
+		@CurrentUser() user: AuthUser,
+		@Param("id", ParseUUIDPipe) id: string,
+	) {
+		return this.publishing.acceptTeamInviteById(user.id, id);
+	}
+
+	@Post("team/invites/by-id/:id/decline")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({
+		summary: "Decline a team invite from its in-app notification",
+	})
+	declineTeamInviteById(
+		@CurrentUser() user: AuthUser,
+		@Param("id", ParseUUIDPipe) id: string,
+	) {
+		return this.publishing.declineTeamInviteById(user.id, id);
 	}
 
 	@Post("team/invites/:token/accept")

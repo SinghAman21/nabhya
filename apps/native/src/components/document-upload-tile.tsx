@@ -27,6 +27,7 @@ export function DocumentUploadTile({
 	existing,
 	onUploaded,
 	saving,
+	readOnly = false,
 }: {
 	title: string;
 	hint: string;
@@ -34,6 +35,8 @@ export function DocumentUploadTile({
 	existing?: AdminOrgDocument;
 	onUploaded: (key: string) => void;
 	saving?: boolean;
+	/** The viewer may see the slot but not upload to it (a team role without `org.edit`). */
+	readOnly?: boolean;
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
 	const { pickAndUpload, isUploading, error } = useFileUpload(purpose, {
@@ -106,19 +109,21 @@ export function DocumentUploadTile({
 							{openDocument.isPending ? "Opening…" : "View"}
 						</Caption>
 					</Pressable>
-					<Pressable
-						onPress={pick}
-						disabled={busy}
-						hitSlop={8}
-						accessibilityRole="button"
-						accessibilityLabel={`Replace ${title}`}
-						accessibilityState={{ disabled: Boolean(busy) }}
-						{...focusable}
-					>
-						<Caption weight="medium" color="secondary">
-							{busy ? "Uploading…" : "Replace"}
-						</Caption>
-					</Pressable>
+					{!readOnly && (
+						<Pressable
+							onPress={pick}
+							disabled={busy}
+							hitSlop={8}
+							accessibilityRole="button"
+							accessibilityLabel={`Replace ${title}`}
+							accessibilityState={{ disabled: Boolean(busy) }}
+							{...focusable}
+						>
+							<Caption weight="medium" color="secondary">
+								{busy ? "Uploading…" : "Replace"}
+							</Caption>
+						</Pressable>
+					)}
 				</View>
 
 				{error && (
@@ -136,10 +141,10 @@ export function DocumentUploadTile({
 	return (
 		<Pressable
 			onPress={pick}
-			disabled={busy}
+			disabled={busy || readOnly}
 			accessibilityRole="button"
 			accessibilityLabel={`${title}. ${hint}`}
-			accessibilityState={{ disabled: Boolean(busy) }}
+			accessibilityState={{ disabled: Boolean(busy || readOnly) }}
 			{...focusable}
 			style={({ pressed }) => ({
 				borderWidth: 2,
@@ -148,7 +153,7 @@ export function DocumentUploadTile({
 				borderRadius: borderRadius.lg,
 				padding: spacing[6],
 				alignItems: "center",
-				opacity: busy ? 0.6 : 1,
+				opacity: busy || readOnly ? 0.6 : 1,
 			})}
 		>
 			<Body weight="medium" style={{ marginBottom: spacing[1] }}>

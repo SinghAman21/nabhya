@@ -37,6 +37,7 @@ import {
 	type BulkReviewResult,
 	computeUserVerificationStatus,
 	type DocumentQueueQuery,
+	ORG_DOCUMENT_LABELS,
 	type ReviewDocumentInput,
 	type ReviewOrganizationInput,
 	type SetOrgStatusInput,
@@ -66,6 +67,7 @@ import type { PgColumn } from "drizzle-orm/pg-core";
 import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import { paginate, toOffset } from "../../common/utils";
+import { NotificationsService } from "../notifications/notifications.service";
 
 /**
  * Turns a validated sort key into an `ORDER BY`.
@@ -148,6 +150,8 @@ export class AdminService {
 	constructor(
 		@Inject(DB_TOKEN) private readonly db: typeof dbType,
 		@Inject(AuditService) private readonly audit: AuditService,
+		@Inject(NotificationsService)
+		private readonly notifications: NotificationsService,
 	) {}
 
 	// ─── Overview ────────────────────────────────────────────────────────────
@@ -592,6 +596,29 @@ export class AdminService {
 			},
 		});
 
+		// Only the two decisions are news; moving an org back to PENDING or
+		// UNDER_REVIEW is a reviewer's bookkeeping, not something to announce.
+		if (
+			input.verificationStatus === "VERIFIED" ||
+			input.verificationStatus === "REJECTED"
+		) {
+			const verified = input.verificationStatus === "VERIFIED";
+			void this.notifications.notifyOrganizationTeam(organizationId, {
+				type: verified ? "ORG_VERIFIED" : "ORG_REJECTED",
+				title: verified
+					? `${organization.organizationName} is verified`
+					: `${organization.organizationName} wasn't verified`,
+				// The reviewer's reason is the body verbatim - it is free text, and
+				// wrapping it in our own sentence breaks on its punctuation.
+				body: verified
+					? "You can now publish needs, events and updates to volunteers."
+					: (input.reason ??
+						"Upload corrected documents from Verification to reopen review."),
+				entityName: "ORGANIZATION",
+				entityId: organizationId,
+			});
+		}
+
 		return updated;
 	}
 
@@ -978,6 +1005,21 @@ export class AdminService {
 			entityId: documentId,
 			oldValue: { verificationStatus: document.verificationStatus },
 			newValue: input,
+		});
+
+		// A rejection is the one the NGO has to act on, and the remarks are the
+		// only place it learns what to fix.
+		const label = ORG_DOCUMENT_LABELS[document.documentType] ?? "A document";
+		const verified = input.verificationStatus === "VERIFIED";
+		void this.notifications.notifyOrganizationTeam(document.organizationId, {
+			type: verified ? "DOCUMENT_VERIFIED" : "DOCUMENT_REJECTED",
+			title: verified ? `${label} approved` : `${label} needs another look`,
+			body: verified
+				? "One step closer to verification."
+				: (input.remarks ??
+					"Upload a clearer or corrected copy from Verification."),
+			entityName: "ORGANIZATION_DOCUMENT",
+			entityId: documentId,
 		});
 
 		return updated;

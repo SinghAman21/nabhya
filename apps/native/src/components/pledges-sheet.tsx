@@ -2,8 +2,11 @@ import type { PledgeStatus } from "@nabhya/shared";
 import { Package } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
+import { ContactActions } from "@/components/contact-actions";
 import { Field, useFieldInputStyle } from "@/components/form-field";
 import { InitialAvatar } from "@/components/initial-avatar";
+import { LoadMoreFooter } from "@/components/load-more-footer";
+import { usePagedQuery } from "@/components/paged-list";
 import {
 	EmptyState,
 	ErrorState,
@@ -22,9 +25,9 @@ import { toast } from "@/components/ui/overlay";
 import { Sheet, SheetFlatList } from "@/components/ui/sheet";
 import { Body, BodySmall, Caption } from "@/components/ui/typography";
 import { useMyTeamRole } from "@/hooks/use-my-team-role";
-import { useNeedPledges, useReviewPledge } from "@/hooks/use-needs";
+import { useReviewPledge } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/use-theme";
-import { apiErrorMessage } from "@/lib/api";
+import { apiErrorMessage, orgNeedsApi, queryKeys } from "@/lib/api";
 import { formatProgress, formatRelative } from "@/lib/format";
 import type { NeedPledge, OrgNeedListItem } from "@/lib/types";
 
@@ -56,17 +59,21 @@ export function PledgesSheet({
 	const [filter, setFilter] = useState<StatusFilter>("PENDING");
 	const [note, setNote] = useState("");
 
-	const query = useNeedPledges(need?.id ?? undefined);
+	// Paged and filtered by the server - filtering page 1 here hid every
+	// pending pledge past the twentieth.
+	const params = filter === "ALL" ? {} : { status: filter };
+	const { query, items, loadMore } = usePagedQuery({
+		queryKey: queryKeys.orgNeedPledges(need?.id ?? "", params),
+		fetchPage: (page) =>
+			orgNeedsApi.pledges(need?.id as string, { ...params, page, limit: 20 }),
+		enabled: !!need?.id,
+	});
 	const review = useReviewPledge(need?.id ?? "");
 
 	// Accepting, declining or completing is `people.review`. Allowed while the
 	// role is still resolving; the server still 403s anything denied.
 	const teamRole = useMyTeamRole();
 	const canReview = teamRole.isLoading ? true : teamRole.can("people.review");
-
-	const items = (query.data?.items ?? []).filter((pledge) =>
-		filter === "ALL" ? true : pledge.status === filter,
-	);
 
 	const close = () => {
 		setNote("");
@@ -143,6 +150,19 @@ export function PledgesSheet({
 					data={items}
 					keyExtractor={(item) => item.id}
 					ListHeaderComponent={header}
+					onEndReached={loadMore}
+					onEndReachedThreshold={0.6}
+					ListFooterComponent={
+						items.length > 0 ? (
+							<LoadMoreFooter
+								hasMore={!!query.hasNextPage}
+								loading={query.isFetchingNextPage}
+								onLoadMore={loadMore}
+								count={items.length}
+								noun="responses"
+							/>
+						) : null
+					}
 					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
 					ListEmptyComponent={
 						<EmptyState
@@ -196,10 +216,8 @@ function PledgeRow({
 	const { colors, spacing } = useTheme();
 	const name = pledge.user.fullName ?? "Unnamed volunteer";
 	const verified = pledge.user.verificationStatus === "VERIFIED";
-	const meta = [
-		pledge.user.city ?? pledge.user.email,
-		verified ? "ID verified" : null,
-	]
+	// City only: contact details wait for acceptance (`ContactActions`).
+	const meta = [pledge.user.city, verified ? "ID verified" : null]
 		.filter(Boolean)
 		.join(" · ");
 
@@ -254,6 +272,16 @@ function PledgeRow({
 				{formatRelative(pledge.createdAt)}
 				{pledge.reviewNote ? ` · Your note: ${pledge.reviewNote}` : ""}
 			</Caption>
+
+			{/* Once accepted the NGO has to arrange the handover - #9's
+			    "follow up after the pledge", without building chat. */}
+			{(pledge.status === "ACCEPTED" || pledge.status === "COMPLETED") && (
+				<ContactActions
+					name={name}
+					phone={pledge.user.phone}
+					email={pledge.user.email}
+				/>
+			)}
 
 			{!canReview &&
 			pledge.status !== "REJECTED" &&

@@ -1,10 +1,19 @@
 import type { db as dbType } from "@nabhya/db";
-import { notifications, roles, userRoles, users } from "@nabhya/db/schema";
-import type {
-	BroadcastInput,
-	MarkReadInput,
-	NotificationQuery,
-	NotificationType,
+import {
+	notifications,
+	organizationAdmins,
+	organizations,
+	roles,
+	userRoles,
+	users,
+} from "@nabhya/db/schema";
+import {
+	type BroadcastInput,
+	canTeamRole,
+	type MarkReadInput,
+	type NotificationQuery,
+	type NotificationType,
+	type OrgPermissionAction,
 } from "@nabhya/shared";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -30,6 +39,63 @@ export class NotificationsService {
 	 * Fire-and-forget, exactly like the audit trail: a failed notification must
 	 * never roll back the action that triggered it. Callers use `void notify(...)`.
 	 */
+	/**
+	 * Notifies everyone running an organization: its active team plus the
+	 * owner column (orgs created before memberships existed). Pass
+	 * `permission` to reach only the teammates who can act on it - a new
+	 * applicant is news to whoever reviews applicants, not to a viewer.
+	 * Fire-and-forget like `notify`; never throws.
+	 */
+	async notifyOrganizationTeam(
+		organizationId: string,
+		payload: Omit<NotifyInput, "userId">,
+		options: { permission?: OrgPermissionAction } = {},
+	): Promise<void> {
+		try {
+			const [members, org] = await Promise.all([
+				this.db
+					.select({
+						userId: organizationAdmins.userId,
+						role: organizationAdmins.role,
+						isOwner: organizationAdmins.isOwner,
+					})
+					.from(organizationAdmins)
+					.where(
+						and(
+							eq(organizationAdmins.organizationId, organizationId),
+							eq(organizationAdmins.status, "ACTIVE"),
+						),
+					),
+				this.db.query.organizations.findFirst({
+					where: eq(organizations.id, organizationId),
+					columns: { ownerUserId: true },
+				}),
+			]);
+			const recipients = new Set(
+				members
+					.filter(
+						(member) =>
+							!options.permission ||
+							canTeamRole(
+								member.isOwner ? "OWNER" : member.role,
+								options.permission,
+							),
+					)
+					.map((member) => member.userId),
+			);
+			if (org?.ownerUserId) recipients.add(org.ownerUserId);
+			await this.notify(
+				[...recipients].map((userId) => ({ userId, ...payload })),
+			);
+		} catch (error) {
+			this.logger.warn(
+				`Team notification for ${organizationId} failed: ${
+					error instanceof Error ? error.message : String(error)
+				}`,
+			);
+		}
+	}
+
 	async notify(input: NotifyInput | NotifyInput[]): Promise<void> {
 		const rows = Array.isArray(input) ? input : [input];
 		if (rows.length === 0) return;

@@ -4,6 +4,7 @@ import { ActivityIndicator, Platform, View } from "react-native";
 import { useOnboardingStatus } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { authService } from "@/lib/api/auth";
+import { takePendingInvite } from "@/lib/pending-invite";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
@@ -37,6 +38,26 @@ export default function Index() {
 			.finally(() => setWebSessionChecked(true));
 	}, [email, setUser]);
 
+	// A team invite opened while signed out outranks every other destination:
+	// the invitee must not reach role-select or the NGO wizard first. Read once
+	// per sign-in; `undefined` means "not looked yet", so routing waits for it.
+	const [pendingInvite, setPendingInvite] = useState<string | null | undefined>(
+		undefined,
+	);
+	useEffect(() => {
+		if (!email) {
+			setPendingInvite(undefined);
+			return;
+		}
+		let live = true;
+		void takePendingInvite().then((token) => {
+			if (live) setPendingInvite(token);
+		});
+		return () => {
+			live = false;
+		};
+	}, [email]);
+
 	const {
 		data: status,
 		isLoading,
@@ -59,6 +80,15 @@ export default function Index() {
 
 		if (!email) {
 			router.replace("/(auth)/login");
+			return;
+		}
+
+		if (pendingInvite === undefined) return;
+		if (pendingInvite) {
+			router.replace({
+				pathname: "/team/invites/[token]",
+				params: { token: pendingInvite },
+			});
 			return;
 		}
 
@@ -89,7 +119,15 @@ export default function Index() {
 				status.isOnboarded ? "/(volunteer)" : "/(onboarding)/volunteer",
 			);
 		}
-	}, [email, status, isError, router, webSessionChecked]);
+	}, [
+		email,
+		status,
+		isError,
+		router,
+		webSessionChecked,
+		pendingInvite,
+		syncFromStatus,
+	]);
 
 	return (
 		<View

@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { confirm, toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import { Body, Caption, H3, Label } from "@/components/ui/typography";
 import {
 	useConfirmOwnershipTransfer,
@@ -37,22 +38,17 @@ import {
 	useTeamInvites,
 	useUpdateAdmin,
 } from "@/hooks/use-directory";
-import { useMyTeamRole } from "@/hooks/use-my-team-role";
+import { useOrgAccess } from "@/hooks/use-org-access";
 import { useTheme } from "@/hooks/use-theme";
 
 import { apiErrorMessage } from "@/lib/api";
 import { copyText } from "@/lib/clipboard";
 import { formatDate } from "@/lib/format";
 import { verticalScrollbar } from "@/lib/scroll";
+import { TEAM_ROLE_COPY, TEAM_ROLE_LABELS } from "@/lib/team-roles";
 import type { OrgTeamMember, TeamInvite, TeamStatusFilter } from "@/lib/types";
 
 const ROLES = ["ADMIN", "MANAGER", "MEMBER", "VIEWER"] as const;
-const ROLE_COPY: Record<(typeof ROLES)[number], string> = {
-	ADMIN: "Full operations access, except ownership transfer.",
-	MANAGER: "Events, needs, applicants, attendance and certificates.",
-	MEMBER: "Draft support and attendance marking.",
-	VIEWER: "Read-only observer with money visibility.",
-};
 
 const STATUS_OPTIONS: Array<{ value: TeamStatusFilter; label: string }> = [
 	{ value: "ACTIVE", label: "Active" },
@@ -72,23 +68,27 @@ export default function OrgTeam() {
 	const [managing, setManaging] = useState<OrgTeamMember | null>(null);
 	const [transferring, setTransferring] = useState(false);
 
+	// Every control here mirrors a server permission, so nobody is offered a
+	// button that 403s: inviting (and seeing invites) is `team.invite`,
+	// changing someone is `team.changeRole`, and ownership is the owner's.
+	const access = useOrgAccess();
+	const canInvite = !access.blocked("team.invite");
+	const canManage = !access.blocked("team.changeRole");
+	const isOwner = access.isOwner;
+	// Only an active admin can receive ownership (`requestOwnershipTransfer`).
+	const canReceiveOwnership = access.role === "ADMIN";
+
 	const teamQuery = useOrgTeam({ status, includeLeft });
-	const invitesQuery = useTeamInvites();
+	const invitesQuery = useTeamInvites(canInvite);
 	const items = teamQuery.data ?? [];
 	const invites = invitesQuery.data ?? [];
-	const loading = teamQuery.isLoading || invitesQuery.isLoading;
+	const loading = teamQuery.isLoading || (canInvite && invitesQuery.isLoading);
 	const refreshing = teamQuery.isRefetching || invitesQuery.isRefetching;
-
-	// Inviting is `team.invite`: owners and admins only. Allowed while the
-	// role is still resolving so owners never see a flicker of denial; the
-	// server still 403s anything the role cannot do.
-	const teamRole = useMyTeamRole();
-	const canInvite = teamRole.isLoading ? true : teamRole.can("team.invite");
-	const inviteGated = !teamRole.isLoading && !canInvite;
 
 	const refetch = () => {
 		void teamQuery.refetch();
-		void invitesQuery.refetch();
+		// `refetch` ignores `enabled`, so guard it the same way.
+		if (canInvite) void invitesQuery.refetch();
 	};
 
 	const memberCount =
@@ -101,7 +101,9 @@ export default function OrgTeam() {
 			<ScreenHeader
 				back
 				title="Team"
-				subtitle={`${memberCount} · ${invites.length} pending`}
+				subtitle={
+					canInvite ? `${memberCount} · ${invites.length} pending` : memberCount
+				}
 				action={
 					canInvite ? (
 						<Button size="sm" onPress={() => setInviting(true)}>
@@ -142,7 +144,10 @@ export default function OrgTeam() {
 									gap: spacing[2],
 								}}
 							>
-								<ShieldCheck size={18} color={colors.primary.main as string} />
+								<ShieldCheck
+									size={18}
+									color={colors.text.secondary as string}
+								/>
 								<H3>Access roles</H3>
 							</View>
 							<Caption color="tertiary">
@@ -159,10 +164,10 @@ export default function OrgTeam() {
 									gap: spacing[2],
 								}}
 							>
-								{["OWNER", ...ROLES].map((role) => (
+								{(["OWNER", ...ROLES] as const).map((role) => (
 									<StatusPill
 										key={role}
-										label={role}
+										label={TEAM_ROLE_LABELS[role]}
 										tone={role === "OWNER" ? "info" : "neutral"}
 									/>
 								))}
@@ -170,7 +175,7 @@ export default function OrgTeam() {
 						</View>
 					</Surface>
 
-					<SectionTitle
+					<SectionHeading
 						title="Members"
 						{...(canInvite
 							? {
@@ -179,7 +184,7 @@ export default function OrgTeam() {
 								}
 							: {})}
 					/>
-					{inviteGated ? (
+					{!canInvite && !access.isLoading ? (
 						<Caption color="tertiary">
 							Only owners and admins can invite. Ask an owner or admin.
 						</Caption>
@@ -190,18 +195,11 @@ export default function OrgTeam() {
 						value={status}
 						onChange={setStatus}
 					/>
-					<Button
-						size="sm"
-						variant={includeLeft ? "default" : "outline"}
-						accessibilityRole="switch"
-						accessibilityState={{ checked: includeLeft }}
-						accessibilityLabel="Include people who left"
-						onPress={() => setIncludeLeft((v) => !v)}
-					>
-						{includeLeft
-							? "Including people who left"
-							: "Include people who left"}
-					</Button>
+					<SwitchRow
+						label="Include people who left"
+						checked={includeLeft}
+						onChange={setIncludeLeft}
+					/>
 					{items.length === 0 ? (
 						<EmptyState
 							icon={Users}
@@ -229,14 +227,17 @@ export default function OrgTeam() {
 								<MemberRow
 									key={item.id}
 									member={item}
-									onPress={() => setManaging(item)}
+									canManage={canManage}
+									onPress={canManage ? () => setManaging(item) : undefined}
 								/>
 							))}
 						</View>
 					)}
 
-					<SectionTitle title="Pending invites" />
-					{invitesQuery.isError ? (
+					{/* Listing invites is `team.invite` too; for anyone else the
+					    endpoint 403s, which used to render as an error block. */}
+					{canInvite ? <SectionHeading title="Pending invites" /> : null}
+					{!canInvite ? null : invitesQuery.isError ? (
 						<ErrorState
 							message={apiErrorMessage(invitesQuery.error)}
 							onRetry={() => void invitesQuery.refetch()}
@@ -260,8 +261,11 @@ export default function OrgTeam() {
 						</View>
 					)}
 
-					<OwnershipSection onTransfer={() => setTransferring(true)} />
-					<ConfirmTransferCard />
+					<OwnershipSection
+						isOwner={isOwner}
+						onTransfer={() => setTransferring(true)}
+					/>
+					{canReceiveOwnership ? <ConfirmTransferCard /> : null}
 				</ScrollView>
 			)}
 
@@ -275,7 +279,8 @@ export default function OrgTeam() {
 	);
 }
 
-function SectionTitle({
+/** Screen-local: an H3 with an optional action, unlike screen-shell's caption. */
+function SectionHeading({
 	title,
 	actionLabel,
 	onAction,
@@ -309,20 +314,23 @@ function memberPill(member: OrgTeamMember): {
 	tone: PillTone;
 } {
 	if (member.isOwner || member.role === "OWNER")
-		return { label: "OWNER", tone: "info" };
+		return { label: TEAM_ROLE_LABELS.OWNER, tone: "info" };
 	const status = member.status ?? "ACTIVE";
 	if (status === "SUSPENDED") return { label: "Suspended", tone: "warning" };
 	if (status === "LEFT") return { label: "Left", tone: "neutral" };
 	if (status === "REMOVED") return { label: "Removed", tone: "neutral" };
-	return { label: member.role ?? "ADMIN", tone: "neutral" };
+	return { label: TEAM_ROLE_LABELS[member.role ?? "ADMIN"], tone: "neutral" };
 }
 
 function MemberRow({
 	member,
+	canManage,
 	onPress,
 }: {
 	member: OrgTeamMember;
-	onPress: () => void;
+	/** `team.changeRole` - reactivating is a status change, so it needs it too. */
+	canManage: boolean;
+	onPress?: () => void;
 }) {
 	const { spacing } = useTheme();
 	const update = useUpdateAdmin();
@@ -369,7 +377,7 @@ function MemberRow({
 						: `Joined ${formatDate(member.joinedAt)}`}
 					{member.isPublic ? " · Public" : ""}
 				</Caption>
-				{suspended ? (
+				{suspended && canManage ? (
 					<View style={{ alignItems: "flex-start" }}>
 						<Button
 							size="sm"
@@ -410,7 +418,7 @@ function isRateLimited(error: unknown): boolean {
 }
 
 function InviteRow({ invite }: { invite: TeamInvite }) {
-	const { spacing } = useTheme();
+	const { colors, spacing } = useTheme();
 	const resend = useResendTeamInvite();
 	const revoke = useRevokeTeamInvite();
 	const [sharedUrl, setSharedUrl] = useState<string | undefined>(
@@ -457,13 +465,14 @@ function InviteRow({ invite }: { invite: TeamInvite }) {
 						alignItems: "center",
 					}}
 				>
-					<UserPlus size={22} />
+					<UserPlus size={22} color={colors.text.tertiary as string} />
 					<View style={{ flex: 1, minWidth: 0 }}>
 						<Body weight="bold" numberOfLines={1}>
 							{invite.email}
 						</Body>
 						<Caption color="tertiary" numberOfLines={1}>
-							{invite.role} · expires {formatDate(invite.expiresAt)}
+							{TEAM_ROLE_LABELS[invite.role]} · expires{" "}
+							{formatDate(invite.expiresAt)}
 						</Caption>
 						{(invite.resentCount ?? 0) > 0 ? (
 							<Caption color="tertiary" numberOfLines={1}>
@@ -675,7 +684,7 @@ function MemberSheetInner({
 						This person has left the team, so their access can't be changed.
 					</Caption>
 				) : null}
-				<Field label="Access role" hint={ROLE_COPY[role]}>
+				<Field label="Access role">
 					<RolePicker value={role} onChange={setRole} disabled={isOwner} />
 				</Field>
 				<Field label="Designation" optional>
@@ -686,17 +695,12 @@ function MemberSheetInner({
 						style={inputStyle}
 					/>
 				</Field>
-				<View style={{ gap: spacing[2] }}>
-					<Label>Public profile</Label>
-					<Button
-						variant={isPublic ? "default" : "outline"}
-						accessibilityRole="switch"
-						accessibilityState={{ checked: isPublic }}
-						onPress={() => setPublic((v) => !v)}
-					>
-						{isPublic ? "Shown on NGO profile" : "Hidden from public profile"}
-					</Button>
-				</View>
+				<SwitchRow
+					label="Show on your public profile"
+					hint="With their designation, in the team section volunteers see."
+					checked={isPublic}
+					onChange={setPublic}
+				/>
 			</View>
 		</Sheet>
 	);
@@ -797,7 +801,8 @@ function InviteSheet({
 							{created.email}
 						</Body>
 						<Caption color="tertiary">
-							{created.role} · expires {formatDate(created.expiresAt)}
+							{TEAM_ROLE_LABELS[created.role]} · expires{" "}
+							{formatDate(created.expiresAt)}
 						</Caption>
 					</View>
 					{link ? (
@@ -862,19 +867,31 @@ function RolePicker({
 						disabled={disabled}
 						accessibilityRole="radio"
 						accessibilityState={{ selected: value === role }}
-						accessibilityLabel={`${role}. ${ROLE_COPY[role]}`}
+						accessibilityLabel={`${TEAM_ROLE_LABELS[role]}. ${TEAM_ROLE_COPY[role]}`}
 						onPress={() => onChange(role)}
 					>
-						{role}
+						{TEAM_ROLE_LABELS[role]}
 					</Button>
 				))}
 			</View>
-			<Caption color="tertiary">{ROLE_COPY[value]}</Caption>
+			<Caption color="tertiary">{TEAM_ROLE_COPY[value]}</Caption>
 		</View>
 	);
 }
 
-function OwnershipSection({ onTransfer }: { onTransfer: () => void }) {
+/**
+ * Two acts that belong to different people: the owner hands over, everyone
+ * else can leave. Both used to be shown to every role - a viewer was offered
+ * "Transfer ownership", and an owner "Leave team", which the server refuses
+ * until ownership has moved.
+ */
+function OwnershipSection({
+	isOwner,
+	onTransfer,
+}: {
+	isOwner: boolean;
+	onTransfer: () => void;
+}) {
 	const { colors, spacing } = useTheme();
 	const leave = useLeaveTeam();
 
@@ -906,23 +923,27 @@ function OwnershipSection({ onTransfer }: { onTransfer: () => void }) {
 					<H3>Ownership & leaving</H3>
 				</View>
 				<Caption color="tertiary">
-					Only an active admin can receive ownership, and they must confirm
-					before anything changes. Leaving removes your own access.
+					{isOwner
+						? "Only an active admin can receive ownership, and they must confirm before anything changes. To leave, hand ownership over first."
+						: "Leaving removes your own access immediately. An owner or admin can invite you back."}
 				</Caption>
 				<View
 					style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[2] }}
 				>
-					<Button variant="outline" onPress={onTransfer}>
-						Transfer ownership
-					</Button>
-					<Button
-						variant="ghost"
-						loading={leave.isPending}
-						accessibilityLabel="Leave the team"
-						onPress={onLeave}
-					>
-						Leave team
-					</Button>
+					{isOwner ? (
+						<Button variant="outline" onPress={onTransfer}>
+							Transfer ownership
+						</Button>
+					) : (
+						<Button
+							variant="ghost"
+							loading={leave.isPending}
+							accessibilityLabel="Leave the team"
+							onPress={onLeave}
+						>
+							Leave team
+						</Button>
+					)}
 				</View>
 			</View>
 		</Surface>
@@ -984,7 +1005,14 @@ function TransferSheet({
 			footer={
 				created ? (
 					<View style={{ gap: spacing[2] }}>
-						<Button onPress={() => copyLink(created.token, "")}>
+						<Button
+							onPress={() =>
+								copyLink(
+									created.token,
+									"No token on this transfer - start it again.",
+								)
+							}
+						>
 							Copy transfer token
 						</Button>
 						<Button variant="outline" onPress={close}>
@@ -1086,5 +1114,41 @@ function ConfirmTransferCard() {
 				</View>
 			</View>
 		</Surface>
+	);
+}
+
+/** A labelled switch - a setting, not a button that changes its own label. */
+function SwitchRow({
+	label,
+	hint,
+	checked,
+	onChange,
+}: {
+	label: string;
+	hint?: string;
+	checked: boolean;
+	onChange: (next: boolean) => void;
+}) {
+	const { spacing } = useTheme();
+	return (
+		<View
+			style={{
+				flexDirection: "row",
+				alignItems: "center",
+				justifyContent: "space-between",
+				gap: spacing[3],
+				minHeight: 44,
+			}}
+		>
+			<View style={{ flex: 1, minWidth: 0 }}>
+				<Label>{label}</Label>
+				{hint ? <Caption color="tertiary">{hint}</Caption> : null}
+			</View>
+			<Switch
+				checked={checked}
+				onCheckedChange={onChange}
+				accessibilityLabel={label}
+			/>
+		</View>
 	);
 }

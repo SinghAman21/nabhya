@@ -1,10 +1,11 @@
 import type { db as dbType } from "@nabhya/db";
-import { posts, postsMedia, users } from "@nabhya/db/schema";
-import type {
-	AdminOrgPostsQuery,
-	CreateFeedMediaIntentsInput,
-	CreateFeedPostInput,
-	FeedQuery,
+import { organizations, posts, postsMedia, users } from "@nabhya/db/schema";
+import {
+	type AdminOrgPostsQuery,
+	type CreateFeedMediaIntentsInput,
+	type CreateFeedPostInput,
+	canTeamRole,
+	type FeedQuery,
 } from "@nabhya/shared";
 import {
 	ForbiddenException,
@@ -33,6 +34,10 @@ export class FeedService {
 	) {}
 
 	async createMediaIntents(user: AuthUser, input: CreateFeedMediaIntentsInput) {
+		await this.organizationsService.requireOrgPermission(
+			user.id,
+			"content.publish",
+		);
 		await this.organizationsService.requireVerifiedOrganization(user.id);
 		return this.uploads.createFeedMediaIntents(user, input.files);
 	}
@@ -41,6 +46,12 @@ export class FeedService {
 		const mediaFolder =
 			input.mediaFolder ?? this.uploads.createEmptyFeedMediaFolder();
 		await this.uploads.assertFeedMediaKeys(user, mediaFolder, input.mediaKeys);
+		// Needs, events and announcements all check `content.publish`; a post
+		// only checked verification, so a viewer could publish as the NGO.
+		await this.organizationsService.requireOrgPermission(
+			user.id,
+			"content.publish",
+		);
 		const organization =
 			await this.organizationsService.requireVerifiedOrganization(user.id);
 		const post = await this.db.transaction(async (tx) => {
@@ -163,8 +174,14 @@ export class FeedService {
 			where: eq(posts.id, postId),
 		});
 		if (!post) throw new NotFoundException("Post not found");
-		if (!user.roles.includes("superadmin") && post.authorUserId !== user.id) {
-			throw new ForbiddenException("You can only delete your own posts.");
+		if (
+			!user.roles.includes("superadmin") &&
+			post.authorUserId !== user.id &&
+			!(await this.canModerateFor(user.id, post.organizationId))
+		) {
+			throw new ForbiddenException(
+				"Only the author, or a teammate who can delete content, can remove this post.",
+			);
 		}
 		const media = await this.db
 			.select({ objectKey: postsMedia.objectKey })
@@ -179,6 +196,33 @@ export class FeedService {
 			entityId: postId,
 		});
 		return { deleted: true };
+	}
+
+	/**
+	 * Whether this account may take down its organization's posts - the same
+	 * `content.delete` that lets it delete the org's needs and events. A post
+	 * outlives its author's place on the team, so author-only deletion left a
+	 * departed member's posts undeletable by anyone but a superadmin.
+	 */
+	private async canModerateFor(
+		userId: string,
+		organizationId: string | null,
+	): Promise<boolean> {
+		if (!organizationId) return false;
+		const membership =
+			await this.organizationsService.getActiveMembership(userId);
+		if (membership) {
+			return (
+				membership.organizationId === organizationId &&
+				canTeamRole(membership.role, "content.delete")
+			);
+		}
+		// Legacy owner with no membership row, as `requireOrgPermission` allows.
+		const organization = await this.db.query.organizations.findFirst({
+			where: eq(organizations.id, organizationId),
+			columns: { ownerUserId: true },
+		});
+		return organization?.ownerUserId === userId;
 	}
 
 	private async getPost(postId: string) {

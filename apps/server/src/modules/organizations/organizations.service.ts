@@ -1,5 +1,10 @@
 import type { db as dbType } from "@nabhya/db";
 import {
+	eventApplications,
+	events,
+	follows,
+	needPledges,
+	needs,
 	organizationAdmins,
 	organizationCategories,
 	organizationDocuments,
@@ -7,6 +12,7 @@ import {
 } from "@nabhya/db/schema";
 import type {
 	NearbyQuery,
+	OrgOverview,
 	OrgPermissionAction,
 	PaginationQuery,
 	UpdateOrganizationInput,
@@ -19,7 +25,17 @@ import {
 	Injectable,
 	NotFoundException,
 } from "@nestjs/common";
-import { and, count, desc, eq, ilike, isNotNull, or, sql } from "drizzle-orm";
+import {
+	and,
+	count,
+	countDistinct,
+	desc,
+	eq,
+	ilike,
+	isNotNull,
+	or,
+	sql,
+} from "drizzle-orm";
 import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
@@ -53,8 +69,13 @@ export class OrganizationsService {
 			},
 		);
 		if (inactiveMembership) {
+			// `getActiveMembership` also drops an active member of a suspended
+			// organization; telling them their *membership* is inactive sent
+			// them looking for the wrong problem.
 			throw new ForbiddenException(
-				"Your team membership is not active for this organization.",
+				inactiveMembership.status === "ACTIVE"
+					? "This organization is suspended and cannot perform this action."
+					: "Your team membership is not active for this organization.",
 			);
 		}
 
@@ -168,10 +189,16 @@ export class OrganizationsService {
 		}
 
 		const { organizationCategories: orgCategories, ...rest } = organization;
+		// Shown on the public page and the NGO's own profile (issue #7).
+		const [followers] = await this.db
+			.select({ value: count() })
+			.from(follows)
+			.where(eq(follows.organizationId, organizationId));
 
 		return {
 			...rest,
 			categories: orgCategories.map((oc) => oc.category),
+			followerCount: followers?.value ?? 0,
 		};
 	}
 
@@ -384,6 +411,70 @@ export class OrganizationsService {
 		});
 
 		return this.getById(updated.id);
+	}
+
+	/**
+	 * Whole-org counts for the NGO dashboard. Four small aggregates rather
+	 * than one query with correlated subqueries - see the server guide's trap
+	 * about those - and each is an index range on `organization_id`.
+	 */
+	async getMyOverview(userId: string): Promise<OrgOverview> {
+		const organization = await this.requireOwnedOrganization(userId);
+		const orgId = organization.id;
+
+		const [[publishedEvents], [openNeeds], [applications], [pledges]] =
+			await Promise.all([
+				this.db
+					.select({ value: count() })
+					.from(events)
+					.where(
+						and(
+							eq(events.organizationId, orgId),
+							eq(events.status, "PUBLISHED"),
+						),
+					),
+				this.db
+					.select({ value: count() })
+					.from(needs)
+					.where(
+						and(eq(needs.organizationId, orgId), eq(needs.status, "OPEN")),
+					),
+				this.db
+					.select({
+						total: count(),
+						parents: countDistinct(eventApplications.eventId),
+					})
+					.from(eventApplications)
+					.innerJoin(events, eq(eventApplications.eventId, events.id))
+					.where(
+						and(
+							eq(events.organizationId, orgId),
+							eq(eventApplications.status, "PENDING"),
+						),
+					),
+				this.db
+					.select({
+						total: count(),
+						parents: countDistinct(needPledges.needId),
+					})
+					.from(needPledges)
+					.innerJoin(needs, eq(needPledges.needId, needs.id))
+					.where(
+						and(
+							eq(needs.organizationId, orgId),
+							eq(needPledges.status, "PENDING"),
+						),
+					),
+			]);
+
+		return {
+			publishedEvents: publishedEvents?.value ?? 0,
+			openNeeds: openNeeds?.value ?? 0,
+			pendingApplications: applications?.total ?? 0,
+			eventsWithApplicants: applications?.parents ?? 0,
+			pendingPledges: pledges?.total ?? 0,
+			needsWithPledges: pledges?.parents ?? 0,
+		};
 	}
 
 	async listDocuments(userId: string) {

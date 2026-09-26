@@ -11,6 +11,7 @@ import {
 	Moon,
 	ShieldCheck,
 	TrendingUp,
+	UserCheck,
 	UserRound,
 } from "lucide-react-native";
 import { useState } from "react";
@@ -225,8 +226,15 @@ export default function VolunteerProfile() {
 					onPress={() => router.push("/(volunteer)/donations")}
 				/>
 				<ListRow
-					icon={Bookmark}
+					icon={UserCheck}
 					label="NGOs you follow"
+					hint="Their posts make your Following feed"
+					onPress={() => router.push("/following")}
+				/>
+				<ListRow
+					icon={Bookmark}
+					label="Saved NGOs"
+					hint="Your private shortlist"
 					onPress={() => router.push("/bookmarks")}
 				/>
 				<ListRow

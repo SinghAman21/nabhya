@@ -7,6 +7,7 @@ import {
 	users,
 } from "@nabhya/db/schema";
 import type {
+	OrgReviewQuery,
 	PaginationQuery,
 	ReplyToReviewInput,
 	ReviewQuery,
@@ -19,7 +20,7 @@ import {
 	Injectable,
 	NotFoundException,
 } from "@nestjs/common";
-import { and, avg, count, desc, eq, sql } from "drizzle-orm";
+import { and, avg, count, desc, eq, isNull, type SQL, sql } from "drizzle-orm";
 import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
@@ -62,6 +63,37 @@ export class EngagementService {
 			.onConflictDoNothing();
 
 		return { bookmarked: true };
+	}
+
+	/** The NGOs the caller follows, newest first - the Following page (#7). */
+	async listFollowing(userId: string, query: PaginationQuery) {
+		const where = eq(follows.userId, userId);
+		const { limit, offset } = toOffset(query);
+
+		const [items, [totals]] = await Promise.all([
+			this.db
+				.select({
+					id: follows.id,
+					createdAt: follows.createdAt,
+					organization: {
+						id: organizations.id,
+						organizationName: organizations.organizationName,
+						logo: organizations.logo,
+						city: organizations.city,
+						state: organizations.state,
+						description: organizations.description,
+					},
+				})
+				.from(follows)
+				.innerJoin(organizations, eq(follows.organizationId, organizations.id))
+				.where(where)
+				.orderBy(desc(follows.createdAt))
+				.limit(limit)
+				.offset(offset),
+			this.db.select({ value: count() }).from(follows).where(where),
+		]);
+
+		return paginate(items, totals?.value ?? 0, query);
 	}
 
 	async listBookmarks(userId: string, query: PaginationQuery) {
@@ -215,6 +247,13 @@ export class EngagementService {
 		reviewId: string,
 		input: ReplyToReviewInput,
 	) {
+		// A reply is published on the NGO's public page under its name, so it
+		// takes the same permission as any other public content - without it a
+		// viewer could answer a volunteer's review on the organisation's behalf.
+		await this.organizationsService.requireOrgPermission(
+			userId,
+			"content.publish",
+		);
 		const organization =
 			await this.organizationsService.requireOwnedOrganization(userId);
 
@@ -247,8 +286,15 @@ export class EngagementService {
 
 	async listReviews(organizationId: string, query: ReviewQuery) {
 		await this.organizationsService.assertPubliclyVisible(organizationId);
+		return this.queryReviews(organizationId, query);
+	}
 
-		const where = eq(reviews.organizationId, organizationId);
+	private async queryReviews(
+		organizationId: string,
+		query: PaginationQuery,
+		filter?: SQL,
+	) {
+		const where = and(eq(reviews.organizationId, organizationId), filter);
 		const { limit, offset } = toOffset(query);
 
 		const [items, [totals], summary] = await Promise.all([
@@ -307,10 +353,33 @@ export class EngagementService {
 		};
 	}
 
-	/** Reviews left for the caller's own organization, for the NGO screen. */
-	async listMyOrganizationReviews(userId: string, query: ReviewQuery) {
+	/**
+	 * Reviews left for the caller's own organization, for the NGO screen.
+	 *
+	 * Not `listReviews`: that one asserts the org is publicly visible, which is
+	 * right for a stranger and wrong here - an NGO under review or suspended
+	 * got a 404 on its own Reviews tab. `awaitingReplyCount` is the whole
+	 * org's, so the header can say "3 awaiting" without paging to the end.
+	 */
+	async listMyOrganizationReviews(userId: string, query: OrgReviewQuery) {
 		const organization =
 			await this.organizationsService.requireOwnedOrganization(userId);
-		return this.listReviews(organization.id, query);
+		const [page, [awaiting]] = await Promise.all([
+			this.queryReviews(
+				organization.id,
+				query,
+				query.awaitingReply ? isNull(reviews.reply) : undefined,
+			),
+			this.db
+				.select({ value: count() })
+				.from(reviews)
+				.where(
+					and(
+						eq(reviews.organizationId, organization.id),
+						isNull(reviews.reply),
+					),
+				),
+		]);
+		return { ...page, awaitingReplyCount: awaiting?.value ?? 0 };
 	}
 }

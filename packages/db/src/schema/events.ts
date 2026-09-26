@@ -104,6 +104,12 @@ export const eventApplications = pgTable(
 		 * certificate issuance - a certificate can never exist without it.
 		 */
 		attendedAt: timestamp("attended_at"),
+		/**
+		 * Hours this volunteer actually served, entered by the NGO when marking
+		 * attendance. Null means "the whole event" - certificates and impact
+		 * totals fall back to the event's own duration.
+		 */
+		hoursServed: decimal("hours_served", { precision: 5, scale: 1 }),
 		appliedAt: timestamp("applied_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},
