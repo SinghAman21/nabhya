@@ -104,7 +104,10 @@ export function ScreenHeader({
 				}}
 			>
 				<BackButton />
-				<View style={{ alignItems: "flex-end" }}>
+				{/* Title beside the chevron, not pushed to the far edge: with
+				    space-between and no flex it floated to the middle when there
+				    was an action and to the right edge when there wasn't. */}
+				<View style={{ flex: 1, minWidth: 0 }}>
 					<H3
 						accessibilityRole="header"
 						numberOfLines={1}
@@ -165,11 +168,20 @@ export function Surface({
 	onPress,
 	style,
 	padded = true,
+	footer,
 }: {
 	children: React.ReactNode;
 	onPress?: () => void;
 	style?: StyleProp<ViewStyle>;
 	padded?: boolean;
+	/**
+	 * Controls that belong to the card but not to its press - Edit, Remove.
+	 * They render inside the card, below the pressable body, rather than inside
+	 * it: a button inside a button is invalid HTML on the web (React warns and
+	 * the inner press also fires the outer one's focus), and a screen reader
+	 * reads the whole card as one button with no way to reach the controls.
+	 */
+	footer?: React.ReactNode;
 }) {
 	const { colors, spacing, borderRadius, elevation, isDark } = useTheme();
 
@@ -183,7 +195,48 @@ export function Surface({
 		...style,
 	};
 
-	if (!onPress) return <View style={base}>{children}</View>;
+	if (!onPress) {
+		return (
+			<View style={base}>
+				{children}
+				{footer}
+			</View>
+		);
+	}
+
+	if (footer) {
+		// The card is the surface; only the body is the press target. The body
+		// carries the padding so its hover tint reaches the card's edges.
+		const { padding: _padding, ...shell } = base;
+		return (
+			<View style={{ ...shell, overflow: "hidden" }}>
+				<Pressable
+					onPress={onPress}
+					accessibilityRole="button"
+					{...focusable}
+					style={(state) => {
+						const { pressed, hovered } = state as PressState;
+						return {
+							padding: padded ? spacing[4] : 0,
+							paddingBottom: 0,
+							backgroundColor:
+								pressed || hovered ? colors.background.subtle : "transparent",
+						};
+					}}
+				>
+					{children}
+				</Pressable>
+				<View
+					style={{
+						paddingHorizontal: padded ? spacing[4] : 0,
+						paddingBottom: padded ? spacing[4] : 0,
+					}}
+				>
+					{footer}
+				</View>
+			</View>
+		);
+	}
 
 	return (
 		<Pressable

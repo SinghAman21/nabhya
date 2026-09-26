@@ -76,52 +76,64 @@ function Bookmarks() {
 					/>
 				}
 				renderItem={(item) => (
-					<Pressable
-						onPress={() => router.push(`/ngos/${item.organization.id}`)}
-						accessibilityRole="button"
-						accessibilityLabel={item.organization.organizationName}
-						{...focusable}
-						style={(state) => {
-							const { pressed, hovered } = state as {
-								pressed: boolean;
-								hovered?: boolean;
-							};
-							return {
-								flexDirection: "row",
-								alignItems: "center",
-								gap: spacing[3],
-								paddingHorizontal: spacing[4],
-								paddingVertical: spacing[3],
-								minHeight: 64,
-								backgroundColor:
-									pressed || hovered ? colors.background.subtle : "transparent",
-							};
+					<View
+						style={{
+							flexDirection: "row",
+							alignItems: "center",
+							gap: spacing[3],
+							paddingRight: spacing[4],
 						}}
 					>
-						<View
-							style={{
-								width: 40,
-								height: 40,
-								borderRadius: 20,
-								backgroundColor: colors.primary.tint,
-								alignItems: "center",
-								justifyContent: "center",
+						<Pressable
+							onPress={() => router.push(`/ngos/${item.organization.id}`)}
+							accessibilityRole="button"
+							accessibilityLabel={item.organization.organizationName}
+							{...focusable}
+							style={(state) => {
+								const { pressed, hovered } = state as {
+									pressed: boolean;
+									hovered?: boolean;
+								};
+								return {
+									flex: 1,
+									flexDirection: "row",
+									alignItems: "center",
+									gap: spacing[3],
+									paddingHorizontal: spacing[4],
+									paddingVertical: spacing[3],
+									minHeight: 64,
+									backgroundColor:
+										pressed || hovered
+											? colors.background.subtle
+											: "transparent",
+								};
 							}}
 						>
-							<Label weight="bold" color={colors.primary.ink}>
-								{item.organization.organizationName[0]?.toUpperCase()}
-							</Label>
-						</View>
-						<View style={{ flex: 1, minWidth: 0 }}>
-							<Body weight="medium" numberOfLines={1}>
-								{item.organization.organizationName}
-							</Body>
-							<Caption color="tertiary" numberOfLines={1}>
-								{[item.organization.city, item.organization.state]
-									.filter(Boolean)
-									.join(", ") || "Location not set"}
-							</Caption>
-						</View>
+							<View
+								style={{
+									width: 40,
+									height: 40,
+									borderRadius: 20,
+									backgroundColor: colors.primary.tint,
+									alignItems: "center",
+									justifyContent: "center",
+								}}
+							>
+								<Label weight="bold" color={colors.primary.ink}>
+									{item.organization.organizationName[0]?.toUpperCase()}
+								</Label>
+							</View>
+							<View style={{ flex: 1, minWidth: 0 }}>
+								<Body weight="medium" numberOfLines={1}>
+									{item.organization.organizationName}
+								</Body>
+								<Caption color="tertiary" numberOfLines={1}>
+									{[item.organization.city, item.organization.state]
+										.filter(Boolean)
+										.join(", ") || "Location not set"}
+								</Caption>
+							</View>
+						</Pressable>
 						<Pressable
 							onPress={() => remove(item)}
 							disabled={toggle.isPending}
@@ -135,7 +147,7 @@ function Bookmarks() {
 								Remove
 							</Caption>
 						</Pressable>
-					</Pressable>
+					</View>
 				)}
 			/>
 		</Screen>

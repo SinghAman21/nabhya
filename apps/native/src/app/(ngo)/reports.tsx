@@ -180,7 +180,7 @@ export default function OrgReports() {
 					}
 					renderItem={({ item }) => (
 						<GridCell>
-							<Surface onPress={() => openDocument.mutate(item.documentKey)}>
+							<Surface>
 								<View
 									style={{
 										flexDirection: "row",

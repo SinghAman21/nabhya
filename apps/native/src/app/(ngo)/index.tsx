@@ -177,7 +177,7 @@ export default function NgoDashboard() {
 					<ActionTile
 						icon={PenLine}
 						label="Post"
-						hint={tileHint(postBlocked, "Share an update")}
+						hint={tileHint(postBlocked, "Share news")}
 						disabled={!!postBlocked}
 						first
 						onPress={() => setComposerTag("POST")}

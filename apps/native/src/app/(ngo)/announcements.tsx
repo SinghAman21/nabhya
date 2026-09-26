@@ -178,7 +178,47 @@ function AnnouncementRow({
 	const isDraft = announcement.status === "DRAFT";
 
 	return (
-		<Surface onPress={onEdit}>
+		<Surface
+			onPress={onEdit}
+			footer={
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						justifyContent: "space-between",
+						gap: spacing[3],
+						marginTop: spacing[3],
+						paddingTop: spacing[3],
+						borderTopWidth: 1,
+						borderTopColor: colors.border.hairline,
+					}}
+				>
+					<Caption color="quaternary" style={{ flex: 1 }} numberOfLines={1}>
+						{isDraft
+							? `Saved ${formatRelative(announcement.updatedAt)}`
+							: `Published ${formatRelative(announcement.publishedAt ?? announcement.createdAt)}`}
+					</Caption>
+					<View style={{ flexDirection: "row", gap: spacing[3] }}>
+						{onEdit && (
+							<TextAction
+								label={isDraft ? "Edit & publish" : "Edit"}
+								tone={isDraft ? "brand" : "default"}
+								onPress={onEdit}
+								accessibilityLabel={`Edit ${announcement.title}`}
+							/>
+						)}
+						{onDelete && (
+							<TextAction
+								label="Delete"
+								tone="danger"
+								onPress={onDelete}
+								accessibilityLabel={`Delete ${announcement.title}`}
+							/>
+						)}
+					</View>
+				</View>
+			}
+		>
 			{(isDraft || announcement.isPinned) && (
 				<View
 					style={{
@@ -216,43 +256,6 @@ function AnnouncementRow({
 			>
 				{announcement.body}
 			</Caption>
-
-			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					justifyContent: "space-between",
-					gap: spacing[3],
-					marginTop: spacing[3],
-					paddingTop: spacing[3],
-					borderTopWidth: 1,
-					borderTopColor: colors.border.hairline,
-				}}
-			>
-				<Caption color="quaternary" style={{ flex: 1 }} numberOfLines={1}>
-					{isDraft
-						? `Saved ${formatRelative(announcement.updatedAt)}`
-						: `Published ${formatRelative(announcement.publishedAt ?? announcement.createdAt)}`}
-				</Caption>
-				<View style={{ flexDirection: "row", gap: spacing[3] }}>
-					{onEdit && (
-						<TextAction
-							label={isDraft ? "Edit & publish" : "Edit"}
-							tone={isDraft ? "brand" : "default"}
-							onPress={onEdit}
-							accessibilityLabel={`Edit ${announcement.title}`}
-						/>
-					)}
-					{onDelete && (
-						<TextAction
-							label="Delete"
-							tone="danger"
-							onPress={onDelete}
-							accessibilityLabel={`Delete ${announcement.title}`}
-						/>
-					)}
-				</View>
-			</View>
 		</Surface>
 	);
 }

@@ -18,6 +18,7 @@ import { humanizeStatus, StatusPill } from "@/components/status-pill";
 import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
 import { confirm, toast } from "@/components/ui/overlay";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, Label } from "@/components/ui/typography";
 import { useDeleteNeed, usePublicNeed } from "@/hooks/use-needs";
 import { useOrgAccess } from "@/hooks/use-org-access";
@@ -25,6 +26,7 @@ import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useGridColumns } from "@/hooks/useMedia";
 import { apiErrorMessage, orgNeedsApi, queryKeys } from "@/lib/api";
+import { focusable } from "@/lib/focus";
 import { formatProgress, formatRelative } from "@/lib/format";
 import type { OrgNeedListItem } from "@/lib/types";
 
@@ -208,7 +210,63 @@ function NeedRow({
 	const pending = need.pendingPledges ?? 0;
 
 	return (
-		<Surface onPress={onReview}>
+		<Surface
+			onPress={onReview}
+			footer={
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						justifyContent: "space-between",
+						gap: spacing[3],
+						marginTop: spacing[3],
+						paddingTop: spacing[3],
+						borderTopWidth: 1,
+						borderTopColor: colors.border.hairline,
+					}}
+				>
+					<Pressable
+						onPress={onReview}
+						accessibilityRole="button"
+						accessibilityLabel={`See responses to ${need.title}`}
+						{...focusable}
+						style={{ flex: 1, minWidth: 0 }}
+					>
+						<Label numberOfLines={1}>
+							{formatProgress(need.fulfilledQuantity, need.quantity, need.unit)}
+						</Label>
+						<Caption
+							weight={pending > 0 ? "medium" : "normal"}
+							color={
+								pending > 0 ? (colors.warning.ink as string) : "quaternary"
+							}
+							numberOfLines={1}
+						>
+							{pending > 0
+								? `${pending} pledge${pending === 1 ? "" : "s"} to review`
+								: "Tap to see responses"}
+						</Caption>
+					</Pressable>
+					<View style={{ flexDirection: "row", gap: spacing[3] }}>
+						{onEdit && (
+							<TextAction
+								label="Edit"
+								onPress={onEdit}
+								accessibilityLabel={`Edit ${need.title}`}
+							/>
+						)}
+						{onDelete && (
+							<TextAction
+								label="Remove"
+								tone="danger"
+								onPress={onDelete}
+								accessibilityLabel={`Remove ${need.title}`}
+							/>
+						)}
+					</View>
+				</View>
+			}
+		>
 			<View
 				style={{
 					flexDirection: "row",
@@ -239,51 +297,6 @@ function NeedRow({
 			>
 				{need.description}
 			</Caption>
-
-			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					justifyContent: "space-between",
-					gap: spacing[3],
-					marginTop: spacing[3],
-					paddingTop: spacing[3],
-					borderTopWidth: 1,
-					borderTopColor: colors.border.hairline,
-				}}
-			>
-				<View style={{ flex: 1, minWidth: 0 }}>
-					<Label numberOfLines={1}>
-						{formatProgress(need.fulfilledQuantity, need.quantity, need.unit)}
-					</Label>
-					<Caption
-						weight={pending > 0 ? "medium" : "normal"}
-						color={pending > 0 ? (colors.warning.ink as string) : "quaternary"}
-						numberOfLines={1}
-					>
-						{pending > 0
-							? `${pending} pledge${pending === 1 ? "" : "s"} to review`
-							: "Tap to see responses"}
-					</Caption>
-				</View>
-				<View style={{ flexDirection: "row", gap: spacing[3] }}>
-					{onEdit && (
-						<TextAction
-							label="Edit"
-							onPress={onEdit}
-							accessibilityLabel={`Edit ${need.title}`}
-						/>
-					)}
-					{onDelete && (
-						<TextAction
-							label="Remove"
-							tone="danger"
-							onPress={onDelete}
-							accessibilityLabel={`Remove ${need.title}`}
-						/>
-					)}
-				</View>
-			</View>
 		</Surface>
 	);
 }

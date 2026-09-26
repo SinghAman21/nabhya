@@ -197,7 +197,7 @@ function ReviewRow({
 	const name = review.user.fullName ?? "Volunteer";
 
 	return (
-		<Surface onPress={review.reply ? undefined : onReply}>
+		<Surface>
 			<View
 				style={{ flexDirection: "row", alignItems: "center", gap: spacing[3] }}
 			>

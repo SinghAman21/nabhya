@@ -22,6 +22,7 @@ import {
 import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
 import { confirm, toast } from "@/components/ui/overlay";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, Label } from "@/components/ui/typography";
 import { useDeleteEvent, useOrgEvent } from "@/hooks/use-events";
 import { useOrgAccess } from "@/hooks/use-org-access";
@@ -29,6 +30,7 @@ import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useGridColumns } from "@/hooks/useMedia";
 import { apiErrorMessage, orgEventsApi, queryKeys } from "@/lib/api";
+import { focusable } from "@/lib/focus";
 import { formatDateRange } from "@/lib/format";
 import type { OrgEventListItem } from "@/lib/types";
 
@@ -264,7 +266,64 @@ function EventRow({
 	const pending = event.pendingApplications ?? 0;
 
 	return (
-		<Surface onPress={onReview}>
+		<Surface
+			onPress={onReview}
+			footer={
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						justifyContent: "space-between",
+						gap: spacing[3],
+						marginTop: spacing[3],
+						paddingTop: spacing[3],
+						borderTopWidth: 1,
+						borderTopColor: colors.border.hairline,
+					}}
+				>
+					<Pressable
+						onPress={onReview}
+						accessibilityRole="button"
+						accessibilityLabel={`See applicants for ${event.title}`}
+						{...focusable}
+						style={{ flex: 1, minWidth: 0 }}
+					>
+						<Label numberOfLines={1}>
+							{event.acceptedCount} of {event.volunteersNeeded} volunteers
+						</Label>
+						<Caption
+							weight={pending > 0 ? "medium" : "normal"}
+							color={
+								pending > 0 ? (colors.warning.ink as string) : "quaternary"
+							}
+							numberOfLines={1}
+						>
+							{pending > 0
+								? `${pending} applicant${pending === 1 ? "" : "s"} waiting`
+								: "Tap to see applicants"}
+						</Caption>
+					</Pressable>
+					<View style={{ flexDirection: "row", gap: spacing[3] }}>
+						{onEdit && (
+							<TextAction
+								label={event.status === "DRAFT" ? "Edit & publish" : "Edit"}
+								tone={event.status === "DRAFT" ? "brand" : "default"}
+								onPress={onEdit}
+								accessibilityLabel={`Edit ${event.title}`}
+							/>
+						)}
+						{onDelete && (
+							<TextAction
+								label="Remove"
+								tone="danger"
+								onPress={onDelete}
+								accessibilityLabel={`Remove ${event.title}`}
+							/>
+						)}
+					</View>
+				</View>
+			}
+		>
 			<View
 				style={{
 					flexDirection: "row",
@@ -315,52 +374,6 @@ function EventRow({
 							filled >= 1 ? colors.success.main : colors.primary.main,
 					}}
 				/>
-			</View>
-
-			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					justifyContent: "space-between",
-					gap: spacing[3],
-					marginTop: spacing[3],
-					paddingTop: spacing[3],
-					borderTopWidth: 1,
-					borderTopColor: colors.border.hairline,
-				}}
-			>
-				<View style={{ flex: 1, minWidth: 0 }}>
-					<Label numberOfLines={1}>
-						{event.acceptedCount} of {event.volunteersNeeded} volunteers
-					</Label>
-					<Caption
-						weight={pending > 0 ? "medium" : "normal"}
-						color={pending > 0 ? (colors.warning.ink as string) : "quaternary"}
-						numberOfLines={1}
-					>
-						{pending > 0
-							? `${pending} applicant${pending === 1 ? "" : "s"} waiting`
-							: "Tap to see applicants"}
-					</Caption>
-				</View>
-				<View style={{ flexDirection: "row", gap: spacing[3] }}>
-					{onEdit && (
-						<TextAction
-							label={event.status === "DRAFT" ? "Edit & publish" : "Edit"}
-							tone={event.status === "DRAFT" ? "brand" : "default"}
-							onPress={onEdit}
-							accessibilityLabel={`Edit ${event.title}`}
-						/>
-					)}
-					{onDelete && (
-						<TextAction
-							label="Remove"
-							tone="danger"
-							onPress={onDelete}
-							accessibilityLabel={`Remove ${event.title}`}
-						/>
-					)}
-				</View>
 			</View>
 		</Surface>
 	);

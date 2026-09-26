@@ -1,11 +1,5 @@
 import { inviteTeamMemberSchema } from "@nabhya/shared";
-import {
-	KeyRound,
-	MailPlus,
-	ShieldCheck,
-	UserPlus,
-	Users,
-} from "lucide-react-native";
+import { KeyRound, MailPlus, UserPlus, Users } from "lucide-react-native";
 import { useState } from "react";
 import { RefreshControl, ScrollView, View } from "react-native";
 import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
@@ -135,71 +129,30 @@ export default function OrgTeam() {
 						paddingBottom: spacing[10],
 					}}
 				>
-					<Surface>
-						<View style={{ gap: spacing[2] }}>
-							<View
-								style={{
-									flexDirection: "row",
-									alignItems: "center",
-									gap: spacing[2],
-								}}
-							>
-								<ShieldCheck
-									size={18}
-									color={colors.text.secondary as string}
-								/>
-								<H3>Access roles</H3>
-							</View>
-							<Caption color="tertiary">
-								Roles decide what teammates can do. Only owners can transfer
-								ownership.
-							</Caption>
-							<Caption color="tertiary">
-								Designation is just the public label shown beside their name.
-							</Caption>
-							<View
-								style={{
-									flexDirection: "row",
-									flexWrap: "wrap",
-									gap: spacing[2],
-								}}
-							>
-								{(["OWNER", ...ROLES] as const).map((role) => (
-									<StatusPill
-										key={role}
-										label={TEAM_ROLE_LABELS[role]}
-										tone={role === "OWNER" ? "info" : "neutral"}
-									/>
-								))}
-							</View>
-						</View>
-					</Surface>
-
-					<SectionHeading
-						title="Members"
-						{...(canInvite
-							? {
-									actionLabel: "Invite member",
-									onAction: () => setInviting(true),
-								}
-							: {})}
-					/>
+					{/* The header's Invite is the one way in; a second button here
+					    was a third invite control on one screen. */}
+					<SectionHeading title="Members" />
 					{!canInvite && !access.isLoading ? (
 						<Caption color="tertiary">
 							Only owners and admins can invite. Ask an owner or admin.
 						</Caption>
 					) : null}
-					<FilterChips
-						inline
-						options={STATUS_OPTIONS}
-						value={status}
-						onChange={setStatus}
-					/>
-					<SwitchRow
-						label="Include people who left"
-						checked={includeLeft}
-						onChange={setIncludeLeft}
-					/>
+					{/* Filters only once there is something to filter. */}
+					{items.length > 0 || status !== "ACTIVE" || includeLeft ? (
+						<>
+							<FilterChips
+								inline
+								options={STATUS_OPTIONS}
+								value={status}
+								onChange={setStatus}
+							/>
+							<SwitchRow
+								label="Include people who left"
+								checked={includeLeft}
+								onChange={setIncludeLeft}
+							/>
+						</>
+					) : null}
 					{items.length === 0 ? (
 						<EmptyState
 							icon={Users}
@@ -260,6 +213,38 @@ export default function OrgTeam() {
 							))}
 						</View>
 					)}
+
+					{/* Reference, not the first thing on the page: it used to open
+					    the screen and push the members below the fold on a phone. */}
+					<SectionHeading title="What each role can do" />
+					<Surface>
+						<View style={{ gap: spacing[3] }}>
+							{(["OWNER", ...ROLES] as const).map((role) => (
+								<View
+									key={role}
+									style={{
+										flexDirection: "row",
+										alignItems: "flex-start",
+										gap: spacing[3],
+									}}
+								>
+									<View style={{ width: 84 }}>
+										<StatusPill
+											label={TEAM_ROLE_LABELS[role]}
+											tone={role === "OWNER" ? "info" : "neutral"}
+										/>
+									</View>
+									<Caption color="tertiary" style={{ flex: 1 }}>
+										{TEAM_ROLE_COPY[role]}
+									</Caption>
+								</View>
+							))}
+							<Caption color="quaternary">
+								A designation ("Field lead - Pune") is only the label shown
+								beside a name; the role is what grants access.
+							</Caption>
+						</View>
+					</Surface>
 
 					<OwnershipSection
 						isOwner={isOwner}
@@ -350,7 +335,24 @@ function MemberRow({
 	};
 
 	return (
-		<Surface onPress={onPress}>
+		<Surface
+			onPress={onPress}
+			footer={
+				suspended && canManage ? (
+					<View style={{ alignItems: "flex-start", marginTop: spacing[3] }}>
+						<Button
+							size="sm"
+							variant="outline"
+							loading={update.isPending}
+							accessibilityLabel={`Reactivate ${name}`}
+							onPress={reactivate}
+						>
+							Reactivate
+						</Button>
+					</View>
+				) : undefined
+			}
+		>
 			<View style={{ gap: spacing[3] }}>
 				<View
 					style={{
@@ -377,19 +379,6 @@ function MemberRow({
 						: `Joined ${formatDate(member.joinedAt)}`}
 					{member.isPublic ? " · Public" : ""}
 				</Caption>
-				{suspended && canManage ? (
-					<View style={{ alignItems: "flex-start" }}>
-						<Button
-							size="sm"
-							variant="outline"
-							loading={update.isPending}
-							accessibilityLabel={`Reactivate ${name}`}
-							onPress={reactivate}
-						>
-							Reactivate
-						</Button>
-					</View>
-				) : null}
 			</View>
 		</Surface>
 	);
