@@ -5,7 +5,7 @@
 -- administrators is a permanent attack surface, and the operation is needed
 -- roughly once per environment. Run it against the database instead.
 --
---   1. Sign up through the app first — this promotes an existing user, it does
+--   1. Sign up through the app first - this promotes an existing user, it does
 --      not create one. Supabase Auth owns account creation.
 --   2. Set the email below.
 --   3. Run it:
@@ -34,7 +34,7 @@ insert into roles (name, description)
 values ('superadmin', 'System super administrator')
 on conflict (name) do nothing;
 
--- Fail loudly rather than silently doing nothing when the email is unknown —
+-- Fail loudly rather than silently doing nothing when the email is unknown -
 -- a typo here is otherwise indistinguishable from success.
 do $$
 declare

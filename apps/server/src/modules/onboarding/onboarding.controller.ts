@@ -29,7 +29,7 @@ export class OnboardingController {
 
 	@Get("status")
 	@ApiOperation({
-		summary: "Where the caller is in onboarding — drives client routing",
+		summary: "Where the caller is in onboarding - drives client routing",
 	})
 	getStatus(@CurrentUser() user: AuthUser) {
 		return this.onboardingService.getStatus(user);

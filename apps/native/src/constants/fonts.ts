@@ -15,7 +15,7 @@ export const fontByWeight = {
  *
  * Display type defaults to the **bold** face: it is used for screen titles and
  * numerals, which need the weight. The regular face is reachable at `light` for
- * the rare large-and-quiet heading — mapping `normal` to it made every title in
+ * the rare large-and-quiet heading - mapping `normal` to it made every title in
  * the app render thin.
  */
 export const displayByWeight = {

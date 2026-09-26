@@ -14,23 +14,23 @@ import { apiErrorMessage } from "@/lib/api";
 /**
  * The body of a console list: the count, the rows, and the way to the next page.
  *
- * **Nothing here owns a scroller.** The page does — see the note at the top of
+ * **Nothing here owns a scroller.** The page does - see the note at the top of
  * `list-chrome.tsx`. That is why this renders its rows inline instead of using
  * `PagedList`, which the rest of the app uses and which wraps a `FlatList`: a
  * `FlatList` inside the page scroller is the nested-scroll bug the console just
  * got rid of, and it is what stops `DataTable`'s header from sticking.
  *
  * The cost is virtualisation, and it is worth paying here and nowhere else. A
- * console page is 20 rows of type — no images, no video, no players — and a
+ * console page is 20 rows of type - no images, no video, no players - and a
  * reviewer working a queue loads maybe five pages. The volunteer feed, which
  * has all three of those things and no end, keeps `PagedList`.
  *
  * ## Three shapes, one component
  *
- * - **Desktop + `table`** — `DataTable`. Comparing records down a column.
- * - **Desktop + `grid`** — the cards, two or three across via `useGridColumns`.
+ * - **Desktop + `table`** - `DataTable`. Comparing records down a column.
+ * - **Desktop + `grid`** - the cards, two or three across via `useGridColumns`.
  *   Recognising one record by name and state.
- * - **Mobile** — always the cards, one across, whatever `view` says. A 360dp
+ * - **Mobile** - always the cards, one across, whatever `view` says. A 360dp
  *   window cannot hold six columns, and a table squeezed into it is six
  *   two-line wraps per row.
  */
@@ -146,18 +146,18 @@ export function ConsoleList<T, K extends string>({
  * A wrapping row of cards.
  *
  * Flex wrap rather than a `FlatList` grid, for the same no-nested-scroller
- * reason as above — and it behaves better at the end of a short list: a
+ * reason as above - and it behaves better at the end of a short list: a
  * `numColumns` grid stretches a lone last card across the full row, while
  * `flexBasis` keeps it one column wide.
  *
  * **Columns come from the measured container, not from `useGridColumns()`.**
  * That hook caps at three, which was right while console pages were capped at
  * 1180; now that they are full width, three cards on a 2560 monitor are 760pt
- * each — a card wide enough that its own two lines of text sit in the left
+ * each - a card wide enough that its own two lines of text sit in the left
  * third. Here the *card* width is what is held steady (~`TARGET` each) and the
  * count follows the window, so a wide screen gets more cards rather than
- * bigger ones. The table wants the opposite — one column absorbing the
- * slack — which is why this is not a shared rule.
+ * bigger ones. The table wants the opposite - one column absorbing the
+ * slack - which is why this is not a shared rule.
  */
 const TARGET_CARD_WIDTH = 380;
 const MAX_COLUMNS = 6;
@@ -211,7 +211,7 @@ function Cards<T>({
 						// The gap is taken out of the basis so `columns` cards plus
 						// `columns - 1` gaps come to 100% and never wrap one short.
 						// `calc()` is a CSS value react-native-web passes through, and
-						// this branch only runs on desktop web — RN's own types stop at
+						// this branch only runs on desktop web - RN's own types stop at
 						// numbers and percentages, hence the cast.
 						flexBasis: `calc(${100 / columns}% - ${
 							(gap * (columns - 1)) / columns

@@ -49,8 +49,8 @@ import { verticalScrollbar } from "@/lib/scroll";
  *
  * ## Why tabs and not one long column
  *
- * A profile carries four unrelated kinds of thing — the public record, the
- * numbers, the legal review, the account controls — and they are wanted at
+ * A profile carries four unrelated kinds of thing - the public record, the
+ * numbers, the legal review, the account controls - and they are wanted at
  * different times. Stacked in one column they made a page you scrolled past
  * rather than read, and put "Appearance" three screens below the fold. Tabs
  * are a *page* device here, not a navigation one: `PageTabs` keeps them in
@@ -59,15 +59,15 @@ import { verticalScrollbar } from "@/lib/scroll";
  *
  * ## The order
  *
- * 1. **Hero** — cover, logo, name, city, verification line, and the two things
+ * 1. **Hero** - cover, logo, name, city, verification line, and the two things
  *    an owner does from here: view the public page, edit the record. Always
  *    visible, on every tab, because it is the answer to "whose page is this".
  * 2. **The verification banner**, above the tabs and outside them, while the
  *    organisation is not verified. It gates events, needs and posts going
  *    public, so it outranks whichever tab you happen to be on.
- * 3. **Overview** — what a volunteer or donor would see: impact, about, causes,
+ * 3. **Overview** - what a volunteer or donor would see: impact, about, causes,
  *    contact, at a glance.
- * 4. **Verification** — where the review stands and what each document is
+ * 4. **Verification** - where the review stands and what each document is
  *    doing, read-only, with one way through to `(ngo)/verification`, which owns
  *    uploading.
  *
@@ -102,7 +102,7 @@ import { verticalScrollbar } from "@/lib/scroll";
 /**
  * Desktop is two columns, roughly two-thirds and one-third.
  *
- * The wide column takes what is read in sequence — the numbers, the prose, the
+ * The wide column takes what is read in sequence - the numbers, the prose, the
  * contact details. The narrow one takes what is *looked up*: registration
  * number, founding year, team size. Facts of that kind read better in a column
  * you scan than as rows stretched across a 1000pt page, which is what the
@@ -179,7 +179,7 @@ export default function NgoProfile() {
 	const logoSize = isDesktop ? 96 : 76;
 	/*
 	 * Only the logo rides up over the cover. Pulling the whole block up would
-	 * drag the name with it — at these sizes the name's own height is greater
+	 * drag the name with it - at these sizes the name's own height is greater
 	 * than what is left of the logo below the cover, so the text would land on
 	 * top of the photo.
 	 */
@@ -646,7 +646,7 @@ export default function NgoProfile() {
 	 * Both panels split the same way on desktop, and for the same reason: read
 	 * on the left, look up and act on the right. On a phone the aside's contents
 	 * fall in after the wide column's, except on Verification, where the state
-	 * and the way through to the upload screen go first — being told where the
+	 * and the way through to the upload screen go first - being told where the
 	 * review stands matters more than which of four slots is filled.
 	 */
 	const overviewPanel = isDesktop ? (

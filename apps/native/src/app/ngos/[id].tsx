@@ -74,7 +74,7 @@ import { verticalScrollbar } from "@/lib/scroll";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
- * An NGO's public page — the one screen a volunteer or donor judges an
+ * An NGO's public page - the one screen a volunteer or donor judges an
  * organisation by.
  *
  * ## Layout
@@ -82,15 +82,15 @@ import { useAuthStore } from "@/store/auth-store";
  * A hero, then two columns on desktop: what you read on the left, what you
  * *do* and look up on the right.
  *
- * The hero is the NGO's own branding — the cover band and logo it uploads on
+ * The hero is the NGO's own branding - the cover band and logo it uploads on
  * `(ngo)/edit`, drawn through the same `OrgCover` / `OrgLogo` as its private
  * profile so the two cannot drift. Before this the page opened on a bare `H2`:
  * the organisation had somewhere to put a cover photo and a logo and nowhere
  * they appeared.
  *
  * On desktop the aside holds the actions and the registry facts, which does two
- * things. Donate stops being a bar welded to the bottom of a 1000pt window —
- * fine on a phone, odd on a desk — and the details stop being a `ListRow` list
+ * things. Donate stops being a bar welded to the bottom of a 1000pt window -
+ * fine on a phone, odd on a desk - and the details stop being a `ListRow` list
  * with the label hard left and a right-aligned value clamped to `maxWidth: 60%`,
  * which is what they were. `FactList` stacks label over value, so a registration
  * number reads the same at any column width.
@@ -438,7 +438,7 @@ type Organization = NonNullable<ReturnType<typeof useOrganization>["data"]>;
 
 /**
  * The registry record. On desktop it lives in the aside; on a phone there is no
- * aside, so `AboutTab` renders it under the prose — one component either way so
+ * aside, so `AboutTab` renders it under the prose - one component either way so
  * the two placements cannot say different things.
  */
 function OrgFacts({ organization }: { organization: Organization }) {
@@ -480,7 +480,7 @@ function AboutTab({
 	withFacts,
 }: {
 	organization: Organization;
-	/** Only on a phone — desktop draws the facts in the aside instead. */
+	/** Only on a phone - desktop draws the facts in the aside instead. */
 	withFacts?: boolean;
 }) {
 	const { spacing } = useTheme();
@@ -538,7 +538,7 @@ function AboutTab({
  * Team is secondary content: while loading it is a small inline spinner, on
  * error it stays silent, and when the list is empty the whole section hides
  * rather than announcing that nobody opted in. Rows match the Updates tab's
- * `ListGroup` language — avatar, name and designation with the role as a
+ * `ListGroup` language - avatar, name and designation with the role as a
  * pill (`info` for OWNER, `neutral` for everyone else).
  */
 function PublicTeamSection({ organizationId }: { organizationId: string }) {
@@ -752,7 +752,7 @@ function ReviewsTab({
 								gap: spacing[1.5],
 							}}
 						>
-							<H3>{summary?.count ? summary.average.toFixed(1) : "—"}</H3>
+							<H3>{summary?.count ? summary.average.toFixed(1) : "-"}</H3>
 							<Star
 								size={16}
 								color={colors.warning.ink}

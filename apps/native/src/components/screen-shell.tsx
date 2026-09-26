@@ -36,7 +36,7 @@ type PressState = { pressed: boolean; focused?: boolean; hovered?: boolean };
  * The page container every screen sits in: page background, gutters, and the
  * top safe-area inset.
  *
- * Screens each hardcoded `paddingTop: spacing[8]`, which is not an inset — it is
+ * Screens each hardcoded `paddingTop: spacing[8]`, which is not an inset - it is
  * a guess at one. With `headerShown: false` the content box starts at y=0, so on
  * a device with a 47pt notch the title was 15pt into the status bar, and on a
  * device without one it was 32pt of dead space.
@@ -74,7 +74,7 @@ export function Screen({
 /**
  * Two shapes, one component. A top-level tab gets the display-face title on
  * its own line. A pushed page passes `back`, which puts the back button, a
- * smaller title and the action on one 40pt row — the title no longer floats
+ * smaller title and the action on one 40pt row - the title no longer floats
  * under a lone arrow with a gap that changes from screen to screen.
  */
 export function ScreenHeader({
@@ -215,7 +215,7 @@ export function Surface({
 /**
  * One cell in a multi-column `FlatList` (`numColumns={useGridColumns()}`).
  *
- * On a phone this renders nothing extra — the card is the row. On desktop it
+ * On a phone this renders nothing extra - the card is the row. On desktop it
  * takes an equal share of the row and caps its width at one column, so a
  * half-empty last row keeps its cards aligned instead of ballooning to fill
  * the row. Pair with `key={\`grid-${columns}\`}` (a `numColumns` change needs
@@ -236,8 +236,8 @@ export function GridCell({ children }: { children: React.ReactNode }) {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Quiet section label. The old treatment — 13px bold, uppercase, letter-spaced,
- * with a leading icon — shouted louder than the content under it.
+ * Quiet section label. The old treatment - 13px bold, uppercase, letter-spaced,
+ * with a leading icon - shouted louder than the content under it.
  */
 export function SectionTitle({
 	children,
@@ -268,7 +268,7 @@ export function SectionTitle({
 /* -------------------------------------------------------------------------- */
 
 /**
- * One surface holding many rows, divided by hairlines — instead of a stack of
+ * One surface holding many rows, divided by hairlines - instead of a stack of
  * individually outlined cards, which is what made these screens read as noise.
  */
 export function ListGroup({ children }: { children: React.ReactNode }) {
@@ -310,15 +310,15 @@ export function ListRow({
 	icon?: LucideIcon;
 	label: string;
 	hint?: string;
-	/** Trailing content — a count, a pill, a switch. Replaces the chevron. */
+	/** Trailing content - a count, a pill, a switch. Replaces the chevron. */
 	value?: React.ReactNode;
 	onPress?: () => void;
 	/** Set false for an action row (sign out) that does not navigate anywhere. */
 	chevron?: boolean;
 	/**
 	 * Override the spoken label. The row's own label is announced instead of
-	 * its children, so a `value` that carries meaning — a queue's waiting
-	 * count — has to be spelled into the sentence here or it is simply not
+	 * its children, so a `value` that carries meaning - a queue's waiting
+	 * count - has to be spelled into the sentence here or it is simply not
 	 * read out.
 	 */
 	accessibilityLabel?: string;
@@ -411,7 +411,7 @@ export interface Fact {
 }
 
 /**
- * A record's own details — label above value, hairline between rows.
+ * A record's own details - label above value, hairline between rows.
  *
  * Deliberately *not* a `ListRow` with a trailing `value`. That shape puts the
  * label hard left and the value hard right, which works for a short state word
@@ -421,7 +421,7 @@ export interface Fact {
  * be, and reads the same at every column width.
  *
  * Empty facts are dropped rather than shown blank, so a sparse organisation
- * gets a short card instead of a column of dashes — unless `showEmpty` says
+ * gets a short card instead of a column of dashes - unless `showEmpty` says
  * otherwise. The one audience it is wrong for is a reviewer: a missing
  * registration number is *the* finding on an NGO awaiting verification, and
  * dropping the row hides it. So the admin dossiers ask for the dashes.
@@ -481,7 +481,7 @@ export function FactList({
 }
 
 function Dash() {
-	return <Body color="quaternary">—</Body>;
+	return <Body color="quaternary">-</Body>;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -498,7 +498,7 @@ export interface Stat {
 /**
  * Numerals share one surface and are separated by hairlines. Each stat used to
  * be its own outlined card in its own colour, which turned a summary into a
- * mosaic — six boxes, four hues, no hierarchy.
+ * mosaic - six boxes, four hues, no hierarchy.
  */
 export function MetricRow({ stats }: { stats: Stat[] }) {
 	const { colors, spacing } = useTheme();
@@ -722,7 +722,7 @@ export function ErrorState({
 /* -------------------------------------------------------------------------- */
 
 /**
- * Selection is monochrome — an ink pill, not an orange one. Orange is the
+ * Selection is monochrome - an ink pill, not an orange one. Orange is the
  * colour of *doing* something in this app; a filter is not an action, and
  * spending the brand on it left nothing to spend on the primary button.
  */
@@ -804,7 +804,7 @@ export function FilterChips<T extends string>({
 
 /**
  * Constrains content width and centres it on desktop web. Passes through on
- * mobile — no extra wrapper, no layout shift.
+ * mobile - no extra wrapper, no layout shift.
  */
 export function WebContent({ children }: { children: React.ReactNode }) {
 	const { spacing } = useTheme();

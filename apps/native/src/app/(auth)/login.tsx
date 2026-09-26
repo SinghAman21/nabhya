@@ -49,7 +49,7 @@ export default function Login() {
 		} catch (error) {
 			// Inline, above the button, rather than in an OS dialog you have to
 			// dismiss before you can see the field you got wrong. The real reason
-			// matters here — a wrong password, an unconfirmed email and a dead
+			// matters here - a wrong password, an unconfirmed email and a dead
 			// network each need a different response from the user.
 			setFailure(
 				authErrorCopy(

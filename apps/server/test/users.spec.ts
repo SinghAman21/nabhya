@@ -14,8 +14,8 @@ import { createOrganization, createUser, seedRoles } from "./factories";
 import { createTestDb, type TestDb, truncateAll } from "./harness";
 
 /**
- * Role selection is the only thing in the system that grants a role — JwtGuard
- * deliberately assigns none — so it is the whole authorization story for a new
+ * Role selection is the only thing in the system that grants a role - JwtGuard
+ * deliberately assigns none - so it is the whole authorization story for a new
  * account.
  */
 describe("UsersService", () => {

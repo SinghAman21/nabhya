@@ -120,7 +120,7 @@ export class CertificatesController {
 	@Get("certificates/:code/verify")
 	@ApiOperation({
 		summary:
-			"Verify a certificate by code. Public by design — a certificate is " +
+			"Verify a certificate by code. Public by design - a certificate is " +
 			"only worth something if a third party can check it.",
 	})
 	verify(@Param("code") code: string) {

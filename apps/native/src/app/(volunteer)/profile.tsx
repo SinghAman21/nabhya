@@ -44,12 +44,12 @@ import { verticalScrollbar } from "@/lib/scroll";
 /**
  * The volunteer's own page, top to bottom in the order a person needs it:
  *
- * 1. Who I am — one tappable card: avatar, name, city, verification line.
+ * 1. Who I am - one tappable card: avatar, name, city, verification line.
  *    Tapping it edits the profile; there is no separate edit button to find.
- * 2. What I have done — three numbers, tap for the full impact page.
- * 3. What needs me — the verification banner, only while it does.
- * 4. Where things are — two short groups: my activity, then settings.
- * 5. Sign out — on its own at the end, away from everything else.
+ * 2. What I have done - three numbers, tap for the full impact page.
+ * 3. What needs me - the verification banner, only while it does.
+ * 4. Where things are - two short groups: my activity, then settings.
+ * 5. Sign out - on its own at the end, away from everything else.
  *
  * Email, bio and phone are not shown here; they belong to the edit page. A
  * profile screen is a hub, and every extra line on the hub is a line before
@@ -59,7 +59,7 @@ import { verticalScrollbar } from "@/lib/scroll";
 /**
  * The desktop rail. `flexGrow: 0, flexShrink: 0` is spelled out because a
  * fixed `width` alone loses to flex when the row has spare space, and this
- * column previously used `position: sticky` — which needs a scrolling
+ * column previously used `position: sticky` - which needs a scrolling
  * ancestor it did not have, so it only made the column size to its content.
  */
 const RAIL = { width: 340, flexGrow: 0, flexShrink: 0 } as const;
@@ -322,7 +322,7 @@ export default function VolunteerProfile() {
 	/*
 	 * One `ScrollView` for both platforms, varying only the layout inside it.
 	 * The desktop branch used to be a plain `View`, so on a window shorter than
-	 * the page — which is most of them, once the settings group is open — the
+	 * the page - which is most of them, once the settings group is open - the
 	 * bottom of the profile was drawn into `overflow: hidden` and could not be
 	 * reached at all: no sign-out, no appearance, no certificates.
 	 */
@@ -378,7 +378,7 @@ export default function VolunteerProfile() {
 /**
  * The photo, with initials as the designed fallback.
  *
- * `profileImage` is a storage **key**, not a URL — the bucket is private — so it
+ * `profileImage` is a storage **key**, not a URL - the bucket is private - so it
  * has to be exchanged for a short-lived signed URL first, and that exchange can
  * legitimately return nothing (no photo, or a dev environment with no Supabase
  * Storage credentials, where the storage stub has nothing to sign). Initials

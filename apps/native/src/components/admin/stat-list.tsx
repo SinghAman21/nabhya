@@ -9,15 +9,15 @@ import { useTheme } from "@/hooks/use-theme";
  * `MetricRow` from `screen-shell` is the right thing on a phone and in a wide
  * column: four `H2` numerals side by side, each one the loudest thing in its
  * cell. It is the wrong thing in a 320pt console aside, which is where the
- * Overview needs it — four stats at `minWidth: 92` wrap 3 + 1, so "Suspended"
+ * Overview needs it - four stats at `minWidth: 92` wrap 3 + 1, so "Suspended"
  * ends up alone on a second line under a 28px zero, and three of those blocks
  * stacked read as a dashboard from 2013. Worse, the numeral gets the emphasis
  * whether or not the number means anything: a platform with 16 accounts and 0
  * suspended draws the 0 exactly as loudly as the 16.
  *
  * So: label left, number right, hairlines between, one line each. The number
- * is `Label` weight-bold rather than `H2` — big enough to find, small enough
- * that a column of six does not shout — and only a number that carries a
+ * is `Label` weight-bold rather than `H2` - big enough to find, small enough
+ * that a column of six does not shout - and only a number that carries a
  * decision takes a tone. Everything else is ink, which is the same rule
  * `MetricRow` follows and the same rule the feed card follows.
  */

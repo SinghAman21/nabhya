@@ -46,7 +46,7 @@ const STANDING = [
  * Volunteers. **Only volunteers.**
  *
  * This used to be "People" with a Role select covering volunteers, NGO accounts
- * and superadmins — which meant the console had two screens claiming the same
+ * and superadmins - which meant the console had two screens claiming the same
  * ground: an NGO appeared here as an *account* and next door as an
  * *organisation*, and nothing on either screen said which one you were supposed
  * to use. The role is fixed now and the filter is gone. One screen, one
@@ -55,7 +55,7 @@ const STANDING = [
  * **An NGO's own account is reached through its organisation**, not from here:
  * `(admin)/organizations` → the NGO → "Manage this account" in the Owner
  * section, which hands off to the same `UserDetailSheet` this screen opens. That
- * is also the better route — you almost never want to suspend an NGO's login
+ * is also the better route - you almost never want to suspend an NGO's login
  * without having just read its record.
  *
  * Superadmins have no screen and need none: there is no moderation action a
@@ -80,7 +80,7 @@ export default function AdminVolunteers() {
 
 	const debouncedSearch = useDebounced(search.trim());
 	const list = useAdminUsersPaged({
-		// Not a filter the reader can change — see the note above.
+		// Not a filter the reader can change - see the note above.
 		role: "volunteer",
 		...(debouncedSearch ? { search: debouncedSearch } : {}),
 		...(identity === "ANY" ? {} : { verificationStatus: identity }),

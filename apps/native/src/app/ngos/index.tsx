@@ -42,7 +42,7 @@ const MODES: Array<{ value: Mode; label: string }> = [
  * Public NGO directory.
  *
  * "Near me" uses the coordinates on the signed-in user's own organisation or
- * their saved city — the app never asks for device location, which would be a
+ * their saved city - the app never asks for device location, which would be a
  * heavy permission for a browse screen.
  */
 export default function NgoDirectory() {

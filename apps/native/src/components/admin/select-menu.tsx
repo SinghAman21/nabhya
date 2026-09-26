@@ -11,7 +11,7 @@ import { focusable, type PressState } from "@/lib/focus";
  *
  * **Why not `ui/select.tsx` or `ui/dropdown-menu.tsx`.** Both are
  * `@rn-primitives` and both render through a portal, which this repo has
- * already established cannot be positioned reliably — see the long note at the
+ * already established cannot be positioned reliably - see the long note at the
  * top of `ui/sheet.tsx`. This one draws its panel as an absolutely positioned
  * sibling inside its own wrapper, the same trick `ui/tooltip.tsx` uses, so it
  * works on a page, inside a sheet, and inside the drawer alike.
@@ -21,7 +21,7 @@ import { focusable, type PressState } from "@/lib/focus";
  * stacked rows of eleven chips between the title and the first row of data,
  * which spends the top of every page saying what could be filtered rather than
  * showing what was. A closed select says the current value in one line and
- * gives the rest of the page back — and it scales: the audit log's entity list
+ * gives the rest of the page back - and it scales: the audit log's entity list
  * and a city filter cannot be chips at all.
  *
  * The trigger always shows **label and value** ("Status · Pending"), never a
@@ -31,7 +31,7 @@ import { focusable, type PressState } from "@/lib/focus";
 export interface SelectOption<T extends string> {
 	value: T;
 	label: string;
-	/** A second line in the open panel — what the option actually filters to. */
+	/** A second line in the open panel - what the option actually filters to. */
 	hint?: string;
 }
 

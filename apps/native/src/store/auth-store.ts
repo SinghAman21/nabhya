@@ -5,7 +5,7 @@ import { storage } from "@/lib/storage";
 import type { OnboardingStatus, User } from "@/lib/types";
 
 /**
- * Canonical vocabulary — `organisation`, not `ngo`. The Expo route group is
+ * Canonical vocabulary - `organisation`, not `ngo`. The Expo route group is
  * still called `(ngo)` for readability, but the role value matches the server
  * and the `roles` table.
  */

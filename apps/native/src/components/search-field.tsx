@@ -8,14 +8,14 @@ import { focusable, focusWithin } from "@/lib/focus";
  * The one search control: one shell holding the icon, the field and a clear
  * button, on a quiet inset fill rather than an outline.
  *
- * There were three of these — the feed's search route, the desktop top bar and
- * the admin lists — all the same 44pt well with the same icon at the same
+ * There were three of these - the feed's search route, the desktop top bar and
+ * the admin lists - all the same 44pt well with the same icon at the same
  * weight, and all three had drifted: two different clear-button treatments,
  * two different heights, one with an `accessibilityRole="search"` and two
  * without. Nothing about "search a list of NGOs" differs from "search the
  * feed", so the shell is shared and the differences are props.
  *
- * The ring is drawn on the shell via `focusWithin`, not on the bare input —
+ * The ring is drawn on the shell via `focusWithin`, not on the bare input -
  * see the focus note in `src/global.css`.
  */
 export function SearchField({
@@ -44,7 +44,7 @@ export function SearchField({
 	autoFocus?: boolean;
 	/** `characters` for the audit log, which filters on SCREAMING_SNAKE actions. */
 	autoCapitalize?: "none" | "characters";
-	/** Caps the well inside a wide row — the top bar's 440 beside the nav. */
+	/** Caps the well inside a wide row - the top bar's 440 beside the nav. */
 	maxWidth?: number;
 	/** 40pt instead of 44, for a field sitting inside a chrome row rather than on a page. */
 	compact?: boolean;

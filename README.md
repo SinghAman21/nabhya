@@ -1,7 +1,7 @@
 # nabhya
 
 A verified NGO ↔ volunteer platform for India. See `AGENTS.md` for the full
-architecture guide — this file is just how to get it running locally.
+architecture guide - this file is just how to get it running locally.
 
 ## Stack
 
@@ -32,17 +32,17 @@ You need one Supabase project providing both the Postgres database and auth:
 
 1. Create a project at [supabase.com/dashboard](https://supabase.com/dashboard).
 2. **Project Settings → Authentication → Sessions** (or Providers → Email): set JWT
-   signing keys to **asymmetric (ES256/RS256)**. This is required — the server
+   signing keys to **asymmetric (ES256/RS256)**. This is required - the server
    verifies tokens against a JWKS endpoint that only exists in asymmetric mode.
 3. **Authentication → Sign In / Providers → Email**: since this app has no email
-   provider wired yet, turn off **"Confirm email"** — otherwise signup won't return
+   provider wired yet, turn off **"Confirm email"** - otherwise signup won't return
    a session until a confirmation email is clicked, and none gets sent.
 4. **Project Settings → Database**: copy the **Transaction pooler** connection string
-   (port `6543`) and the **Session pooler** connection string (port `5432`) — see
+   (port `6543`) and the **Session pooler** connection string (port `5432`) - see
    the note below on why the session pooler is used instead of Supabase's own
    "Direct connection" entry.
 5. **Project Settings → API**: copy the **Project URL** and the **anon / public**
-   key (never the `service_role` key — that one must never leave the server).
+   key (never the `service_role` key - that one must never leave the server).
 
 > **Why the session pooler instead of "Direct connection":** Supabase's direct
 > connection host (`db.<ref>.supabase.co`) is IPv6-only unless your project has the
@@ -53,18 +53,18 @@ You need one Supabase project providing both the Postgres database and auth:
 
 ## 3. Configure environment files
 
-Neither app reads a committed env file — you create these yourself, and both are
+Neither app reads a committed env file - you create these yourself, and both are
 gitignored. **The server reads `.env`; the client reads `.env.local`** (Expo's own
 env loading prioritizes `.env.local` automatically, so no extra config is needed
-there) — don't mix these up.
+there) - don't mix these up.
 
 **`apps/server/.env`** (create this file):
 
 ```bash
-# Pooled connection (transaction-mode pgbouncer, port 6543) — used by the app.
+# Pooled connection (transaction-mode pgbouncer, port 6543) - used by the app.
 DATABASE_URL="postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres"
 
-# Session pooler (port 5432) — used by Drizzle Kit for push/generate/studio.
+# Session pooler (port 5432) - used by Drizzle Kit for push/generate/studio.
 DIRECT_URL="postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres"
 
 CORS_ORIGIN="http://localhost:8081"
@@ -75,10 +75,10 @@ SUPABASE_AUTH_JWKS_URL="https://<project-ref>.supabase.co/auth/v1/.well-known/jw
 
 `<project-ref>`, `<password>` and `<region>` come from the connection strings you
 copied in step 2. Supabase Storage (object storage) and Razorpay (payments) vars
-are optional — see `apps/server/.env.example` for the full list; leaving them
+are optional - see `apps/server/.env.example` for the full list; leaving them
 unset falls back to in-memory stubs in development.
 
-Fastest path for this file: run `pnpm db:setup` from the repo root — an interactive
+Fastest path for this file: run `pnpm db:setup` from the repo root - an interactive
 wizard that asks for these same values and writes the file for you.
 
 **`apps/native/.env.local`** (create this file):
@@ -87,7 +87,7 @@ wizard that asks for these same values and writes the file for you.
 EXPO_PUBLIC_SUPABASE_URL="https://<project-ref>.supabase.co"
 EXPO_PUBLIC_SUPABASE_ANON_KEY="<anon-public-key>"
 
-# Optional in development — falls back to 10.0.2.2:3000 on the Android emulator
+# Optional in development - falls back to 10.0.2.2:3000 on the Android emulator
 # and localhost:3000 elsewhere. Required for a physical device: use your
 # machine's LAN IP, e.g. http://192.168.1.42:3000
 # EXPO_PUBLIC_API_URL="http://192.168.1.42:3000"
@@ -124,7 +124,7 @@ cd apps/native
 pnpm dev            # same as: pnpm start
 pnpm android         # open on Android emulator/device
 pnpm ios             # open on iOS simulator/device
-pnpm web             # not a real target yet — no web app is scaffolded
+pnpm web             # not a real target yet - no web app is scaffolded
 ```
 
 **Both at once** from the repo root (Turborepo runs every app's `dev` script):
@@ -157,13 +157,13 @@ local development before exercising these routes.
 
 ## Everyday scripts
 
-- `pnpm check` — Biome lint/format (writes fixes)
-- `pnpm --filter server test` / `test:watch` / `test:coverage` — server test suite
+- `pnpm check` - Biome lint/format (writes fixes)
+- `pnpm --filter server test` / `test:watch` / `test:coverage` - server test suite
   (runs against a real Postgres compiled to WASM via PGlite, no live database needed)
-- `pnpm --filter server verify:di` — catches NestJS dependency-injection mistakes
+- `pnpm --filter server verify:di` - catches NestJS dependency-injection mistakes
   that `tsc` can't (run this after touching any constructor)
-- `pnpm db:generate` — generate a Drizzle migration after a schema change
-- `pnpm db:studio` — Drizzle Studio, a GUI over your Supabase database
+- `pnpm db:generate` - generate a Drizzle migration after a schema change
+- `pnpm db:studio` - Drizzle Studio, a GUI over your Supabase database
 
 See `AGENTS.md` for the full architecture guide, per-role feature docs, and the
 list of known traps before making non-trivial changes.

@@ -11,7 +11,7 @@ import { focusable, type PressState } from "@/lib/focus";
  *
  * The admin screens were a column of full-width cards: an NGO's name, two
  * pills and a footnote inside an 1100pt rounded rectangle, forty of them down
- * the page. A card is the right shape when a row is a *thing you look at* — a
+ * the page. A card is the right shape when a row is a *thing you look at* - a
  * feed post, an event with a photo. It is the wrong shape when a row is a
  * *record you compare*, which is the entire job here: is this NGO older than
  * that one, which has documents waiting, who has never been reviewed. Cards
@@ -29,9 +29,9 @@ import { focusable, type PressState } from "@/lib/focus";
  * - **No virtualisation, deliberately.** A page is 20 rows and a reviewer
  *   loads a few; a `FlatList` here would reintroduce the nested scroller the
  *   sticky header exists to remove. Mobile keeps the card list, which *is*
- *   virtualised — see each screen's `compact` branch.
+ *   virtualised - see each screen's `compact` branch.
  * - **The table is one `Surface`, and the rows are inside it.** It used to be
- *   naked rows on the page background, separated from the toolbar by a margin —
+ *   naked rows on the page background, separated from the toolbar by a margin -
  *   which read as loose text with rules through it rather than as a table, and
  *   ran the first column hard against the page gutter. Now: `background.card`,
  *   `borderRadius.xl`, the light-mode shadow, and a real 16pt inset so the
@@ -63,11 +63,11 @@ import { focusable, type PressState } from "@/lib/focus";
  *      across the rows.
  *
  *   Narrow windows are handled by dropping columns (`wideOnly`, below 1240) and
- *   below the mobile breakpoint by not rendering a table at all — `ConsoleList`
+ *   below the mobile breakpoint by not rendering a table at all - `ConsoleList`
  *   switches to cards. There is no width at which sideways scrolling was the
  *   right answer.
  * - **Sorting is a server round trip.** A sortable header sets the query, it
- *   does not re-order `items` — the list is paged, so sorting in the browser
+ *   does not re-order `items` - the list is paged, so sorting in the browser
  *   sorts twenty of three hundred rows. `sortKey` is what makes a header
  *   pressable; a column without one is not sortable and shows no affordance.
  */
@@ -98,7 +98,7 @@ export interface TableSort<K extends string> {
  *
  * 64, not the 52 this started at. A console row carries two lines in its
  * identity column (name over email) plus a `StatusPill`, and 52 left the pill
- * touching the hairlines above and below it — technically fitting, visually
+ * touching the hairlines above and below it - technically fitting, visually
  * cramped, and tiring over forty rows. 64 gives the two-line cell real leading
  * and the pill its own air, and still shows ~11 rows on a laptop.
  */
@@ -106,7 +106,7 @@ const ROW_HEIGHT = 64;
 const HEADER_HEIGHT = 44;
 
 /**
- * The card's inner gutter — the padding the rows and the header share.
+ * The card's inner gutter - the padding the rows and the header share.
  *
  * 16, matching `Surface`'s own. Without it the first column started at the
  * card's edge and the trailing column ended at it, which is what made the table
@@ -122,13 +122,13 @@ const TICK_WIDTH = 28;
  *
  * `position: sticky` is a CSS value react-native-web passes straight through;
  * React Native's own `position` type stops at "absolute" | "relative", hence
- * the cast — the same idiom as the desktop rails and the console aside. It
+ * the cast - the same idiom as the desktop rails and the console aside. It
  * needs an opaque background, or the rows show through it as they pass under.
  *
  * **`top` is not 0.** The page's own command bar pins there
  * (`AdminScreen`), so a header at 0 pins *underneath* it and the column labels
  * disappear. The offset comes from `useStickyOffset()`, which the bar publishes
- * after measuring itself — a hard-coded number would drift the moment the
+ * after measuring itself - a hard-coded number would drift the moment the
  * toolbar wraps to two lines on a narrow window.
  */
 const STICKY_HEADER = {
@@ -224,7 +224,7 @@ export function DataTable<T, K extends string>({
 	return (
 		// `width: "100%"` so the flexing column gets the window's slack, and
 		// `minWidth` as the floor that keeps the fixed columns from being crushed
-		// — on a window narrower than the floor the page's own horizontal
+		// - on a window narrower than the floor the page's own horizontal
 		// overflow is the fallback, which is the browser's job, not a nested
 		// scroller's. No `overflow: hidden`: it would make this a scroll
 		// container and kill the sticky header.
@@ -407,7 +407,7 @@ export function DataTable<T, K extends string>({
 
 				return (
 					// The whole row is the pressable, including the tick gutter, so the
-					// hover tint covers the row edge to edge — highlighting only the
+					// hover tint covers the row edge to edge - highlighting only the
 					// inner area left a 16pt dead strip down each side. The tick is a
 					// nested `Pressable` and wins its own presses, so ticking a row
 					// still does not open it.
@@ -442,7 +442,7 @@ export function DataTable<T, K extends string>({
  * Hand-drawn rather than `ui/checkbox.tsx` because it needs a third state:
  * "some of this page is selected", which is what the header shows once the
  * reviewer has ticked four of twenty. A two-state box has to lie about that,
- * and the lie matters — an unchecked header next to four ticked rows reads as
+ * and the lie matters - an unchecked header next to four ticked rows reads as
  * "nothing selected".
  */
 function Tick({

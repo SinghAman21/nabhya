@@ -31,7 +31,7 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsService } from "../organizations/organizations.service";
 import { renderCertificatePdf } from "./certificate-pdf";
 
-/** Unambiguous alphabet — no O/0 or I/1, since codes get read aloud and typed. */
+/** Unambiguous alphabet - no O/0 or I/1, since codes get read aloud and typed. */
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 @Injectable()
@@ -227,7 +227,7 @@ export class CertificatesService {
 		if (certificate.organizationId !== organization.id) {
 			throw new ForbiddenException("That certificate belongs to another NGO.");
 		}
-		// Already revoked — don't rewrite the original timestamp/reason on a
+		// Already revoked - don't rewrite the original timestamp/reason on a
 		// double-tap or retry.
 		if (certificate.revokedAt) return certificate;
 
@@ -294,7 +294,7 @@ export class CertificatesService {
 	/**
 	 * Public verification by code. No auth: the whole point is that a third
 	 * party can check a certificate. Only what's needed to corroborate the
-	 * claim is returned — never contact details.
+	 * claim is returned - never contact details.
 	 */
 	async verify(code: string): Promise<CertificateVerification> {
 		const [row] = await this.db

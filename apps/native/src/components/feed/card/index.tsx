@@ -32,12 +32,12 @@ export { CardKicker } from "./card-meta";
  * which is what every other raised block in the app uses: `background.card`,
  * `borderRadius.xl`, `elevation.card` **in light mode only**, and no border at
  * all. Getting that wrong is most of why this card looked like a foreign
- * object — it carried a 1px hairline outline and a shadow in dark mode, so
+ * object - it carried a 1px hairline outline and a shadow in dark mode, so
  * where the rest of the app has soft, edgeless panels the feed had a column of
  * outlined tiles.
  *
- * It is also near-monochrome. Type hierarchy and arrangement do the work — see
- * `card-body.tsx` for how the four kinds differ — and the brand colour appears
+ * It is also near-monochrome. Type hierarchy and arrangement do the work - see
+ * `card-body.tsx` for how the four kinds differ - and the brand colour appears
  * exactly twice: a need's gauge and the one solid button.
  */
 
@@ -78,7 +78,7 @@ export interface FeedCardActions {
 	onToggleLike?: (item: FeedItem, liked: boolean) => void;
 	onToggleSave?: (item: FeedItem, saved: boolean) => void;
 	/**
-	 * Supplied only where the viewer authored the row — the NGO feed passes it
+	 * Supplied only where the viewer authored the row - the NGO feed passes it
 	 * for that org's own posts. Present means a delete control is drawn in the
 	 * header; absent means the card has no owner affordances at all, which is
 	 * every volunteer's view of it.
@@ -99,7 +99,7 @@ function FeedCardImpl({
 	const { height: windowHeight } = useWindowDimensions();
 	// Breakpoints come from the window, not from the card's own measured width.
 	// Measuring the card and then sizing its media from that measurement is what
-	// produced the web "Maximum update depth exceeded" — see `Media` in
+	// produced the web "Maximum update depth exceeded" - see `Media` in
 	// `card-body.tsx` for the full account.
 	const { isDesktop } = useMedia();
 	const email = useAuthStore((s) => s.email);
@@ -109,7 +109,7 @@ function FeedCardImpl({
 	const [commentsOpen, setCommentsOpen] = useState(false);
 	// One fullscreen viewer per card, shared by post media and cover images. It
 	// lives here (not in the carousel) so "comment" can dismiss the modal first
-	// — a sheet opened underneath a modal would never be seen.
+	// - a sheet opened underneath a modal would never be seen.
 	const [viewer, setViewer] = useState<{
 		media: FeedMedia[];
 		index: number;
@@ -135,7 +135,7 @@ function FeedCardImpl({
 					: "/";
 		try {
 			await Share.share({
-				message: `${headline}${org ? ` — ${org.organizationName}` : ""} on Nabhya\n${Linking.createURL(path)}`,
+				message: `${headline}${org ? ` - ${org.organizationName}` : ""} on Nabhya\n${Linking.createURL(path)}`,
 			});
 			if (email) recordShare.mutate({ item });
 		} catch {
@@ -177,7 +177,7 @@ function FeedCardImpl({
 					// `Surface`'s exact recipe: elevation in light mode, nothing in
 					// dark. A shadow on near-black is invisible, and the hairline
 					// border that used to stand in for it made every row an outlined
-					// tile — the one thing in the app drawn that way.
+					// tile - the one thing in the app drawn that way.
 					...(isDark ? {} : elevation.card),
 				}}
 			>
@@ -241,7 +241,7 @@ function FeedCardImpl({
 /**
  * Memoised on the row and its handlers.
  *
- * Every card re-rendered on every list render before this — and each one holds
+ * Every card re-rendered on every list render before this - and each one holds
  * a media carousel that re-measures, plus a video player per video. With the
  * reaction mutations now writing straight into the cache, a like re-renders the
  * list, so a card that ignores an unchanged `item` is what keeps that from

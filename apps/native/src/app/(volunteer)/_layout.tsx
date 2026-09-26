@@ -55,7 +55,7 @@ export default function VolunteerLayout() {
 						),
 					}}
 				/>
-				{/* Still routable — Activity links into them for the fuller list —
+				{/* Still routable - Activity links into them for the fuller list -
 				    but no longer destinations of their own. */}
 				<Tabs.Screen name="donations" options={{ href: null }} />
 				<Tabs.Screen name="events" options={{ href: null }} />

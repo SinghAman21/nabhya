@@ -9,8 +9,8 @@ import type { AuditLogEntry } from "@/lib/types";
  * One line of the audit log: actor · action · entity · when.
  *
  * Dense on purpose. An operations admin scans this for the one suspension
- * among a hundred approvals, so the only colour is a 6px dot by intent —
- * destructive, constructive, or neither — and everything else is ink.
+ * among a hundred approvals, so the only colour is a 6px dot by intent -
+ * destructive, constructive, or neither - and everything else is ink.
  */
 export function auditTone(action: string): "error" | "success" | "neutral" {
 	if (/REJECT|SUSPEND|DELETE|REVOKE|CANCEL/.test(action)) return "error";

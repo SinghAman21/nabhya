@@ -1,7 +1,7 @@
 export const PAYMENT_PROVIDER_TOKEN = "PAYMENT_PROVIDER";
 
 export interface CheckoutRequest {
-	/** Our donation id — echoed back on the webhook via metadata. */
+	/** Our donation id - echoed back on the webhook via metadata. */
 	referenceId: string;
 	amountMinor: number;
 	currency: string;
@@ -36,7 +36,7 @@ export interface PaymentProvider {
 	createCheckout(input: CheckoutRequest): Promise<CheckoutResult>;
 	/**
 	 * Verifies authenticity and normalises the payload. Receives the *raw* body
-	 * — re-serialising JSON would change bytes and break the signature.
+	 * - re-serialising JSON would change bytes and break the signature.
 	 */
 	parseWebhook(rawBody: string, headers: Record<string, string>): PaymentEvent;
 }

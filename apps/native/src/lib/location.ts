@@ -10,7 +10,7 @@ import { Platform } from "react-native";
  * and give up when `granted` was false. On the web that check **never
  * prompts**: expo-location's web module answers it from
  * `navigator.permissions.query({ name: "geolocation" })`, and a browser that
- * has not been asked yet reports `"prompt"` — which maps to `UNDETERMINED`,
+ * has not been asked yet reports `"prompt"` - which maps to `UNDETERMINED`,
  * so `granted` is `false`. The result was that "Use my current location" in the
  * web app failed instantly with "location is off", having never asked for it.
  *
@@ -20,8 +20,8 @@ import { Platform } from "react-native";
  *
  * ## Why the shape
  *
- * "Denied" and "failed" need different copy — one is a setting the user can
- * change, the other is a retry — and the coordinates are worth keeping even
+ * "Denied" and "failed" need different copy - one is a setting the user can
+ * change, the other is a retry - and the coordinates are worth keeping even
  * when the platform cannot name the place they belong to, so this returns them
  * separately from any reverse geocoding.
  */
@@ -68,7 +68,7 @@ function isDenial(error: unknown): boolean {
  * The street-level part of a reverse-geocoded place, as one line.
  *
  * Reverse geocoding is a platform service and **is not available on the web at
- * all** — `Location.reverseGeocodeAsync` throws there — and on Android it can
+ * all** - `Location.reverseGeocodeAsync` throws there - and on Android it can
  * return an empty array when Play Services' geocoder is unavailable. So every
  * caller must treat "no name" as normal; `nearestCity` in `lib/cities.ts` is
  * the fallback that keeps the feature useful in those cases.

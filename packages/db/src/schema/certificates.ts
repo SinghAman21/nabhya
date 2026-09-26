@@ -54,7 +54,7 @@ export const certificates = pgTable(
 		revokedReason: text("revoked_reason"),
 	},
 	(table) => [
-		// One certificate per application — re-issuing replaces the PDF rather
+		// One certificate per application - re-issuing replaces the PDF rather
 		// than minting a second code for the same participation.
 		uniqueIndex("certificates_application_unique").on(table.applicationId),
 		index("certificates_volunteer_idx").on(table.volunteerId),

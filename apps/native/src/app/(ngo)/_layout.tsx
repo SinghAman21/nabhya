@@ -22,7 +22,7 @@ import { useAuthStore } from "@/store/auth-store";
  * whatever the monitor offers: at 2560px the needs grid drew three cards a
  * metre wide, and the reviews list ran a single line of prose across the whole
  * desk. Capping once here fixes all twelve screens rather than each remembering
- * to cap itself — and the page background stays full-bleed, because it is
+ * to cap itself - and the page background stays full-bleed, because it is
  * painted by the row below, not by this column.
  *
  * 1440 holds the feed's 720pt column plus its 384pt rail with room to spare,
@@ -39,7 +39,7 @@ const CONTENT_MAX_WIDTH = 1440;
  * chain of `flex: 1` ancestors. On the web that chain is only as good as its
  * weakest link: if any ancestor resolves to content height instead of viewport
  * height, the `ScrollView` grows to fit its content, the `View` above it clips
- * at `overflow: hidden`, and the page silently becomes unscrollable — no
+ * at `overflow: hidden`, and the page silently becomes unscrollable - no
  * scrollbar, no wheel response, content simply gone below the fold.
  *
  * Pinning the shell to the viewport removes the chain from the question. `dvh`

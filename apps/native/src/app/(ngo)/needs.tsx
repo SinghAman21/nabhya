@@ -212,7 +212,7 @@ export default function NgoNeeds() {
 }
 
 /**
- * One post. Tapping the card opens its responses — that is the decision this
+ * One post. Tapping the card opens its responses - that is the decision this
  * screen exists for. Edit and Remove sit quietly in the footer.
  */
 function NeedRow({

@@ -36,7 +36,7 @@ interface Draft {
  * field errors back onto the inputs.
  *
  * Passing `event` switches to edit mode, which is the only way to publish a
- * draft — without it a draft is a permanent dead end.
+ * draft - without it a draft is a permanent dead end.
  */
 export function EventFormSheet({
 	visible,

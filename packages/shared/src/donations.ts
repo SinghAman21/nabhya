@@ -10,7 +10,7 @@ export const donationStatusSchema = z.enum([
 
 export type DonationStatus = z.infer<typeof donationStatusSchema>;
 
-/** ₹10 minimum, ₹5,00,000 maximum — both in paise. */
+/** ₹10 minimum, ₹5,00,000 maximum - both in paise. */
 export const MIN_DONATION_MINOR = 1_000;
 export const MAX_DONATION_MINOR = 50_000_000;
 
@@ -18,7 +18,7 @@ export const createDonationSchema = z.object({
 	organizationId: z.uuid(),
 	/**
 	 * Minor units (paise). Integer-only so no float rounding can ever reach the
-	 * ledger — the client sends paise, never rupees.
+	 * ledger - the client sends paise, never rupees.
 	 */
 	amountMinor: z.coerce
 		.number()

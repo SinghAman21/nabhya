@@ -143,7 +143,7 @@ describe("NotificationsService", () => {
 	describe("broadcast", () => {
 		/**
 		 * The audience filter is a correlated subquery written with interpolated
-		 * Drizzle columns — the exact construct that has silently matched nothing
+		 * Drizzle columns - the exact construct that has silently matched nothing
 		 * elsewhere in this codebase. These assertions are about the SQL, not the
 		 * business rule.
 		 */

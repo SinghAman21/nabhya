@@ -12,7 +12,7 @@ import { focusable } from "@/lib/focus";
  * another.
  *
  * Its own file because it is the largest single thing in the composer and the
- * least coupled to it — it takes a `ComposerMedia` and reports a removal, and
+ * least coupled to it - it takes a `ComposerMedia` and reports a removal, and
  * knows nothing about types, urgency or which endpoint the post is bound for.
  */
 
@@ -25,7 +25,7 @@ export const TILE = 88;
 
 /**
  * One attachment. Carries its position (order is what the carousel shows), its
- * kind, and its own upload state — a fill bar with a real percentage rather
+ * kind, and its own upload state - a fill bar with a real percentage rather
  * than one spinner for the whole batch, because "it is working" and "it is
  * three quarters through the second video" are different pieces of news.
  *
@@ -102,7 +102,7 @@ export function MediaTile({
 				</View>
 			)}
 
-			{/* Position. Order is meaningful — it is `sortOrder` on the server. */}
+			{/* Position. Order is meaningful - it is `sortOrder` on the server. */}
 			<View
 				style={{
 					position: "absolute",

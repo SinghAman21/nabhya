@@ -31,7 +31,7 @@ interface FormFieldProps
 	 * Not a nicety: a masked field with no reveal is the single biggest cause of
 	 * a failed sign-in that the user cannot explain, because a phone keyboard's
 	 * autocorrect, a stray caps-lock and a mistyped character are all invisible.
-	 * Pass this instead of `secureTextEntry` — the toggle owns that prop.
+	 * Pass this instead of `secureTextEntry` - the toggle owns that prop.
 	 */
 	revealable?: boolean;
 }

@@ -1,4 +1,4 @@
-# apps/web — not scaffolded yet
+# apps/web - not scaffolded yet
 
 There is **no web app**. This directory holds only this guide; do not import from it,
 add it to CI, or "fix" its absence from the workspace. `notes.md` at the repo root
@@ -20,13 +20,13 @@ If you are asked to scaffold it:
   Bearer token; on web the token lives in localStorage. Mirror the native client's
   force-logout-on-401 interceptor behaviour (see `apps/native/src/lib/api/auth.ts`
   and `client.ts` for the pattern to follow).
-- Talk to the existing API only (`/api`, port 3000, CORS via `CORS_ORIGIN` — add
+- Talk to the existing API only (`/api`, port 3000, CORS via `CORS_ORIGIN` - add
   the web origin there). Do not add web-only endpoints without wiring them into the
   server's conventions (guards, Zod pipes, `Paginated<T>`, org scoping from the
-  token — see `apps/server/AGENTS.md`).
+  token - see `apps/server/AGENTS.md`).
 - Good first scope: the superadmin console (verification queues, moderation, audit
-  log) plus SEO-friendly public pages — NGO profiles, event pages, and the
+  log) plus SEO-friendly public pages - NGO profiles, event pages, and the
   certificate verification page (`GET /api/certificates/:code/verify` is public by
   design).
 - Only after a web target exists does browser automation (Playwright) become
-  fair game — and still only when the user explicitly asks for it.
+  fair game - and still only when the user explicitly asks for it.

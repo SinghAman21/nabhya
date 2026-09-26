@@ -176,13 +176,13 @@ interface AdminActivityItem {
 
 The backend returns a **flat paginated list**, but each item includes:
 
-- `kind` — frontend can group/filter by activity type
-- `groupKey` — frontend can group by day
-- `status` — frontend can group by state, e.g. pending/accepted/completed
-- `actor` — who did it
+- `kind` - frontend can group/filter by activity type
+- `groupKey` - frontend can group by day
+- `status` - frontend can group by state, e.g. pending/accepted/completed
+- `actor` - who did it
 
-- `subject` — what the action was about
-- `organization` — useful on volunteer activity timelines
+- `subject` - what the action was about
+- `organization` - useful on volunteer activity timelines
 
 This means frontend can render it as:
 

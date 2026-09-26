@@ -45,7 +45,7 @@ export default function SignUp() {
 			}
 			router.replace("/");
 		} catch (error) {
-			// Inline, above the button — see the same note in `login.tsx`.
+			// Inline, above the button - see the same note in `login.tsx`.
 			setFailure(
 				authErrorCopy(
 					apiErrorMessage(error, "Check your details and try again."),
@@ -80,7 +80,7 @@ export default function SignUp() {
 				Create your account
 			</H2>
 			<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
-				Volunteer, or register your NGO — you'll choose on the next step.
+				Volunteer, or register your NGO - you'll choose on the next step.
 			</Body>
 
 			<FormField

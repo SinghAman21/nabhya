@@ -26,7 +26,7 @@ import { adminApi, queryKeys, queryScopes } from "@/lib/api";
  *
  * Keyed by the window so switching 7/30/90 is a cache hit after the first look
  * rather than a refetch, and `placeholderData: keepPreviousData` holds the last
- * chart up while the next window loads — a skeleton flash on a chart that is
+ * chart up while the next window loads - a skeleton flash on a chart that is
  * about to be nearly identical is worse than a moment of stale data, and it
  * jumps the page's layout.
  */
@@ -103,7 +103,7 @@ export function useAuditLogs(query: Partial<AuditLogQuery> = {}) {
  * The cross-organization verification queues.
  *
  * The dossier screens show one NGO's documents at a time; these answer the
- * other question a reviewer has — "what is waiting on me right now?" — without
+ * other question a reviewer has - "what is waiting on me right now?" - without
  * opening every organization in turn.
  */
 export function useOrgDocumentQueue(query: Partial<DocumentQueueQuery> = {}) {
@@ -211,7 +211,7 @@ export function useReviewDocument(kind: "organization" | "user") {
  * Approving or rejecting a whole selection.
  *
  * The server reports per-document outcomes rather than a count, so the caller
- * can tell the reviewer which rows are still waiting — see
+ * can tell the reviewer which rows are still waiting - see
  * `bulkReviewDocumentsSchema` in `@nabhya/shared`. Invalidating the whole
  * `admin` scope is right here even though the single-document path does the
  * same: a batch can move an NGO's own verification state and re-derive several

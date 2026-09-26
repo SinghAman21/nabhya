@@ -10,7 +10,7 @@ import { NestFactory } from "@nestjs/core";
  * The dev runner (tsx) and the bundler both use esbuild, which does not
  * implement `emitDecoratorMetadata`. Without it `design:paramtypes` is
  * undefined, Nest sees a class with no declared dependencies, constructs it
- * with zero arguments, and every service lands as `undefined` — no boot error,
+ * with zero arguments, and every service lands as `undefined` - no boot error,
  * just a 500 on the first request that touches it.
  *
  * That is why every constructor parameter in this app carries an explicit
@@ -30,7 +30,7 @@ function walk(dir: string): string[] {
 		// Skip specs: they import vitest, which only exists inside the runner.
 		if (full.endsWith(".spec.ts") || full.endsWith(".test.ts")) return [];
 		// Skip the entrypoint: importing it runs bootstrap(), which binds port
-		// 3000 — so this script could only ever run with the dev server stopped,
+		// 3000 - so this script could only ever run with the dev server stopped,
 		// and left a real listening server behind when it did.
 		if (full === join(SRC, "index.ts")) return [];
 		return full.endsWith(".ts") ? [full] : [];
@@ -66,7 +66,7 @@ async function main() {
 	// the server env the moment it loads, so the placeholders have to be in
 	// place first. Static imports would be hoisted (and reordered by the import
 	// sorter), which would put validation before the defaults and make this
-	// script unrunnable without a developer's .env — the DI wiring it
+	// script unrunnable without a developer's .env - the DI wiring it
 	// checks has nothing to do with real credentials.
 	await import("../test/setup-env");
 	const { AppModule } = await import("../src/app/app.module");
@@ -85,7 +85,7 @@ async function main() {
 		try {
 			instance = app.get(target) as Record<string, unknown>;
 		} catch {
-			// Not registered in the graph (e.g. a DTO-ish helper) — nothing to check.
+			// Not registered in the graph (e.g. a DTO-ish helper) - nothing to check.
 			continue;
 		}
 		if (!instance || typeof instance !== "object") continue;

@@ -39,14 +39,14 @@ import { verticalScrollbar } from "@/lib/scroll";
 /*
  * Everything the volunteer has done, in one timeline.
  *
- * This replaces two tabs — "Donations" (items | money) and the "My
- * applications" half of "Events" — plus the notifications screen, which were
+ * This replaces two tabs - "Donations" (items | money) and the "My
+ * applications" half of "Events" - plus the notifications screen, which were
  * four separate lists of the same thing: what I did, and what happened to it.
  * A volunteer's question is never "show me my pledges"; it is "I gave 20
  * blankets, did it land, and where is my certificate".
  *
  * Known limit: five endpoints, five first pages, merged and sorted here. That is
- * correct for the volumes one volunteer generates and wrong in general — a true
+ * correct for the volumes one volunteer generates and wrong in general - a true
  * merged cursor is server work, tracked as step 1 in `ui-redesign.md`.
  */
 
@@ -120,7 +120,7 @@ export default function Activity() {
 					? { next: "Waiting for the NGO to review" }
 					: {}),
 				...(pledge.status === "ACCEPTED"
-					? { next: "Accepted — arrange handover with the NGO" }
+					? { next: "Accepted - arrange handover with the NGO" }
 					: {}),
 			});
 		}
@@ -165,7 +165,7 @@ export default function Activity() {
 					? { next: "Waiting for the NGO to review" }
 					: {}),
 				...(application.status === "ACCEPTED"
-					? { next: "You're in — turn up and get marked present" }
+					? { next: "You're in - turn up and get marked present" }
 					: {}),
 				href: `/events/${application.event.id}`,
 			});
@@ -260,7 +260,7 @@ export default function Activity() {
 					}
 					description={
 						filter === "ALL"
-							? "Pledge an item or apply to an event from Home. Every step — reviewed, accepted, certificate issued — lands here."
+							? "Pledge an item or apply to an event from Home. Every step - reviewed, accepted, certificate issued - lands here."
 							: filter === "ALERTS"
 								? "Updates from NGOs about your pledges and applications arrive here."
 								: "Try another filter, or see everything under All."
@@ -336,7 +336,7 @@ export default function Activity() {
 /**
  * One event in the timeline. The status pill says where it stands; `next` says
  * what the volunteer is waiting on, which is the part that was missing entirely
- * — a pledge could sit at PENDING forever with nothing on screen explaining
+ * - a pledge could sit at PENDING forever with nothing on screen explaining
  * that the NGO, not the volunteer, owes the next move.
  */
 function TimelineRow({
@@ -431,7 +431,7 @@ const DAY_LABEL = new Intl.DateTimeFormat("en-IN", {
 	year: "numeric",
 });
 
-/** Today / Yesterday / a date — so a scroll reads as a history, not a list. */
+/** Today / Yesterday / a date - so a scroll reads as a history, not a list. */
 function groupByDay(
 	entries: Entry[],
 ): Array<{ label: string; entries: Entry[] }> {

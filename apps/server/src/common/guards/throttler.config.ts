@@ -9,7 +9,7 @@ import type { ThrottlerModuleOptions } from "@nestjs/throttler";
  * into the strict bucket with @Throttle({ strict: { ... } }).
  *
  * Keyed by IP by default. Behind a proxy the app must trust the forwarded
- * header or every request appears to come from one address — see main bootstrap.
+ * header or every request appears to come from one address - see main bootstrap.
  */
 export const throttlerConfig: ThrottlerModuleOptions = {
 	throttlers: [

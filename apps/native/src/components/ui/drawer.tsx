@@ -18,7 +18,7 @@ import { verticalScrollbar } from "@/lib/scroll";
  * The slide-over panel.
  *
  * Same contract as `Sheet` (title, subtitle, body, pinned footer) and the same
- * header — screens never know which one rendered. On desktop web, where a
+ * header - screens never know which one rendered. On desktop web, where a
  * bottom sheet sliding up a 1400px window reads as a mistake and there is
  * horizontal space to spend, this docks a panel to the right edge instead:
  * the feed stays visible on the left, the decision happens on the right, and
@@ -35,8 +35,8 @@ export interface DrawerProps {
 	footer?: React.ReactNode;
 	/**
 	 * Widens the desktop panel from 440 to 520, and the narrow-web dialog with
-	 * it. For a body that is not a column of short fields — a writing canvas, a
-	 * strip of media tiles — where 440 crams the measure.
+	 * it. For a body that is not a column of short fields - a writing canvas, a
+	 * strip of media tiles - where 440 crams the measure.
 	 */
 	wide?: boolean;
 	/**
@@ -44,7 +44,7 @@ export interface DrawerProps {
 	 * and a decision, read side by side with the list it was opened from. At 520
 	 * an org's two-column fact rows wrap and its document cards stack their own
 	 * buttons; at 720 both sit flat, and there is still 600px of list visible on
-	 * a 1440 window — which is the whole reason a reviewer gets a panel instead
+	 * a 1440 window - which is the whole reason a reviewer gets a panel instead
 	 * of a page.
 	 */
 	xl?: boolean;
@@ -62,8 +62,8 @@ export function Drawer(props: DrawerProps) {
 				title={title}
 				subtitle={subtitle}
 				footer={footer}
-				// `xl` has no meaning on a phone — the sheet is the window's width
-				// either way — so it collapses into the sheet's own `wide`.
+				// `xl` has no meaning on a phone - the sheet is the window's width
+				// either way - so it collapses into the sheet's own `wide`.
 				wide={wide || xl}
 			>
 				{children}

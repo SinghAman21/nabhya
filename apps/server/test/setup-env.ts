@@ -3,7 +3,7 @@
  *
  * Importing almost anything from `common/` reaches `@nabhya/db`, which
  * validates the server env at module load. Without this the whole suite fails
- * to import on a machine that has no `.env` — meaning the tests would
+ * to import on a machine that has no `.env` - meaning the tests would
  * only ever run for whoever happened to have secrets lying around.
  *
  * None of these values are used: integration specs talk to PGlite, and the
@@ -19,7 +19,7 @@ const TEST_ENV: Record<string, string> = {
 };
 
 for (const [key, value] of Object.entries(TEST_ENV)) {
-	// Never clobber a real value — CI may legitimately set NODE_ENV.
+	// Never clobber a real value - CI may legitimately set NODE_ENV.
 	process.env[key] ??= value;
 }
 

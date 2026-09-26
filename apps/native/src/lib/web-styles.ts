@@ -5,13 +5,13 @@ import { darkColors, lightColors } from "@/constants/design-system";
  * The handful of web rules that cannot be expressed in React Native styles,
  * injected at runtime.
  *
- * **Why not `global.css`.** Two attempts at the scrollbar lived there — one
- * inside `@layer base`, one outside it — and neither reached the browser: raw
+ * **Why not `global.css`.** Two attempts at the scrollbar lived there - one
+ * inside `@layer base`, one outside it - and neither reached the browser: raw
  * `::-webkit-scrollbar` and attribute selectors do not survive NativeWind's
  * compilation of that stylesheet on the way to the web bundle. A `<style>`
  * appended to `<head>` cannot be dropped by a build step, is last in document
- * order, and lets colours come from `design-system.ts` — the actual source of
- * truth — rather than from a CSS variable that may not have been emitted.
+ * order, and lets colours come from `design-system.ts` - the actual source of
+ * truth - rather than from a CSS variable that may not have been emitted.
  *
  * Called by `ThemeProvider`, which is the only place that knows the resolved
  * colour scheme.
@@ -22,7 +22,7 @@ const STYLE_ID = "nabhya-web-styles";
 /**
  * Above react-native-web's `Modal`, which it hosts at `zIndex: 9999`.
  *
- * Everything that portals — `DropdownMenu`, `Select` — is Radix underneath on
+ * Everything that portals - `DropdownMenu`, `Select` - is Radix underneath on
  * web and lands in `document.body`, so a menu opened from a `Sheet` competes
  * with that modal directly. See `popperRule` for why this has to be CSS.
  */
@@ -51,7 +51,7 @@ function withAlpha(hex: string, alpha: number) {
  * - The positioned element is Radix's own wrapper div, marked
  *   `data-radix-popper-content-wrapper`. `@radix-ui/react-popper` reads the
  *   *computed* z-index off the content and copies it onto that wrapper as an
- *   **inline** style — so with `z-50` winning above, the wrapper is pinned at
+ *   **inline** style - so with `z-50` winning above, the wrapper is pinned at
  *   50 against the modal's 9999 and the menu renders behind the sheet.
  *
  * A stylesheet declaration marked `!important` outranks that inline style,
@@ -72,8 +72,8 @@ const popperRule = `
  *    scrollbar and into the legacy one, stepper arrows included.** The arrows
  *    are not drawn by anything here; they are what is left when a custom
  *    scrollbar does not suppress them. `-button` must be zeroed on every axis.
- * 2. `scrollbar-width: none` — what React Native's
- *    `showsVerticalScrollIndicator={false}` compiles to — still wins over all
+ * 2. `scrollbar-width: none` - what React Native's
+ *    `showsVerticalScrollIndicator={false}` compiles to - still wins over all
  *    of this, by design. That is how the sidebar and the desktop rail stay
  *    bare while content panes get a thumb. See `lib/scroll.ts`.
  */

@@ -4,7 +4,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { useOnboardingStore } from "@/store/onboarding-store";
 
 /**
- * Signs out properly — which is more than clearing local state.
+ * Signs out properly - which is more than clearing local state.
  *
  * The store's `signOut` only drops the token and the Zustand slice. Used on
  * its own it leaves the Supabase Auth session alive and every cached query in

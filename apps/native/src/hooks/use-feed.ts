@@ -75,7 +75,7 @@ export function useFeed(filters: FeedFilters, enabled = true) {
 /**
  * Feed items the caller has saved (the reaction-bar bookmark on a card, not
  * the NGO-level bookmark behind `useToggleBookmark` / `/bookmarks`). One
- * endpoint, so — unlike `useFeed` — there is no lens to pick; it still takes
+ * endpoint, so - unlike `useFeed` - there is no lens to pick; it still takes
  * the shared filters so a future "Saved → Needs only" chip has somewhere to
  * plug in. Included in the same `queryKeys.feed` family as the other lenses,
  * so liking/saving/unsaving anywhere (`useFeedReaction`'s
@@ -108,7 +108,7 @@ export function useSavedFeed(filters: Omit<FeedFilters, "tab"> = {}) {
  * Publish a post: upload the attachments, then create the row.
  *
  * The two steps are one mutation because they are one user action and they
- * fail as one — a post created without its media would be a silent
+ * fail as one - a post created without its media would be a silent
  * half-success, and media uploaded without a post is orphaned bytes. The
  * media list is threaded through so the composer's tiles can show real
  * per-file progress; `onMediaChange` is called from inside the upload loop.
@@ -191,7 +191,7 @@ type FeedSnapshot = [readonly unknown[], CachedFeed | undefined];
  * Rewrites one row everywhere it is cached, and hands back what was there.
  *
  * A row is in as many caches as there are lenses and filter combinations the
- * reader has visited — liking something in For You has to move the same row in
+ * reader has visited - liking something in For You has to move the same row in
  * Trending, or switching tabs undoes the tap on screen. `queryScopes.feed` is
  * `["feed"]`, which also matches the comment queries (`["feed","comments",…]`),
  * so the page shape is checked rather than assumed.
@@ -272,7 +272,7 @@ function withReaction(
  *
  * Applied optimistically and **not** invalidated afterwards, which is a
  * deliberate reversal of what this did before. Invalidating `["feed"]` on
- * every tap refetched every page of every lens and re-ran the ranker — so a
+ * every tap refetched every page of every lens and re-ran the ranker - so a
  * like could reorder the list, or drop the row the thumb was still on, and the
  * filled heart only appeared once the network came back. The server returns
  * the same two booleans this function computes, so there is nothing to
@@ -302,7 +302,7 @@ export function useFeedReaction(action: "like" | "save") {
  * Record a share or an impression. Neither shows up anywhere in the UI (no
  * screen renders a share count, and an impression is invisible by
  * definition), so unlike `useFeedReaction` this must not invalidate the feed
- * scope — impressions fire once per card per scroll (`onViewableItemsChanged`
+ * scope - impressions fire once per card per scroll (`onViewableItemsChanged`
  * dedupes per session, not per request), and invalidating an active
  * `useInfiniteQuery` refetches every page already loaded. That refetch storm
  * is what was blowing through the default rate-limit bucket on `/feed/*`

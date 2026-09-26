@@ -88,7 +88,7 @@ const COPY = [
 	},
 	{
 		title: "Your team and presence",
-		lede: "All optional — but a logo and a founding year are what make a stranger believe you exist.",
+		lede: "All optional - but a logo and a founding year are what make a stranger believe you exist.",
 	},
 	{
 		title: "Check and create",
@@ -102,7 +102,7 @@ const COPY = [
  * ## What changed, and why
  *
  * **The dead step is gone.** Step 3 used to be a read-only list of the
- * documents verification would later ask for — a screen with nothing to do on
+ * documents verification would later ask for - a screen with nothing to do on
  * it, in the middle of a five-step form, because uploads genuinely cannot
  * happen before the organisation row exists. The same information now arrives
  * on the completion screen, *after* the org is created, where it is followed by
@@ -120,7 +120,7 @@ const COPY = [
  * had almost nothing to rank.
  *
  * **The draft is a draft.** Values lived in `auth-store.orgProfile`, which is
- * persisted and never cleared — a finished NGO carried a copy of its own
+ * persisted and never cleared - a finished NGO carried a copy of its own
  * registration number in secure storage forever. They now live in
  * `onboarding-store`, cleared on success.
  */
@@ -228,7 +228,7 @@ export default function OrgOnboarding() {
 		const name = draft.orgName;
 		const branding = { logo: draft.logoPreview, cover: draft.coverPreview };
 
-		// `body`, not `result.data` — see the note in the volunteer wizard: the
+		// `body`, not `result.data` - see the note in the volunteer wizard: the
 		// parse validates, the server normalises. `description` is the field that
 		// would otherwise be posted as `null` and rejected.
 		complete.mutate(body, {
@@ -250,7 +250,7 @@ export default function OrgOnboarding() {
 	 * Neither can be uploaded during the wizard: `ORG_LOGO` and `ORG_COVER` keys
 	 * are derived from the caller's organization, which does not exist until the
 	 * request above succeeds (see the note in `photo-field.tsx`). So both files
-	 * are held as local URIs through the wizard and stored here — upload the
+	 * are held as local URIs through the wizard and stored here - upload the
 	 * bytes, then PATCH the returned keys onto the organization in one write.
 	 *
 	 * A failure here is not a failed signup: the organisation exists either way,
@@ -295,7 +295,7 @@ export default function OrgOnboarding() {
 	// sets `isOnboarded`, and checking that first would replace the "what
 	// happens next" screen with a redirect the instant the org was created.
 	if (!createdName) {
-		// Client-side only, and UX rather than security — the server's `@Roles`
+		// Client-side only, and UX rather than security - the server's `@Roles`
 		// and its one-org-per-account conflict are the real gates. This stops a
 		// volunteer who deep-links to `/(onboarding)` on the web from filling in
 		// a five-step NGO form that can only end in a 403, and stops an NGO that
@@ -318,7 +318,7 @@ export default function OrgOnboarding() {
 				{/*
 				 * Scrollable, not a centred flex box: this screen carries an icon, a
 				 * heading, three numbered lines, two buttons and a footnote, which
-				 * overflows a short phone — and a branch that can overflow without a
+				 * overflows a short phone - and a branch that can overflow without a
 				 * scroller draws its content into `overflow: hidden` (AGENTS.md →
 				 * Scrolling on web). `flexGrow` keeps it optically centred while
 				 * there is room.
@@ -357,7 +357,7 @@ export default function OrgOnboarding() {
 									variant="ghost"
 									onPress={() => router.replace("/(ngo)/feed")}
 								>
-									Later — take me to my dashboard
+									Later - take me to my dashboard
 								</Button>
 							</>
 						}
@@ -376,7 +376,7 @@ export default function OrgOnboarding() {
 						color="quaternary"
 						style={{ marginTop: spacing[6], textAlign: "center" }}
 					>
-						Until you're verified you can still create events and needs — they
+						Until you're verified you can still create events and needs - they
 						stay private until a reviewer approves your documents.
 					</Caption>
 				</ScrollView>
@@ -441,7 +441,7 @@ export default function OrgOnboarding() {
 					loading={complete.isPending}
 					{...(step === 2 && draft.categoryIds.length === 0
 						? {
-								note: "No causes means no interest matching — you can still continue.",
+								note: "No causes means no interest matching - you can still continue.",
 							}
 						: {})}
 				/>
@@ -517,7 +517,7 @@ function stepOwning(field: string | undefined): number {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Step 1 — the organisation                                                  */
+/* Step 1 - the organisation                                                  */
 /* -------------------------------------------------------------------------- */
 
 function OrgStep({
@@ -590,7 +590,7 @@ function OrgStep({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Step 2 — location                                                          */
+/* Step 2 - location                                                          */
 /* -------------------------------------------------------------------------- */
 
 function LocationStep({
@@ -609,7 +609,7 @@ function LocationStep({
 	 * Fill the address and pincode from what the location control worked out.
 	 *
 	 * Only into empty fields, never over something typed: having just been told
-	 * where someone is, asking them to type it again is rude — but overwriting
+	 * where someone is, asking them to type it again is rude - but overwriting
 	 * an address they entered carefully with a geocoder's guess is worse. A
 	 * detected line stays editable, which is the point of putting it in the
 	 * field rather than offering it as a suggestion.
@@ -675,7 +675,7 @@ function LocationStep({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Step 3 — causes                                                            */
+/* Step 3 - causes                                                            */
 /* -------------------------------------------------------------------------- */
 
 function CausesStep({
@@ -729,7 +729,7 @@ function CausesStep({
 						{draft.categoryIds.length === 0
 							? `Pick up to ${MAX_CAUSES}. Volunteers who follow a cause see NGOs that work on it.`
 							: draft.categoryIds.length >= MAX_CAUSES
-								? `${MAX_CAUSES} of ${MAX_CAUSES} chosen — deselect one to swap.`
+								? `${MAX_CAUSES} of ${MAX_CAUSES} chosen - deselect one to swap.`
 								: `${draft.categoryIds.length} of ${MAX_CAUSES} chosen`}
 					</Caption>
 					{errors.categoryIds ? (
@@ -762,7 +762,7 @@ function CausesStep({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Step 4 — team and presence                                                 */
+/* Step 4 - team and presence                                                 */
 /* -------------------------------------------------------------------------- */
 
 function TeamStep({
@@ -868,7 +868,7 @@ function TeamStep({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Step 5 — review                                                            */
+/* Step 5 - review                                                            */
 /* -------------------------------------------------------------------------- */
 
 function ReviewStep({
@@ -914,7 +914,7 @@ function ReviewStep({
 						label: "Coordinates",
 						value:
 							draft.latitude !== undefined && draft.longitude !== undefined
-								? "Saved — you'll appear in “near me”"
+								? "Saved - you'll appear in “near me”"
 								: "Not saved",
 						onEdit: () => onEdit(1),
 					},

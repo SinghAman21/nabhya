@@ -59,7 +59,7 @@ export default function RootLayout() {
 							<Stack.Screen name="(ngo)" />
 							<Stack.Screen name="(volunteer)" />
 							<Stack.Screen name="(admin)" />
-							{/* Public — browsable without an account */}
+							{/* Public - browsable without an account */}
 							<Stack.Screen name="events" />
 							<Stack.Screen name="certificates" />
 							<Stack.Screen name="notifications" />
@@ -75,7 +75,7 @@ export default function RootLayout() {
 						</Stack>
 						<PortalHost />
 						{/* Toasts and confirmations. Every open sheet mounts its own
-						    host, which takes over while it is up — see the host-stack
+						    host, which takes over while it is up - see the host-stack
 						    note in `ui/overlay.tsx`. */}
 						<OverlayHost />
 					</View>

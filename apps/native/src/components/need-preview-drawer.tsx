@@ -15,7 +15,7 @@ import type { FeedNeedItem } from "@/lib/types";
  *
  * Pledging is volunteers-only on the server (`POST /needs/:id/pledges` is
  * `@Roles("volunteer")`), so for an organisation this used to push the whole
- * NGO page — a long detour for a glance. Now the need previews in place: the
+ * NGO page - a long detour for a glance. Now the need previews in place: the
  * ask, its progress, who posted it with a follow action, and one button into
  * the full NGO page for the rare case that is actually wanted.
  */

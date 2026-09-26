@@ -11,7 +11,7 @@ import { roles, userRoles, users } from "./schema/users";
 
 /**
  * Demo content so the app looks lived-in: six verified NGOs across four cities
- * with needs, offers, upcoming events and updates. Re-runnable — everything it
+ * with needs, offers, upcoming events and updates. Re-runnable - everything it
  * creates is tagged (`DEMO-` registration numbers, `@demo.nabhya.org` owners)
  * and is removed before being re-inserted, so it never duplicates and never
  * touches real rows.

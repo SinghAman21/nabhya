@@ -24,7 +24,7 @@ import { useAppTheme } from "@/hooks/use-app-theme";
  * This matters beyond render cost: the returned object gets spread into props
  * and passed to navigators. Returning a fresh object every render made
  * `screenOptions` a new value on every pass, which React Navigation treats as a
- * change, re-renders for, and so produces a new value again — "Maximum update
+ * change, re-renders for, and so produces a new value again - "Maximum update
  * depth exceeded", reported against whichever navigator happened to be nearest.
  */
 export function useTheme() {

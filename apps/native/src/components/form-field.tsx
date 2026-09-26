@@ -6,7 +6,7 @@ import { useTheme } from "@/hooks/use-theme";
  * The one form-field recipe for the NGO screens and sheets.
  *
  * Label above the input, `spacing[1.5]` between them, `spacing[5]` between
- * fields, and the error drawn inline under the field in the tone's ink — never
+ * fields, and the error drawn inline under the field in the tone's ink - never
  * in `error.main`, which is a fill colour and unreadable as 13px type.
  */
 export function Field({

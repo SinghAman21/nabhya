@@ -8,8 +8,8 @@ import { useMe } from "@/hooks/use-profile";
  *
  * Matches `useMe`'s user id against `useOrgTeam`'s membership rows
  * (`userId`, falling back to the nested `user.id`). The server stays the real
- * gate — `requireOrgPermission` in `organizations.service.ts` 403s on every
- * guarded route — so an unknown role (still loading, query error, or no
+ * gate - `requireOrgPermission` in `organizations.service.ts` 403s on every
+ * guarded route - so an unknown role (still loading, query error, or no
  * membership row) denies: `can()` returns false and the UI hides or disables
  * the control instead of letting the tap fail.
  */

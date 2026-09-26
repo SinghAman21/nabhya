@@ -56,8 +56,8 @@ describe("UploadsService", () => {
 
 			// The client never proposes a key; it is derived from the token. The
 			// document prefixes carry a readable folder between the prefix and
-			// the owner id — `<bucket>/user-documents/<label>-<date>/<userId>/…`
-			// — so the owner segment is asserted through `parseStorageKey`,
+			// the owner id - `<bucket>/user-documents/<label>-<date>/<userId>/…`
+			// - so the owner segment is asserted through `parseStorageKey`,
 			// which is the function authorisation actually uses, rather than by
 			// re-deriving the layout here and drifting from it.
 			expect(
@@ -202,7 +202,7 @@ describe("UploadsService", () => {
 			// A *well-formed* key aimed at the victim's folder: the point of this
 			// test is the ownership check, so the key has to survive parsing.
 			// Built without the bucket prefix it was merely malformed, which is
-			// a different refusal — covered by the test above — and told us
+			// a different refusal - covered by the test above - and told us
 			// nothing about whether ownership is enforced.
 			const forged = `${NGO_VERIFICATION_BUCKET}/user-documents/someone-070926/${victim.id}/anything.pdf`;
 
@@ -234,7 +234,7 @@ describe("UploadsService", () => {
 			);
 
 			// A signed PUT cannot cap body size, so oversized objects are caught
-			// here — simulate one landing in storage.
+			// here - simulate one landing in storage.
 			await storage.putObject({
 				key: ticket.key,
 				body: new Uint8Array(11 * 1024 * 1024),

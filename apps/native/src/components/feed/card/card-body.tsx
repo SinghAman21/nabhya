@@ -11,7 +11,7 @@ import { EventDate, EventFacts, eventStart, NeedFacts } from "./card-facts";
 import { CardKicker } from "./card-meta";
 
 /**
- * The body — and the one place the four kinds are genuinely different.
+ * The body - and the one place the four kinds are genuinely different.
  *
  * They are told apart by **arrangement**, not colour. An earlier pass gave each
  * kind a tone and tinted its pill, its facts panel and its button to match,
@@ -24,7 +24,7 @@ import { CardKicker } from "./card-meta";
  * - **A story leads with its picture** and sets its title a step larger.
  * - **A need ends with its gauge**, so "how far along" and the action are read
  *   together.
- * - **An update is just words** — which is what makes the other three legible
+ * - **An update is just words** - which is what makes the other three legible
  *   as *not* that.
  *
  * Because the shape carries the distinction, the kind label above the title was
@@ -34,7 +34,7 @@ import { CardKicker } from "./card-meta";
 type CardLayout = "need" | "event" | "story" | "update";
 
 /**
- * A row's arrangement. Only `post` is renamed — an update is what it is to a
+ * A row's arrangement. Only `post` is renamed - an update is what it is to a
  * reader, and "post" is the table it came out of.
  *
  * This was a `kind.ts` module returning a label, an icon and a layout. The
@@ -49,7 +49,7 @@ function cardLayout(item: FeedItem): CardLayout {
 const CLAMP_LINES = { story: 5, other: 3 } as const;
 /**
  * Roughly how many characters fit in a clamped line at this ramp step. Used
- * only to decide whether to *offer* "Read more" — over-offering it on a body
+ * only to decide whether to *offer* "Read more" - over-offering it on a body
  * that happens to fit is a smaller failure than silently clipping one that does
  * not, which is what a flat 220-character threshold did to every need.
  */
@@ -98,7 +98,7 @@ function resolveBody(item: FeedItem): ResolvedBody {
  *
  * This is the fix for "Maximum update depth exceeded" on web. The card shell
  * used to carry the `onLayout` and derive the media's height ceiling from its
- * own measured width — so width set height, height set the page's scroll
+ * own measured width - so width set height, height set the page's scroll
  * extent, the scrollbar's appearance set the width back, and react-native-web's
  * `ResizeObserver` ran that circle until React gave up. Here the observed box
  * is a plain wrapper whose width comes from the parent's fixed padding and
@@ -150,7 +150,7 @@ export function CardBody({
 	expanded: boolean;
 	onToggleExpand: () => void;
 	mediaMaxHeight: number;
-	/** False while something else is playing this media — see the card shell. */
+	/** False while something else is playing this media - see the card shell. */
 	mediaActive: boolean;
 	onOpenViewer: (media: FeedMedia[], index: number) => void;
 }) {

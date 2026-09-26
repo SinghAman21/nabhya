@@ -7,13 +7,13 @@ import type { OrgVerificationStatus } from "@/lib/types/domain";
  *
  * Three surfaces render this: the dashboard banner, the profile banner and the
  * "Verification" row's trailing state. Each of them used to carry its own
- * chain of nested ternaries over the same four statuses, so the copy drifted —
+ * chain of nested ternaries over the same four statuses, so the copy drifted -
  * the row said "Not started" where the banner said "Get verified to go
  * public", and a wording change meant finding all three.
  *
  * `tone`/`title`/`description` are the banner; `label` is the row. The
  * `VERIFIED` case exists for the row and for `(ngo)/verification.tsx`'s success
- * banner — the two profile banners are hidden once verified, because a notice
+ * banner - the two profile banners are hidden once verified, because a notice
  * that congratulates you every visit is a notice you stop reading.
  */
 export interface OrgVerificationCopy {
@@ -77,7 +77,7 @@ export interface OrgDocumentSpec {
 }
 
 /**
- * What review actually waits on. Both of these, and nothing else — the two
+ * What review actually waits on. Both of these, and nothing else - the two
  * below are accelerants, not conditions.
  */
 export const ORG_REQUIRED_DOCUMENTS: OrgDocumentSpec[] = [

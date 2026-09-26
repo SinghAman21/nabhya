@@ -86,7 +86,7 @@ export function FeedCommentsSheet({
 			 * All three of these are the shared screen states, not hand-rolled
 			 * blocks. They used to be a bare "Loading comments..." caption, a
 			 * two-line error and a left-aligned empty message, each padded by hand
-			 * — so the emptiest, most common view of this sheet was a sentence
+			 * - so the emptiest, most common view of this sheet was a sentence
 			 * stuck to the top-left corner of a tall white area, which reads as a
 			 * rendering fault rather than as "nobody has said anything yet".
 			 */}

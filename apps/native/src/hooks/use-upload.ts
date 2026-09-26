@@ -118,8 +118,8 @@ export interface ImageUploadOptions {
 /**
  * Normalise a captured or picked image and upload it straight to storage.
  *
- * Camera and library assets can be HEIC — which the storage content-type
- * allowlist rejects — and several megabytes each, so every image is re-encoded
+ * Camera and library assets can be HEIC - which the storage content-type
+ * allowlist rejects - and several megabytes each, so every image is re-encoded
  * to JPEG and downscaled first. Like the file path, the bytes go directly to
  * the signed URL (never through our API) and the object key comes back for the
  * caller to attach to a record.
@@ -215,7 +215,7 @@ function readableUploadFileName(
  * Sends the file body to the signed URL.
  *
  * fetch with a blob is used rather than axios: the signed URL must receive the
- * raw bytes with exactly the headers that were signed, and no interceptors —
+ * raw bytes with exactly the headers that were signed, and no interceptors -
  * our axios instance would attach an Authorization header and break the
  * signature.
  */

@@ -24,7 +24,7 @@ const TAGS: PostTag[] = ["POST", "EVENT", "NEED", "ANNOUNCEMENT"];
  * is deleted from storage and a `DELETE_POST` audit entry is written.
  *
  * **Deletion is moderation, not an overflow option.** It sits behind `confirm`
- * with its consequence spelled out, and the result is a toast — the drawer
+ * with its consequence spelled out, and the result is a toast - the drawer
  * stays open either way, so an inline error would be missed and a closing
  * sheet would blink with nothing said.
  *

@@ -30,18 +30,18 @@ const ENTITIES = [
 /**
  * The audit log.
  *
- * **A ledger, so it is a table and only a table** — no view switch. Cards would
+ * **A ledger, so it is a table and only a table** - no view switch. Cards would
  * be actively wrong here: every entry is the same four fields, nobody
  * *recognises* an audit entry, and the reason anyone opens this page is to
  * compare a column (who, when, what kind of action). It also never grids, for
  * the same reason a bank statement does not: a ledger has one axis.
  *
  * It also has no selection and no row press. There is nothing to do to an audit
- * entry — the record is the point — so a tick column would offer an action that
+ * entry - the record is the point - so a tick column would offer an action that
  * does not exist, and a hover state would promise a detail page that is not
  * there.
  *
- * The one column that is not plain type is a 6px dot by intent —
+ * The one column that is not plain type is a 6px dot by intent -
  * destructive, constructive, or neither. An operations admin scans this for the
  * one suspension among a hundred approvals, and that is a job for peripheral
  * vision, not for reading.
@@ -124,7 +124,7 @@ export default function AdminAuditLog() {
 						? `${humanizeStatus(entry.entityName)}${
 								entry.entityId ? ` ${entry.entityId.slice(0, 8)}` : ""
 							}`
-						: "—"}
+						: "-"}
 				</Caption>
 			),
 		},
@@ -136,7 +136,7 @@ export default function AdminAuditLog() {
 			align: "end",
 			// The absolute time, not "23 hours ago". A ledger is read to answer
 			// "was this before or after that", and every row saying "23 hours ago"
-			// — which is what the card list showed — cannot answer it. The card
+			// - which is what the card list showed - cannot answer it. The card
 			// view keeps the relative form, where there is room for one line only.
 			render: (entry) => (
 				<Caption color="quaternary" numberOfLines={1}>

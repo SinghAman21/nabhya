@@ -14,12 +14,12 @@ import { createTestDb, type TestDb, truncateAll } from "./harness";
 /**
  * Regression cover for the polymorphic feed target. `assertVisible` once
  * looked only in `posts`, so every like, impression and comment on a need,
- * event or announcement 404'd — those ids belong to their own tables.
+ * event or announcement 404'd - those ids belong to their own tables.
  *
  * Visibility is intentionally strict, matching the candidate pool
  * (`FeedRankingService.candidates`) and the single-item detail fetches
  * (`EventsService.getPublicById`, etc.): only an OPEN need, a PUBLISHED event
- * or a PUBLISHED announcement is engageable — the same status gate that keeps
+ * or a PUBLISHED announcement is engageable - the same status gate that keeps
  * it out of the feed in the first place also keeps it un-likeable once it
  * changes state, rather than freezing engagement at whatever it was when the
  * row was last visible.
@@ -162,7 +162,7 @@ describe("FeedEngagementService", () => {
 		expect(await db.query.postInteractions.findMany({})).toHaveLength(1);
 	});
 
-	it("refuses a need that has closed — the status gate cuts both ways", async () => {
+	it("refuses a need that has closed - the status gate cuts both ways", async () => {
 		const { org, volunteer } = await fixture();
 		const need = await createNeed(db, org.id, { status: "CLOSED" });
 
@@ -201,7 +201,7 @@ describe("FeedEngagementService", () => {
 		).rejects.toBeInstanceOf(NotFoundException);
 	});
 
-	it("refuses a completed event — same status gate, not just draft", async () => {
+	it("refuses a completed event - same status gate, not just draft", async () => {
 		const { org, volunteer } = await fixture();
 		const event = await createEvent(db, org.id, { status: "COMPLETED" });
 

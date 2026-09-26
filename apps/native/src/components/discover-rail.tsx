@@ -17,12 +17,12 @@ import { useFeedStore } from "@/store/feed-store";
 /**
  * The second column on desktop Discover.
  *
- * Its job is to surface what the feed's current filter and scroll position hide —
+ * Its job is to surface what the feed's current filter and scroll position hide -
  * so both sections are **server-filtered**, not a slice of the page already on
  * screen. The urgent rail now reuses the feed's `urgent` + `kind=need` filter,
  * while upcoming events still come from the public event list.
  *
- * Deliberately not here: "trending". There is no metric for it — no view counts,
+ * Deliberately not here: "trending". There is no metric for it - no view counts,
  * no pledge velocity, no follower counts anywhere in the schema. Trending would
  * have to be defined server-side first (pledges in the last 7 days, say);
  * inventing it client-side would be a ranked list of nothing.
@@ -45,8 +45,8 @@ export function DiscoverRail() {
 
 /**
  * Exported alongside `DiscoverRail` so a caller can take one section without
- * the other. Both rails that exist today — the volunteer home's and the NGO
- * feed's — take the pair, and an NGO wants it for the same reason a volunteer
+ * the other. Both rails that exist today - the volunteer home's and the NGO
+ * feed's - take the pair, and an NGO wants it for the same reason a volunteer
  * does: it is how you find out somebody two districts over needs the thing you
  * have a surplus of. One implementation, because two copies of a ranked list
  * drift.
@@ -93,7 +93,7 @@ export function UrgentNow() {
 
 /**
  * Events in the rail rather than interleaved into the feed. This is not a
- * compromise — it is what lets events appear on Discover at all without a merged
+ * compromise - it is what lets events appear on Discover at all without a merged
  * cursor, since two paginated endpoints cannot be interleaved client-side.
  */
 export function HappeningSoon() {

@@ -15,7 +15,7 @@ const devFallback = Platform.select({
 
 /**
  * A tunnelled packager is not a host the API is also reachable on, so the
- * derivation below must not fire for one — `EXPO_PUBLIC_API_URL` is the only
+ * derivation below must not fire for one - `EXPO_PUBLIC_API_URL` is the only
  * answer in that case.
  */
 const TUNNEL_HOST =
@@ -37,7 +37,7 @@ function packagerHost(): string | null {
 	if (!host || TUNNEL_HOST.test(host)) return null;
 
 	// An Android emulator reaches the host machine at 10.0.2.2, never at its
-	// own loopback — and Metro reports `localhost` there.
+	// own loopback - and Metro reports `localhost` there.
 	if (
 		Platform.OS === "android" &&
 		(host === "localhost" || host === "127.0.0.1")
@@ -54,7 +54,7 @@ function packagerHost(): string | null {
  * `EXPO_PUBLIC_API_URL` used to be the only source, which meant the machine's
  * LAN IP was hardcoded in `.env` and had to be kept in step with
  * `REACT_NATIVE_PACKAGER_HOSTNAME` in `.env.local` by hand. Every time the
- * network changed — a new router, a phone hotspot — the two drifted apart and
+ * network changed - a new router, a phone hotspot - the two drifted apart and
  * the app failed in the least diagnosable way available: Metro still served
  * the bundle, so the app booted and signed in normally, and only data requests
  * hung until the client's 30s timeout, twice over. "The feed says Building the

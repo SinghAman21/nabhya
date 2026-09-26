@@ -11,7 +11,7 @@ import { focusable } from "@/lib/focus";
  *
  * This replaces two heavier things: a full-width switch row per boolean, and a
  * `+ Add a closing date` line per optional field. Both were correct and both
- * were too big — an announcement whose only property is "pinned" got a 60pt
+ * were too big - an announcement whose only property is "pinned" got a 60pt
  * card with an icon well and two lines of prose, which read as the most
  * important thing on a screen whose point is the writing above it.
  *
@@ -46,7 +46,7 @@ export function PropertyRow({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * A quiet line under the row, for facts the author does not set — where the
+ * A quiet line under the row, for facts the author does not set - where the
  * post will be filed, or why urgency is not on offer for this type.
  */
 export function PropertyNote({ children }: { children: React.ReactNode }) {
@@ -65,7 +65,7 @@ export function PropertyNote({ children }: { children: React.ReactNode }) {
  * The row and its note sit tight together; a `Field` carries its own bottom
  * margin but no top one, so without this the first revealed field butts
  * straight against the note. Rendering nothing when there is nothing revealed
- * is the point — a wrapper that always emitted its margin would leave a gap
+ * is the point - a wrapper that always emitted its margin would leave a gap
  * under the chip row on every type that has no open field, which is the common
  * case.
  */
@@ -82,7 +82,7 @@ export function RevealedFields({ children }: { children: React.ReactNode }) {
  *
  * `off` and `on` are the two halves of a toggle; `add` is the invitation to
  * open an optional field. They are one component because they are one row and
- * must be the same size and shape in it — three components would have drifted
+ * must be the same size and shape in it - three components would have drifted
  * on padding the first time one of them changed.
  */
 export function PropertyChip({

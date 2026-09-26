@@ -27,7 +27,7 @@ export const bookmarks = pgTable(
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 	},
 	(table) => [
-		// Bookmarking is idempotent — the unique index is what makes the toggle
+		// Bookmarking is idempotent - the unique index is what makes the toggle
 		// safe against double taps.
 		uniqueIndex("bookmarks_user_organization_unique").on(
 			table.userId,
@@ -115,7 +115,7 @@ export const notificationTypeEnum = pgEnum("notification_type", [
  * In-app notifications, one row per recipient.
  *
  * A broadcast fans out into a row per user rather than being a single record
- * with a join table — it keeps read state and the unread count a plain query
+ * with a join table - it keeps read state and the unread count a plain query
  * on this one table.
  */
 export const notifications = pgTable(

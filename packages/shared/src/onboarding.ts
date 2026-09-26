@@ -24,7 +24,7 @@ export const step1BasicInfoSchema = z.object({
 	orgType: z.enum(["trust", "society", "section8", "others"] as const, {
 		message: "Select your organization type",
 	}),
-	// The single most important field for verifying an Indian NGO — a
+	// The single most important field for verifying an Indian NGO - a
 	// superadmin checks this against the uploaded registration certificate.
 	registrationNumber: z
 		.string()
@@ -45,7 +45,7 @@ export const step2AddressSchema = z.object({
 		.string()
 		.trim()
 		.regex(/^[1-9]\d{5}$/, "Enter a 6-digit pincode"),
-	// Optional, and only ever set from the device's own location — it powers
+	// Optional, and only ever set from the device's own location - it powers
 	// "NGOs near me", which no NGO ever appears in if the only way to record
 	// coordinates is an edit screen nobody opens after signing up.
 	latitude: latitudeSchema.optional(),
@@ -69,7 +69,7 @@ export const orgCausesStepSchema = z.object({
 	description: optionalText(500),
 });
 
-/** Team, history and public presence — every field optional. */
+/** Team, history and public presence - every field optional. */
 export const step4TeamSchema = z.object({
 	teamSize: optionalCount(1, 100000, {
 		min: "At least 1 member",
@@ -83,7 +83,7 @@ export const step4TeamSchema = z.object({
 });
 
 // No `logo` here, deliberately. `ORG_LOGO` upload keys are derived from the
-// caller's organization, so one cannot exist before this payload is accepted —
+// caller's organization, so one cannot exist before this payload is accepted -
 // the wizard holds the picked file locally and PATCHes the key onto the new
 // organization afterwards. See `components/onboarding/photo-field.tsx`.
 

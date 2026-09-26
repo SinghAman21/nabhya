@@ -20,7 +20,7 @@ function runWithSpinner({
 		s.start(label);
 		if (dryRun) {
 			setTimeout(() => {
-				s.stop(`${label} (skipped — dry run)`);
+				s.stop(`${label} (skipped - dry run)`);
 				resolveRun();
 			}, 350);
 			return;
@@ -36,15 +36,15 @@ function runWithSpinner({
 			stderr += chunk.toString();
 		});
 		child.on("error", (err) => {
-			s.stop(`${label} — failed`);
+			s.stop(`${label} - failed`);
 			rejectRun(err);
 		});
 		child.on("close", (code) => {
 			if (code === 0) {
-				s.stop(`${label} — done`);
+				s.stop(`${label} - done`);
 				resolveRun();
 			} else {
-				s.stop(`${label} — failed (exit ${code})`);
+				s.stop(`${label} - failed (exit ${code})`);
 				if (stderr.trim()) process.stderr.write(stderr);
 				rejectRun(new Error(`${command} ${args.join(" ")} exited ${code}`));
 			}
@@ -71,7 +71,7 @@ export type DbState =
 // Known sentinel tables that indicate a nabhya-managed schema.
 // Extend this list as tables are added to packages/db/src/schema.
 const NABHYA_SENTINEL_TABLES = new Set<string>([
-	// placeholder — add real table names here as the schema grows
+	// placeholder - add real table names here as the schema grows
 	// e.g. "users", "sessions", etc.
 ]);
 

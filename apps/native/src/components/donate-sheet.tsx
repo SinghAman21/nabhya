@@ -19,7 +19,7 @@ import { useAuthStore } from "@/store/auth-store";
 /**
  * Donation entry point.
  *
- * The amount is captured in rupees but sent as paise — integers only, so no
+ * The amount is captured in rupees but sent as paise - integers only, so no
  * float rounding ever reaches the ledger.
  */
 interface RazorpayCheckout {
@@ -35,7 +35,7 @@ interface RazorpayWebConstructor {
 }
 
 /**
- * Razorpay's web Checkout.js isn't an npm package — it's loaded from their CDN
+ * Razorpay's web Checkout.js isn't an npm package - it's loaded from their CDN
  * and attaches `window.Razorpay` once it runs. Injected at most once per
  * session; a second `open()` call reuses the same script tag.
  */
@@ -62,7 +62,7 @@ function loadRazorpayWebScript(): Promise<void> {
 
 /**
  * Razorpay ships a native module on iOS/Android (exists only in a dev client
- * or a store build — never Expo Go) and a separate, script-loaded Checkout.js
+ * or a store build - never Expo Go) and a separate, script-loaded Checkout.js
  * on web. Both are wrapped behind the same Promise-based `.open()` so the
  * caller never has to branch on platform.
  */
@@ -194,14 +194,14 @@ export function DonateSheet({
 						toast.error(
 							Platform.OS === "web"
 								? "Razorpay's checkout script didn't load. Check your connection and try again."
-								: "Donations open Razorpay's secure checkout, which is not available in this preview — use the dev client build instead.",
+								: "Donations open Razorpay's secure checkout, which is not available in this preview - use the dev client build instead.",
 						);
 						return;
 					}
 					try {
 						// Fields present because we always pass order_id: razorpay_payment_id,
 						// razorpay_order_id, razorpay_signature. This is fast client-side
-						// feedback only — never proof the donation is COMPLETED.
+						// feedback only - never proof the donation is COMPLETED.
 						await checkout.open({
 							key: razorpayKeyId,
 							order_id: orderId,
@@ -221,11 +221,11 @@ export function DonateSheet({
 						// client's own success callback can only promise that it
 						// is being confirmed.
 						toast.success(
-							"Thank you — we're confirming your donation now. It will show in My Donations shortly.",
+							"Thank you - we're confirming your donation now. It will show in My Donations shortly.",
 						);
 					} catch (err: unknown) {
 						// User-cancelled checkouts land here too (react-native-razorpay
-						// rejects on dismiss, not just on failure) — there is no distinct
+						// rejects on dismiss, not just on failure) - there is no distinct
 						// "cancelled" code documented, so this message stays generic.
 						const description =
 							typeof err === "object" && err !== null && "description" in err
@@ -387,7 +387,7 @@ export function DonateSheet({
 					)}
 				</View>
 				<Caption color="secondary" style={{ flex: 1 }}>
-					Donate anonymously — your name is hidden from the NGO
+					Donate anonymously - your name is hidden from the NGO
 				</Caption>
 			</Pressable>
 

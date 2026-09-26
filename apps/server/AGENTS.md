@@ -1,4 +1,4 @@
-# apps/server — NestJS API agent guide
+# apps/server - NestJS API agent guide
 
 Repo-wide rules and context live in the root `AGENTS.md`; this file is what you must
 know before touching the server. NestJS 11, global `/api` prefix, port 3000, Swagger
@@ -10,7 +10,7 @@ at `/api/docs`.
    `tsdown` both use esbuild, which does not implement `emitDecoratorMetadata` even
    though `tsconfig.json` enables it. So `design:paramtypes` is always `undefined`,
    Nest thinks the class has no dependencies, constructs it with zero arguments, and
-   every service silently becomes `undefined` — it boots fine and 500s on the first
+   every service silently becomes `undefined` - it boots fine and 500s on the first
    request. **Run `pnpm --filter server verify:di` after touching any constructor**;
    it resolves every controller and service and fails if a dependency is missing.
    Beware the linter: with `verbatimModuleSyntax` on, a service used only as a type
@@ -20,8 +20,8 @@ at `/api/docs`.
 2. **Correlated subqueries in a `select()` must be written with literal,
    table-qualified SQL.** Drizzle renders an interpolated `${table.column}`
    *unqualified* inside a select-field template, so `${events.id}` becomes `"id"`
-   and binds to the subquery's own FROM. That silently compares a table to itself —
-   every such count reads zero — or errors as ambiguous. Write
+   and binds to the subquery's own FROM. That silently compares a table to itself -
+   every such count reads zero - or errors as ambiguous. Write
    `from event_applications ea where ea.event_id = events.id` by hand instead.
 
 ## Request pipeline
@@ -32,16 +32,16 @@ Guard order (all global `APP_GUARD`s in `app.module.ts`):
 - **Everything is protected by default.** `JwtGuard` verifies the Supabase Auth JWT
   against a remote JWKS (`jose`), then JIT-syncs the user: lookup by `auth_user_id`,
   fall back to email and link, else insert. It rejects suspended/inactive accounts on
-  every request and does **not** assign a default role — `request.user.roles` is
+  every request and does **not** assign a default role - `request.user.roles` is
   empty until the user picks one via `POST /users/me/role`.
-- `RolesGuard` — OR semantics over `@Roles(...)`, throws a descriptive 403.
+- `RolesGuard` - OR semantics over `@Roles(...)`, throws a descriptive 403.
 - Decorators in `src/common/decorators/`: `@Public()`, `@OptionalAuth()`, `@Roles()`,
-  `@CurrentUser()`. `@OptionalAuth()` is for public feeds — anonymous callers get
+  `@CurrentUser()`. `@OptionalAuth()` is for public feeds - anonymous callers get
   through, a valid token additionally populates `request.user` so the response can
   include the caller's own application/pledge, and an *invalid* token reads as
   anonymous rather than 401.
 - Validation is per-route: `new ZodValidationPipe(schema)` with schemas imported from
-  `@nabhya/shared`. Never hand-write a duplicate shape — the client uses the same
+  `@nabhya/shared`. Never hand-write a duplicate shape - the client uses the same
   schema in its forms.
 - Responses: interceptor wraps success as `{ success, data, timestamp }`; the global
   exception filter emits `{ statusCode, timestamp, path, message, errors? }` and
@@ -55,7 +55,7 @@ Guard order (all global `APP_GUARD`s in `app.module.ts`):
 ## Module conventions
 
 - Organisation-scoped routes live under `org/*` and resolve the org **from the
-  token** via `OrganizationsService.requireOwnedOrganization(userId)` — an org id is
+  token** via `OrganizationsService.requireOwnedOrganization(userId)` - an org id is
   never accepted from the client. `requireVerifiedOrganization` additionally gates
   anything that becomes publicly visible. Modules import `OrganizationsModule` for
   this; events, needs, engagement, certificates, publishing and donations all do.
@@ -65,9 +65,9 @@ Guard order (all global `APP_GUARD`s in `app.module.ts`):
 - Counter mutations (`events.accepted_count`, `needs.fulfilled_quantity`)
   happen inside a transaction with `SELECT … FOR UPDATE` on the parent row. Never
   update these counters outside that pattern.
-- `@Global()` modules — `DatabaseModule` (`DB_TOKEN`), `StorageModule`
+- `@Global()` modules - `DatabaseModule` (`DB_TOKEN`), `StorageModule`
   (`STORAGE_TOKEN`: Supabase Storage or in-memory stub, stub refused in
-  production), `AuditModule`, `NotificationsModule` — inject them anywhere
+  production), `AuditModule`, `NotificationsModule` - inject them anywhere
   without imports.
 - Audit writes are fire-and-forget: `void this.audit.record(...)`. An audit failure
   must never fail the business action, so never await it inside a transaction.
@@ -77,7 +77,7 @@ Guard order (all global `APP_GUARD`s in `app.module.ts`):
   the object before any key is persisted, because a signed PUT cannot cap body size.
   Reads go through `POST /uploads/download-url` for a short-lived signed URL.
 - Donations: Razorpay, native checkout SDK. Amounts are server-computed integer
-  paise; only the signature-verified webhook moves a donation to COMPLETED —
+  paise; only the signature-verified webhook moves a donation to COMPLETED -
   never the client's own checkout-success callback, even though Razorpay hands
   the client a payment id/order id/signature on success. `provider_payment_id`
   is unique so webhook replays cannot double-count. Razorpay's webhook scheme has
@@ -85,15 +85,15 @@ Guard order (all global `APP_GUARD`s in `app.module.ts`):
   idempotency relies entirely on the PENDING-guard + unique index, not a
   freshness check.
 - Two endpoints are server-only by design (no screen): `POST /api/donations/webhook`
-  and `POST /api/admin/events/close-finished` (cron target — the only thing that
+  and `POST /api/admin/events/close-finished` (cron target - the only thing that
   moves events out of PUBLISHED). If you add an endpoint, wire it to a screen or
   document in the root `AGENTS.md` why it has none.
 
 ## Testing
 
 - Integration specs in `test/`, unit specs beside the source (`*.spec.ts`).
-- Integration tests run against a **real Postgres** — PGlite (Postgres-in-WASM),
-  in-process, no Docker — built from the committed migrations in
+- Integration tests run against a **real Postgres** - PGlite (Postgres-in-WASM),
+  in-process, no Docker - built from the committed migrations in
   `packages/db/src/migrations/`, so schema/migration drift fails the suite. Do not
   mock the database: the logic worth testing is unique indexes, `SELECT … FOR
   UPDATE` accounting and filtered aggregates.
@@ -109,7 +109,7 @@ Guard order (all global `APP_GUARD`s in `app.module.ts`):
 ## Deploying
 
 - `GET /api` = liveness; `GET /api/health` = readiness (queries the DB; its
-  `storage` field reads `stub` when Supabase Storage is unconfigured — point
+  `storage` field reads `stub` when Supabase Storage is unconfigured - point
   the LB here).
 - `trust proxy` is set to 1; remove it if there is no proxy in front, or every
   client shares one rate-limit bucket.
@@ -117,5 +117,5 @@ Guard order (all global `APP_GUARD`s in `app.module.ts`):
 - Non-production boots still run `drizzle-kit push` from
   `common/database/database.module.ts`; switch to applying migrations before real
   data lands.
-- First superadmin: `AdminService.grantSuperadmin` is deliberately unrouted — run it
+- First superadmin: `AdminService.grantSuperadmin` is deliberately unrouted - run it
   from a script or set `user_roles` by hand.

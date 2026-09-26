@@ -130,7 +130,7 @@ describe("RazorpayPaymentProvider.createCheckout", () => {
 
 		const result = await makeProvider().createCheckout({
 			referenceId: "donation-1",
-			amountMinor: 12_345, // not a multiple of 100 — arbitrary paise is fine
+			amountMinor: 12_345, // not a multiple of 100 - arbitrary paise is fine
 			currency: "INR",
 			organizationName: "Test NGO",
 			returnUrl: "https://example.com/return",

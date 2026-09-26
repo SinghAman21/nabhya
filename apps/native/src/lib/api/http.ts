@@ -30,7 +30,7 @@ export const http = {
 
 /**
  * Axios serialises `undefined` away but keeps empty strings, which the Zod
- * query schemas then reject. Dropping blanks here keeps filter UIs simple —
+ * query schemas then reject. Dropping blanks here keeps filter UIs simple -
  * they can bind straight to state without clearing keys themselves.
  */
 function clean(params?: Record<string, unknown>) {

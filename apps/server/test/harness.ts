@@ -21,7 +21,7 @@ const MIGRATIONS_DIR = join(
 /**
  * Spins up a real Postgres for a test file.
  *
- * PGlite runs Postgres compiled to WASM in-process — real SQL, real
+ * PGlite runs Postgres compiled to WASM in-process - real SQL, real
  * constraints, real transactions, no Docker and no external service. That
  * matters here because the logic worth testing (unique indexes, SELECT … FOR
  * UPDATE, filtered aggregates, cascade deletes) is precisely the part a mocked

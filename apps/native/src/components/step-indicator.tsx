@@ -16,7 +16,7 @@ interface StepIndicatorProps {
 	 * sit inside a card on a page that already has a header.
 	 *
 	 * Without this the only caller that is not a full-screen wizard had to undo
-	 * the padding with negative margins — `marginHorizontal: -spacing[6]` — which
+	 * the padding with negative margins - `marginHorizontal: -spacing[6]` - which
 	 * is a component telling you it wants a variant.
 	 */
 	embedded?: boolean;

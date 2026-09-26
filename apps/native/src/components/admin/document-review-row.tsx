@@ -24,14 +24,14 @@ import type { AdminOrgDocument } from "@/lib/types";
  * One document as a card: open it, then approve or reject.
  *
  * **This is the mobile and card-view shape only.** The queue's default on
- * desktop is `DataTable` — see the note at the top of `(admin)/queue.tsx` for
+ * desktop is `DataTable` - see the note at the top of `(admin)/queue.tsx` for
  * why a column of 1100pt-wide cards was the wrong shape for the highest-volume
  * screen in the console. The card survives because a 360dp phone cannot hold
  * seven columns, and because "card view" is a legitimate choice on desktop for
  * someone reading documents rather than clearing them.
  *
- * Everything a reviewer needs before deciding — type, owner, upload time, the
- * liveness challenge, any earlier remarks — is on the card, the file opens from
+ * Everything a reviewer needs before deciding - type, owner, upload time, the
+ * liveness challenge, any earlier remarks - is on the card, the file opens from
  * a link, and the two decisions are real buttons in a fixed order (approve
  * first) so a hundred rows train one motion.
  *
@@ -41,7 +41,7 @@ import type { AdminOrgDocument } from "@/lib/types";
  * reads as a banner, not a control. Same rule as the feed card's CTA.
  *
  * Rejection collects remarks inline rather than through Alert.prompt, which
- * only exists on iOS — on Android that would silently do nothing. The server
+ * only exists on iOS - on Android that would silently do nothing. The server
  * also requires remarks on rejection, so the field validates before it sends.
  */
 export function DocumentReviewRow({
@@ -53,7 +53,7 @@ export function DocumentReviewRow({
 	document: AdminOrgDocument;
 	kind: "organization" | "user";
 	label: string;
-	/** Who the document belongs to. Only the queue needs it — inside a dossier
+	/** Who the document belongs to. Only the queue needs it - inside a dossier
 	 * the owner is already the subject of the sheet. */
 	subtitle?: string;
 }) {

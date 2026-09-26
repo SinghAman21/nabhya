@@ -27,10 +27,10 @@ import { AppController } from "./app.controller";
 @Module({
 	imports: [
 		ThrottlerModule.forRoot(throttlerConfig),
-		DatabaseModule, // global — provides db to the whole app
-		AuditModule, // global — provides the activity trail writer
-		StorageModule, // global — provides object storage (Supabase Storage, or a dev stub)
-		MailModule, // global — sends transactional email through Resend when configured
+		DatabaseModule, // global - provides db to the whole app
+		AuditModule, // global - provides the activity trail writer
+		StorageModule, // global - provides object storage (Supabase Storage, or a dev stub)
+		MailModule, // global - sends transactional email through Resend when configured
 		UploadsModule,
 		UsersModule,
 		OnboardingModule,
@@ -39,7 +39,7 @@ import { AppController } from "./app.controller";
 		EventsModule,
 		FeedModule,
 		NeedsModule,
-		NotificationsModule, // global — other modules emit through it
+		NotificationsModule, // global - other modules emit through it
 		EngagementModule,
 		CertificatesModule,
 		PublishingModule,
@@ -48,7 +48,7 @@ import { AppController } from "./app.controller";
 		AdminModule,
 	],
 	providers: [
-		// Order matters — guards run top to bottom. Rate limiting comes first so
+		// Order matters - guards run top to bottom. Rate limiting comes first so
 		// a flood is rejected before it costs a JWT verification and two queries.
 		{
 			provide: APP_GUARD,

@@ -53,7 +53,7 @@ function formatDateTime(date: Date): string {
 function safeFileName(fileName: string): string {
 	const cleaned = fileName
 		.toLowerCase()
-		// Anything outside the allowlist — including "/" — becomes a dash, so a
+		// Anything outside the allowlist - including "/" - becomes a dash, so a
 		// supplied name can never introduce a new path segment.
 		.replace(/[^a-z0-9._-]+/g, "-")
 		// Collapse dot runs: "../.." can no longer traverse once slashes are

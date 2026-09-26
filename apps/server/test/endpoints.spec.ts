@@ -14,7 +14,7 @@ import { createTestDb, type TestDb } from "./harness";
  * The service specs already cover what each endpoint *does*. What nothing
  * covered was the wiring around them: that the route exists at the path the
  * app calls, that the global guards actually run on it, and that an anonymous
- * request gets 401 rather than data. Those break silently — a renamed path or
+ * request gets 401 rather than data. Those break silently - a renamed path or
  * a lost decorator still type-checks and still passes every unit test.
  *
  * The route table is read from Nest's own decorators rather than written out
@@ -28,7 +28,7 @@ import { createTestDb, type TestDb } from "./harness";
 const holder = vi.hoisted(() => ({ db: null as unknown }));
 
 // DatabaseModule provides `useValue: db` at import time, so the app has to be
-// imported after `holder.db` is filled in — see beforeAll.
+// imported after `holder.db` is filled in - see beforeAll.
 vi.mock("@nabhya/db", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("@nabhya/db")>();
 	return {
@@ -270,7 +270,7 @@ describe("HTTP surface", () => {
 		const missing: string[] = [];
 		for (const route of routes) {
 			const status = await call(route, volunteerToken);
-			// 404 from a handler that ran is fine — the UUID above matches nothing.
+			// 404 from a handler that ran is fine - the UUID above matches nothing.
 			// What matters is that Express resolved the path at all, which any
 			// status other than "Cannot <VERB> <path>" proves; Nest answers an
 			// unrouted path with 404 and no envelope, so we check the body shape.
@@ -326,7 +326,7 @@ describe("HTTP surface", () => {
 
 	describe("authenticated access", () => {
 		it("lets a valid token past the auth guard on every route", async () => {
-			// Not asserting success — most of these 404 or 403 on a UUID that
+			// Not asserting success - most of these 404 or 403 on a UUID that
 			// matches nothing. Asserting only that authentication itself passed.
 			const rejected: string[] = [];
 			for (const route of routes.filter((r) => r.auth === "required")) {

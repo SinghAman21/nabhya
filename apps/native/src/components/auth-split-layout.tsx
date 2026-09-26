@@ -25,7 +25,7 @@ interface AuthSplitLayoutProps {
  * Desktop: a dark brand panel on the left, the form centred on the right.
  * Phone: a short dark brand bar under the status bar, then the form in a scroll
  * view that keeps clear of the keyboard. The brand panel speaks to both kinds
- * of account — a volunteer and an NGO land on the same door.
+ * of account - a volunteer and an NGO land on the same door.
  */
 export function AuthSplitLayout({
 	children,
@@ -139,7 +139,7 @@ export function AuthSplitLayout({
 			 * reach them. `flexGrow` keeps the form optically centred while
 			 * there is room, and `automaticallyAdjustKeyboardInsets` insets the
 			 * scroll view by the keyboard on iOS (Android resizes the window
-			 * instead — see android.softwareKeyboardLayoutMode in app.json).
+			 * instead - see android.softwareKeyboardLayoutMode in app.json).
 			 */}
 			<KeyboardAvoidingView
 				style={{ flex: 1 }}

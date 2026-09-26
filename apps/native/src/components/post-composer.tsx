@@ -76,7 +76,7 @@ import { composePostText } from "@/lib/post-text";
 /**
  * The NGO writing surface. Creates Updates (`POST /api/feed`), Needs
  * (`POST /api/org/needs`), Events (`POST /api/org/events`) and Announcements
- * (`POST /api/org/announcements`) — each through the endpoint that owns it,
+ * (`POST /api/org/announcements`) - each through the endpoint that owns it,
  * so feed cards render real facts.
  *
  * Layout is three bands: type picker, content canvas, details. The footer
@@ -121,7 +121,7 @@ const TYPES: readonly TypeOption[] = [
 	{
 		value: "ANNOUNCEMENT",
 		label: "Announcement",
-		hint: "Formal notes — milestones, policies, thank-yous.",
+		hint: "Formal notes - milestones, policies, thank-yous.",
 	},
 ] as const;
 
@@ -286,7 +286,7 @@ export function PostComposer({
 	const draftId = useRef(newDraftId());
 
 	const copy = COPY[type];
-	// Filled canvas inputs — the fill is what separates the writing surface
+	// Filled canvas inputs - the fill is what separates the writing surface
 	// from the sheet behind it on desktop.
 	const canvasBox = {
 		borderWidth: 1,
@@ -364,14 +364,14 @@ export function PostComposer({
 		setRejected([]);
 	};
 
-	/* ---- Drafts (Updates only — the store budget fits text, not metadata) ---- */
+	/* ---- Drafts (Updates only - the store budget fits text, not metadata) ---- */
 
 	const persist = useCallback(async (next: PostDraft[]) => {
 		const result = await saveDrafts(next);
 		setDrafts(result.drafts);
 		setDraftNote(
 			result.tooLarge
-				? "Too long to keep on this device — it stays here until you post."
+				? "Too long to keep on this device - it stays here until you post."
 				: result.evicted > 0
 					? `Kept the newest ${result.drafts.length}. Older drafts made way.`
 					: null,
@@ -462,7 +462,7 @@ export function PostComposer({
 	}, [needs.data, events.data]);
 
 	const appendReference = (title: string, hint: string) => {
-		const line = `↳ ${title}${hint ? ` — ${hint}` : ""}`;
+		const line = `↳ ${title}${hint ? ` - ${hint}` : ""}`;
 		setText((current) =>
 			current.trim() ? `${current.trim()}\n\n${line}` : line,
 		);
@@ -531,7 +531,7 @@ export function PostComposer({
 		const coverImage = uploaded?.mediaKeys[0];
 
 		if (type === "NEED") {
-			// "0" is the bar's resting state for "unspecified" — never sent.
+			// "0" is the bar's resting state for "unspecified" - never sent.
 			const quantity =
 				need.quantity && Number(need.quantity) > 0
 					? Number(need.quantity)
@@ -660,7 +660,7 @@ export function PostComposer({
 						description="Posting opens once a reviewer has approved your registration certificate and PAN card."
 					/>
 					<Caption color="tertiary">
-						You can draft needs and events before then — only publishing waits
+						You can draft needs and events before then - only publishing waits
 						on the review.
 					</Caption>
 				</View>
@@ -673,11 +673,11 @@ export function PostComposer({
 	const status: string | null = formError
 		? null
 		: !hasTitle && hasBody
-			? "Add a headline — the feed has nothing to show without one."
+			? "Add a headline - the feed has nothing to show without one."
 			: !hasBody && media.length > 0
 				? "Add a line of text, even with photos."
 				: atMediaCap
-					? `${MAX_FEED_MEDIA} of ${MAX_FEED_MEDIA} attached — remove one to add another.`
+					? `${MAX_FEED_MEDIA} of ${MAX_FEED_MEDIA} attached - remove one to add another.`
 					: null;
 
 	const activeLabel =
@@ -1035,7 +1035,7 @@ function RejectedRow({
 				style={{ marginTop: 2 }}
 			/>
 			<Caption color="secondary" style={{ flex: 1 }}>
-				<Caption weight="semibold">{fileName}</Caption> — {reason}
+				<Caption weight="semibold">{fileName}</Caption> - {reason}
 			</Caption>
 		</View>
 	);
@@ -1199,7 +1199,7 @@ function ComposerFooter({
 				<Tool
 					icon={ImagePlus}
 					tip="Add photos"
-					label={atMediaCap ? "Add photos — limit reached" : "Add photos"}
+					label={atMediaCap ? "Add photos - limit reached" : "Add photos"}
 					disabled={atMediaCap || saving}
 					busy={pickerBusy}
 					onPress={onPickAll}
@@ -1228,7 +1228,7 @@ function ComposerFooter({
 					tip={draftsCount > 0 ? `Drafts · ${draftsCount}` : "Drafts"}
 					label={
 						!isUpdate
-							? "Drafts — only Updates are kept"
+							? "Drafts - only Updates are kept"
 							: draftsCount > 0
 								? `Drafts, ${draftsCount}`
 								: "Drafts"
@@ -1260,7 +1260,7 @@ function ComposerFooter({
 					<Tool
 						icon={Clock}
 						tip="Scheduling needs a server update"
-						label="Schedule — not available yet"
+						label="Schedule - not available yet"
 						disabled
 						onPress={() => {}}
 					/>

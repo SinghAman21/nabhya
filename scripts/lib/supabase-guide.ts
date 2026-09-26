@@ -38,7 +38,7 @@ export function showOverview() {
 	const b = color.bold;
 	const lines = [
 		`${b("1.")} Open ${color.cyan(SUPABASE_CONSOLE)}`,
-		`   ${dim("Sign in with GitHub, GitLab, or email — free tier is fine.")}`,
+		`   ${dim("Sign in with GitHub, GitLab, or email - free tier is fine.")}`,
 		"",
 		`${b("2.")} Click ${b("New Project")} (or pick an existing one).`,
 		`   ${dim('Project name: anything (e.g. "nabhya"). Set a database password and save it.')}`,
@@ -49,7 +49,7 @@ export function showOverview() {
 		`${b("4.")} After the project is created, you'll land on the dashboard.`,
 		`   ${dim("Go to Project Settings → Database for connection strings, and Project Settings → API for the URL and anon key.")}`,
 	];
-	note(lines.join("\n"), "Supabase — create a project");
+	note(lines.join("\n"), "Supabase - create a project");
 }
 
 export function showRegionTip(region: string) {
@@ -79,15 +79,15 @@ export function showConnectionStringGuide() {
 		`   ${dim("Port")} ${warn("5432")}${dim(". Used by Drizzle Kit for push/generate (needs a stable single connection).")}`,
 		"",
 		`${b("In")} ${b("Project Settings → API")}${b(", also grab:")}`,
-		`   ${dim("Project URL — used for EXPO_PUBLIC_SUPABASE_URL and to derive the JWKS endpoint.")}`,
-		`   ${dim("anon / public key — used for EXPO_PUBLIC_SUPABASE_ANON_KEY.")}`,
+		`   ${dim("Project URL - used for EXPO_PUBLIC_SUPABASE_URL and to derive the JWKS endpoint.")}`,
+		`   ${dim("anon / public key - used for EXPO_PUBLIC_SUPABASE_ANON_KEY.")}`,
 		"",
 		`${b("In")} ${b("Authentication → Sessions")}${b(", switch JWT signing keys to")} ${ok("asymmetric (ES256/RS256)")}`,
 		`   ${dim("so the JWKS endpoint the server verifies against is populated. The legacy shared HS256 secret has no JWKS endpoint and isn't supported here.")}`,
 		"",
 		`${dim("Tip: copy each value with the clipboard icon next to the field.")}`,
 	];
-	note(lines.join("\n"), "Supabase — copy your credentials");
+	note(lines.join("\n"), "Supabase - copy your credentials");
 }
 
 export function consoleUrl(): string {

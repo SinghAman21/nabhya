@@ -1,5 +1,5 @@
 // react-native-razorpay ships no type declarations and there is no
-// @types/react-native-razorpay package — this covers the surface this app
+// @types/react-native-razorpay package - this covers the surface this app
 // actually uses. Re-check against the installed version if the SDK's options
 // or callback shape changes.
 declare module "react-native-razorpay" {

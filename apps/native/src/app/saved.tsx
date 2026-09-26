@@ -23,7 +23,7 @@ import { verticalScrollbar } from "@/lib/scroll";
 import type { FeedNeedItem } from "@/lib/types";
 
 /**
- * Feed items the volunteer has saved via the reaction-bar bookmark — needs,
+ * Feed items the volunteer has saved via the reaction-bar bookmark - needs,
  * events, updates and announcements, in one list, most-recently-posted
  * first. Distinct from `/bookmarks` ("Saved NGOs"), which is the org-level
  * bookmark on an NGO's own page; see the note on `useSavedFeed`.

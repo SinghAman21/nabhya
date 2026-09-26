@@ -149,7 +149,7 @@ export function EventFeed({
 
 /**
  * One event. Who is running it, what it is, when and where, and how many
- * places are left — the number a volunteer is actually deciding on.
+ * places are left - the number a volunteer is actually deciding on.
  */
 export function EventCard({
 	event,

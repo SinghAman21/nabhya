@@ -16,8 +16,8 @@ import { users } from "./users";
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
 /**
- * WANT  — the organization is requesting something (e.g. "200 blankets").
- * OFFER — the organization has surplus to give away (e.g. "40 school desks").
+ * WANT  - the organization is requesting something (e.g. "200 blankets").
+ * OFFER - the organization has surplus to give away (e.g. "40 school desks").
  */
 export const needTypeEnum = pgEnum("need_type", ["WANT", "OFFER"]);
 
@@ -54,7 +54,7 @@ export const needs = pgTable(
 		description: text("description").notNull(),
 		coverImage: text("cover_image"),
 
-		// Quantity is optional — "volunteer tutors, as many as possible" is a
+		// Quantity is optional - "volunteer tutors, as many as possible" is a
 		// legitimate post. When present, fulfilledQuantity tracks progress and is
 		// only mutated inside the pledge-review transaction.
 		quantity: integer("quantity"),
@@ -112,7 +112,7 @@ export const needPledges = pgTable(
 	(table) => [
 		index("need_pledges_need_status_idx").on(table.needId, table.status),
 		index("need_pledges_user_idx").on(table.userId),
-		// One response per person per need — mirrors
+		// One response per person per need - mirrors
 		// `event_applications_event_volunteer_unique`. The service reuses the
 		// existing row when re-pledging after cancelling, so this unique index is
 		// the backstop against a concurrent double-insert inflating

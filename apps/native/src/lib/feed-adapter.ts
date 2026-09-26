@@ -11,8 +11,8 @@ import type {
 /**
  * Maps the server's feed row to the client's.
  *
- * The ranking service returns one generic shape — `type`, `content`, viewer and
- * engagement blocks — for four different things. The card wants to narrow on
+ * The ranking service returns one generic shape - `type`, `content`, viewer and
+ * engagement blocks - for four different things. The card wants to narrow on
  * a `kind` and read typed facts, and the pledge sheet wants a `PublicNeed`.
  * Doing the translation once here keeps that knowledge out of every screen,
  * and means a change in the server payload is a change in one file.
@@ -67,15 +67,15 @@ export function toFeedItem(row: FeedApiItem): FeedItem {
 	 *
 	 * `FeedRankingService` emits a post's candidate type straight from its tag
 	 * (`type: post.tag`), so a post tagged NEED / EVENT / ANNOUNCEMENT arrives
-	 * declaring itself one of those — while carrying a posts row's content,
+	 * declaring itself one of those - while carrying a posts row's content,
 	 * which is `{ text, media }` and none of the fields the typed branches
 	 * below read. Trusting the type produced a card with an empty title, no
 	 * body at all (the text was dropped: `kind` was `need`, so `FeedCard` used
 	 * `description`, which was ""), no facts, and a primary button that
 	 * navigated to a need or event id that was really a post id.
 	 *
-	 * The composer no longer creates those — each type now writes the real row
-	 * through its own endpoint — but rows written before that change are still
+	 * The composer no longer creates those - each type now writes the real row
+	 * through its own endpoint - but rows written before that change are still
 	 * in the database, and this is the client that has to render them. So the
 	 * discriminator is the content, not the label: `content.text` is present on
 	 * a posts row and on nothing else (needs and events carry

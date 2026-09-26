@@ -9,13 +9,13 @@ import { storage } from "@/lib/storage";
  * its values in `auth-store.orgProfile` (persisted, but never cleared, so a
  * finished NGO carried a stale copy of its own registration number forever)
  * and the volunteer wizard kept its values in `useState` (lost entirely the
- * moment the app was backgrounded long enough to be killed — halfway through
+ * moment the app was backgrounded long enough to be killed - halfway through
  * a form is exactly when someone puts the phone down to find a document).
  *
  * One store, one shape per vertical, cleared on a successful submit.
  *
  * **Keep these objects small.** On native `lib/storage` is
- * `expo-secure-store`, which caps a value at 2048 bytes — the same budget
+ * `expo-secure-store`, which caps a value at 2048 bytes - the same budget
  * `lib/post-drafts.ts` works against. Everything here is short text plus two
  * storage keys and a coordinate pair; the free-text fields are the only ones
  * that could grow, and both are capped at 500 characters by their schema.
@@ -141,7 +141,7 @@ export const useOnboardingStore = create<OnboardingState>()(
 			// The `*Preview` fields are deliberately dropped: they are local
 			// `file://` URIs, which the picker can revoke as soon as its session
 			// ends, so a restored draft claiming a photo would restore a broken
-			// one. The uploaded object key survives, and that is the real value —
+			// one. The uploaded object key survives, and that is the real value -
 			// the slot falls back to reading it through `useStoredImageUrl`.
 			partialize: (state) => ({
 				org: { ...state.org, logoPreview: "", coverPreview: "" },

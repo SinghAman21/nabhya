@@ -82,7 +82,7 @@ export const certificatesApi = {
 	listMine: (query: Partial<PaginationQuery>) =>
 		http.getPage<MyCertificate>(CERTIFICATES.MINE, query),
 	pdfUrl: (id: string) => http.get<{ url: string }>(CERTIFICATES.pdf(id)),
-	/** Public — no auth required, which is the point of a verification code. */
+	/** Public - no auth required, which is the point of a verification code. */
 	verify: (code: string) =>
 		http.get<CertificateVerification>(CERTIFICATES.verify(code)),
 

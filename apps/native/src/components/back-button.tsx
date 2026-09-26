@@ -17,13 +17,13 @@ interface BackButtonProps {
 /**
  * A real control, not a floating glyph: a 40pt round target on a subtle fill
  * so it reads as tappable and lines up with the 40pt icon buttons in headers.
- * A chevron rather than an arrow — it is the platform's own "back" glyph and
+ * A chevron rather than an arrow - it is the platform's own "back" glyph and
  * reads as navigation, where an arrow reads as an action. `ScreenHeader back`
  * lays it out inline with the title; the two hero screens (event, NGO) place
  * it themselves.
  *
  * It renders on desktop too. It used to return `null` there on the theory that
- * the browser's own back button and the sidebar cover it — but half the app's
+ * the browser's own back button and the sidebar cover it - but half the app's
  * pushed pages (notifications, bookmarks, a certificate, an NGO's public page)
  * are not sidebar destinations, so on the web they opened with no visible way
  * back and a header whose title sat where the control should be. Chrome's back

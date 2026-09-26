@@ -48,7 +48,7 @@ export const events = pgTable(
 		city: varchar("city"),
 		state: varchar("state"),
 		// Optional coordinates powering "events near me". Distance is computed
-		// with haversine in SQL rather than PostGIS — one dependency fewer, and
+		// with haversine in SQL rather than PostGIS - one dependency fewer, and
 		// accurate enough at city scale.
 		latitude: decimal("latitude"),
 		longitude: decimal("longitude"),
@@ -58,7 +58,7 @@ export const events = pgTable(
 		endAt: timestamp("end_at").notNull(),
 		applicationDeadline: timestamp("application_deadline"),
 
-		// Capacity — acceptedCount is denormalised so public listings avoid a
+		// Capacity - acceptedCount is denormalised so public listings avoid a
 		// per-row aggregate; it is only ever mutated inside the application
 		// review transaction.
 		volunteersNeeded: integer("volunteers_needed").notNull().default(1),
@@ -101,14 +101,14 @@ export const eventApplications = pgTable(
 		reviewedAt: timestamp("reviewed_at"),
 		/**
 		 * Set when the organization confirms the volunteer turned up. Gates
-		 * certificate issuance — a certificate can never exist without it.
+		 * certificate issuance - a certificate can never exist without it.
 		 */
 		attendedAt: timestamp("attended_at"),
 		appliedAt: timestamp("applied_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},
 	(table) => [
-		// One application per volunteer per event — the DB is the source of
+		// One application per volunteer per event - the DB is the source of
 		// truth for this, not an application-level check.
 		uniqueIndex("event_applications_event_volunteer_unique").on(
 			table.eventId,

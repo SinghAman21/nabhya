@@ -13,7 +13,7 @@ import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { DB_TOKEN } from "../../common/database";
 
 /**
- * Derived statistics. Nothing here is stored — it is all computed from
+ * Derived statistics. Nothing here is stored - it is all computed from
  * applications, attendance, pledges and certificates that already exist, so
  * these numbers cannot drift from the underlying records.
  *

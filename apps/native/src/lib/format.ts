@@ -24,14 +24,14 @@ function toDate(value: string | Date | null | undefined): Date | null {
 
 export function formatDate(value: string | Date | null | undefined): string {
 	const date = toDate(value);
-	return date ? DATE_ONLY.format(date) : "—";
+	return date ? DATE_ONLY.format(date) : "-";
 }
 
 export function formatDateTime(
 	value: string | Date | null | undefined,
 ): string {
 	const date = toDate(value);
-	return date ? DATE_TIME.format(date) : "—";
+	return date ? DATE_TIME.format(date) : "-";
 }
 
 /** "12 Mar, 9:00 am – 1:00 pm" when same day, otherwise both dates in full. */
@@ -41,7 +41,7 @@ export function formatDateRange(
 ): string {
 	const from = toDate(start);
 	const to = toDate(end);
-	if (!from) return "—";
+	if (!from) return "-";
 	if (!to) return DATE_TIME.format(from);
 
 	const sameDay = from.toDateString() === to.toDateString();
@@ -56,14 +56,14 @@ export function formatDateRange(
  * Written out by hand rather than with `Intl.RelativeTimeFormat`: Hermes ships
  * only part of Intl (DateTimeFormat, NumberFormat, Collator), so on device that
  * constructor is `undefined` and calling it threw "undefined cannot be used as
- * a constructor" — on the volunteer feed, which is the first screen after
+ * a constructor" - on the volunteer feed, which is the first screen after
  * login. It works in a browser, so the web dashboards never showed it.
  */
 export function formatRelative(
 	value: string | Date | null | undefined,
 ): string {
 	const date = toDate(value);
-	if (!date) return "—";
+	if (!date) return "-";
 
 	const diffMs = date.getTime() - Date.now();
 	const absMs = Math.abs(diffMs);

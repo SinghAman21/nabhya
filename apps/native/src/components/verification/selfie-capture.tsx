@@ -33,9 +33,9 @@ const CHALLENGES = livenessChallengeSchema.options;
 /**
  * Selfie step with a lightweight liveness check. The volunteer captures a
  * straight-on frame and then a second frame performing a randomly chosen action
- * (blink, turn, smile). Both frames are uploaded to storage — the straight-on
+ * (blink, turn, smile). Both frames are uploaded to storage - the straight-on
  * one as the selfie, the action frame recorded in the document's liveness
- * metadata — so a reviewer can see motion rather than a single still, which
+ * metadata - so a reviewer can see motion rather than a single still, which
  * deters photo-of-a-photo spoofing. This is a deterrent and a reviewer aid, not
  * an automated biometric check.
  */

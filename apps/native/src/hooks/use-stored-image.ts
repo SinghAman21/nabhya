@@ -13,14 +13,14 @@ const FRESH_FOR_MS = 5 * 60 * 1000;
 /**
  * Turns a stored object key into something an `<Image>` can load.
  *
- * The bucket is private and this app stores **keys, not URLs** — see the
+ * The bucket is private and this app stores **keys, not URLs** - see the
  * uploads note in the root `AGENTS.md`. So an org logo or cover cannot be
  * rendered straight from the record: the key has to be exchanged for a
  * short-lived signed URL first. Cached per key so a logo shown in three places
  * on one screen resolves once.
  *
  * Returns `undefined` for a missing key, a key that has not resolved yet, or a
- * key the storage layer refuses — every caller therefore needs a real fallback
+ * key the storage layer refuses - every caller therefore needs a real fallback
  * (initials for a logo, a tinted panel for a cover), not a spinner. That also
  * covers development with no Supabase Storage credentials, where the storage
  * stub has nothing to sign.

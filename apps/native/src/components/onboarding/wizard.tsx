@@ -18,7 +18,7 @@ import { focusable } from "@/lib/focus";
 import { verticalScrollbar } from "@/lib/scroll";
 
 /**
- * The frame both onboarding wizards sit in — NGO and volunteer.
+ * The frame both onboarding wizards sit in - NGO and volunteer.
  *
  * Three things it fixes over what each wizard did for itself:
  *
@@ -37,7 +37,7 @@ import { verticalScrollbar } from "@/lib/scroll";
  * where three stages have somewhere to put their names.
  *
  * **Desktop gets the reassurance column.** These are the highest-stakes forms
- * in the product — an NGO decides here whether we look real — and a 560pt
+ * in the product - an NGO decides here whether we look real - and a 560pt
  * column of inputs centred in a 1440pt window says nothing about why any of it
  * is being asked. The `aside` renders beside the form on desktop and at the
  * end of the scroll body on a phone, so it is never a desktop-only reason.
@@ -49,7 +49,7 @@ import { verticalScrollbar } from "@/lib/scroll";
  * 560 was one field per row, which meant every step scrolled on a desktop with
  * two thirds of the window empty. At 720 the steps pair their fields
  * (`FieldPair`) and the review list runs two columns (`ReviewGrid`), so a step
- * fits a laptop window without scrolling — the body is still a `ScrollView`,
+ * fits a laptop window without scrolling - the body is still a `ScrollView`,
  * because "fits" is a default, not a guarantee: a short window, a browser zoom
  * or a step with every suggestion row open all need somewhere to go.
  */
@@ -61,7 +61,7 @@ const ASIDE_MIN_WIDTH = 1180;
 
 /**
  * Pins the page to the viewport on the web so the flex chain down to the
- * scrolling body reaches an actual height — without it the body grows to fit
+ * scrolling body reaches an actual height - without it the body grows to fit
  * its content and the view above clips, which is the trap written up in
  * `AGENTS.md` → Scrolling on web. Same idiom as `(ngo)/_layout.tsx`.
  */
@@ -85,14 +85,14 @@ export function WizardShell({
 	step: number;
 	title: string;
 	lede?: string;
-	/** Omit on the first step — there is nowhere back to go. */
+	/** Omit on the first step - there is nowhere back to go. */
 	onBack?: () => void;
 	/** Top-right escape hatch: sign out, or leave for now. */
 	exit?: ReactNode;
 	/** Submit failure, shown above the form rather than in an OS dialog. */
 	error?: string | null;
 	aside?: ReactNode;
-	/** The pinned action bar — `WizardFooter`, in every current caller. */
+	/** The pinned action bar - `WizardFooter`, in every current caller. */
 	footer: ReactNode;
 	children: ReactNode;
 }) {
@@ -400,7 +400,7 @@ export function WizardFooter({
 /* -------------------------------------------------------------------------- */
 
 /**
- * Two fields on one row — on desktop always, on a phone only when both are
+ * Two fields on one row - on desktop always, on a phone only when both are
  * short enough to survive half a 360dp screen (`tight`).
  *
  * Each child is given `flex: 1` here rather than at the call site, so a step

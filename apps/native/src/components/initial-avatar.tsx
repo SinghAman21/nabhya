@@ -4,7 +4,7 @@ import { useTheme } from "@/hooks/use-theme";
 
 /**
  * A person or organisation as their initials on the brand tint. Ink on tint
- * (6.7:1) rather than white on orange, which failed AA — and quiet enough that
+ * (6.7:1) rather than white on orange, which failed AA - and quiet enough that
  * a list of twenty people does not read as twenty orange dots.
  */
 export function InitialAvatar({

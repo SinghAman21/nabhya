@@ -71,7 +71,7 @@ import { paginate, toOffset } from "../../common/utils";
  * Turns a validated sort key into an `ORDER BY`.
  *
  * Sorting is server-side across the whole result set, not client-side over the
- * loaded pages — see the note on the sort schemas in `@nabhya/shared`. The
+ * loaded pages - see the note on the sort schemas in `@nabhya/shared`. The
  * column comes from a lookup table keyed by the Zod enum, so an unmapped key
  * cannot reach SQL: the enum rejects it at the boundary, and `?? fallback`
  * covers the impossible case rather than emitting an unordered query, which
@@ -99,7 +99,7 @@ function orderFor<K extends string>(
 
 /**
  * Midnight UTC for a moment. The trend buckets are UTC days, so the window's
- * edges have to be too — using local midnight would shift every bucket the day
+ * edges have to be too - using local midnight would shift every bucket the day
  * the deploy region changed.
  */
 function startOfUtcDay(at: Date): Date {
@@ -266,7 +266,7 @@ export class AdminService {
 
 	/**
 	 * The Overview's time series: new NGOs, new volunteers, events created and
-	 * applications made, per day, over the window — plus the totals for it and
+	 * applications made, per day, over the window - plus the totals for it and
 	 * for the window immediately before, so the client can show a delta without
 	 * a second request.
 	 *
@@ -281,7 +281,7 @@ export class AdminService {
 	 * holding UTC. Writing `date_trunc('day', column at time zone 'UTC')` on
 	 * such a column casts naive → `timestamptz` and then truncates in the
 	 * **session** zone, so the bucket a row lands in depends on the database's
-	 * `TimeZone` setting — which silently produced all-zero series here. The
+	 * `TimeZone` setting - which silently produced all-zero series here. The
 	 * window bounds are compared against the same naive column, so both sides
 	 * agree without either knowing a zone.
 	 */
@@ -704,7 +704,7 @@ export class AdminService {
 					createdAt: users.createdAt,
 					// Aliased and table-qualified. Interpolating the columns here
 					// rendered them unqualified, making "id" ambiguous between
-					// user_roles and roles — which made this endpoint throw 500.
+					// user_roles and roles - which made this endpoint throw 500.
 					roles: sql<string[]>`coalesce((
 						select array_agg(r.name)
 						from user_roles ur
@@ -755,7 +755,7 @@ export class AdminService {
 		return paginate(rows, totals?.value ?? 0, query);
 	}
 
-	/** Per-volunteer participation trail — which events, which outcome. */
+	/** Per-volunteer participation trail - which events, which outcome. */
 	async getUserDetail(userId: string) {
 		const user = await this.db.query.users.findFirst({
 			where: eq(users.id, userId),
@@ -1033,7 +1033,7 @@ export class AdminService {
 	 * Reviews one identity document and re-derives the volunteer's own
 	 * verification status from their whole document set. A volunteer is only
 	 * VERIFIED once a government ID *and* a liveness selfie have both been
-	 * approved — approving a single document must never promote the account on
+	 * approved - approving a single document must never promote the account on
 	 * its own, or a selfie-less ID (or an ID-less selfie) would count as
 	 * verified. The account status gates trust badges elsewhere in the app.
 	 */
@@ -1097,7 +1097,7 @@ export class AdminService {
 	 * Reviews many documents in one request.
 	 *
 	 * Sequential rather than one big `UPDATE ... WHERE id IN (...)`, and that is
-	 * deliberate on both counts. Each decision has to be audited on its own —
+	 * deliberate on both counts. Each decision has to be audited on its own -
 	 * an audit log that records "38 documents approved" cannot answer "who
 	 * approved *this* certificate", which is the only question anyone ever asks
 	 * of it. And an identity document additionally re-derives its owner's
@@ -2228,7 +2228,7 @@ export class AdminService {
 
 	/**
 	 * Promotes an existing account to superadmin. Deliberately not exposed over
-	 * HTTP — call it from a script or the DB. Kept here so the role name and
+	 * HTTP - call it from a script or the DB. Kept here so the role name and
 	 * audit trail stay consistent with the rest of admin actions.
 	 */
 	async grantSuperadmin(email: string) {
@@ -2245,7 +2245,7 @@ export class AdminService {
 		});
 
 		if (!superadminRole) {
-			throw new NotFoundException("superadmin role missing — run the seed");
+			throw new NotFoundException("superadmin role missing - run the seed");
 		}
 
 		const existing = await this.db.query.userRoles.findMany({

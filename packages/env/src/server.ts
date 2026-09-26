@@ -1,6 +1,6 @@
 import { config } from "dotenv";
 
-// The server reads env from .env (not .env.local) — apps/native is the one
+// The server reads env from .env (not .env.local) - apps/native is the one
 // that uses .env.local, since Expo's own env loading prioritizes that file.
 config({ path: ".env" });
 
@@ -22,7 +22,7 @@ export const env = createEnv({
 		// to mint short-lived signed URLs; clients never receive it.
 		// Optional: when unset the server falls back to an in-memory stub so the
 		// app still boots and every upload path stays exercisable without
-		// credentials. The stub refuses to run in production — see StorageModule.
+		// credentials. The stub refuses to run in production - see StorageModule.
 		SUPABASE_URL: z.string().url().optional(),
 		SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
 
@@ -34,7 +34,7 @@ export const env = createEnv({
 		RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
 		RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
 
-		// Transactional email — currently used for team invites. The sender is
+		// Transactional email - currently used for team invites. The sender is
 		// env-driven so the verified Resend domain can be changed without code.
 		RESEND_API_KEY: z.string().min(1).optional(),
 		MAIL_FROM_EMAIL: z.email().default("noreply@graphex.me"),

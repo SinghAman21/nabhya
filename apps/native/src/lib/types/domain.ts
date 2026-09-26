@@ -235,7 +235,7 @@ export interface OrgNeedListItem {
 	pendingPledges: number;
 }
 
-/** A pledge as the owning organization sees it — who responded. */
+/** A pledge as the owning organization sees it - who responded. */
 export interface NeedPledge {
 	id: string;
 	status: PledgeStatus;
@@ -246,7 +246,7 @@ export interface NeedPledge {
 	user: VolunteerSummary;
 }
 
-/** The same pledge as the volunteer sees it — what they responded to. */
+/** The same pledge as the volunteer sees it - what they responded to. */
 export interface MyPledgeListItem {
 	id: string;
 	status: PledgeStatus;
@@ -289,7 +289,7 @@ export interface AdminOrgListItem {
 }
 
 /**
- * Extra data on an identity document. Only the liveness selfie sets it — the
+ * Extra data on an identity document. Only the liveness selfie sets it - the
  * challenge the volunteer was asked to perform and the storage key of the
  * second frame captured mid-challenge, so a reviewer can see motion.
  */
@@ -315,7 +315,7 @@ export interface AdminOrgDocument {
 /**
  * A row of the cross-organization verification queue.
  *
- * Same document shape as the dossier view, plus the owner it belongs to —
+ * Same document shape as the dossier view, plus the owner it belongs to -
  * the queue is sorted by upload time across every NGO, so each row has to
  * name its own organization.
  */
@@ -347,9 +347,9 @@ export interface AdminOrgDetail {
 	mission: string | null;
 	vision: string | null;
 	website: string | null;
-	/** Object key, not a URL — resolve it with `useStoredImageUrl`. */
+	/** Object key, not a URL - resolve it with `useStoredImageUrl`. */
 	logo: string | null;
-	/** Object key, not a URL — resolve it with `useStoredImageUrl`. */
+	/** Object key, not a URL - resolve it with `useStoredImageUrl`. */
 	coverImage: string | null;
 	address: string | null;
 	city: string | null;
@@ -554,7 +554,7 @@ export interface OrgDonation {
 	receiptNumber: string | null;
 	completedAt: string | null;
 	createdAt: string;
-	/** Null when the donor chose to stay anonymous — enforced server-side. */
+	/** Null when the donor chose to stay anonymous - enforced server-side. */
 	donorName: string | null;
 }
 
@@ -657,7 +657,7 @@ export interface TeamInvite {
 	status: "PENDING" | "ACCEPTED" | "DECLINED" | "REVOKED" | "EXPIRED";
 	expiresAt: string;
 	createdAt: string;
-	/** Only present on the create/resend response — never on the list. */
+	/** Only present on the create/resend response - never on the list. */
 	token?: string;
 	/** Shareable link built server-side from TEAM_INVITE_URL_BASE. */
 	inviteUrl?: string;
@@ -667,7 +667,7 @@ export interface TeamInvite {
 }
 
 /**
- * One row of `GET /api/organizations/:id/team` — the public subset only.
+ * One row of `GET /api/organizations/:id/team` - the public subset only.
  * No emails, no ids, just what an NGO chose to show beside its name.
  */
 export interface PublicTeamMember {

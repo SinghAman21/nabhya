@@ -11,7 +11,7 @@ import { focusable } from "@/lib/focus";
 /**
  * A count, and optionally what it counts, as **one** control.
  *
- * One label, one filled bar reading `− 200 blankets +` — the feed card prints
+ * One label, one filled bar reading `− 200 blankets +` - the feed card prints
  * the pair as one string ("40 / 200 blankets"), so the form asks it as one
  * fact. Enter it three ways: nudge ±1, quick-add the distance, or type it.
  *
@@ -37,7 +37,7 @@ export function AmountField({
 	label: string;
 	hint?: string;
 	error?: string;
-	/** Digits only — `"0"` means unspecified, never sent to the API. */
+	/** Digits only - `"0"` means unspecified, never sent to the API. */
 	count: string;
 	onCount: (next: string) => void;
 	/** Omit both to render a bare count, e.g. a headcount. */
@@ -116,7 +116,7 @@ export function StepperBar({
 	trailing,
 	style,
 }: {
-	/** Digits only — `"0"` means unspecified, never sent to the API. */
+	/** Digits only - `"0"` means unspecified, never sent to the API. */
 	count: string;
 	onCount: (next: string) => void;
 	countPlaceholder?: string;
@@ -202,7 +202,7 @@ export function StepChips({
 	accessibilityName,
 }: {
 	steps?: readonly number[];
-	/** Digits only — `"0"` means unspecified. */
+	/** Digits only - `"0"` means unspecified. */
 	count: string;
 	onCount: (next: string) => void;
 	max?: number;

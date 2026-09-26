@@ -114,7 +114,7 @@ export const onboardingApi = {
 	status: () => http.get<OnboardingStatus>(ONBOARDING.STATUS),
 	// The payload types are the schemas' *input* side: the wizards post raw form
 	// values and the server normalises them. Posting the client-parsed output
-	// fails validation — `optionalText` turns "" into null, and null is not
+	// fails validation - `optionalText` turns "" into null, and null is not
 	// valid input for it.
 	completeOrganization: (input: CompleteOrgOnboardingPayload) =>
 		http.post<{ id: string }>(ONBOARDING.ORGANIZATION, input),
@@ -154,7 +154,7 @@ export const feedApi = {
 	following: (query: Partial<FollowingFeedQuery>) =>
 		feedPage(FEED.FOLLOWING, query),
 	saved: (query: Partial<SavedFeedQuery>) => feedPage(FEED.SAVED, query),
-	/** Chronological posts only — the composer's own list. */
+	/** Chronological posts only - the composer's own list. */
 	list: (query: Partial<FeedQuery>) =>
 		http.getPage<FeedPostRecord>(FEED.LIST, query),
 	createMediaIntents: (input: CreateFeedMediaIntentsInput) =>

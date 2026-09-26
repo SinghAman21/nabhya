@@ -43,8 +43,8 @@ import { useAuthStore } from "@/store/auth-store";
 
 /**
  * One event, laid out in the order a volunteer decides: who and what, then the
- * facts (when, where, how many places), then the description. The one action —
- * apply, or withdraw — is pinned to the bottom so it never has to be scrolled
+ * facts (when, where, how many places), then the description. The one action -
+ * apply, or withdraw - is pinned to the bottom so it never has to be scrolled
  * to, and the optional message to the organiser lives in a sheet rather than an
  * always-open text box on the page.
  */

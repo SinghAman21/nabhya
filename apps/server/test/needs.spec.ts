@@ -86,7 +86,7 @@ describe("NeedsService", () => {
 		});
 
 		it("refuses a second pledge from the same person", async () => {
-			// Backed by need_pledges_need_user_unique — without it a double-tap
+			// Backed by need_pledges_need_user_unique - without it a double-tap
 			// inserts two PENDING rows and both inflate fulfilledQuantity on accept.
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
@@ -209,7 +209,7 @@ describe("NeedsService", () => {
 		});
 
 		it("does not double-count when accepted then completed", async () => {
-			// ACCEPTED and COMPLETED are both "committed" — moving between them
+			// ACCEPTED and COMPLETED are both "committed" - moving between them
 			// must not add the quantity a second time.
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
@@ -266,7 +266,7 @@ describe("NeedsService", () => {
 	});
 });
 
-describe("NeedsService — correlated counts", () => {
+describe("NeedsService - correlated counts", () => {
 	let db: TestDb;
 	let close: () => Promise<void>;
 	let service: NeedsService;

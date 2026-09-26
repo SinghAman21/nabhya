@@ -60,7 +60,7 @@ const COPY = [
 	},
 	{
 		title: "Where do you volunteer?",
-		lede: "Your city decides what fills your feed. Item donation and event help are local — nobody carries 20 blankets 900km.",
+		lede: "Your city decides what fills your feed. Item donation and event help are local - nobody carries 20 blankets 900km.",
 	},
 	{
 		title: "What do you care about?",
@@ -76,7 +76,7 @@ const COPY = [
  * Volunteer onboarding.
  *
  * Four steps, one pinned action, and a draft that survives the app being
- * killed — it used to live in `useState`, so backgrounding the app to go and
+ * killed - it used to live in `useState`, so backgrounding the app to go and
  * find a phone number lost the form. The shape is deliberately the same as the
  * NGO wizard's (`index.tsx`): same shell, same validation approach, same
  * review-then-done ending, because the two are one flow with two audiences and
@@ -108,7 +108,7 @@ export default function VolunteerOnboarding() {
 
 	/**
 	 * Seed the name and phone from the account, and only into fields the draft
-	 * has not filled — a Google sign-in already told us the name, and typing it
+	 * has not filled - a Google sign-in already told us the name, and typing it
 	 * again is the first thing this form used to ask for.
 	 *
 	 * The ref matters: without it, clearing the name field re-runs this and puts
@@ -232,7 +232,7 @@ export default function VolunteerOnboarding() {
 
 		// `payload`, not `result.data`: the parse is validation only. Sending the
 		// parsed output posts `null` for every blank optional field, and `null`
-		// is not valid *input* for those fields — the server rejected it with
+		// is not valid *input* for those fields - the server rejected it with
 		// "expected string, received null" on `bio` and `profileImage`.
 		complete.mutate(payload, {
 			onSuccess: () => {
@@ -283,7 +283,7 @@ export default function VolunteerOnboarding() {
 						title="You're in"
 						lede="Your feed is set to your city and the causes you picked. Two things make NGOs pick you first."
 						steps={[
-							"Verify your identity — a government ID and a selfie. NGOs accept verified volunteers ahead of everyone else.",
+							"Verify your identity - a government ID and a selfie. NGOs accept verified volunteers ahead of everyone else.",
 							"Pledge an item or apply to an event. Your certificates and impact build from there.",
 						]}
 						actions={
@@ -300,7 +300,7 @@ export default function VolunteerOnboarding() {
 									variant="ghost"
 									onPress={() => router.replace("/(volunteer)")}
 								>
-									Later — take me to my feed
+									Later - take me to my feed
 								</Button>
 							</>
 						}
@@ -364,7 +364,7 @@ export default function VolunteerOnboarding() {
 						? { note: "Waiting for your photo to finish uploading…" }
 						: step === 2 && draft.categoryIds.length === 0
 							? {
-									note: "You can skip causes — your feed will use your city only.",
+									note: "You can skip causes - your feed will use your city only.",
 								}
 							: {})}
 				/>
@@ -435,7 +435,7 @@ export default function VolunteerOnboarding() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Step 1 — about you                                                         */
+/* Step 1 - about you                                                         */
 /* -------------------------------------------------------------------------- */
 
 function AboutStep({
@@ -504,7 +504,7 @@ function AboutStep({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Step 3 — causes                                                            */
+/* Step 3 - causes                                                            */
 /* -------------------------------------------------------------------------- */
 
 function CausesStep({
@@ -561,9 +561,9 @@ function CausesStep({
 						style={{ marginTop: spacing[2] }}
 					>
 						{draft.categoryIds.length === 0
-							? `Pick up to ${MAX_CAUSES}. Skipping is fine — your feed falls back to your city.`
+							? `Pick up to ${MAX_CAUSES}. Skipping is fine - your feed falls back to your city.`
 							: draft.categoryIds.length >= MAX_CAUSES
-								? `${MAX_CAUSES} of ${MAX_CAUSES} chosen — deselect one to swap.`
+								? `${MAX_CAUSES} of ${MAX_CAUSES} chosen - deselect one to swap.`
 								: `${draft.categoryIds.length} of ${MAX_CAUSES} chosen`}
 					</Caption>
 					{errors.categoryIds ? (
@@ -579,7 +579,7 @@ function CausesStep({
 					label="About you"
 					optional
 					error={errors.bio}
-					hint="Skills, availability, languages — anything an NGO should know."
+					hint="Skills, availability, languages - anything an NGO should know."
 				>
 					<Input
 						placeholder="e.g. Free on weekends, comfortable teaching maths to 10–14 year olds, speaks Marathi and Hindi."
@@ -596,7 +596,7 @@ function CausesStep({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Step 4 — review                                                            */
+/* Step 4 - review                                                            */
 /* -------------------------------------------------------------------------- */
 
 function ReviewStep({
@@ -634,7 +634,7 @@ function ReviewStep({
 						label: "Coordinates",
 						value:
 							draft.latitude !== undefined && draft.longitude !== undefined
-								? "Saved — nearby NGOs will rank first"
+								? "Saved - nearby NGOs will rank first"
 								: "Not saved",
 						onEdit: () => onEdit(1),
 					},

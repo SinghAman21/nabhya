@@ -54,7 +54,7 @@ export type CompleteVolunteerOnboardingInput = z.infer<
 >;
 
 /**
- * What the client actually sends — the schema's **input** side.
+ * What the client actually sends - the schema's **input** side.
  *
  * The wizard posts the raw form values ("" for an untouched optional field) and
  * lets the server normalise them, because the parse is not idempotent: an
@@ -137,9 +137,9 @@ export type UploadUserDocumentInput = z.infer<typeof uploadUserDocumentSchema>;
  * have been approved. Verifying a single document must never flip the account,
  * so the account status is always recomputed from the whole document set:
  *
- * - VERIFIED — a government ID *and* a selfie are both approved.
- * - REJECTED — a still-unsatisfied required slot (gov ID or selfie) was rejected.
- * - PENDING  — anything else (awaiting upload or review).
+ * - VERIFIED - a government ID *and* a selfie are both approved.
+ * - REJECTED - a still-unsatisfied required slot (gov ID or selfie) was rejected.
+ * - PENDING  - anything else (awaiting upload or review).
  */
 export function computeUserVerificationStatus(
 	documents: ReadonlyArray<{

@@ -21,7 +21,7 @@ import { useTheme } from "@/hooks/use-theme";
  * An event: when, and how many people.
  *
  * `createEventSchema` has nine fields and an event most people publish needs
- * four of them, so three are visible — start, end, headcount — and the rest are
+ * four of them, so three are visible - start, end, headcount - and the rest are
  * chips. `EventFacts` on the card draws a date chip, a location chip, a
  * "6 of 25 spots left" row and a twelve-segment bar, which is why those three
  * and not others.
@@ -29,19 +29,19 @@ import { useTheme } from "@/hooks/use-theme";
  * Three decisions here are about how much work the form asks for:
  *
  * - **Ends follows Starts.** Setting a start moves the end to three hours
- *   later, the length of nearly every volunteering slot here — and, more to
+ *   later, the length of nearly every volunteering slot here - and, more to
  *   the point, *a valid value*: `createEventSchema` refuses an end before its
  *   start, so two empty date boxes could fail validation on a field the author
  *   had no opinion about. It follows only while untouched (`endTouched`), so
  *   it never overwrites a real answer.
  * - **Venue and address are separate chips, and the address is prefilled.**
- *   They are different facts — `Shivaji Park` is where to meet, the street
- *   address is how to get there — and the NGO's own address is the right first
+ *   They are different facts - `Shivaji Park` is where to meet, the street
+ *   address is how to get there - and the NGO's own address is the right first
  *   guess for an event at its own premises, which most are. Prefilled, not
  *   silent: unlike the city, an address is often *not* the NGO's, so it is
  *   shown for confirmation rather than assumed.
- * - **Urgency is not on offer.** `toFeedItem` derives it from the start date —
- *   an event is urgent inside three days — so a chip would be a control that
+ * - **Urgency is not on offer.** `toFeedItem` derives it from the start date -
+ *   an event is urgent inside three days - so a chip would be a control that
  *   disagrees with the card. It is a `PropertyNote` instead.
  */
 
@@ -51,7 +51,7 @@ export interface EventFieldsValue {
 	deadline: Date | undefined;
 	venue: string;
 	address: string;
-	/** Digits only — see `AmountField`. */
+	/** Digits only - see `AmountField`. */
 	volunteers: string;
 	/**
 	 * Whether the end has been set deliberately. Once true, changing the start
@@ -60,7 +60,7 @@ export interface EventFieldsValue {
 	endTouched: boolean;
 	/**
 	 * Flags rather than `venue.length > 0`, which is what the date chips use.
-	 * A date is absent or a real date, so its own value can drive its chip —
+	 * A date is absent or a real date, so its own value can drive its chip -
 	 * but an open *text* field starts empty and legitimately stays empty while
 	 * somebody thinks, and deriving the chip from the string would collapse the
 	 * field under the cursor on the first backspace.
@@ -133,7 +133,7 @@ export function EventFields({
 				onChange={(next) => onChange({ endAt: next, endTouched: true })}
 				error={errors.endAt}
 				// An end is relative to the start, never to now, so "Tomorrow" and
-				// "In a week" are the wrong offers here — and by the time anybody
+				// "In a week" are the wrong offers here - and by the time anybody
 				// reads this field it already holds a sensible value.
 				shortcuts={false}
 			/>
@@ -216,7 +216,7 @@ export function EventFields({
 			<PropertyNote>
 				{value.placeOpen || !homeCity
 					? "An event becomes urgent on its own in the three days before it starts."
-					: `In ${homeCity} — your NGO's city. Urgent is automatic in the last three days.`}
+					: `In ${homeCity} - your NGO's city. Urgent is automatic in the last three days.`}
 			</PropertyNote>
 
 			<RevealedFields>
@@ -242,7 +242,7 @@ export function EventFields({
 						error={errors.address}
 						hint={
 							homeAddress
-								? "Prefilled from your registration — change it if the event is elsewhere."
+								? "Prefilled from your registration - change it if the event is elsewhere."
 								: "The street address volunteers should travel to."
 						}
 					>
@@ -287,7 +287,7 @@ export function EventFields({
  * A start that is a sensible offer rather than an empty box: the next whole
  * hour, a week out. `createEventSchema` cannot accept a missing start, so the
  * only question is whether the author edits a real date or fills in a blank
- * one — and a blank one is also the shape that produces Zod's useless
+ * one - and a blank one is also the shape that produces Zod's useless
  * "invalid input" from a `coerce.date()`.
  */
 export function defaultEventStart() {

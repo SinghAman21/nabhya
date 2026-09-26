@@ -15,14 +15,14 @@ import { useMedia } from "@/hooks/useMedia";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
- * A hard height for the desktop shell — the same pin `(ngo)/_layout.tsx`
+ * A hard height for the desktop shell - the same pin `(ngo)/_layout.tsx`
  * carries, and for the same reason.
  *
  * Every scroll region in the app is a `ScrollView` or `FlatList` whose height
  * comes from a chain of `flex: 1` ancestors. On the web that chain is only as
  * good as its weakest link: if any ancestor resolves to content height instead
  * of viewport height, the list grows to fit its content, the `View` above it
- * clips at `overflow: hidden`, and the page silently becomes unscrollable — no
+ * clips at `overflow: hidden`, and the page silently becomes unscrollable - no
  * scrollbar, no wheel response, rows simply gone below the fold. This shell had
  * a bare `flex: 1` content column, which is the failure the NGO layout wrote
  * three paragraphs about; the admin lists are the longest in the app, so it is
@@ -38,7 +38,7 @@ const SHELL_HEIGHT: ViewStyle =
 	Platform.OS === "web" ? ({ height: "100dvh" } as unknown as ViewStyle) : {};
 
 /**
- * Superadmin console. The client-side role check here is convenience only —
+ * Superadmin console. The client-side role check here is convenience only -
  * every /api/admin route is guarded by @Roles("superadmin") on the server.
  *
  * There is no content-width cap here, unlike `(ngo)`: each admin screen caps

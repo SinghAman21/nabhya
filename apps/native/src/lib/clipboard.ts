@@ -2,7 +2,7 @@ import * as Clipboard from "expo-clipboard";
 
 /**
  * Copies text to the clipboard, preferring the web Clipboard API where it
- * exists and falling back to expo-clipboard elsewhere. Never throws —
+ * exists and falling back to expo-clipboard elsewhere. Never throws -
  * returns whether the copy succeeded so callers can toast either way.
  */
 export async function copyText(value: string): Promise<boolean> {

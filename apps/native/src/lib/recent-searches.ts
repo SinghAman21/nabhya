@@ -5,8 +5,8 @@ const KEY = "nabhya-recent-searches";
 
 /**
  * Eight, and short ones. `lib/storage` is `expo-secure-store` on native, which
- * caps a value at 2048 bytes — the same budget `lib/post-drafts.ts` works
- * against — and a list longer than this stops being a shortcut and becomes
+ * caps a value at 2048 bytes - the same budget `lib/post-drafts.ts` works
+ * against - and a list longer than this stops being a shortcut and becomes
  * another list to read.
  */
 const MAX = 8;
@@ -17,7 +17,7 @@ const MAX_TERM_LENGTH = 60;
  *
  * A search screen without them makes every repeat search a retype, which is the
  * common case on a phone: the same NGO, the same item, the same city, a day
- * apart. Kept on the device only — a search term is a fair record of what
+ * apart. Kept on the device only - a search term is a fair record of what
  * someone is short of, and there is no reason for the server to hold it.
  *
  * Only **committed** terms are recorded (the keyboard's Search key, or opening

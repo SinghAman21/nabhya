@@ -12,11 +12,11 @@ import { feedApi } from "@/lib/api";
  *    keys `VIDEO` on `.mp4` / `.mov`). A file named `media-1757…` with no
  *    extension is therefore stored as an `IMAGE` whatever it actually is, and
  *    renders as a broken image in every feed. So the extension is *derived from
- *    the content type* here and appended — never taken on trust from the
+ *    the content type* here and appended - never taken on trust from the
  *    picker, which returns `fileName: null` for a video on Android.
  * 2. **Only five content types are accepted** (`feedMediaContentTypeSchema`).
  *    Anything else has to be refused by name up front. Relabelling a HEIC as
- *    `image/jpeg` — which is what the old composer did — produces a signed URL
+ *    `image/jpeg` - which is what the old composer did - produces a signed URL
  *    for one type and a PUT of another, so the upload 403s with nothing on
  *    screen to explain why.
  *
@@ -29,7 +29,7 @@ import { feedApi } from "@/lib/api";
  * Spelled out rather than inferred from `feedMediaContentTypeSchema`: the
  * records below are keyed on it, and `z.infer` of a schema this file also has
  * to key a `Record` on makes the two definitions circular. Kept in step with
- * `packages/shared/src/feed.ts` — if a format is added there, add it here and
+ * `packages/shared/src/feed.ts` - if a format is added there, add it here and
  * to `EXTENSION`, and the compiler will point at the rest.
  */
 export type FeedMediaContentType =
@@ -184,7 +184,7 @@ export function toComposerMedia(
 		if (size > MAX_FEED_MEDIA_BYTES) {
 			rejected.push({
 				fileName: label,
-				reason: `${formatBytes(size)} — the limit is ${formatBytes(MAX_FEED_MEDIA_BYTES)}.`,
+				reason: `${formatBytes(size)} - the limit is ${formatBytes(MAX_FEED_MEDIA_BYTES)}.`,
 			});
 			continue;
 		}
@@ -219,7 +219,7 @@ export function toComposerMedia(
  * at a spinner for thirty seconds. `XMLHttpRequest` reports it on React Native
  * and on the web alike, so the tile can fill instead of just spinning.
  *
- * Deliberately raw — **no Authorization header**. The URL is pre-signed and an
+ * Deliberately raw - **no Authorization header**. The URL is pre-signed and an
  * extra header would break the signature, which is why the app's axios
  * instance must never be used here.
  */
@@ -260,7 +260,7 @@ function putWithProgress(
  *
  * One intent request covers the whole set, because the folder is minted per
  * request and `assertFeedMediaKeys` requires every key to sit under the same
- * one — asking per file would produce four folders and a rejected post.
+ * one - asking per file would produce four folders and a rejected post.
  * Tickets come back in the order the files went out, which is also the order
  * `sortOrder` is assigned in, so the carousel shows them the way they were
  * picked.

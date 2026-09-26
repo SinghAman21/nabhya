@@ -62,7 +62,7 @@ const TYPES: Array<{ value: ReportType; label: string }> = (
  * Transparency documents an NGO publishes voluntarily.
  *
  * Distinct from verification documents, which are private and reviewed by a
- * superadmin — everything here is public, and is what a donor reads before
+ * superadmin - everything here is public, and is what a donor reads before
  * deciding to trust the organization. The endpoint returns the full list, so
  * there is no paging here.
  */

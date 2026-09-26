@@ -13,7 +13,7 @@ export type StoragePurpose =
 
 /**
  * Content types we accept. Anything outside this list is rejected before a
- * signed URL is handed out — the signature pins Content-Type, so a client
+ * signed URL is handed out - the signature pins Content-Type, so a client
  * cannot upload something else with a URL issued for a PDF.
  */
 export const ALLOWED_CONTENT_TYPES = [
@@ -31,7 +31,7 @@ export type AllowedContentType = (typeof ALLOWED_CONTENT_TYPES)[number];
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 export interface UploadTicket {
-	/** Object key to persist. Never store a signed URL — they expire. */
+	/** Object key to persist. Never store a signed URL - they expire. */
 	key: string;
 	/** Pre-signed URL the client PUTs the file body to. */
 	url: string;
@@ -54,7 +54,7 @@ export interface StorageProvider {
 	}): Promise<UploadTicket>;
 
 	/**
-	 * Short-lived read URL. Documents are private — nothing is served from a
+	 * Short-lived read URL. Documents are private - nothing is served from a
 	 * public bucket URL.
 	 */
 	createDownloadUrl(key: string, expiresInSeconds?: number): Promise<string>;
@@ -64,7 +64,7 @@ export interface StorageProvider {
 
 	delete(key: string): Promise<void>;
 
-	/** Uploads bytes directly — used for server-generated files like PDFs. */
+	/** Uploads bytes directly - used for server-generated files like PDFs. */
 	putObject(input: {
 		key: string;
 		body: Uint8Array;

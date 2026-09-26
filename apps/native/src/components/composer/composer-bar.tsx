@@ -23,7 +23,7 @@ import { focusable } from "@/lib/focus";
  * Two rows on one card: the invitation, then the shortcuts, divided by a
  * full-bleed hairline. It sits in the feed rather than behind a "+" because a
  * feed an NGO cannot post to reads as somebody else's product, and the second
- * row exists because "share an update" is a blank page — the shortcuts under
+ * row exists because "share an update" is a blank page - the shortcuts under
  * it name what you might actually be about to do, and each opens the composer
  * already in that state rather than dropping you on the same blank page.
  * Three on a phone, four where there is room for Event; see the note beside
@@ -35,7 +35,7 @@ import { focusable } from "@/lib/focus";
  *   much space reads as a disabled field rather than an invitation. It is
  *   `Body` in a 46pt pill now, which is the size a real input would be.
  * - **The shortcuts were three `flex: 1` buttons.** Stretched to thirds of the
- *   card they read as a segmented control — three tabs, not three shortcuts.
+ *   card they read as a segmented control - three tabs, not three shortcuts.
  *   They are compact and left-aligned now, and the space to their right is
  *   deliberate.
  * - **The icons were bare tertiary glyphs.** Each sits in a tinted well, which
@@ -46,7 +46,7 @@ import { focusable } from "@/lib/focus";
  *
  * Labels shorten on a phone rather than truncating. An earlier version kept
  * the long ones at every width and, in the ~330pt a feed column had at the
- * time, rendered "Photo o…" and "Need u…" — three controls nobody could read.
+ * time, rendered "Photo o…" and "Need u…" - three controls nobody could read.
  */
 export function PostComposerBar({
 	onCompose,
@@ -157,7 +157,7 @@ export function PostComposerBar({
 						/>
 						{/*
 						 * Event only where there is room. Four pills need ~390pt and
-						 * a feed column on a phone has ~330 — and the labels here
+						 * a feed column on a phone has ~330 - and the labels here
 						 * cannot shorten any further without becoming initials. The
 						 * type is one tap away inside the composer either way, so
 						 * the phone loses a shortcut, not a capability.
@@ -184,13 +184,13 @@ export function PostComposerBar({
 /**
  * One shortcut: a tinted icon well and a word, in a pill sized to its content.
  *
- * The well is `primary.tint` with a `primary.ink` glyph — brand as *ink*, never
+ * The well is `primary.tint` with a `primary.ink` glyph - brand as *ink*, never
  * `primary.main`, which is a fill and fails AA for a 15px icon. Same recipe as
  * the dashboard's Create tiles on purpose.
  *
  * The well is a **circle**, not the `borderRadius.sm` square it started as.
  * The control around it is a 999 pill, so the two radii sat inside one another
- * and disagreed — a rounded rectangle floating in a capsule, the corner gap
+ * and disagreed - a rounded rectangle floating in a capsule, the corner gap
  * widest exactly where the hover fill makes it visible. Concentric radii or
  * none: a pill wants a disc inside it.
  */

@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { categoriesApi, onboardingApi, queryKeys, usersApi } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 
-/** The authenticated user's profile — the client's source of truth for role. */
+/** The authenticated user's profile - the client's source of truth for role. */
 export function useMe(enabled = true) {
 	return useQuery({
 		queryKey: queryKeys.me,

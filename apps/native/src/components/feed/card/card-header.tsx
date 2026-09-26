@@ -19,7 +19,7 @@ const AVATAR = 40;
  * `createDownloadUrl`), so `organization.logo` arrives as a **URL**; a
  * volunteer's `author.profileImage` comes straight off the user row and is
  * still a **key**. Passing the signed URL to `useStoredImageUrl` posted it to
- * `/api/uploads/download-url` as though it were a key, which fails — so every
+ * `/api/uploads/download-url` as though it were a key, which fails - so every
  * NGO in the feed fell back to a letter tile even when it had uploaded a logo.
  *
  * `useStoredImageUrl` is called unconditionally (its query is disabled on a
@@ -41,7 +41,7 @@ export interface CardHeaderProps {
 }
 
 /**
- * Who posted, from where, and how long ago — plus the two controls that belong
+ * Who posted, from where, and how long ago - plus the two controls that belong
  * to the poster rather than to the post.
  *
  * An organisation gets a rounded-square avatar and a volunteer gets a circle.
@@ -196,7 +196,7 @@ export function CardHeader({
 			 * volunteer's feed keeps a header with nothing to press.
 			 *
 			 * It says what it does. The icon was `MoreHorizontal` labelled "Post
-			 * options", but there is one option and it deletes the post — an
+			 * options", but there is one option and it deletes the post - an
 			 * overflow affordance that opens nothing is a menu that lies.
 			 */}
 			{onDelete && (

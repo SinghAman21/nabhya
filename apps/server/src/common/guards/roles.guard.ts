@@ -42,7 +42,7 @@ export class RolesGuard implements CanActivate {
 			);
 		}
 
-		// OR semantics — holding any one of the listed roles is enough.
+		// OR semantics - holding any one of the listed roles is enough.
 		if (!requiredRoles.some((role) => user.roles.includes(role))) {
 			throw new ForbiddenException(
 				`This action requires the ${requiredRoles.join(" or ")} role.`,

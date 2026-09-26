@@ -24,7 +24,7 @@ import { apiErrorMessage } from "@/lib/api";
  * cannot say.
  *
  * Served by `GET /api/admin/analytics?days=7|30|90&limit=10`. The `days` value
- * is the page's own window switch — one control above every chart, so a 7-day
+ * is the page's own window switch - one control above every chart, so a 7-day
  * line can never sit beside a 30-day bar. `keepPreviousData` holds the old
  * charts up while the next window loads.
  *
@@ -34,13 +34,13 @@ import { apiErrorMessage } from "@/lib/api";
  * - Application funnel + review-queue age → `PipelineBar` / grouped bars
  *   (ordinal stages, one hue stepping light to dark).
  * - Top locations / causes → `BarList` (categorical counts with a dimension to
- *   plot against — exactly what a stat tile cannot do).
+ *   plot against - exactly what a stat tile cannot do).
  * - Top organizations → rows, not a chart: a ranking with four numbers per
  *   entry is a table, and drawing it as bars would spend a card restating what
  *   the numbers already say.
  *
  * Series colours come from `viz-tokens.ts` in fixed assignment order and are
- * never cycled or reassigned by rank. Text never wears a series colour — a
+ * never cycled or reassigned by rank. Text never wears a series colour - a
  * swatch beside the words carries identity.
  */
 export function AnalyticsSections({ days }: { days: TrendWindow }) {
@@ -269,13 +269,13 @@ function QueueAgeBars({
 			label: `${bucket.label} · NGO docs`,
 			value: bucket.orgDocuments,
 			color: viz.series[0] as string,
-			hint: `${bucket.label} — NGO documents`,
+			hint: `${bucket.label} - NGO documents`,
 		},
 		{
 			label: `${bucket.label} · IDs`,
 			value: bucket.userDocuments,
 			color: viz.series[1] as string,
-			hint: `${bucket.label} — identity documents`,
+			hint: `${bucket.label} - identity documents`,
 		},
 	]);
 

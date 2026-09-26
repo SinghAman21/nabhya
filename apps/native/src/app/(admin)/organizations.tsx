@@ -27,7 +27,7 @@ import type { AdminOrgListItem } from "@/lib/types";
  * The NGO directory, and the screen the whole console pattern is set by.
  *
  * Two axes, not one chip row. Verification state and account state are
- * independent — an NGO can be verified *and* suspended — and the old single
+ * independent - an NGO can be verified *and* suspended - and the old single
  * row of six chips had to lie about that by making "Suspended" a seventh
  * verification value. Two `SelectMenu`s say both at once and take one line
  * between them.
@@ -73,7 +73,7 @@ export default function AdminOrganizations() {
 	/**
 	 * The owner account opened from a dossier. Held here rather than inside
 	 * `OrgDetailSheet` so the two drawers are siblings and open one after the
-	 * other — nesting a `Modal` in a `Modal` puts two `OverlayHost`s in the
+	 * other - nesting a `Modal` in a `Modal` puts two `OverlayHost`s in the
 	 * stack and a toast lands on whichever registered last.
 	 */
 	const [owner, setOwner] = useState<string | null>(null);
@@ -144,7 +144,7 @@ export default function AdminOrganizations() {
 			width: 72,
 			align: "end",
 			// The number a reviewer is actually hunting for, so it is a numeral in
-			// warning ink rather than a pill saying "3 docs to review" — at 72pt
+			// warning ink rather than a pill saying "3 docs to review" - at 72pt
 			// wide the sentence would not fit, and in a column the word is implied
 			// by the header anyway.
 			render: (org) => (
@@ -168,7 +168,7 @@ export default function AdminOrganizations() {
 			wideOnly: true,
 			render: (org) => (
 				<Caption color="tertiary" numberOfLines={1}>
-					{org.city || "—"}
+					{org.city || "-"}
 				</Caption>
 			),
 		},
@@ -287,7 +287,7 @@ export default function AdminOrganizations() {
  * The card, for the grid and for mobile.
  *
  * Deliberately *not* the table row rearranged. A card is read as a block, so it
- * leads with identity and puts state on its own line as pills — the pills are
+ * leads with identity and puts state on its own line as pills - the pills are
  * right here and wrong in the table, where the same information is a column and
  * a pill in every row would be a stripe of colour down the page.
  */

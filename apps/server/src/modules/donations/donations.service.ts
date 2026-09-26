@@ -138,7 +138,7 @@ export class DonationsService {
 		}
 
 		if (donation.status !== "PENDING") {
-			// Already settled — a replay, or a duplicate delivery.
+			// Already settled - a replay, or a duplicate delivery.
 			return { handled: true, duplicate: true };
 		}
 
@@ -344,7 +344,7 @@ export class DonationsService {
 	}
 }
 
-/** e.g. NBH-2607-3F9A21 — year/month plus a slice of the uuid. */
+/** e.g. NBH-2607-3F9A21 - year/month plus a slice of the uuid. */
 function buildReceiptNumber(createdAt: Date, id: string): string {
 	const year = String(createdAt.getFullYear()).slice(2);
 	const month = String(createdAt.getMonth() + 1).padStart(2, "0");

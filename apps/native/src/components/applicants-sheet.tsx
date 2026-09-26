@@ -42,7 +42,7 @@ const FILTERS: Array<{ value: StatusFilter; label: string }> = [
 	{ value: "ALL", label: "All" },
 ];
 
-/** Applicant review for a single event — accept or reject in place. */
+/** Applicant review for a single event - accept or reject in place. */
 export function ApplicantsSheet({
 	eventId,
 	eventTitle,
@@ -111,7 +111,7 @@ export function ApplicantsSheet({
 			>
 				{remainingPlaces > 0
 					? `${remainingPlaces} place${remainingPlaces === 1 ? "" : "s"} left`
-					: "All places are filled — raise the volunteer count to accept more."}
+					: "All places are filled - raise the volunteer count to accept more."}
 			</Caption>
 			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
 			{filter === "PENDING" && (
@@ -199,7 +199,7 @@ function ApplicantRow({
 	applicant: EventApplicant;
 	eventId: string;
 	canAccept: boolean;
-	/** `people.review` — false only once the role has resolved as denied. */
+	/** `people.review` - false only once the role has resolved as denied. */
 	canReview: boolean;
 	busy: boolean;
 	/** Which decision is in flight for *this* row, if any. */

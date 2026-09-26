@@ -32,7 +32,7 @@ import { verticalScrollbar } from "@/lib/scroll";
  *
  * ## Layout
  *
- * Desktop is two columns. The wide one is the work — the stage rail, where you
+ * Desktop is two columns. The wide one is the work - the stage rail, where you
  * stand, and the upload slots. The narrow one is the reassurance: what a
  * reviewer is checking, how long it takes, and that none of it is ever public.
  * That copy used to be a single grey sentence at the very bottom, below eight
@@ -49,7 +49,7 @@ import { verticalScrollbar } from "@/lib/scroll";
  *
  * ## Where the document set is defined
  *
- * `lib/org-verification.ts`, not here — the profile's Verification tab reports
+ * `lib/org-verification.ts`, not here - the profile's Verification tab reports
  * on the same four slots and the same three stages, and two screens disagreeing
  * about which one you are on is worse than neither showing it.
  */
@@ -112,7 +112,7 @@ export default function NgoVerification() {
 		<Banner
 			tone="info"
 			title="Under review"
-			description="A reviewer is checking your documents — usually a few days. You'll be notified either way. Adding the optional documents below can speed things up."
+			description="A reviewer is checking your documents - usually a few days. You'll be notified either way. Adding the optional documents below can speed things up."
 		/>
 	) : (
 		<Banner
@@ -189,8 +189,8 @@ export default function NgoVerification() {
 	);
 
 	/**
-	 * The answers to the two questions an NGO actually has here — "what are they
-	 * looking for?" and "who sees my PAN card?" — placed where they are read
+	 * The answers to the two questions an NGO actually has here - "what are they
+	 * looking for?" and "who sees my PAN card?" - placed where they are read
 	 * rather than in a footnote under the last upload slot.
 	 */
 	const aside = (
@@ -241,7 +241,7 @@ export default function NgoVerification() {
 					<Label>How long it takes</Label>
 					<Caption color="tertiary">
 						Usually a few days once both required documents are in. You are
-						notified either way — there is nothing to keep checking.
+						notified either way - there is nothing to keep checking.
 					</Caption>
 				</View>
 			</Surface>

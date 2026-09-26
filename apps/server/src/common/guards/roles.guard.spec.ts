@@ -10,7 +10,7 @@ import { RolesGuard } from "./roles.guard";
 /**
  * The authorization boundary for every route in the app.
  *
- * A regression here does not fail loudly — it silently grants access — so
+ * A regression here does not fail loudly - it silently grants access - so
  * these cases matter more than their size suggests.
  */
 function contextFor(user: AuthUser | undefined): ExecutionContext {
@@ -79,7 +79,7 @@ describe("RolesGuard", () => {
 
 	it("refuses a caller who has chosen no role yet", () => {
 		// Roles stay empty until role-select, so this is the state a brand new
-		// account is in — it must not reach a role-gated route.
+		// account is in - it must not reach a role-gated route.
 		const roleless: AuthUser = { ...volunteer, role: null, roles: [] };
 		expect(() => guard.canActivate(contextFor(roleless))).toThrow(
 			ForbiddenException,

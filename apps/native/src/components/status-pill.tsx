@@ -12,7 +12,7 @@ export type PillTone = "neutral" | "success" | "warning" | "error" | "info";
  *
  * The label is drawn in the tone's **ink**, not its `main` fill colour. Tinting
  * `main` at 12% and then writing in `main` gave 2.07:1 (warning) to 3.44:1
- * (error) — the verification state, which is the single most load-bearing piece
+ * (error) - the verification state, which is the single most load-bearing piece
  * of information in the product, was the hardest thing on the screen to read.
  * Ink-on-tint measures 6.8:1 to 8.0:1 in light mode and 8.5:1 to 10.4:1 in dark.
  */

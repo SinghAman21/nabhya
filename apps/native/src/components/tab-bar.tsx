@@ -19,7 +19,7 @@ type TabBarProps = Parameters<NonNullable<TabsProps["tabBar"]>>[0];
 /**
  * Navigator-level options shared by `(volunteer)`, `(ngo)` and `(admin)`. The
  * bar itself is drawn by `AppTabBar` below, so nothing about its appearance is
- * configured here — a module constant keeps the identity stable, which React
+ * configured here - a module constant keeps the identity stable, which React
  * Navigation compares on every render.
  */
 export function useTabBarOptions(): TabScreenOptions {

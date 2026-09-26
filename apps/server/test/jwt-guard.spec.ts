@@ -23,7 +23,7 @@ import { createTestDb, type TestDb, truncateAll } from "./harness";
 /**
  * The whole authentication story, against the real guard.
  *
- * Only the JWKS *fetch* is replaced — signing and verification are genuine
+ * Only the JWKS *fetch* is replaced - signing and verification are genuine
  * ES256 through jose, so a change that weakens signature checking fails here
  * rather than in production. `createRemoteJWKSet` is the one piece that would
  * otherwise reach Supabase over the network; everything downstream of it is
@@ -93,7 +93,7 @@ function contextFor(
 	};
 }
 
-describe("JwtGuard — authentication flow", () => {
+describe("JwtGuard - authentication flow", () => {
 	let db: TestDb;
 	let close: () => Promise<void>;
 	let guard: InstanceType<typeof JwtGuard>;
@@ -313,7 +313,7 @@ describe("JwtGuard — authentication flow", () => {
 		});
 
 		it("puts superadmin first when a user holds several", async () => {
-			// The join table returns rows in arbitrary order — an unstable primary
+			// The join table returns rows in arbitrary order - an unstable primary
 			// role sends the app's routing gate into a redirect loop.
 			expect(await signInHolding(["volunteer", "superadmin"])).toMatchObject({
 				role: "superadmin",

@@ -90,7 +90,7 @@ export function useToggleFollow() {
 			following,
 		}: {
 			organizationId: string;
-			/** The current state — true means this call unfollows. */
+			/** The current state - true means this call unfollows. */
 			following: boolean;
 		}) =>
 			following

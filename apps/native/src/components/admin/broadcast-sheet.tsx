@@ -26,7 +26,7 @@ const MIN_LENGTH = 3;
  * Platform-wide announcement.
  *
  * Fans out to one notification per recipient, so it is confirmed before
- * sending — there is no unsend. Validation is inline, under the field it is
+ * sending - there is no unsend. Validation is inline, under the field it is
  * about, so the reviewer never has to guess which of two boxes was too short.
  */
 export function BroadcastSheet({
@@ -81,7 +81,7 @@ export function BroadcastSheet({
 			title: `Send to ${audienceLabel.toLowerCase()}?`,
 			message: "This notifies every matching account and cannot be undone.",
 			confirmLabel: "Send",
-			// Not destructive — it creates something rather than removing it —
+			// Not destructive - it creates something rather than removing it -
 			// but still worth a stop, because the audience is everyone.
 			destructive: false,
 		});
@@ -148,7 +148,7 @@ export function BroadcastSheet({
 			</Field>
 
 			{/* The send failed and the sheet is still open with the message in it,
-			    so this is a form error and belongs on the form — a toast would
+			    so this is a form error and belongs on the form - a toast would
 			    vanish while the sender is still reading it. */}
 			{error && (
 				<Banner tone="error" title="Couldn't send" description={error} />

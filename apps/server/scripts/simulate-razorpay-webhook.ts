@@ -1,6 +1,6 @@
 /**
  * Fires a correctly-signed Razorpay `payment.captured` webhook at the local
- * server for a given donation id — lets you flip a donation PENDING ->
+ * server for a given donation id - lets you flip a donation PENDING ->
  * COMPLETED without needing a tunnel or a real Razorpay round-trip while
  * iterating on the frontend.
  *
@@ -17,7 +17,7 @@ import { createHmac, randomUUID } from "node:crypto";
 import { config } from "dotenv";
 import { Client } from "pg";
 
-// Matches how the server itself loads env (packages/env/src/server.ts) —
+// Matches how the server itself loads env (packages/env/src/server.ts) -
 // .env, not .env.local.
 config({ path: ".env" });
 
@@ -33,7 +33,7 @@ async function main() {
 	const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
 	if (!webhookSecret) {
 		console.error(
-			"RAZORPAY_WEBHOOK_SECRET is not set — check apps/server/.env",
+			"RAZORPAY_WEBHOOK_SECRET is not set - check apps/server/.env",
 		);
 		process.exit(1);
 	}
@@ -53,7 +53,7 @@ async function main() {
 	}
 	if (donation.status !== "PENDING") {
 		console.warn(
-			`Donation is already ${donation.status} — the webhook's PENDING-only guard will no-op this.`,
+			`Donation is already ${donation.status} - the webhook's PENDING-only guard will no-op this.`,
 		);
 	}
 

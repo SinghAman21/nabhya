@@ -13,7 +13,7 @@ type PressState = { pressed: boolean; focused?: boolean; hovered?: boolean };
  * Distinct from two things already in the codebase, and the difference is the
  * point:
  *
- * - `components/tab-bar.tsx` is the bottom bar — app destinations, each its own
+ * - `components/tab-bar.tsx` is the bottom bar - app destinations, each its own
  *   route and its own history entry.
  * - `FilterChips` narrows *one* list to a subset of the same kind of row, which
  *   is why its selected state is a filled pill.
@@ -26,7 +26,7 @@ type PressState = { pressed: boolean; focused?: boolean; hovered?: boolean };
  * The row keeps a full-width hairline under it and each tab draws a 2px ink
  * border that overlaps it, so the active tab connects to its panel rather than
  * floating above it. Horizontal scroll for a phone that cannot fit four labels;
- * the indicator is suppressed on purpose here, unlike vertical panes — see the
+ * the indicator is suppressed on purpose here, unlike vertical panes - see the
  * scrolling note in `apps/native/AGENTS.md`.
  */
 export function PageTabs<T extends string>({
@@ -37,7 +37,7 @@ export function PageTabs<T extends string>({
 	tabs: Array<{
 		value: T;
 		label: string;
-		/** Draws a dot after the label — something on this tab needs attention. */
+		/** Draws a dot after the label - something on this tab needs attention. */
 		alert?: boolean;
 	}>;
 	value: T;

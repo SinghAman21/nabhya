@@ -13,7 +13,7 @@ import { apiErrorMessage } from "@/lib/api";
 /**
  * Write or edit a review.
  *
- * The API upserts, so submitting twice edits rather than duplicating — one
+ * The API upserts, so submitting twice edits rather than duplicating - one
  * review per person per organization is enforced by a unique index.
  */
 export function ReviewSheet({

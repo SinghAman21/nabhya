@@ -76,7 +76,7 @@ export const phoneSchema = z.preprocess(
  * An optional whole number in a range, tolerant of an empty field.
  *
  * A wizard's numeric inputs arrive as `""` while untouched. Zod's `coerce`
- * turns that into `0`, which then fails a `min(1900)` — so a founding year the
+ * turns that into `0`, which then fails a `min(1900)` - so a founding year the
  * user deliberately left blank produced "Enter a valid year" on a field marked
  * optional. Blank collapses to `undefined` before any check runs.
  */
@@ -128,8 +128,8 @@ export function fieldErrorMap(error: z.ZodError): FieldErrors {
  * Validate one wizard step (or a whole payload) against its schema.
  *
  * The multi-step forms deliberately do not use `zodResolver`: their fields are
- * strings held in a persisted draft — an untouched "Founded in" is `""`, not a
- * number — and a resolver would have to be told the difference between the
+ * strings held in a persisted draft - an untouched "Founded in" is `""`, not a
+ * number - and a resolver would have to be told the difference between the
  * input shape and the parsed output for every optional numeric field. Parsing
  * the step's payload directly gives the coerced values *and* a field-error map,
  * which is all a step needs.

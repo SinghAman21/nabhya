@@ -7,15 +7,15 @@ import { and, eq } from "drizzle-orm";
  * Clears the likes, saves, shares, impressions and comments pointing at one
  * feed row.
  *
- * `post_interactions.post_id` and `post_comments.post_id` are polymorphic —
+ * `post_interactions.post_id` and `post_comments.post_id` are polymorphic -
  * the row they name lives in `posts`, `events`, `needs` or `announcements`
- * depending on `target_type` — so no foreign key can cascade for them. Every
+ * depending on `target_type` - so no foreign key can cascade for them. Every
  * path that deletes one of those four rows has to call this, or the orphaned
  * engagement outlives the thing it counted.
  *
  * Not yet wired into any delete path (`feed.service.ts#remove`,
  * `events.service.ts`, `needs.service.ts`, `publishing.service.ts` each
- * delete their own row without calling this) — the gap it fixes is real but
+ * delete their own row without calling this) - the gap it fixes is real but
  * unaddressed; wire it in before relying on it.
  *
  * A plain function rather than a service method: the events, needs and

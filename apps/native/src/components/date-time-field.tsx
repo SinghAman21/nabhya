@@ -11,7 +11,7 @@ import { focusable } from "@/lib/focus";
 /**
  * Date + time entry, one bar with two halves.
  *
- * Native opens the OS picker from the bar — the date half the calendar, the
+ * Native opens the OS picker from the bar - the date half the calendar, the
  * time half the clock. The community picker renders nothing on web (a stub
  * that only warns), so web renders the browser's own date/time controls in
  * the same bar instead. No typed text anywhere: hand-typed dates were the
@@ -41,7 +41,7 @@ export function DateTimeField({
 	onChange,
 	error,
 	shortcuts = true,
-	hint = "Tap to pick — volunteers see it in their timezone.",
+	hint = "Tap to pick - volunteers see it in their timezone.",
 }: {
 	label: string;
 	value: Date | undefined;
@@ -108,7 +108,7 @@ function NativeDateTimeField({
 				picked.getMonth(),
 				picked.getDate(),
 			);
-			// A fresh field has no time yet — 10:00, matching the shortcuts.
+			// A fresh field has no time yet - 10:00, matching the shortcuts.
 			if (!value) next.setHours(10, 0, 0, 0);
 			onChange(next);
 			// After a day, offer the clock straight away.
@@ -237,7 +237,7 @@ function NativeDateTimeField({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Web — the browser's own controls in the same bar                           */
+/* Web - the browser's own controls in the same bar                           */
 /* -------------------------------------------------------------------------- */
 
 function WebDateTimeField({

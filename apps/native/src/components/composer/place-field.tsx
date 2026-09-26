@@ -8,7 +8,7 @@ import { useTheme } from "@/hooks/use-theme";
  *
  * **The state is gone from the UI entirely.** `createNeedSchema` and
  * `createEventSchema` both require one, and the composer used to put it in a
- * box beside the city — a question with one answer, on every single post. An
+ * box beside the city - a question with one answer, on every single post. An
  * NGO registers with a city *and* a state (`onboarding.ts` requires both), and
  * the composer is reachable only once that registration has been approved, so
  * the state is on file in every real case and travels silently from the
@@ -19,7 +19,7 @@ import { useTheme } from "@/hooks/use-theme";
  * one, so hiding the field unconditionally would be a form that fails
  * validation against a field nobody can see.
  *
- * The city is likewise never *asked* — the caller only mounts this once the
+ * The city is likewise never *asked* - the caller only mounts this once the
  * author has said the place is somewhere else, so by the time it renders the
  * question is already live. That is what makes the city effectively optional
  * without making it absent from the payload.

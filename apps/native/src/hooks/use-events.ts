@@ -39,7 +39,7 @@ export function useApplyToEvent(eventId: string) {
 	return useMutation({
 		mutationFn: (input: ApplyToEventInput) => eventsApi.apply(eventId, input),
 		onSuccess: () => {
-			// The detail view carries `myApplication`, and the list shows capacity —
+			// The detail view carries `myApplication`, and the list shows capacity -
 			// both change on apply.
 			queryClient.invalidateQueries({ queryKey: queryScopes.events });
 			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
@@ -71,7 +71,7 @@ export function useOrgEvents(
 	});
 }
 
-/** Full detail of one owned event — used to pre-fill the edit form. */
+/** Full detail of one owned event - used to pre-fill the edit form. */
 export function useOrgEvent(id: string | undefined) {
 	return useQuery({
 		queryKey: queryKeys.orgEvent(id ?? ""),
@@ -89,7 +89,7 @@ export function useCreateEvent() {
 			queryClient.invalidateQueries({ queryKey: queryScopes.events });
 			// The composer can create one of these straight from the feed, and
 			// the ranking pool holds open needs, upcoming events and published
-			// announcements — so the feed is stale the moment one is written,
+			// announcements - so the feed is stale the moment one is written,
 			// whichever surface wrote it.
 			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
 		},

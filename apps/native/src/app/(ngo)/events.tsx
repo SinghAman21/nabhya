@@ -85,8 +85,8 @@ export default function NgoEvents() {
 	};
 
 	const confirmDelete = async (event: OrgEventListItem) => {
-		// An event with accepted volunteers is cancelled, not deleted — the
-		// server keeps it so their applications and certificates survive — so
+		// An event with accepted volunteers is cancelled, not deleted - the
+		// server keeps it so their applications and certificates survive - so
 		// the wording and the button both have to say which one is happening.
 		const cancelling = event.acceptedCount > 0;
 		const ok = await confirm({
@@ -229,7 +229,7 @@ export default function NgoEvents() {
 }
 
 /**
- * One event. Tapping the card opens its applicants — the decision this screen
+ * One event. Tapping the card opens its applicants - the decision this screen
  * exists for. The fact that matters is one line: places filled, and how many
  * people are waiting.
  */

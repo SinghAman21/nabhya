@@ -12,7 +12,7 @@ import { focusable } from "@/lib/focus";
  * An organisation's two images: the cover band and the logo.
  *
  * Both are stored as **object keys in a private bucket**, never URLs, so
- * nothing here can render a record field directly — `useStoredImageUrl` swaps
+ * nothing here can render a record field directly - `useStoredImageUrl` swaps
  * the key for a short-lived signed URL first, and every piece below falls back
  * to something designed rather than to a broken-image glyph. That fallback is
  * the normal case in two situations, not an edge one: an NGO that has not
@@ -46,7 +46,7 @@ export function OrgCover({
 }: {
 	imageKey: string | null | undefined;
 	height: number;
-	/** Drawn in the top-right corner — the change control, on an owner's view. */
+	/** Drawn in the top-right corner - the change control, on an owner's view. */
 	action?: React.ReactNode;
 	empty?: string;
 }) {
@@ -95,7 +95,7 @@ export function OrgCover({
 /* -------------------------------------------------------------------------- */
 
 /**
- * The logo as a rounded square — `InitialAvatar`'s `square` shape is this
+ * The logo as a rounded square - `InitialAvatar`'s `square` shape is this
  * codebase's mark for an organisation rather than a person, and the initials
  * are the fallback when there is no uploaded file.
  *
@@ -174,7 +174,7 @@ export function OrgLogo({
 /**
  * The small circular camera control that sits on a cover or a logo.
  *
- * Icon-only, so it carries a real `accessibilityLabel` — and per the tooltip
+ * Icon-only, so it carries a real `accessibilityLabel` - and per the tooltip
  * rule in `apps/native/AGENTS.md` it is never the only explanation of the
  * action: on the profile hero it points at the edit screen, where the same two
  * images appear as labelled slots.
@@ -236,8 +236,8 @@ export function ImageEditButton({
 /**
  * A labelled image slot, for the edit screen.
  *
- * The whole slot is the control — a preview you press to replace, rather than a
- * preview with a button beside it — so there is one target and it is the thing
+ * The whole slot is the control - a preview you press to replace, rather than a
+ * preview with a button beside it - so there is one target and it is the thing
  * you are looking at. Empty state says what to provide and at what size; a
  * filled one says how to change it, because a preview alone does not tell you
  * it is pressable.

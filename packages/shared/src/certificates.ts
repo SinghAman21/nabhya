@@ -26,7 +26,7 @@ export type RevokeCertificateInput = z.infer<typeof revokeCertificateSchema>;
 
 export const certificateQuerySchema = paginationQuerySchema;
 
-/** Public payload returned by the verification page — deliberately minimal. */
+/** Public payload returned by the verification page - deliberately minimal. */
 export interface CertificateVerification {
 	code: string;
 	valid: boolean;

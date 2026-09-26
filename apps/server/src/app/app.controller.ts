@@ -43,13 +43,13 @@ export class AppController {
 
 	/**
 	 * Readiness. Answers "can this instance serve traffic", which means actually
-	 * reaching the database — the previous handler returned a hardcoded "OK",
+	 * reaching the database - the previous handler returned a hardcoded "OK",
 	 * so a load balancer would happily route requests to an instance whose
 	 * database was unreachable and every one of them would 500.
 	 */
 	@Public()
 	@Get("health")
-	@ApiOperation({ summary: "Readiness probe — verifies dependencies" })
+	@ApiOperation({ summary: "Readiness probe - verifies dependencies" })
 	@ApiResponse({ status: 503, description: "A dependency is unreachable." })
 	async ready() {
 		const startedAt = Date.now();
@@ -58,7 +58,7 @@ export class AppController {
 			await this.db.execute(sql`select 1`);
 		} catch (error) {
 			this.logger.error(
-				`Readiness failed: database unreachable — ${
+				`Readiness failed: database unreachable - ${
 					error instanceof Error ? error.message : String(error)
 				}`,
 			);

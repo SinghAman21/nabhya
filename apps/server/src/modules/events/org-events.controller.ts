@@ -37,7 +37,7 @@ import { EventsService } from "./events.service";
 
 /**
  * Event management for the organization the caller owns. Every route resolves
- * the org from the token — an organization id is never accepted from the client.
+ * the org from the token - an organization id is never accepted from the client.
  */
 @ApiTags("Organization Events")
 @Controller("org/events")

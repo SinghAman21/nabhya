@@ -123,12 +123,12 @@ export type FeedCommentsQuery = z.infer<typeof feedCommentsQuerySchema>;
  * pool and these cut the pool before scoring, so page N of a filtered view is
  * as well defined as page N of the plain one.
  *
- * - `kind`       — one item type only (the search page's result tabs).
- * - `categoryIds` — only NGOs tagged with at least one selected cause.
- * - `city`       — case-insensitive substring on the item's city, falling back
+ * - `kind`       - one item type only (the search page's result tabs).
+ * - `categoryIds` - only NGOs tagged with at least one selected cause.
+ * - `city`       - case-insensitive substring on the item's city, falling back
  *                  to the NGO's city.
- * - `search`     — substring over title / text / description / NGO name.
- * - `urgent`     — HIGH-urgency needs, urgent posts, events within three days.
+ * - `search`     - substring over title / text / description / NGO name.
+ * - `urgent`     - HIGH-urgency needs, urgent posts, events within three days.
  */
 export const feedFilterSchema = z.object({
 	kind: feedItemTypeSchema.optional(),

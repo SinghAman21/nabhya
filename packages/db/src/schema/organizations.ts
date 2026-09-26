@@ -112,7 +112,7 @@ export const organizations = pgTable(
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},
 	(table) => [
-		// One organization per owner — enforced in the DB so a double-submitted
+		// One organization per owner - enforced in the DB so a double-submitted
 		// onboarding form cannot create a duplicate NGO.
 		uniqueIndex("organizations_owner_unique").on(table.ownerUserId),
 		// Drives the superadmin verification queue.

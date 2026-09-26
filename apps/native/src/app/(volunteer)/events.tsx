@@ -32,7 +32,7 @@ const TABS: Array<{ value: Tab; label: string }> = [
 
 /**
  * Events for a volunteer: the public list to browse, and the ones they have
- * applied to. Not on the tab bar — reached from Activity and Profile — so the
+ * applied to. Not on the tab bar - reached from Activity and Profile - so the
  * header carries a back button.
  */
 export default function VolunteerEvents() {
@@ -72,7 +72,7 @@ function MyApplications({ onBrowse }: { onBrowse: () => void }) {
 				<EmptyState
 					icon={CalendarCheck}
 					title="No applications yet"
-					description="Apply to an event and you can follow its status here — pending, accepted, or not this time."
+					description="Apply to an event and you can follow its status here - pending, accepted, or not this time."
 					action={
 						<Button size="sm" variant="outline" onPress={onBrowse}>
 							Browse events
@@ -106,7 +106,7 @@ function ApplicationCard({
 			? { text: "Waiting for the NGO to review", ink: colors.warning.ink }
 			: application.status === "ACCEPTED"
 				? {
-						text: "You're in — turn up and get marked present",
+						text: "You're in - turn up and get marked present",
 						ink: colors.success.ink,
 					}
 				: null;

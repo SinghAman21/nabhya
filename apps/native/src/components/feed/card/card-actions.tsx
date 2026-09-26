@@ -29,7 +29,7 @@ import type { FeedItem } from "@/lib/types";
  * alone on the right because it is a thing done for yourself.
  *
  * Hover is read from the style callback, not held in state. A `useState` hover
- * hook re-rendered the whole card — and its video player — every time the
+ * hook re-rendered the whole card - and its video player - every time the
  * pointer crossed one of these four buttons.
  */
 
@@ -55,11 +55,11 @@ function Reaction({
 }: {
 	icon: LucideIcon;
 	active?: boolean;
-	/** Shown only above zero. Never passed for likes — see the header. */
+	/** Shown only above zero. Never passed for likes - see the header. */
 	count?: number;
 	/** Screen-reader label. Always a full phrase, never just the verb. */
 	label: string;
-	/** Visible word beside the icon. Wide cards only — see `showLabels`. */
+	/** Visible word beside the icon. Wide cards only - see `showLabels`. */
 	text?: string;
 	activeColor?: string;
 	onPress?: () => void;

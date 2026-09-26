@@ -2,8 +2,8 @@ import { z } from "zod";
 import { optionalText, paginationQuerySchema } from "./common";
 
 /**
- * WANT  — the organization is asking for something.
- * OFFER — the organization has surplus it wants to give away.
+ * WANT  - the organization is asking for something.
+ * OFFER - the organization has surplus it wants to give away.
  */
 export const needTypeSchema = z.enum(["WANT", "OFFER"]);
 export const needStatusSchema = z.enum(["OPEN", "FULFILLED", "CLOSED"]);

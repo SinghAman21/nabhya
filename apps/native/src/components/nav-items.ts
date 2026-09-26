@@ -21,13 +21,13 @@ import type { NavItem } from "@/components/sidebar";
  *
  * These used to live inside `(ngo)/_layout.tsx` and `(admin)/_layout.tsx`,
  * which was fine while the rail only ever appeared inside those groups. It now
- * also appears around the shared root-level screens — notifications, an NGO's
- * public page, a certificate — through `AppShell`, and a rail whose contents
+ * also appears around the shared root-level screens - notifications, an NGO's
+ * public page, a certificate - through `AppShell`, and a rail whose contents
  * depend on which file rendered it is a rail that changes as you navigate.
  */
 
 export const NGO_NAV_ITEMS: NavItem[] = [
-	// Feed is the landing page, so it leads — unsectioned, like Dashboard.
+	// Feed is the landing page, so it leads - unsectioned, like Dashboard.
 	{ label: "Feed", href: "/(ngo)/feed", icon: Newspaper },
 	{ label: "Dashboard", href: "/(ngo)", icon: House },
 	{
@@ -80,7 +80,7 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
 	},
 	// Two populations, two screens, no overlap: `organizations` is the NGO
 	// *organisations* and `volunteers` is volunteers only. An NGO's own user
-	// account is reached from its organisation's dossier — see the note at the
+	// account is reached from its organisation's dossier - see the note at the
 	// top of `(admin)/volunteers.tsx`.
 	{
 		label: "NGOs",

@@ -25,7 +25,7 @@ export const docVerificationStatusSchema = z.enum([
  *
  * These are **server-side** and deliberately so: the console pages at 20 rows,
  * and re-ordering the rows already in the browser would sort a page rather than
- * a table — "oldest first" would show the oldest of the newest twenty. Every
+ * a table - "oldest first" would show the oldest of the newest twenty. Every
  * key here maps to one column (or one correlated count) in
  * `AdminService`; a key with no mapping is rejected by the enum rather than
  * silently ignored.
@@ -135,8 +135,8 @@ export type ReviewDocumentInput = z.infer<typeof reviewDocumentSchema>;
 /**
  * Reviewing a page of documents at once.
  *
- * The queue is the reviewer's grind — four documents per NGO, one decision
- * each, and the decision is nearly always "approve" — so approving a selection
+ * The queue is the reviewer's grind - four documents per NGO, one decision
+ * each, and the decision is nearly always "approve" - so approving a selection
  * is the single action that changes how long verification takes. Capped at 50
  * because each identity document additionally re-derives its owner's account
  * status inside a transaction.
@@ -411,7 +411,7 @@ export const adminTrendQuerySchema = z.object({
 
 export type AdminTrendQuery = z.infer<typeof adminTrendQuerySchema>;
 
-/** One day. Zero-filled — see `AdminTrends`. */
+/** One day. Zero-filled - see `AdminTrends`. */
 export interface AdminTrendPoint {
 	/** `YYYY-MM-DD`, UTC. */
 	date: string;
@@ -426,7 +426,7 @@ export interface AdminTrendPoint {
  *
  * **Every day in the window is present, including the zeros.** A `GROUP BY date`
  * returns only days that had a row, and plotting those points as a line draws a
- * straight segment across a gap — which reads as steady activity over a week
+ * straight segment across a gap - which reads as steady activity over a week
  * when the truth is nothing happened. The server zero-fills so the client never
  * has to know the difference, and a young platform's chart honestly reads as
  * mostly floor.

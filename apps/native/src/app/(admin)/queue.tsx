@@ -66,7 +66,7 @@ const STATUSES = [
 ];
 
 /**
- * The verification queue — every document waiting on a superadmin, across all
+ * The verification queue - every document waiting on a superadmin, across all
  * organizations at once.
  *
  * The dossier sheets answer "is this NGO legitimate?"; this answers "what is
@@ -76,7 +76,7 @@ const STATUSES = [
  *
  * **This is the screen the table was built for.** It used to be a column of
  * 1100pt-wide cards, each carrying a document type, one line of metadata, a
- * link, and a full-bleed orange Approve button — one screenful per two
+ * link, and a full-bleed orange Approve button - one screenful per two
  * documents, and a reviewer with forty pending had to scroll a metre to see
  * what was there. Four documents per NGO times every NGO on the platform is a
  * grind, and the shape of the work is: scan the list, notice that fifteen of
@@ -91,7 +91,7 @@ const STATUSES = [
  * - **Approve is a press; Reject asks.** The server requires remarks on a
  *   rejection, so rejecting one row and rejecting a selection both open
  *   `RejectDocumentsSheet`. That is the asymmetry the screen is arranged
- *   around — the common answer is cheap, the consequential one is a question.
+ *   around - the common answer is cheap, the consequential one is a question.
  * - **The file opens in a column, not a paragraph.** "Open document" was a
  *   link buried mid-card; here it is a 96pt column and the same distance from
  *   the pointer on every row.
@@ -133,8 +133,8 @@ export default function AdminQueue() {
 /* -------------------------------------------------------------------------- */
 
 /**
- * The kinds differ in three things — which hook, which label map, and whose
- * name goes on the row — so those are what the shared body takes. Two thin
+ * The kinds differ in three things - which hook, which label map, and whose
+ * name goes on the row - so those are what the shared body takes. Two thin
  * wrappers rather than one component calling both hooks: hook order cannot
  * depend on a prop, and calling both would keep the unused queue fetching.
  */
@@ -219,7 +219,7 @@ function DocumentQueue<T extends AdminOrgDocument>({
 	const { spacing } = useTheme();
 	const [view, setView] = useTableView("queue");
 	const [selection, setSelection] = useState<Set<string>>(new Set());
-	/** Ids about to be rejected — one from a row, or the whole selection. */
+	/** Ids about to be rejected - one from a row, or the whole selection. */
 	const [rejecting, setRejecting] = useState<string[]>([]);
 
 	const review = useReviewDocument(kind);
@@ -387,7 +387,7 @@ function DocumentQueue<T extends AdminOrgDocument>({
 			wideOnly: true,
 			render: (document) => (
 				<Caption color="quaternary" numberOfLines={2}>
-					{document.remarks || "—"}
+					{document.remarks || "-"}
 				</Caption>
 			),
 		},
@@ -497,7 +497,7 @@ function DocumentQueue<T extends AdminOrgDocument>({
  * Reports a batch honestly.
  *
  * The server returns per-document outcomes because one id in forty can fail on
- * its own — already reviewed, or deleted while the reviewer was reading. A
+ * its own - already reviewed, or deleted while the reviewer was reading. A
  * toast saying "39 approved" and nothing else leaves the fortieth sitting in the
  * queue with no explanation, so a partial result is an error toast naming the
  * count that did not go through.
@@ -512,7 +512,7 @@ function reportBulk(
 		return;
 	}
 	toast.error(
-		`${done} ${verb}, ${result.failed.length} could not be — they may have been reviewed already. Refresh to see what is left.`,
+		`${done} ${verb}, ${result.failed.length} could not be - they may have been reviewed already. Refresh to see what is left.`,
 	);
 }
 

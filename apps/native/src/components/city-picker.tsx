@@ -18,8 +18,8 @@ import { placeParts, requestPosition, reverseGeocode } from "@/lib/location";
 /**
  * City scope for the feed.
  *
- * Item donation and volunteering are physically local — nobody hands 20 blankets
- * to an NGO 900km away — so a nationwide feed is mostly noise for any single
+ * Item donation and volunteering are physically local - nobody hands 20 blankets
+ * to an NGO 900km away - so a nationwide feed is mostly noise for any single
  * user. But it is never scoped *silently*: the current city is always on screen
  * and "All India" is always one tap away, because a feed that quietly hides
  * things reads as broken.
@@ -35,7 +35,7 @@ import { placeParts, requestPosition, reverseGeocode } from "@/lib/location";
  * Known data problem: `needs.city` is free text, so "Mumbai",
  * "mumbai" and "Bombay" are three cities to the query. The city list and the
  * alias/case normalisation now live in `lib/cities.ts`, shared with the two
- * onboarding wizards — this picker filters a feed, they write the rows the
+ * onboarding wizards - this picker filters a feed, they write the rows the
  * feed filters, and the two disagreeing about a spelling is exactly how a
  * city ends up with nothing in it. The real fix is still server-side: a
  * canonical city table, or a normalising write path.
@@ -97,7 +97,7 @@ export function CityPicker({
 		setDetecting(true);
 		setLocationError(null);
 		try {
-			// Never gated on a permission *query* — on the web that answers
+			// Never gated on a permission *query* - on the web that answers
 			// "prompt" without asking, so this used to fail instantly having
 			// never shown the browser's dialog. See `lib/location.ts`.
 			const position = await requestPosition();
@@ -119,7 +119,7 @@ export function CityPicker({
 			// The geocoder's spelling is not ours: it returns "Bombay" and
 			// "bengaluru" depending on the device, and either one filters the feed
 			// down to nothing. With no name at all, fall back to the nearest city
-			// we know — the web has no reverse geocoding to begin with.
+			// we know - the web has no reverse geocoding to begin with.
 			const city = named
 				? normaliseCityName(named)
 				: (nearestCity(position.latitude, position.longitude)?.city ?? null);

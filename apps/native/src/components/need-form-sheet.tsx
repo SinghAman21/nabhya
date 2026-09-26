@@ -185,7 +185,7 @@ export function NeedFormSheet({
 
 				<Field label="Details" error={errors.description?.message}>
 					<Input
-						placeholder="Condition, sizes, pickup or drop-off — anything a helper needs to know"
+						placeholder="Condition, sizes, pickup or drop-off - anything a helper needs to know"
 						value={form.watch("description")}
 						onChangeText={(v) =>
 							form.setValue("description", v, { shouldValidate: true })

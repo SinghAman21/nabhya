@@ -18,14 +18,14 @@ import { adminApi, queryKeys } from "@/lib/api";
  * of hundreds is never told "20 documents" when there are 300.
  *
  * They used to hand-roll `useInfiniteQuery` here, a second copy of what
- * `components/paged-list.tsx` already does for every other list in the app —
+ * `components/paged-list.tsx` already does for every other list in the app -
  * with its own `PAGE_SIZE` that could drift from the shared one and its own
  * `infinite: true` marker where `usePagedQuery` appends `"infinite"` to the key
  * itself. Same `queryKeys` family and therefore the same invalidation: every
  * moderation mutation clears `queryScopes.admin`, which reaches these too.
  *
  * `total` is the whole result count from the first page's envelope, not the
- * number of rows loaded — the screens print it in the header, where "1 of 340
+ * number of rows loaded - the screens print it in the header, where "1 of 340
  * NGOs pending" is the number a reviewer needs.
  */
 

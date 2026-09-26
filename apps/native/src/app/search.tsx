@@ -43,18 +43,18 @@ import type { FeedItem, FeedKind, FeedNeedItem } from "@/lib/types";
 /**
  * Search, as its own page.
  *
- * There is more to find than one list can hold — an NGO by name, a specific
- * item, an event in another city — so the field gets a screen with a keyboard
+ * There is more to find than one list can hold - an NGO by name, a specific
+ * item, an event in another city - so the field gets a screen with a keyboard
  * up from the first frame. Before a term is typed the page teaches what it can
  * find: a few example searches and the two browse destinations. Once a term is
  * in, result tabs split by what the person is looking for: everything, NGOs,
  * needs, events or updates. Search is the one place the city scope is dropped
- * on purpose — someone typing a name wants that name, wherever it is.
+ * on purpose - someone typing a name wants that name, wherever it is.
  *
  * Recent terms sit above the examples once there are any, because on a phone
  * the commonest search is one already made: the same NGO, the same item, a day
  * later. They are device-local (`lib/recent-searches.ts`) and a term is only
- * recorded when it is committed — the Search key, or opening a result — so the
+ * recorded when it is committed - the Search key, or opening a result - so the
  * list holds words rather than the prefixes typed on the way to them.
  */
 
@@ -295,7 +295,7 @@ function SearchScreen() {
 			description={
 				scope === "all"
 					? "Check the spelling, or try a broader word like “blankets” or “teaching”."
-					: "Try the All tab — it may be listed as something else."
+					: "Try the All tab - it may be listed as something else."
 			}
 		/>
 	) : active && feedItems.length > 0 ? (
@@ -308,7 +308,7 @@ function SearchScreen() {
 	 * Stable handlers, so `FeedCard`'s `memo` can actually hold.
 	 *
 	 * Written inline in `renderItem` these were a new function on every render,
-	 * which fails the memo comparison for every card in the list — so a like,
+	 * which fails the memo comparison for every card in the list - so a like,
 	 * which now writes straight into the query cache, re-rendered every card
 	 * and every video player in it. Each closes only over a mutation's `mutate`,
 	 * which react-query keeps stable, so these dependencies never change.
@@ -342,7 +342,7 @@ function SearchScreen() {
 					borderBottomColor: colors.border.hairline,
 				}}
 			>
-				{/* `"none"` is not a colour — RN ignored it and the button kept its
+				{/* `"none"` is not a colour - RN ignored it and the button kept its
 				    default fill. `transparent` is what was meant. */}
 				<BackButton style={{ backgroundColor: "transparent", width: 24 }} />
 				<View style={{ flex: 1 }}>

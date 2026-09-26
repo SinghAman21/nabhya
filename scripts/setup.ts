@@ -184,7 +184,7 @@ async function collectSupabaseCredentials() {
 		}),
 	) as string;
 
-	// The JWKS endpoint is a fixed well-known path under the project URL —
+	// The JWKS endpoint is a fixed well-known path under the project URL -
 	// no need to prompt for it separately.
 	const supabaseAuthJwksUrl = `${projectUrl.replace(/\/+$/, "")}/auth/v1/.well-known/jwks.json`;
 
@@ -198,7 +198,7 @@ async function collectSupabaseCredentials() {
 
 function openInBrowser(url: string) {
 	open(url).catch(() => {
-		// ignore — not all environments allow this
+		// ignore - not all environments allow this
 	});
 }
 
@@ -218,13 +218,13 @@ async function ensureDatabaseReady(directUrl: string | undefined) {
 	}
 
 	if (state.kind === "empty") {
-		s.stop("Database is empty — fresh setup");
+		s.stop("Database is empty - fresh setup");
 		return;
 	}
 
 	if (state.kind === "nabhya") {
 		s.stop(
-			`Database already has nabhya schema (${state.tableCount} tables) — will be idempotent`,
+			`Database already has nabhya schema (${state.tableCount} tables) - will be idempotent`,
 		);
 		return;
 	}

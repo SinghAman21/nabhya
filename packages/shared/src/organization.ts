@@ -13,7 +13,7 @@ import {
  * merging the per-step schemas so the wizard and the API can never drift.
  *
  * Every field the team/causes steps add is optional in its own step schema, so
- * there is no `.partial()` here — a blank optional field arrives as absent,
+ * there is no `.partial()` here - a blank optional field arrives as absent,
  * not as a zero that the range checks then reject.
  */
 export const completeOrgOnboardingSchema = step1BasicInfoSchema

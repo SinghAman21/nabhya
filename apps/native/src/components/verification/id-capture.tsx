@@ -19,8 +19,8 @@ export interface IdCaptureValue {
 /**
  * One government ID, and only one: the Aadhaar card.
  *
- * The step used to open with a chip row of every accepted ID — Aadhaar, PAN,
- * licence, voter ID, passport — which read as a checklist of documents to
+ * The step used to open with a chip row of every accepted ID - Aadhaar, PAN,
+ * licence, voter ID, passport - which read as a checklist of documents to
  * produce rather than a choice between them, and made the first thing on the
  * screen a decision nobody needed to make. Aadhaar is the near-universal one
  * and the only ID a reviewer can check a name and a photo against, so the

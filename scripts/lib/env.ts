@@ -41,10 +41,10 @@ export function readEnv(): Partial<EnvValues> {
 
 export function writeEnv(values: EnvValues): void {
 	const content = [
-		"# Pooled connection — used by the app at runtime",
+		"# Pooled connection - used by the app at runtime",
 		`DATABASE_URL="${values.DATABASE_URL}"`,
 		"",
-		"# Direct (unpooled) connection — used by Drizzle Studio and migrations",
+		"# Direct (unpooled) connection - used by Drizzle Studio and migrations",
 		`DIRECT_URL="${values.DIRECT_URL}"`,
 		"",
 		"# Server config",

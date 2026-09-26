@@ -9,8 +9,8 @@ import type {
 /**
  * In-memory stand-in used when Supabase Storage credentials are absent.
  *
- * Every upload path stays exercisable without credentials — the ticket is
- * issued, the key is recorded, and HEAD succeeds — so document flows can be
+ * Every upload path stays exercisable without credentials - the ticket is
+ * issued, the key is recorded, and HEAD succeeds - so document flows can be
  * developed and tested end to end locally. Nothing is persisted, so a restart
  * loses everything, and StorageModule refuses to select this in production.
  */
@@ -32,7 +32,7 @@ export class StubStorageProvider implements StorageProvider {
 		});
 
 		this.logger.warn(
-			`Storage stub issued a ticket for ${input.key} — nothing will actually be stored.`,
+			`Storage stub issued a ticket for ${input.key} - nothing will actually be stored.`,
 		);
 
 		return {

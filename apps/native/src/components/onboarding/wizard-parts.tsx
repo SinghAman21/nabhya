@@ -83,7 +83,7 @@ export interface ReviewRow {
  * One group of what the wizard collected, every row a way back to its step.
  *
  * The old NGO review drew its own two-column key/value table inside a
- * `Surface`, with the values right-aligned and nothing tappable — so spotting a
+ * `Surface`, with the values right-aligned and nothing tappable - so spotting a
  * typo meant pressing Back four times. It is now the app's grouped list, and a
  * row is the edit control, which is what the volunteer wizard already did.
  */
@@ -122,7 +122,7 @@ export function ReviewSection({
  *
  * Both wizards used to `router.replace()` straight into the app the instant the
  * request returned, which threw away the only moment either account is
- * guaranteed to be paying attention to the one thing left to do — upload
+ * guaranteed to be paying attention to the one thing left to do - upload
  * documents, for an NGO, and verify an identity, for a volunteer. Neither is
  * something the product can ask for later with any authority.
  *

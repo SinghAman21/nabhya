@@ -67,7 +67,7 @@ describe("PublishingService", () => {
 		await seedRoles(db);
 	});
 
-	/** A verified org plus its owner — the state most of these paths require. */
+	/** A verified org plus its owner - the state most of these paths require. */
 	async function verifiedOrg() {
 		const owner = await createUser(db, { role: "organisation" });
 		const org = await createOrganization(db, owner.id, {

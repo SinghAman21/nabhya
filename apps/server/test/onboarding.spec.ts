@@ -25,7 +25,7 @@ import { createTestDb, type TestDb, truncateAll } from "./harness";
 
 /**
  * Onboarding decides where every account lands on launch, so a wrong answer
- * here is either a locked-out user or an infinite redirect — both of which
+ * here is either a locked-out user or an infinite redirect - both of which
  * have already happened once.
  */
 describe("OnboardingService", () => {
@@ -131,7 +131,7 @@ describe("OnboardingService", () => {
 
 			expect(org.organizationName).toBe("Sahaara Foundation");
 			expect(org.orgType).toBe("TRUST");
-			// Always PENDING — an NGO cannot self-verify.
+			// Always PENDING - an NGO cannot self-verify.
 			expect(org.verificationStatus).toBe("PENDING");
 			expect(org.email).toBe(owner.email);
 
@@ -235,8 +235,8 @@ describe("OnboardingService", () => {
 	});
 
 	/**
-	 * The wizards post **raw form values** — "" for every untouched optional
-	 * field — and this schema is the only normaliser. The service specs call the
+	 * The wizards post **raw form values** - "" for every untouched optional
+	 * field - and this schema is the only normaliser. The service specs call the
 	 * service directly and so never exercise the controller's validation pipe,
 	 * which is how the client shipped once posting its own parsed output: an
 	 * `optionalText` field parses "" into `null`, and `null` is not valid input
@@ -247,7 +247,7 @@ describe("OnboardingService", () => {
 		it("accepts a volunteer payload with every optional field blank", () => {
 			const parsed = completeVolunteerOnboardingSchema.safeParse({
 				fullName: "Asha Menon",
-				// As typed, spaces and country code included — the wizard's own
+				// As typed, spaces and country code included - the wizard's own
 				// placeholder is 16 characters and a raw `max(15)` rejected it.
 				phone: "+91 98765 43210",
 				profileImage: "",
@@ -412,7 +412,7 @@ describe("OnboardingService", () => {
 
 		it("clears interests when the submitted selection is empty", async () => {
 			// The wizard posts every step together, so the selection it sends is
-			// authoritative — deselecting everything has to actually stick.
+			// authoritative - deselecting everything has to actually stick.
 			const user = await createUser(db, { role: "volunteer" });
 			const [cause] = await db
 				.insert(categories)

@@ -55,7 +55,7 @@ export class PublishingService {
 	// ─── Announcements ───────────────────────────────────────────────────────
 
 	/**
-	 * Publishing an update notifies everyone who bookmarked the organization —
+	 * Publishing an update notifies everyone who bookmarked the organization -
 	 * that is the whole point of a bookmark, and it is why announcements are
 	 * worth having rather than being a static blob on the profile.
 	 */
@@ -248,7 +248,7 @@ export class PublishingService {
 	}
 
 	/**
-	 * Public — these documents exist to be read by donors. Unlike verification
+	 * Public - these documents exist to be read by donors. Unlike verification
 	 * documents, they carry no signed-URL ownership check beyond the caller
 	 * being able to see the organization at all.
 	 */

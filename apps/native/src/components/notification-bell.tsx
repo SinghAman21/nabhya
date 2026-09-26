@@ -22,7 +22,7 @@ type PressState = { pressed: boolean; focused?: boolean; hovered?: boolean };
  * Inbox entry point with an unread badge.
  *
  * On a phone this pushes `/notifications`, because a full screen is the right
- * shape for a list you scroll and act on. On desktop it opens a **popover** —
+ * shape for a list you scroll and act on. On desktop it opens a **popover** -
  * navigating a 1400px window away from what you were reading to show a column
  * of twelve rows is a mobile pattern wearing a desktop layout, and a sheet is
  * worse still: it dims the whole page to show a glance-sized list.

@@ -18,7 +18,7 @@ interface SayOptions {
 	stdout?: NodeJS.WriteStream;
 }
 
-// "Nabhi" — Sanskrit for navel/center, the root of "nabhya"
+// "Nabhi" - Sanskrit for navel/center, the root of "nabhya"
 const NAME = "Nabhi";
 const NAME_COLOR = color.hex("#FF6B6B").bold;
 
@@ -60,7 +60,7 @@ export async function nabhi(
 		: ["◡", "○", "▫", "▪", "■", "◡"];
 	const restingEye = ascii ? "o" : "◉";
 	const restingMouth = ascii ? "u" : "◡";
-	const walls = ascii ? ["—", "|"] : ["─", "│"];
+	const walls = ascii ? ["-", "|"] : ["─", "│"];
 	const corners = ascii ? ["+", "+", "+", "+"] : ["╭", "╮", "╰", "╯"];
 
 	const face = (text: string, eye: string, mouth: string) => {

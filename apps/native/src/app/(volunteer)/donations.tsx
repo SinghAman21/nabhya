@@ -38,7 +38,7 @@ const TABS: Array<{ value: Tab; label: string }> = [
 ];
 
 /**
- * Everything the volunteer has given — item pledges and monetary donations.
+ * Everything the volunteer has given - item pledges and monetary donations.
  *
  * The two are rendered by separate components rather than one list with a
  * union type: their shapes share almost nothing, and forcing them together
@@ -118,7 +118,7 @@ function ItemPledges() {
 					item.status === "PENDING"
 						? "Waiting for the NGO to review"
 						: item.status === "ACCEPTED"
-							? "Accepted — arrange the handover with the NGO"
+							? "Accepted - arrange the handover with the NGO"
 							: null;
 
 				return (
@@ -264,7 +264,7 @@ function DonationCard({
 				</Caption>
 			)}
 
-			{/* Only completed payments have a receipt — the server refuses one for
+			{/* Only completed payments have a receipt - the server refuses one for
 			    anything still pending. */}
 			{item.status === "COMPLETED" && (
 				<Button
@@ -316,7 +316,7 @@ function ReceiptSheet({
 					<>
 						<View style={{ marginBottom: spacing[4] }}>
 							<Caption color="tertiary">Receipt number</Caption>
-							<H3>{receipt.receiptNumber ?? "—"}</H3>
+							<H3>{receipt.receiptNumber ?? "-"}</H3>
 						</View>
 						<ListGroup>
 							<ReceiptRow
@@ -329,13 +329,13 @@ function ReceiptSheet({
 									.filter(Boolean)
 									.join(", ")}
 							/>
-							<ReceiptRow label="From" value={receipt.donorName ?? "—"} />
+							<ReceiptRow label="From" value={receipt.donorName ?? "-"} />
 							<ReceiptRow
 								label="Date"
 								value={
 									receipt.completedAt
 										? formatDateTime(receipt.completedAt)
-										: "—"
+										: "-"
 								}
 							/>
 						</ListGroup>

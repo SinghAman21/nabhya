@@ -25,7 +25,7 @@ function useTextColor(color?: TextColor) {
  * callers pick a step, never a number.
  *
  * Line heights are explicit because React Native falls back to the font's
- * own metrics, and the loaded faces report tight ones — descenders clipped in
+ * own metrics, and the loaded faces report tight ones - descenders clipped in
  * pills, two-line titles set solid, captions crowding the row above. Headings
  * sit at ~1.2, body at 1.5, small text at ~1.4.
  */
@@ -46,7 +46,7 @@ function BaseText({
 	size: number;
 	lineHeight: number;
 	weight?: keyof typeof fontByWeight;
-	/** Optical tracking. Tightens as size grows — set by the ramp, not by callers. */
+	/** Optical tracking. Tightens as size grows - set by the ramp, not by callers. */
 	tracking?: number;
 	/** Dynamic Type ceiling. Body text is allowed to grow further than headings,
 	 *  which are already large and would break layout first. */

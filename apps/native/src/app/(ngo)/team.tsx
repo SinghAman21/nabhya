@@ -62,7 +62,7 @@ const STATUS_OPTIONS: Array<{ value: TeamStatusFilter; label: string }> = [
 /**
  * Organisation team management: members, pending invites, and ownership.
  * The team endpoint returns the whole team (no paging), so a ScrollView is
- * enough here — see the paged-list note in apps/native/AGENTS.md.
+ * enough here - see the paged-list note in apps/native/AGENTS.md.
  */
 export default function OrgTeam() {
 	const { colors, spacing } = useTheme();
@@ -806,7 +806,7 @@ function InviteSheet({
 						</Caption>
 					) : (
 						<Caption color="tertiary">
-							No link on this invite — resend it from Pending invites to get
+							No link on this invite - resend it from Pending invites to get
 							one.
 						</Caption>
 					)}

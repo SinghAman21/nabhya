@@ -41,13 +41,13 @@ import { useAuthStore } from "@/store/auth-store";
 /**
  * The superadmin dashboard.
  *
- * It was a stack of `MetricRow`s — nineteen numbers in three surfaces, which is
+ * It was a stack of `MetricRow`s - nineteen numbers in three surfaces, which is
  * a readout, not a dashboard. What it is now, top to bottom, and why each piece
  * is the form it is:
  *
  * 1. **Three queue tiles.** What is waiting on me, as `StatTile`s that are also
  *    the way into the list that clears each one. A single current value is a
- *    stat tile, not a one-bar bar chart — drawing "12 documents" as a bar is a
+ *    stat tile, not a one-bar bar chart - drawing "12 documents" as a bar is a
  *    picture of a number. The amber left edge and amber numeral appear only
  *    above zero, because a status colour that is always on says nothing.
  * 2. **Two charts, and only where there is a dimension to plot against.**
@@ -60,16 +60,16 @@ import { useAuthStore } from "@/store/auth-store";
  * 3. **The verification pipeline**, as one ordinal stacked bar. Pending → In
  *    review → Verified is a funnel, so the colour steps light to dark and the
  *    order carries the meaning; Rejected is terminal, not further along, so it
- *    takes the neutral. Not a pie — comparing two close slices by angle is the
+ *    takes the neutral. Not a pie - comparing two close slices by angle is the
  *    thing pies are worst at.
- * 4. **What just happened** — the last few audit entries, with a way to the log.
+ * 4. **What just happened** - the last few audit entries, with a way to the log.
  * 5. **The remaining counters** in the aside as a `StatList`, because they are
  *    context rather than work: nobody opens this page to learn how many events
  *    exist. Given the whole width as `MetricRow`s they pushed the activity feed
  *    a screen and a half down; given the 320 aside they wrapped 3 + 1 and put a
  *    28px zero on its own line.
  *
- * The chart palette is not the brand palette, and `viz-tokens.ts` says why —
+ * The chart palette is not the brand palette, and `viz-tokens.ts` says why -
  * `#FF7E40` is a fill and fails the contrast a 2px line mark needs, and the
  * remaining tones are status colours whose meaning is reserved.
  */
@@ -88,7 +88,7 @@ export default function AdminOverviewScreen() {
 
 	const overview = query.data;
 	const points = trends.data?.points ?? [];
-	// `d MMM` — short enough that three of them fit under a 90-day axis.
+	// `d MMM` - short enough that three of them fit under a 90-day axis.
 	const labels = points.map((point) =>
 		new Date(`${point.date}T00:00:00Z`).toLocaleDateString(undefined, {
 			day: "numeric",

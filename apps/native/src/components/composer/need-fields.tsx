@@ -21,25 +21,25 @@ import { useTheme } from "@/hooks/use-theme";
  * A need, in as few fields as a need can be described.
  *
  * Two things are visible: what kind of need it is, and how much of it. That is
- * the whole form. Everything else — when it closes, where it is if not where
- * the NGO is — is a chip in the property row, off until it is wanted.
+ * the whole form. Everything else - when it closes, where it is if not where
+ * the NGO is - is a chip in the property row, off until it is wanted.
  *
  * The two that stayed visible earn it from the feed card. `NeedFacts` builds
  * "40 / 200 blankets" and its progress track out of `quantity` + `unit`, and
- * **returns `null` when it has neither** — so a need filed without an amount
+ * **returns `null` when it has neither** - so a need filed without an amount
  * produces a card with a title, a paragraph and nothing a volunteer can act on
  * or measure. And `KindPill` prints "Needs items" or "Giving away" straight
  * off `type`, so the WANT/OFFER choice is the first thing anybody reads.
  *
  * The city is **not** asked for. It is required by `createNeedSchema`, and it
- * is answered by the NGO's own registration in nearly every case — so it is
+ * is answered by the NGO's own registration in nearly every case - so it is
  * filled silently and stated in a line under the row, with a chip for the
  * times it is somewhere else. See `PlaceField`.
  */
 
 export interface NeedFieldsValue {
 	needType: NeedType;
-	/** Digits only, or empty for unspecified — see `AmountField`. */
+	/** Digits only, or empty for unspecified - see `AmountField`. */
 	quantity: string;
 	unit: string;
 	expiresAt: Date | undefined;
@@ -65,7 +65,7 @@ const NEED_TYPES: Array<{ value: NeedType; label: string; hint: string }> = [
 	},
 ];
 
-/** Item needs cluster in tens and hundreds — 200 blankets, 500 meals. */
+/** Item needs cluster in tens and hundreds - 200 blankets, 500 meals. */
 const QUANTITY_STEPS = [10, 50, 100] as const;
 
 export function NeedFields({
@@ -151,8 +151,8 @@ export function NeedFields({
 			</View>
 			<Caption color="quaternary" style={{ marginTop: spacing[2] }}>
 				{giving
-					? "e.g. 200 blankets you can give — pledges count against the number. Leave it at 0 to skip."
-					: "e.g. 200 blankets needed — pledges count against the number. Leave it at 0 to skip."}
+					? "e.g. 200 blankets you can give - pledges count against the number. Leave it at 0 to skip."
+					: "e.g. 200 blankets needed - pledges count against the number. Leave it at 0 to skip."}
 			</Caption>
 			<View style={{ marginTop: spacing[2], marginBottom: spacing[5] }}>
 				<StepChips
@@ -168,7 +168,7 @@ export function NeedFields({
 				icon={AlertTriangle}
 				tone="error"
 				title="Mark as urgent"
-				hint="High urgency — Urgent lens, ranked higher in every feed."
+				hint="High urgency - Urgent lens, ranked higher in every feed."
 				value={urgent}
 				onChange={onUrgent}
 				disabled={disabled}
@@ -214,7 +214,7 @@ export function NeedFields({
 
 			{!value.placeOpen && homeCity && (
 				<PropertyNote>
-					{giving ? "Collected in" : "Needed in"} {homeCity} — your NGO's city.
+					{giving ? "Collected in" : "Needed in"} {homeCity} - your NGO's city.
 				</PropertyNote>
 			)}
 

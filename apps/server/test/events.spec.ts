@@ -328,7 +328,7 @@ describe("EventsService", () => {
 	});
 });
 
-describe("EventsService — correlated counts", () => {
+describe("EventsService - correlated counts", () => {
 	let db: TestDb;
 	let close: () => Promise<void>;
 	let service: EventsService;

@@ -25,7 +25,7 @@ import { verticalScrollbar } from "@/lib/scroll";
  * The volunteer's contribution summary.
  *
  * Every figure is derived from applications, attendance and pledges rather
- * than stored — hours come from the attended events' own durations, so an
+ * than stored - hours come from the attended events' own durations, so an
  * organisation cannot inflate someone's record without changing the event
  * everyone else can see.
  *

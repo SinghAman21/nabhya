@@ -7,7 +7,7 @@ export default function OnboardingLayout() {
 
 	// The role groups all guard on the store; onboarding did not. When the axios
 	// interceptor signed a user out mid-wizard, these screens stayed mounted with
-	// no credentials — every submit then left without an Authorization header and
+	// no credentials - every submit then left without an Authorization header and
 	// came back 401, with no route back to the login screen. On web it also
 	// stopped a signed-out visitor opening /volunteer directly.
 	if (!email) return <Redirect href="/" />;

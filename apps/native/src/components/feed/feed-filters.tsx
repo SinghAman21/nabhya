@@ -44,7 +44,7 @@ export const ALL_CAUSES = "";
  * need type is either redundant or empty. So the sheet offers one list and
  * `feedContentQuery` turns the choice back into the pair the hook wants.
  *
- * Events and updates used to be unreachable here — the section held only All,
+ * Events and updates used to be unreachable here - the section held only All,
  * Needs and Offers, so "show me events I can turn up to", the second most
  * common thing a volunteer wants, had no control at all.
  */
@@ -92,12 +92,12 @@ const TABS = feedTabSchema.options.map((value) => ({
 /**
  * The one row that shapes the feed: the lens (For you, Following, Trending,
  * Urgent) scrolling sideways, and a filter button pinned at the right edge
- * that opens the cause picker. One row, not two — the cause is chosen rarely
+ * that opens the cause picker. One row, not two - the cause is chosen rarely
  * and the lens often, so the rare control folds into a sheet and the row
  * stays a single line of chips.
  *
- * The chips bleed to the screen edge — negative margin out of the page
- * gutter, the gutter put back as scroll padding — so the first chip lines up
+ * The chips bleed to the screen edge - negative margin out of the page
+ * gutter, the gutter put back as scroll padding - so the first chip lines up
  * with the cards and the last slides under the filter button instead of
  * stopping short of it.
  */

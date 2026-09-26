@@ -46,8 +46,8 @@ export class UploadsService {
 	/**
 	 * Issues a pre-signed upload URL.
 	 *
-	 * The key is derived server-side from the caller's identity — the client
-	 * never proposes one — so a volunteer cannot obtain a ticket that writes
+	 * The key is derived server-side from the caller's identity - the client
+	 * never proposes one - so a volunteer cannot obtain a ticket that writes
 	 * into another organization's prefix.
 	 */
 	async createIntent(user: AuthUser, input: UploadIntentInput) {

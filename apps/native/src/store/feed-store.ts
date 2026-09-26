@@ -15,7 +15,7 @@ interface FeedState {
  * Discover's search term and city scope, owned outside the screen.
  *
  * On desktop the search field lives in the top bar and on mobile it lives in the
- * page, so the value has to outlive whichever one is mounted — and there must be
+ * page, so the value has to outlive whichever one is mounted - and there must be
  * exactly one of them. Two fields bound to two pieces of state is how a screen
  * ends up filtered by a term the visible input does not show.
  *

@@ -52,12 +52,12 @@ import type { FeedItem, FeedNeedItem } from "@/lib/types";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
- * NGO feed — the shared ranking feed, plus the one place the NGO can add to it.
+ * NGO feed - the shared ranking feed, plus the one place the NGO can add to it.
  *
  * For you / Trending / Following show all tags; Urgent narrows to urgent items.
  *
  * Lives inside the `(ngo)` group (not top-level) so the desktop sidebar and
- * the mobile tab bar stay mounted — the NGO's landing page, with every other
+ * the mobile tab bar stay mounted - the NGO's landing page, with every other
  * destination one tap away in the same chrome.
  *
  * **The composer is the point of this screen.** `POST /api/feed` had no client
@@ -65,7 +65,7 @@ import { useAuthStore } from "@/store/auth-store";
  * NGO could read the feed and never write to it. It is reachable three ways
  * here, and each is deliberate:
  *
- * - the prompt bar at the top of the list — the invitation, and where the two
+ * - the prompt bar at the top of the list - the invitation, and where the two
  *   media/need shortcuts live;
  * - a header button on desktop, where a bar scrolled out of view is a dead end
  *   because there is no thumb-reachable corner to fall back on;
@@ -75,20 +75,20 @@ import { useAuthStore } from "@/store/auth-store";
  *
  * Feed, then `DiscoverRail`. Nothing else: the rail briefly carried the org's
  * own pending decisions, metric tiles and verification nudge, which were a
- * second copy of four blocks the Dashboard already renders one nav item away —
+ * second copy of four blocks the Dashboard already renders one nav item away -
  * so the feed page was doing the dashboard's job in a column beside itself.
  * A feed is a feed. What stays is `DiscoverRail`, the same component the
  * volunteer home uses, because *other* NGOs' urgent needs and upcoming events
- * are feed material — it is how an NGO finds out that somebody two districts
+ * are feed material - it is how an NGO finds out that somebody two districts
  * over needs the thing they have a surplus of.
  *
- * The feed column is capped at `FEED_MAX_WIDTH` — at 1920 an uncapped
+ * The feed column is capped at `FEED_MAX_WIDTH` - at 1920 an uncapped
  * `flex: 1` column drew 1500px-wide cards whose text ran forty words to the
  * line. A cap leaves a remainder, and `flex-start` piles all of it on one
  * side: at the `(ngo)` content cap of 1440 the pair comes to 1128, so 312pt
  * sat dead against the right edge and the whole thing read as shoved left.
  * `justifyContent: "center"` splits it 156/156 instead. Widening either column
- * to absorb it would be the wrong fix — 720 is already the top of a
+ * to absorb it would be the wrong fix - 720 is already the top of a
  * comfortable measure, and the rail is short on content, so a wider rail is
  * just a wider gap.
  */
@@ -98,14 +98,14 @@ import { useAuthStore } from "@/store/auth-store";
  *
  * `flexGrow: 0` and `flexShrink: 0` are the load-bearing part. This is a
  * `ScrollView`, and react-native-web gives every ScrollView
- * `flexGrow: 1; flexShrink: 1` in its base style — which beats `width` when
+ * `flexGrow: 1; flexShrink: 1` in its base style - which beats `width` when
  * the row has spare space, so the rail grew to ~700px and squeezed the feed
  * column down to its minimum. A `View` would have defaulted to `flexGrow: 0`
  * and this would never have come up.
  *
  * `alignSelf: "stretch"` rather than `position: sticky`: the rail is a sibling
  * of the feed's scroll container, not a child of it, so there is nothing for
- * sticky to stick to — it only made the column size to its content and clip.
+ * sticky to stick to - it only made the column size to its content and clip.
  * Stretched, it is exactly as tall as the row and scrolls inside itself.
  */
 const RAIL_WIDTH = 384;
@@ -128,7 +128,7 @@ const COLUMN_GAP = 24;
  *
  * It has to equal `FeedCard`'s own `marginHorizontal` (`spacing[3]`), because
  * the card supplies its own gutter and the header has to agree with it. The
- * `Screen` gutter is switched off on this route for the same reason — the
+ * `Screen` gutter is switched off on this route for the same reason - the
  * scroll container then reaches the edge of the pane, so its scrollbar sits
  * where a page's scrollbar sits instead of floating 20pt inside the content.
  */
@@ -197,7 +197,7 @@ export default function NgoFeed() {
 	// Publishing is `content.publish`: owners, admins and managers. Allowed
 	// while the role is still resolving so permitted authors never see a
 	// flicker of denial; the server still 403s anything the role cannot do.
-	// Verification gates first — an unverified org cannot post at all.
+	// Verification gates first - an unverified org cannot post at all.
 	const teamRole = useMyTeamRole();
 	const canPublish = teamRole.isLoading
 		? true
@@ -215,7 +215,7 @@ export default function NgoFeed() {
 
 	/**
 	 * Deleting is irreversible and takes the stored media with it, so it is
-	 * confirmed — and named, because "Delete post" over a feed of twenty is
+	 * confirmed - and named, because "Delete post" over a feed of twenty is
 	 * not enough to know which one is about to go.
 	 */
 	const confirmDelete = useCallback(
@@ -242,7 +242,7 @@ export default function NgoFeed() {
 	 * Stable handlers, so `FeedCard`'s `memo` can actually hold.
 	 *
 	 * Written inline in `renderItem` these were a new function on every render,
-	 * which fails the memo comparison for every card in the list — so a like,
+	 * which fails the memo comparison for every card in the list - so a like,
 	 * which now writes straight into the query cache, re-rendered every card
 	 * and every video player in it. Each closes only over a mutation's `mutate`,
 	 * which react-query keeps stable, so these dependencies never change.
@@ -270,7 +270,7 @@ export default function NgoFeed() {
 	};
 
 	/*
-	 * Desktop: one pinned row — the lenses and New post together, because they
+	 * Desktop: one pinned row - the lenses and New post together, because they
 	 * are the two things you reach for at any scroll depth and splitting them
 	 * across a title row and a chip row spent 110pt of permanent chrome saying
 	 * "Feed" next to a sidebar item that already says Feed. It sits above the
@@ -326,7 +326,7 @@ export default function NgoFeed() {
 	 * row: it is 64pt tall and belongs to the content, not the chrome.
 	 *
 	 * `GUTTER` is the one number that lines it up with the cards. `FeedCard`
-	 * carries its own `marginHorizontal: spacing[3]`, so the list adds none —
+	 * carries its own `marginHorizontal: spacing[3]`, so the list adds none -
 	 * otherwise the cards sit 12pt further in than everything above them, which
 	 * is exactly the misalignment this had.
 	 */
@@ -368,7 +368,7 @@ export default function NgoFeed() {
 			description={
 				tab === "following"
 					? "Follow NGOs working on causes near yours and their updates land here."
-					: "Be the first thing in it — post what your team did this week."
+					: "Be the first thing in it - post what your team did this week."
 			}
 			action={
 				isVerified && canPublish && tab !== "following" ? (
@@ -401,7 +401,7 @@ export default function NgoFeed() {
 					onToggleLike={handleToggleLike}
 					onToggleSave={handleToggleSave}
 					// Only a post has a delete route, and only its own author may
-					// call it — the server enforces both, and offering the control
+					// call it - the server enforces both, and offering the control
 					// on anything else would be a button that always fails.
 					{...(item.kind === "post" && myUserId && item.author?.id === myUserId
 						? { onDelete: confirmDelete }
@@ -460,7 +460,7 @@ export default function NgoFeed() {
 						{list}
 					</View>
 					{/* Scrolls on its own: on a short window a plain View clips the
-					    bottom with nothing to scroll — the same bug the profile page
+					    bottom with nothing to scroll - the same bug the profile page
 					    had. */}
 					{/* No scrollbar: this column is chrome, and a thumb on it reads
 					    as a second page competing with the feed's. */}

@@ -5,7 +5,7 @@
  * free text, so "Mumbai", "mumbai" and "Bombay" are three different cities to
  * every query that filters on one. The real fix is a city table or a
  * normalising write path on the server; until then the *client* can at least
- * stop creating new spellings, which is where nearly all of them come from —
+ * stop creating new spellings, which is where nearly all of them come from -
  * a typed city at onboarding, and a reverse-geocoded one from the OS.
  *
  * So this file does three things:
@@ -16,7 +16,7 @@
  *   to whatever the device's geocoder hands back.
  *
  * It is deliberately not exhaustive. An unlisted city still goes through as
- * typed (normalised for case and spacing) — a volunteer in Tezpur must not be
+ * typed (normalised for case and spacing) - a volunteer in Tezpur must not be
  * told their town does not exist.
  */
 
@@ -152,7 +152,7 @@ const ALIASES: Record<string, string> = {
 	"navi mumbai": "Navi Mumbai",
 };
 
-/** Suggestion order — the keys above, with the underscore placeholder fixed. */
+/** Suggestion order - the keys above, with the underscore placeholder fixed. */
 export const CITY_SUGGESTIONS: string[] = Object.keys(CITY_STATES).map((city) =>
 	city.replace(/_/g, " "),
 );
@@ -246,8 +246,8 @@ export function stateForCity(city: string): string | null {
 /**
  * Cities to offer for what has been typed so far.
  *
- * Prefix matches rank above substring matches — someone typing "na" wants
- * Nagpur and Nashik before Puna-adjacent middles — and an exact match offers
+ * Prefix matches rank above substring matches - someone typing "na" wants
+ * Nagpur and Nashik before Puna-adjacent middles - and an exact match offers
  * nothing, because there is nothing left to choose.
  */
 export function citySuggestions(query: string, limit = 6): string[] {
@@ -308,7 +308,7 @@ function haversineKm(
  * (Expo dropped the Google Geocoding dependency), and on Android it can return
  * an empty array when Play Services' geocoder is unavailable or rate-limited.
  * Before this, "Use my current location" on those platforms saved coordinates
- * and then told the user to type their city anyway — which reads as broken,
+ * and then told the user to type their city anyway - which reads as broken,
  * because from the outside nothing happened.
  *
  * 120km is the cutoff: far enough to catch someone in a suburb or a satellite

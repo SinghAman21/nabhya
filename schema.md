@@ -103,22 +103,22 @@ Reports --> AuditLogs
 
 ## Amendments (agreed, apply when writing Drizzle schema)
 
-### 1. Item donations — the core differentiator
+### 1. Item donations - the core differentiator
 Money-only `Donation` misses the "donate stuff" idea. Add:
 
-- **OrganizationNeed** — organization_id, title, item, quantity_needed, quantity_fulfilled, urgency, status, created_at/updated_at. What an NGO is asking for.
-- **ItemDonation** — need_id (nullable — spontaneous donations allowed), organization_id, donor_id, item, quantity, status (`pledged | in_transit | received | cancelled`), message, created_at. Item pledges fulfil needs.
+- **OrganizationNeed** - organization_id, title, item, quantity_needed, quantity_fulfilled, urgency, status, created_at/updated_at. What an NGO is asking for.
+- **ItemDonation** - need_id (nullable - spontaneous donations allowed), organization_id, donor_id, item, quantity, status (`pledged | in_transit | received | cancelled`), message, created_at. Item pledges fulfil needs.
 - Keep monetary `Donation` in the schema but ship item donations first (payments need gateway + 80G receipt work).
 
-### 2. Auth is Better Auth — drop hand-rolled auth tables
+### 2. Auth is Better Auth - drop hand-rolled auth tables
 Better Auth owns `user`, `session`, `account`, `verification`. Therefore:
 
-- **Remove**: `PasswordResetToken`, `EmailVerificationToken`, and `password_hash` / `email_verified` on User — Better Auth manages all of these.
+- **Remove**: `PasswordResetToken`, `EmailVerificationToken`, and `password_hash` / `email_verified` on User - Better Auth manages all of these.
 - **Extend** Better Auth's `user` via additional fields (or a 1:1 `user_profile`): `role`, `phone`, `profile_photo`, `verification_status`.
 - Sessions replace the refresh-token machinery.
 
 ### 3. Fields the app already collects (missing from Organization)
-`org_type` (legal type: trust/society/section-8 — distinct from category), `team_size`, `founding_year`, `updated_at`, `onboarding_step` (server-side onboarding progress).
+`org_type` (legal type: trust/society/section-8 - distinct from category), `team_size`, `founding_year`, `updated_at`, `onboarding_step` (server-side onboarding progress).
 
 ### 4. Constraints & types (bake into Drizzle)
 - Unique pairs: `Bookmark(user_id, organization_id)`, `Review(user_id, organization_id)`, `OrganizationCategory(organization_id, category_id)`, `VolunteerApplication(event_id, user_id)`; unique `Organization.registration_number`.

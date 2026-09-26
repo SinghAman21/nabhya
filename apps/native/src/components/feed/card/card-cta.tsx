@@ -14,7 +14,7 @@ import type { FeedItem, FeedNeedItem } from "@/lib/types";
  * decide this inline in an IIFE no test could reach.
  *
  * Two shapes, and the difference is whether the row is asking for something.
- * **Solid** is the commitment — "I can help", "Claim this", "View & apply" —
+ * **Solid** is the commitment - "I can help", "Claim this", "View & apply" -
  * and is the only saturated element on the card. **Quiet** is a link with an
  * arrow, for a destination that asks nothing. A story has neither (the body
  * carries an inline "Read more") and so does an update, because "View NGO"
@@ -52,7 +52,7 @@ export function primaryCta(
 			const { startAt, volunteersNeeded, acceptedCount } = item.event;
 			const past = Date.parse(startAt) < Date.now();
 			const full = volunteersNeeded > 0 && acceptedCount >= volunteersNeeded;
-			// Past and full still open the event — the page carries the details and
+			// Past and full still open the event - the page carries the details and
 			// what happened. Only the wording and the weight change, so the reader
 			// is not promised a form that is not there.
 			if (past || full) {
@@ -82,7 +82,7 @@ export function primaryCta(
  * banner rather than as something you press.
  *
  * `primary.contrast` on `primary.main` is the one pairing the token file
- * guarantees on a solid fill (7.44:1). White here is 2.53:1 — the failure that
+ * guarantees on a solid fill (7.44:1). White here is 2.53:1 - the failure that
  * token exists to prevent. Hover comes from the style callback rather than a
  * `useState`, so pointing at a button does not re-render the card around it.
  */

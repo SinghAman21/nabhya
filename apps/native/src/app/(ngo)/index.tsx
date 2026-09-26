@@ -49,14 +49,14 @@ import { useAuthStore } from "@/store/auth-store";
 /**
  * The organisation's home tab, in the order a coordinator needs it:
  *
- * 1. Anything blocking them — verification, while it is not done.
- * 2. Anything they came here to *do* — post, ask for something, run an event.
+ * 1. Anything blocking them - verification, while it is not done.
+ * 2. Anything they came here to *do* - post, ask for something, run an event.
  *    A dashboard that only reports is a wall the coordinator has to walk
  *    around; these are the three creation acts in the product and they open
  *    in place, not two navigations away.
- * 3. Anything waiting on them — pending applicants and pledges, with counts
+ * 3. Anything waiting on them - pending applicants and pledges, with counts
  *    and a tap straight to the screen where the decision is made.
- * 4. The numbers — one `MetricRow`, and public impact once verified.
+ * 4. The numbers - one `MetricRow`, and public impact once verified.
  * 5. Whatever the surrounding chrome does not already offer.
  *
  * That last point is why the "Manage" list differs by platform, and it is not
@@ -173,7 +173,7 @@ export default function NgoDashboard() {
 	);
 
 	/*
-	 * Three acts on one surface, hairline-divided — the same language as
+	 * Three acts on one surface, hairline-divided - the same language as
 	 * `MetricRow`, so the page reads as two rows of one thing rather than a
 	 * card wall. Posting needs a verified org (the API enforces it on both the
 	 * post and the upload-intent route); needs and events can be drafted
@@ -245,7 +245,7 @@ export default function NgoDashboard() {
 						<ListRow
 							icon={HeartHandshake}
 							label={`${pendingPledges} pledge${pendingPledges === 1 ? "" : "s"} to review`}
-							hint={`On ${needsWithPledges} post${needsWithPledges === 1 ? "" : "s"} — people offering what you asked for`}
+							hint={`On ${needsWithPledges} post${needsWithPledges === 1 ? "" : "s"} - people offering what you asked for`}
 							value={<Count value={pendingPledges} />}
 							onPress={() => router.push("/(ngo)/needs")}
 						/>
@@ -461,7 +461,7 @@ export default function NgoDashboard() {
 }
 
 /**
- * One creation act. Icon over label over consequence — three lines is enough
+ * One creation act. Icon over label over consequence - three lines is enough
  * to distinguish "ask for items" from "call volunteers", which is the choice
  * a new coordinator actually finds hard.
  *

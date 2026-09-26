@@ -28,7 +28,7 @@ describe("GlobalExceptionFilter", () => {
 
 	it("forwards per-field validation errors to the client", () => {
 		// Without this the client receives only "Validation failed" and cannot
-		// mark which input was wrong — every form silently loses its error state.
+		// mark which input was wrong - every form silently loses its error state.
 		const { host, json } = hostFor();
 
 		filter.catch(

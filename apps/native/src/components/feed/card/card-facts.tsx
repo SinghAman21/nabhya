@@ -13,7 +13,7 @@ import type { FeedEventItem, FeedNeedItem } from "@/lib/types";
  * mistake: a hairline stretched across 800pt of desktop column reads as a
  * divider, not as a measurement, and at 3pt it had no substance to read.
  *
- * A gauge is now **short and thick** — 8pt tall, capped at 120pt wide, sitting
+ * A gauge is now **short and thick** - 8pt tall, capped at 120pt wide, sitting
  * at the end of the line it belongs to. A progress bar is a thing you compare
  * two lengths in, so it wants to be small enough to take in at once; the width
  * of a paragraph is exactly the wrong size for it.
@@ -180,7 +180,7 @@ export function eventStart(item: FeedEventItem): Date | null {
  * This is the event layout's whole idea: an event is the one kind whose
  * headline fact is *when*, so `when` gets its own column and everything else
  * sets beside it. No other kind indents, so an event is identifiable from the
- * shape of the card — which is the job the "Event" label no longer has to do.
+ * shape of the card - which is the job the "Event" label no longer has to do.
  *
  * It carries **no border and no padding**. Boxed, it was a 50pt tile beside a
  * 22pt title, which made the date the tallest thing in the row and gave the

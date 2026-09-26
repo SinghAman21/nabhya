@@ -38,7 +38,7 @@ export interface DetectedPlace {
  *
  * 1. **It invented cities.** `city` is free text on every table that has one,
  *    and the feed, the needs list and "NGOs near me" all filter on an exact
- *    match — so "mumbai" typed in lower case is a city with nothing in it.
+ *    match - so "mumbai" typed in lower case is a city with nothing in it.
  *    Suggestions and `normaliseCityName` mean a typed city usually resolves to
  *    the one spelling everything else uses. See `lib/cities.ts`.
  * 2. **City and state could disagree.** Choosing a suggested city now fills the
@@ -46,7 +46,7 @@ export interface DetectedPlace {
  * 3. **Nobody's coordinates were ever recorded.** `organizations.latitude` and
  *    `users.latitude` exist and `GET /organizations/nearby` reads them, but the
  *    only screen that could set them was an edit form nobody opens after
- *    signing up — so proximity search had almost nothing to search. Location is
+ *    signing up - so proximity search had almost nothing to search. Location is
  *    offered here, once, with the reason stated and never silently requested.
  */
 export function LocationFields({
@@ -65,7 +65,7 @@ export function LocationFields({
 	detectLede: string;
 	/**
 	 * The street line and pincode, when the platform produced them. The NGO
-	 * wizard uses it to fill the address it also asks for — having just been
+	 * wizard uses it to fill the address it also asks for - having just been
 	 * told where someone is, asking them to type it is rude.
 	 */
 	onDetectedPlace?: (place: DetectedPlace) => void;
@@ -134,8 +134,8 @@ export function LocationFields({
 				return;
 			}
 
-			// No name from the platform — reverse geocoding does not exist on the
-			// web and can come back empty on Android — so work the city out from
+			// No name from the platform - reverse geocoding does not exist on the
+			// web and can come back empty on Android - so work the city out from
 			// the coordinates ourselves rather than saving them and asking the
 			// user to type the city they just asked us to find.
 			const near = nearestCity(coords.latitude, coords.longitude);
@@ -155,7 +155,7 @@ export function LocationFields({
 
 			onChange(coords);
 			setDetectNote(
-				"Location saved, but we couldn't name a city near you — please type it.",
+				"Location saved, but we couldn't name a city near you - please type it.",
 			);
 		} finally {
 			setDetecting(false);

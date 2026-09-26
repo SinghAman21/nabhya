@@ -26,7 +26,7 @@ const CHOICES: Array<{
 		title: "I want to volunteer",
 		description:
 			"Find NGOs near you, pledge items they need, help at events and collect certificates.",
-		next: "Next: 4 short steps — your name, your city and the causes you care about.",
+		next: "Next: 4 short steps - your name, your city and the causes you care about.",
 		Icon: HandHeart,
 	},
 	{
@@ -40,7 +40,7 @@ const CHOICES: Array<{
 ];
 
 /**
- * The one question after sign-up. Volunteer first — it is most people — and
+ * The one question after sign-up. Volunteer first - it is most people - and
  * each choice is a whole tappable card, so there is nothing else to find.
  *
  * Two things it now does that it did not:

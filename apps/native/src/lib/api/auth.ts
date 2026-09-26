@@ -15,7 +15,7 @@ import { USERS } from "./endpoints";
 // leaking; a no-op everywhere except that edge case.
 WebBrowser.maybeCompleteAuthSession();
 
-// Supabase's session storage adapter expects getItem/setItem/removeItem —
+// Supabase's session storage adapter expects getItem/setItem/removeItem -
 // apps/native/src/lib/storage.ts uses get/set/remove for its other callers
 // (theme, auth-store persistence), so this is a thin shim rather than a
 // rename that would ripple through unrelated code.
@@ -38,7 +38,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 // Supabase's token auto-refresh is driven by a timer that keeps running while
-// the app is backgrounded unless explicitly paused — this is the officially
+// the app is backgrounded unless explicitly paused - this is the officially
 // recommended wiring for React Native (supabase-js docs), and has no Neon
 // Auth equivalent since that adapter managed its own session lifecycle.
 AppState.addEventListener("change", (state) => {
@@ -49,7 +49,7 @@ AppState.addEventListener("change", (state) => {
 	}
 });
 
-/** Rejects if `promise` has not settled within `ms` — the promise itself keeps running. */
+/** Rejects if `promise` has not settled within `ms` - the promise itself keeps running. */
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 	return new Promise<T>((resolve, reject) => {
 		const timer = setTimeout(() => reject(new Error("timed out")), ms);
@@ -88,14 +88,14 @@ export class AuthService {
 
 	/**
 	 * Google sign-in, routed through Supabase's OAuth provider (already
-	 * enabled in the Supabase dashboard — no client secret lives in this app).
+	 * enabled in the Supabase dashboard - no client secret lives in this app).
 	 *
-	 * Web: a full-page redirect to Google and back. There is no popup here —
+	 * Web: a full-page redirect to Google and back. There is no popup here -
 	 * `expo-web-browser`'s popup flow polls `window.closed` to notice the
 	 * consent screen finishing, and Chrome's Cross-Origin-Opener-Policy blocks
 	 * that read for a cross-origin popup (Google's login page), which either
 	 * throws a console error or leaves the promise hanging. The browser tab
-	 * *is* the app on web, so there's nothing a popup buys here anyway —
+	 * *is* the app on web, so there's nothing a popup buys here anyway -
 	 * Supabase parses the returned session out of the URL itself
 	 * (`detectSessionInUrl` above) once Google redirects back to this origin;
 	 * `getCurrentSession()` below picks it up on the next mount.
@@ -128,7 +128,7 @@ export class AuthService {
 
 		const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 		if (result.type !== "success") {
-			// User closed the browser or backgrounded the app — not a real error.
+			// User closed the browser or backgrounded the app - not a real error.
 			throw new Error("CANCELLED");
 		}
 
@@ -172,14 +172,14 @@ export class AuthService {
 		try {
 			// Supabase's default `scope: "global"` calls its Auth server to revoke
 			// the session everywhere, which is a network request with no timeout
-			// of its own — on a flaky connection it can hang well past what
+			// of its own - on a flaky connection it can hang well past what
 			// anyone waits for a "sign out" tap. Race it: server-side revocation
 			// still wins when the network cooperates, but a stalled request can
 			// never trap the device sign-out below it, which is the part the
 			// person actually asked for and the part `finally` cannot skip.
 			await withTimeout(supabase.auth.signOut(), 5000);
 		} catch {
-			// Revocation failed or timed out — the device still signs out below.
+			// Revocation failed or timed out - the device still signs out below.
 		} finally {
 			await this.clearToken();
 		}

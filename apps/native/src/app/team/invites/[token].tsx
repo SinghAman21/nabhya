@@ -30,7 +30,7 @@ import { useAuthStore } from "@/store/auth-store";
 /**
  * Accept (or decline) a team invite from its email link.
  *
- * Public route on purpose — the person tapping the link may not be signed in
+ * Public route on purpose - the person tapping the link may not be signed in
  * yet. The server enforces the one rule that matters: the invite's email must
  * equal the signed-in account's email, so signing in with anything else 403s
  * with a message that names the account to switch to.
@@ -70,7 +70,7 @@ function TeamInvitePage() {
 				<EmptyState
 					icon={LogIn}
 					title="Sign in to accept this invite"
-					description="Team invites are tied to your account. Sign in first — the link will still work afterwards."
+					description="Team invites are tied to your account. Sign in first - the link will still work afterwards."
 					action={
 						<Button
 							onPress={() => {
@@ -94,7 +94,7 @@ function TeamInvitePage() {
 		if (status === 403) {
 			setError(
 				accountEmail
-					? `This invite was sent to a different email address — you are signed in as ${accountEmail}. Switch to the invited account and try again.`
+					? `This invite was sent to a different email address - you are signed in as ${accountEmail}. Switch to the invited account and try again.`
 					: "This invite was sent to a different email address. Sign in with the invited account and try again.",
 			);
 			return;

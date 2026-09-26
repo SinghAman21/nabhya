@@ -42,7 +42,7 @@ import { verticalScrollbar } from "@/lib/scroll";
  *
  * The form lives in one capped column, and short fields are paired into rows on
  * desktop. Before that it was a single stack inside the `(ngo)` shell's 1440pt
- * content area, so "Pincode" and "Phone" were input bars a foot wide — a text
+ * content area, so "Pincode" and "Phone" were input bars a foot wide - a text
  * box whose width promises four times what it wants is a text box you distrust.
  * Each group is a `Surface` too, which is what `useFieldInputStyle` was written
  * for ("the quiet input treatment used inside cards"): grouped fields on a card
@@ -50,14 +50,14 @@ import { verticalScrollbar } from "@/lib/scroll";
  *
  * ## The two images
  *
- * Cover and logo are picked here and nowhere else — the camera controls on the
+ * Cover and logo are picked here and nowhere else - the camera controls on the
  * profile hero navigate to this screen rather than opening their own picker, so
  * there is one code path that knows the aspect ratios and the size limits.
  *
  * They upload straight to object storage on pick (the bytes never pass through
  * our API) and what is stored on the form is the returned **object key**, not a
  * URL. The picked file's local `uri` is kept alongside it purely so the slot
- * can show the new image before the record round-trips — a key cannot be
+ * can show the new image before the record round-trips - a key cannot be
  * displayed without a signed download URL, and asking for one for an object
  * uploaded two seconds ago is a request that can lose a race with its own
  * bucket.
@@ -65,7 +65,7 @@ import { verticalScrollbar } from "@/lib/scroll";
  * ## Clearing a field
  *
  * `optionalText` in `@nabhya/shared` maps `""` to `null` ("clear it") and skips
- * `undefined` ("not provided") — see trap 5 in the root `AGENTS.md`. This screen
+ * `undefined` ("not provided") - see trap 5 in the root `AGENTS.md`. This screen
  * used to send `undefined` for every blank optional field, with a comment
  * claiming that cleared them; it did the opposite, so a website or a mission
  * statement could be set once and never removed. Optional text now sends the
@@ -146,7 +146,7 @@ export default function EditOrganization() {
 
 	const [form, setForm] = useState<Form>(EMPTY);
 	const [error, setError] = useState<string | null>(null);
-	// Local previews for a file picked in this session — see the header note.
+	// Local previews for a file picked in this session - see the header note.
 	const [coverPreview, setCoverPreview] = useState<string | null>(null);
 	const [logoPreview, setLogoPreview] = useState<string | null>(null);
 

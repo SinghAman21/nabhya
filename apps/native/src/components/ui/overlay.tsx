@@ -27,7 +27,7 @@ import { focusable } from "@/lib/focus";
  *   it needs to be readable while the person retries. A modal you dismiss to
  *   get back to the row you were acting on is a step of work, not information.
  * - **On the web it is browser chrome, or nothing at all.** react-native-web
- *   ships `Alert` as `static alert() {}` — an empty function — so every dialog
+ *   ships `Alert` as `static alert() {}` - an empty function - so every dialog
  *   was a silent no-op there until `lib/alert.ts` mapped it onto
  *   `window.alert` / `window.confirm`. Those work, but they draw the
  *   *browser's* dialog: the origin in the title bar, the browser's own button

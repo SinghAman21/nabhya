@@ -21,7 +21,7 @@ export const announcementStatusEnum = pgEnum("announcement_status", [
 ]);
 
 /**
- * Public updates from an organization — "we distributed 400 blankets", "our
+ * Public updates from an organization - "we distributed 400 blankets", "our
  * next drive is in Pune". Shown on the org's profile and pushed as a
  * notification to everyone who bookmarked them.
  */
@@ -70,7 +70,7 @@ export const financialReportTypeEnum = pgEnum("financial_report_type", [
 ]);
 
 /**
- * Transparency documents an NGO publishes voluntarily — annual reports, audited
+ * Transparency documents an NGO publishes voluntarily - annual reports, audited
  * statements, FCRA returns.
  *
  * Distinct from `organization_documents`, which are private verification

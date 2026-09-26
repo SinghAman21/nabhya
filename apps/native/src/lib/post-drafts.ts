@@ -6,8 +6,8 @@ import { storage } from "@/lib/storage";
  * Post drafts.
  *
  * **Local to the device, by design and by necessity.** There is no draft
- * column on `posts` and no draft endpoint — the server takes a finished post
- * or nothing — so a draft cannot follow a coordinator to another phone, and
+ * column on `posts` and no draft endpoint - the server takes a finished post
+ * or nothing - so a draft cannot follow a coordinator to another phone, and
  * the composer says so rather than implying it can. Adding real drafts is a
  * schema change (`posts.status` or a `post_drafts` table) and belongs with
  * scheduling, which needs the same thing.
@@ -20,7 +20,7 @@ import { storage } from "@/lib/storage";
  *
  * **The size budget is the interesting constraint.** On the web this is
  * `localStorage` and effectively unbounded. On native `lib/storage` is
- * `expo-secure-store`, whose documented per-value ceiling is 2048 bytes — and
+ * `expo-secure-store`, whose documented per-value ceiling is 2048 bytes - and
  * a single post can be 5000 characters on its own. So writes are budgeted:
  * drafts are evicted oldest-first until the payload fits, and `saveDrafts`
  * reports what survived so the caller can tell the truth about it instead of
@@ -46,7 +46,7 @@ export const MAX_DRAFTS = 5;
 /**
  * Bytes available for the whole serialised list. `expo-secure-store` documents
  * 2048; the margin covers the JSON scaffolding and multi-byte characters,
- * which matter here — Devanagari is three bytes a character, so a Hindi draft
+ * which matter here - Devanagari is three bytes a character, so a Hindi draft
  * costs three times what the character count suggests.
  */
 const BUDGET = Platform.OS === "web" ? 2_000_000 : 1_800;

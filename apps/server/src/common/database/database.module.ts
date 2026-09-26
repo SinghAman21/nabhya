@@ -30,8 +30,8 @@ export class DatabaseModule implements OnModuleInit {
 	async onModuleInit() {
 		if (process.env.NODE_ENV === "production") return;
 		// Tests run against an in-process PGlite database. Pushing here would
-		// spawn drizzle-kit and rewrite whatever DIRECT_URL happens to point at —
-		// a developer's real database — just for running `pnpm test`.
+		// spawn drizzle-kit and rewrite whatever DIRECT_URL happens to point at -
+		// a developer's real database - just for running `pnpm test`.
 		if (process.env.NODE_ENV === "test") return;
 
 		this.logger.log("Auto-syncing schema (drizzle-kit push)…");
@@ -48,7 +48,7 @@ export class DatabaseModule implements OnModuleInit {
 			});
 
 			// drizzle-kit writes its failures to stdout as often as stderr, so
-			// capture both — a warning with an empty tail is undiagnosable.
+			// capture both - a warning with an empty tail is undiagnosable.
 			let output = "";
 			const collect = (chunk: Buffer) => {
 				output += chunk.toString();
@@ -62,7 +62,7 @@ export class DatabaseModule implements OnModuleInit {
 					resolve();
 				} else {
 					this.logger.warn(
-						`drizzle-kit push exited ${code} — ${output.trim()}`,
+						`drizzle-kit push exited ${code} - ${output.trim()}`,
 					);
 					// Warn but don't crash the server on sync failure
 					resolve();

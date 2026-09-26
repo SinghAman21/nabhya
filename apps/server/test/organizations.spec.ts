@@ -7,7 +7,7 @@ import { OrganizationsService } from "../src/modules/organizations/organizations
 import { createOrganization, createUser, seedRoles } from "./factories";
 import { createTestDb, type TestDb, truncateAll } from "./harness";
 
-/** Mumbai, Pune and Delhi — roughly 120 km and 1150 km apart respectively. */
+/** Mumbai, Pune and Delhi - roughly 120 km and 1150 km apart respectively. */
 const MUMBAI = { latitude: 19.076, longitude: 72.8777 };
 const PUNE = { latitude: 18.5204, longitude: 73.8567 };
 const DELHI = { latitude: 28.6139, longitude: 77.209 };

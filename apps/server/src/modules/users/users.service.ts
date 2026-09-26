@@ -230,7 +230,7 @@ export class UsersService {
 
 			// Verification needs a government ID *and* a selfie, both approved, so
 			// derive the account status from the whole set rather than blindly
-			// resetting it — a fresh upload can only move it off VERIFIED.
+			// resetting it - a fresh upload can only move it off VERIFIED.
 			const currentDocs = await tx
 				.select({
 					documentType: userDocuments.documentType,

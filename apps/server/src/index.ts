@@ -16,13 +16,13 @@ async function bootstrap() {
 		rawBody: true,
 	});
 
-	// Global prefix for all routes — e.g. /api/users/me
+	// Global prefix for all routes - e.g. /api/users/me
 	app.setGlobalPrefix("api");
 
 	// Behind a load balancer the socket address is the proxy's, and without
 	// this every request looks like one client, throttling the entire user
 	// base together. But the inverse trap is just as real: turned on with no
-	// proxy actually in front — true of every local/LAN dev run — it has the
+	// proxy actually in front - true of every local/LAN dev run - it has the
 	// same effect for the opposite reason, trusting a forwarded-for chain
 	// nothing is providing. Only turn it on where `Deploying` in AGENTS.md
 	// says a load balancer is assumed.
@@ -33,7 +33,7 @@ async function bootstrap() {
 	app.enableShutdownHooks();
 
 	// CORS_ORIGIN is documented as comma-separated, but passing the raw string
-	// through emits it verbatim as Access-Control-Allow-Origin — a header that
+	// through emits it verbatim as Access-Control-Allow-Origin - a header that
 	// may name at most one origin, so browsers reject it and every cross-origin
 	// request fails. Split it so cors() echoes back just the matching origin.
 	const allowedOrigins = env.CORS_ORIGIN.split(",")
@@ -48,8 +48,8 @@ async function bootstrap() {
 			// CORS only governs browsers, so there is nothing to check.
 			if (!origin) return callback(null, true);
 			if (allowedOrigins.includes(origin)) return callback(null, true);
-			// Expo's dev server takes whatever port is free — 8081, then 8082,
-			// then 8083 — so pinning one in CORS_ORIGIN silently breaks the web
+			// Expo's dev server takes whatever port is free - 8081, then 8082,
+			// then 8083 - so pinning one in CORS_ORIGIN silently breaks the web
 			// client every time it moves. Any localhost port is fine in dev;
 			// production stays restricted to the configured list.
 			if (isDevelopment && LOCALHOST.test(origin)) return callback(null, true);
@@ -58,10 +58,10 @@ async function bootstrap() {
 		methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 	});
 
-	// Global exception filter — consistent error shape
+	// Global exception filter - consistent error shape
 	app.useGlobalFilters(new GlobalExceptionFilter());
 
-	// Global response envelope — wraps all success responses in { success, data, timestamp }
+	// Global response envelope - wraps all success responses in { success, data, timestamp }
 	app.useGlobalInterceptors(new ResponseTransformInterceptor());
 
 	// ─── Swagger / OpenAPI ────────────────────────────────────────────────────

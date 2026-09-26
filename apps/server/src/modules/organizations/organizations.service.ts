@@ -36,7 +36,7 @@ export class OrganizationsService {
 	/**
 	 * Resolves the organization the caller acts on behalf of.
 	 *
-	 * Shared by the events and needs modules — every organisation-scoped write
+	 * Shared by the events and needs modules - every organisation-scoped write
 	 * funnels through here so ownership is checked in exactly one place.
 	 */
 	async requireOwnedOrganization(userId: string) {
@@ -132,7 +132,7 @@ export class OrganizationsService {
 	}
 
 	/**
-	 * Publishing to the public feed is gated on verification — an unverified
+	 * Publishing to the public feed is gated on verification - an unverified
 	 * NGO can draft events and needs but cannot surface them to volunteers.
 	 */
 	async requireVerifiedOrganization(userId: string) {
@@ -175,7 +175,7 @@ export class OrganizationsService {
 		};
 	}
 
-	/** Public directory — only verified, active NGOs are ever listed. */
+	/** Public directory - only verified, active NGOs are ever listed. */
 	async listPublic(
 		query: PaginationQuery & { search?: string; city?: string },
 	) {
@@ -226,7 +226,7 @@ export class OrganizationsService {
 	/**
 	 * "NGOs near me", ordered by distance.
 	 *
-	 * Haversine in SQL rather than PostGIS — one dependency fewer, and precise
+	 * Haversine in SQL rather than PostGIS - one dependency fewer, and precise
 	 * enough at city scale. The bounding-box pre-filter lets Postgres use the
 	 * latitude index instead of computing a trig expression for every row.
 	 */
@@ -262,7 +262,7 @@ export class OrganizationsService {
 			sql`${organizations.longitude}::float8
 				between ${longitude - lonDelta} and ${longitude + lonDelta}`,
 			// The box is square; this trims the corners to a true radius. It lives
-			// in WHERE rather than HAVING because nothing here is aggregated — and
+			// in WHERE rather than HAVING because nothing here is aggregated - and
 			// that also lets the count query reuse the identical predicate.
 			sql`${distance} <= ${radiusKm}`,
 		);
@@ -316,7 +316,7 @@ export class OrganizationsService {
 	 * reports, reviews, impact). Those take an org id straight from the URL, so
 	 * without this an unverified or superadmin-suspended NGO's content would stay
 	 * publicly readable even after its events/needs were pulled. Selects only the
-	 * status columns — the caller already has the id it needs.
+	 * status columns - the caller already has the id it needs.
 	 */
 	async assertPubliclyVisible(organizationId: string) {
 		const [organization] = await this.db
@@ -398,7 +398,7 @@ export class OrganizationsService {
 		await this.requireOrgPermission(userId, "org.edit");
 		const organization = await this.requireOwnedOrganization(userId);
 
-		// Confirm the object landed in storage before recording its key — the
+		// Confirm the object landed in storage before recording its key - the
 		// client uploads directly, so this server never saw the bytes.
 		await this.uploads.assertUploaded(input.documentKey);
 

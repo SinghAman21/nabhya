@@ -39,13 +39,13 @@ import { verticalScrollbar } from "@/lib/scroll";
  * detents, a body that scrolls once the sheet is fully open and drags the sheet
  * before that, and a keyboard that pushes the sheet up instead of covering the
  * field. The title row and
- * the footer are pinned — the title is drawn as the sheet's *handle*, so it
+ * the footer are pinned - the title is drawn as the sheet's *handle*, so it
  * stays put while the body scrolls under it and picks up a hairline once it
  * does.
  *
  * On web it is a plain `Modal`: a slide-up panel on a phone-width window and a
  * centred dialog on desktop, where a sheet sliding up a 1400px window reads as
- * a mistake. Same props, same header, same footer — screens never know which.
+ * a mistake. Same props, same header, same footer - screens never know which.
  *
  * Sized to content by default, capped just under the status bar, so a
  * two-field form is a short card and a long list still scrolls. Pass
@@ -58,7 +58,7 @@ import { verticalScrollbar } from "@/lib/scroll";
  * platform: on native the root `PortalHost` sits *below* the React Native
  * `Modal` the sheet is hosted in, and on web react-native-web hosts that Modal
  * at `zIndex: 9999` while Radix pins its popper wrapper to the content's own
- * computed z-index — which no prop on the menu can raise, because the props
+ * computed z-index - which no prop on the menu can raise, because the props
  * spread lands on a child of the positioned element. Use an inline control
  * instead; `post-composer.tsx` chose `ChoiceChips` for exactly this reason.
  */
@@ -80,7 +80,7 @@ export interface SheetProps {
 	detents?: Array<string | number>;
 	/**
 	 * Widens the desktop dialog from 480 to 620. For a body that is not a
-	 * column of fields — a writing canvas, a media grid — where 480 crams the
+	 * column of fields - a writing canvas, a media grid - where 480 crams the
 	 * measure and wraps a four-tile strip onto two rows.
 	 */
 	wide?: boolean;
@@ -200,7 +200,7 @@ function NativeSheet({
 	/*
 	 * Hosted in a React Native `Modal`, not gorhom's modal provider. The Modal
 	 * guarantees the sheet sits above the native stack and the tab bar on both
-	 * platforms; gorhom provides everything inside it — the drag, the detents,
+	 * platforms; gorhom provides everything inside it - the drag, the detents,
 	 * the keyboard handling and the scroll hand-off. Android needs its own
 	 * gesture root inside a Modal, hence the wrapper.
 	 */

@@ -11,7 +11,7 @@ import { useTheme } from "@/hooks/use-theme";
 /**
  * Appearance as a *setting*, not a floating switch.
  *
- * Every role reaches the same three-way choice — System, Light, Dark — from
+ * Every role reaches the same three-way choice - System, Light, Dark - from
  * wherever its settings live: the volunteer Profile, the admin Overview's
  * Account group, the NGO Profile, and the desktop sidebar footer. One sheet,
  * one label table, so the wording and the order never drift between them.

@@ -33,14 +33,14 @@ import { useAuthStore } from "@/store/auth-store";
  * spending the brand colour on whichever row you happen to be looking at left
  * the actual actions on the page with nothing louder to say.
  *
- * The rail collapses to icons. Collapsing animates **one** value — the width —
+ * The rail collapses to icons. Collapsing animates **one** value - the width -
  * and everything else derives from it by interpolation, so there is no second
  * timeline to fall out of step with the first. The row tree is identical in both
  * states: labels are clipped by the container rather than unmounted, which is
  * what keeps the transition seamless instead of a layout swap mid-animation.
  *
  * The footer is where settings live on desktop: an Appearance row that opens
- * the same three-way sheet the phone uses, then the account block — who is
+ * the same three-way sheet the phone uses, then the account block - who is
  * signed in, as what, and the way out.
  */
 
@@ -60,14 +60,14 @@ const EXPANDED_WIDTH = 264;
  *   ROW_INSET + ICON_SIZE + ICON_GAP      <=  COLLAPSED_WIDTH - 2*ROW_MARGIN
  *
  * The second line is the one that bites. The row is `icon, gap, label(flex:1)`
- * and an icon does not shrink — RN defaults `flexShrink` to 0, unlike the web —
+ * and an icon does not shrink - RN defaults `flexShrink` to 0, unlike the web -
  * so when inset + icon + gap + paddingRight came to 63px inside a 56px row, the
  * row was over-constrained by 7px and Yoga resolved that overflow on every frame
  * of the collapse.
  *
  * The fix is arithmetic, not a conditional: the row carries no `paddingRight`
  * (the label does, so it can shrink to nothing), and the gap is small enough to
- * fit. Do **not** make the gap depend on `collapsed` — the flag flips instantly
+ * fit. Do **not** make the gap depend on `collapsed` - the flag flips instantly
  * while the width takes 260ms, so the row would jump halfway through.
  */
 const COLLAPSED_WIDTH = 68;
@@ -492,7 +492,7 @@ function RailFooter({
 /* -------------------------------------------------------------------------- */
 
 /**
- * Wordmark only. The logo tile — an orange rounded square holding one letter —
+ * Wordmark only. The logo tile - an orange rounded square holding one letter -
  * was doing the same job as the word next to it.
  */
 function BrandHeader({
@@ -600,7 +600,7 @@ export function Sidebar({
 		Animated.timing(openness, {
 			toValue: next ? 0 : 1,
 			duration: 260,
-			// Decelerating: quick to commit, settling into place. No overshoot —
+			// Decelerating: quick to commit, settling into place. No overshoot -
 			// a rail that bounces past its width reads as a glitch, not physics.
 			easing: Easing.bezier(0.22, 1, 0.36, 1),
 			useNativeDriver: false,

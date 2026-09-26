@@ -42,7 +42,7 @@ import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
 import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsService } from "../organizations/organizations.service";
 
-/** Columns exposed on the public feed — never the internal review fields. */
+/** Columns exposed on the public feed - never the internal review fields. */
 const publicEventColumns = {
 	id: events.id,
 	title: events.title,
@@ -85,7 +85,7 @@ export class EventsService {
 
 	/**
 	 * The volunteer-facing feed. Only PUBLISHED events belonging to verified,
-	 * active organizations are ever visible — this is enforced with an inner
+	 * active organizations are ever visible - this is enforced with an inner
 	 * join rather than a post-filter so pagination counts stay correct.
 	 */
 	async listPublic(query: PublicEventQuery) {
@@ -338,7 +338,7 @@ export class EventsService {
 		);
 		const { event } = await this.requireOwnedEvent(userId, eventId);
 
-		// Volunteers have already been told they're in — cancel, don't delete.
+		// Volunteers have already been told they're in - cancel, don't delete.
 		if (event.acceptedCount > 0) {
 			const [cancelled] = await this.db
 				.update(events)
@@ -591,7 +591,7 @@ export class EventsService {
 		// Attached with a second bounded query rather than a correlated subquery:
 		// the relational builder aliases its FROM, so hand-written qualified SQL
 		// cannot reliably reference it. Without this the organization has no way
-		// to see — or revoke — a certificate it has already issued.
+		// to see - or revoke - a certificate it has already issued.
 		const issued = items.length
 			? await this.db
 					.select({

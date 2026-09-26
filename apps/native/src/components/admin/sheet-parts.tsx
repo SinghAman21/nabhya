@@ -36,12 +36,12 @@ export function Section({
  *
  * **Two columns on a wide panel, one on a phone.** The dossier is a `Drawer`
  * with `xl` (720), and an NGO carries nine facts: stacked, they are a screen of
- * scrolling before the documents — which are the thing the reviewer opened the
+ * scrolling before the documents - which are the thing the reviewer opened the
  * panel for. Paired, they are five rows. Below 560 it stays a single column,
  * because a label and its value in half of a 360dp screen wrap to three lines
  * each.
  *
- * Label above value, never label-left/value-right — that shape puts a phone
+ * Label above value, never label-left/value-right - that shape puts a phone
  * number a hand's width from the word "Phone" and wraps a two-line address
  * against its label. Same reasoning as `FactList`, which this uses directly in
  * the one-column case.
@@ -88,7 +88,7 @@ export function FactGroup({ facts }: { facts: Fact[] }) {
 						{typeof fact.value === "string" && fact.value ? (
 							<Body selectable>{fact.value}</Body>
 						) : (
-							fact.value || <Body color="quaternary">—</Body>
+							fact.value || <Body color="quaternary">-</Body>
 						)}
 					</View>
 				))}
@@ -99,7 +99,7 @@ export function FactGroup({ facts }: { facts: Fact[] }) {
 
 /**
  * The reason box above the decision buttons. Errors render under the field,
- * never in an alert — the reviewer is already looking here.
+ * never in an alert - the reviewer is already looking here.
  */
 export function ReasonField({
 	value,
@@ -111,7 +111,7 @@ export function ReasonField({
 	value: string;
 	onChangeText: (text: string) => void;
 	placeholder: string;
-	/** "reject or suspend" — completes "Required to …". */
+	/** "reject or suspend" - completes "Required to …". */
 	requiredFor: string;
 	error: string | null;
 }) {

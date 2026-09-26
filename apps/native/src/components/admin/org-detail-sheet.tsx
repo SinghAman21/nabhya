@@ -41,11 +41,11 @@ import { formatDate } from "@/lib/format";
  *
  * Read top to bottom the way a reviewer works: state, then the facts they
  * check against the documents, then the documents themselves, then the
- * decision — always in the same order (approve, under review, reject, suspend)
+ * decision - always in the same order (approve, under review, reject, suspend)
  * so the hand learns where each button is.
  *
  * **A `Drawer`, not a `Sheet`, and `xl`.** Opening an NGO is not leaving the
- * list — the reviewer is working *down* a filtered directory, and the row they
+ * list - the reviewer is working *down* a filtered directory, and the row they
  * came from, plus the ten after it, stay visible on the left while they decide.
  * A centred dialog covers exactly that. 720 rather than the drawer's usual 520
  * because a dossier is fact tables and document cards, not a column of short
@@ -54,7 +54,7 @@ import { formatDate } from "@/lib/format";
  *
  * **The decision lives in the pinned footer.** It used to be four full-width
  * buttons at the bottom of the scroll, which meant the action was only
- * reachable after scrolling past every fact — and a stack of four 100%-wide
+ * reachable after scrolling past every fact - and a stack of four 100%-wide
  * buttons reads as a menu, not a decision. Pinned, sized to their labels, and
  * in a row, they are always there and the primary one is obvious. The reason
  * box stays in the body directly above them, because it is a *field*: it has to
@@ -69,7 +69,7 @@ export function OrgDetailSheet({
 	onClose: () => void;
 	/**
 	 * Opens the owner's own account. The caller closes this drawer first and
-	 * opens the user one — sequentially, never nested: a drawer inside a drawer
+	 * opens the user one - sequentially, never nested: a drawer inside a drawer
 	 * is a `Modal` inside a `Modal`, and the inner one's `OverlayHost` would end
 	 * up fighting the outer one's for every toast.
 	 */
@@ -319,7 +319,7 @@ export function OrgDetailSheet({
 
 					{/* The one route to an NGO's *account*, as opposed to its
 					    organisation: `(admin)/volunteers` is volunteers only, so this
-					    is where suspending an NGO's login lives — which is the right
+					    is where suspending an NGO's login lives - which is the right
 					    place for it anyway, since you have just read the record. */}
 					<Section title="Owner">
 						<FactGroup
@@ -451,7 +451,7 @@ export function OrgDetailSheet({
  *
  * Buttons **size to their labels** and wrap; none of them is full width. A
  * 100%-wide "Approve organization" in a 720pt panel is a banner, not a control
- * — the same reason the feed card's CTA hugs its label. Wrapping rather than
+ * - the same reason the feed card's CTA hugs its label. Wrapping rather than
  * scrolling because on a narrow panel four buttons on two lines is readable and
  * four buttons you have to push sideways is not.
  */

@@ -4,7 +4,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { focusable } from "@/lib/focus";
 
 /**
- * A quiet text button for the secondary actions on a card footer — Edit,
+ * A quiet text button for the secondary actions on a card footer - Edit,
  * Remove, View. Drawn as text so the card's one primary affordance (tapping
  * it) stays the loudest thing, but sized and labelled as a real control.
  */

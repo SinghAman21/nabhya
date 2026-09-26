@@ -10,13 +10,13 @@ import { apiErrorMessage } from "@/lib/api/http";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
- * "Continue with Google", shared by login and signup — Supabase treats both
+ * "Continue with Google", shared by login and signup - Supabase treats both
  * as the same `signInWithOAuth` call, so there is no separate sign-up variant.
  * A new Google account is provisioned server-side on first token exchange the
  * same way email/password signup is.
  *
  * Failures are handed to `onError` rather than reported here, so they land in
- * the host screen's own `AuthError` block above the submit button — one place
+ * the host screen's own `AuthError` block above the submit button - one place
  * on the form where anything that went wrong appears, whichever control caused
  * it. A dismissed dialog left the form looking untouched.
  */
@@ -35,7 +35,7 @@ export function GoogleSignInButton({
 		setLoading(true);
 		try {
 			const result = await authService.signInWithGoogle();
-			// Web returns null here — the whole page is already navigating to
+			// Web returns null here - the whole page is already navigating to
 			// Google, so there's nothing left to route; the entry gate picks the
 			// session back up when Google redirects to this origin.
 			if (result?.user) {
@@ -44,8 +44,8 @@ export function GoogleSignInButton({
 				router.replace("/");
 			}
 		} catch (error) {
-			// A cancelled OAuth popup is not a failure — the person changed
-			// their mind — so it reports nothing.
+			// A cancelled OAuth popup is not a failure - the person changed
+			// their mind - so it reports nothing.
 			if (error instanceof Error && error.message === "CANCELLED") return;
 			onError?.(
 				apiErrorMessage(

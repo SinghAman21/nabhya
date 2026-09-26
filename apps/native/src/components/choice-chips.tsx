@@ -7,7 +7,7 @@ import { focusable } from "@/lib/focus";
 /**
  * Segmented choice in a form: post type, urgency, organisation type.
  *
- * Selection is monochrome — an ink pill, the same as `FilterChips` — because
+ * Selection is monochrome - an ink pill, the same as `FilterChips` - because
  * orange is the colour of the primary action and a chosen option is not an
  * action. Radio semantics: one group, one checked value.
  */

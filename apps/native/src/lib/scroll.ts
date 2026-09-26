@@ -4,7 +4,7 @@ import { Platform } from "react-native";
  * Scroll-indicator props for a **vertical** scroller.
  *
  * Every screen used to hard-code the indicator off, which on a phone is a
- * reasonable aesthetic call — the platform indicator is a transient overlay and
+ * reasonable aesthetic call - the platform indicator is a transient overlay and
  * the content is obviously swipeable. On the web it is not an aesthetic call,
  * it is a bug: react-native-web turns `showsVerticalScrollIndicator={false}`
  * into `scrollbar-width: none` (see `ScrollViewBase`), Chrome has honoured that
@@ -13,15 +13,15 @@ import { Platform } from "react-native";
  * with a mouse and no trackpad has nothing to grab.
  *
  * So: hidden on native, shown on web. `src/global.css` styles web scrollbars
- * thin, trackless and theme-aware — including suppressing the stepper arrows
- * Chrome brings back the moment `::-webkit-scrollbar` is styled at all — so the
+ * thin, trackless and theme-aware - including suppressing the stepper arrows
+ * Chrome brings back the moment `::-webkit-scrollbar` is styled at all - so the
  * one that appears is the designed one.
  *
  * Spread it instead of writing the prop by hand:
  *
  *   <ScrollView {...verticalScrollbar} … />
  *
- * Horizontal rows — chip strips, the media carousel — keep
+ * Horizontal rows - chip strips, the media carousel - keep
  * `showsHorizontalScrollIndicator={false}` explicitly: a scrollbar under a row
  * of five chips is furniture, and those rows have their own overflow cues.
  */

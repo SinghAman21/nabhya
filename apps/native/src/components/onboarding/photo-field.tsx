@@ -10,7 +10,7 @@ import { useImageUpload } from "@/hooks/use-upload";
 /**
  * A square image slot that uploads what it is given and hands back the key.
  *
- * The wizards' one image each — the NGO's logo and the volunteer's photo —
+ * The wizards' one image each - the NGO's logo and the volunteer's photo -
  * previously did not exist at all, which is why every feed card, every
  * applicant row and every NGO header in the app draws initials: the only
  * screens that could set an image were the two edit forms, reached from a
@@ -27,14 +27,14 @@ import { useImageUpload } from "@/hooks/use-upload";
  * `ORG_LOGO` is an **org-scoped** upload purpose: `UploadsService.resolveOwnerId`
  * derives the object key from the caller's organization and throws
  * "Complete organization onboarding before uploading these files" when there is
- * no organization yet — which, in the middle of the wizard that creates one, is
+ * no organization yet - which, in the middle of the wizard that creates one, is
  * always. (`AVATAR` is user-scoped, so the volunteer's photo uploads on the
  * spot.) Making the purpose user-scoped instead would break reads: download
  * authorisation resolves the owner from the key, so an org logo filed under a
  * user id becomes unreadable to the org that owns it.
  *
  * So `deferred` picks and previews the file without uploading, and the caller
- * uploads it after the record exists — `(onboarding)/index.tsx` does that in the
+ * uploads it after the record exists - `(onboarding)/index.tsx` does that in the
  * submit's `onSuccess`, then PATCHes the key onto the new organization. The
  * upload is therefore the one part of the wizard that can fail *after* success,
  * and the completion screen says so when it does.
@@ -67,11 +67,11 @@ export function PhotoField({
 	 * Raised while an upload is in flight, so the form can hold its submit.
 	 *
 	 * Without it, submitting mid-upload posts an empty key and the photo is
-	 * lost silently — the upload finishes and writes to a draft that has
+	 * lost silently - the upload finishes and writes to a draft that has
 	 * already been sent.
 	 */
 	onBusyChange?: (busy: boolean) => void;
-	/** Ignored when `aspectRatio` is set — a banner is full width. */
+	/** Ignored when `aspectRatio` is set - a banner is full width. */
 	width?: number;
 	/** For a wide slot (an NGO banner). Square when omitted. */
 	aspectRatio?: number;

@@ -17,15 +17,15 @@ import { SelectMenu } from "./select-menu";
 /**
  * The dossier timelines.
  *
- * Both admin detail drawers end with "what has this record been doing" — the
+ * Both admin detail drawers end with "what has this record been doing" - the
  * NGO's events/needs/posts/documents and the volunteer's applications/pledges/
- * documents — served by `GET /api/admin/organizations/:id/activity` and
+ * documents - served by `GET /api/admin/organizations/:id/activity` and
  * `GET /api/admin/users/:id/activity`. One flat paginated list; the grouping
  * (by day, via `groupKey`) and the kind filter both happen here, so the
  * contract never changes when a reviewer wants a new cut.
  *
  * **Drawer-safe, deliberately.** A dossier is a `Drawer` that already scrolls,
- * so this renders eager rows plus a `LoadMoreButton` — never a `FlatList` or a
+ * so this renders eager rows plus a `LoadMoreButton` - never a `FlatList` or a
  * nested scroller. Same reason the kind filter is a `SelectMenu` and not a chip
  * row: eleven kinds in chips would push the first row a screen down.
  */
@@ -204,7 +204,7 @@ function groupByDay(items: AdminActivityItem[]) {
  * One timeline row.
  *
  * Title + status on the first line, description below, then the "who / what /
- * when" line. The kind rides as a neutral pill — kinds are told apart by the
+ * when" line. The kind rides as a neutral pill - kinds are told apart by the
  * words, not by colour, so forty consecutive NEED rows stay readable.
  */
 export function ActivityCard({ item }: { item: AdminActivityItem }) {

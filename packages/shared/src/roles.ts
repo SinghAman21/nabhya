@@ -4,7 +4,7 @@ import { z } from "zod";
  * Canonical role vocabulary for the whole platform.
  *
  * These strings are the `roles.name` values seeded in the database and the
- * values carried on `request.user.roles` — client and server must not invent
+ * values carried on `request.user.roles` - client and server must not invent
  * their own spellings. The Expo route group is still named `(ngo)` for URL
  * readability, but the role itself is always `organisation`.
  */

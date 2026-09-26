@@ -120,12 +120,12 @@ export class FeedRankingService {
 	}
 
 	/**
-	 * Feed items the caller has saved — the reaction-bar bookmark, not the
+	 * Feed items the caller has saved - the reaction-bar bookmark, not the
 	 * NGO-level `bookmarks` table behind `/engagement/bookmarks`. Same
 	 * candidate pool as every other lens (so a saved item that has since gone
 	 * unpublished or dropped off the source window quietly stops appearing,
-	 * same as `following`), filtered down to `viewer.saved` — already computed
-	 * by `hydrate()` — and ordered newest-first by the item's own `createdAt`,
+	 * same as `following`), filtered down to `viewer.saved` - already computed
+	 * by `hydrate()` - and ordered newest-first by the item's own `createdAt`,
 	 * same as `following`.
 	 */
 	async saved(user: AuthUser, query: SavedFeedQuery) {
@@ -366,10 +366,10 @@ export class FeedRankingService {
 			// count and for `viewer.liked`/`viewer.saved` below, not just a scoring
 			// signal. A 14-day recency cutoff used to live here, which meant a like
 			// older than that silently dropped out of the count and the heart
-			// stopped showing filled for the user who made it — while the unique
+			// stopped showing filled for the user who made it - while the unique
 			// index still blocked them from liking it again, so the client had no
 			// way to recover. The impression window in `viewerContext` below is a
-			// separate, intentionally recent-only signal — don't conflate the two.
+			// separate, intentionally recent-only signal - don't conflate the two.
 			this.db.select().from(postInteractions),
 			this.db
 				.select({

@@ -4,7 +4,7 @@ import { useTheme } from "@/hooks/use-theme";
 import type { FeedItem } from "@/lib/types";
 
 /**
- * The kicker — and, most of the time, nothing at all.
+ * The kicker - and, most of the time, nothing at all.
  *
  * This started as a row of filled pills, became a tertiary line naming every
  * row's kind, and is now the shortest of the three: **a kind that the layout
@@ -21,7 +21,7 @@ import type { FeedItem } from "@/lib/types";
  * - **A closed state**, which otherwise shows only as a missing button.
  *
  * A healthy update, story or event therefore renders no kicker, which is most
- * of the feed — and that silence is what lets the rows that *do* carry one
+ * of the feed - and that silence is what lets the rows that *do* carry one
  * register at a glance.
  */
 

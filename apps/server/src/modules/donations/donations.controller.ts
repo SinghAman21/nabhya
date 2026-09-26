@@ -53,7 +53,7 @@ export class DonationsController {
 	}
 
 	/**
-	 * Provider callback. Public because the payment provider has no session —
+	 * Provider callback. Public because the payment provider has no session -
 	 * authenticity comes from the signature over the raw body, not from auth.
 	 */
 	@Public()

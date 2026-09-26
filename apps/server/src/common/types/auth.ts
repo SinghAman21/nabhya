@@ -11,7 +11,7 @@ export interface AuthUser {
 	id: string;
 	email: string;
 	/**
-	 * Primary role — first assigned, or null before the user has chosen one.
+	 * Primary role - first assigned, or null before the user has chosen one.
 	 * Prefer `roles` for authorization checks.
 	 */
 	role: UserRole | null;

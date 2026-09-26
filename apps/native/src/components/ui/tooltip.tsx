@@ -15,7 +15,7 @@ import { useTheme } from "@/hooks/use-theme";
  * person with a mouse wondering what the fourth icon does.
  *
  * **Deliberately not a portal.** Every portalling primitive in this app fails
- * inside a sheet or drawer — see the note at the top of `ui/sheet.tsx` — and a
+ * inside a sheet or drawer - see the note at the top of `ui/sheet.tsx` - and a
  * tooltip is small enough to position against its own wrapper instead.
  * react-native-web's `View` does not clip by default (no `overflow: hidden` in
  * its base style), so an absolutely positioned bubble escapes the toolbar row

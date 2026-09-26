@@ -4,7 +4,7 @@ import { HEADERLESS } from "@/lib/navigation";
 
 /**
  * `index` needs a signed-in volunteer; `[code]` is public verification, which
- * is why no guard lives here — the API decides per route.
+ * is why no guard lives here - the API decides per route.
  */
 function CertificatesLayout() {
 	return (

@@ -29,7 +29,7 @@ export const donationStatusEnum = pgEnum("donation_status", [
  * to COMPLETED. `providerPaymentId` is unique so a webhook replay cannot
  * double-count.
  *
- * Amounts are integer minor units (paise for INR) — never floats.
+ * Amounts are integer minor units (paise for INR) - never floats.
  */
 export const donations = pgTable(
 	"donations",
@@ -51,7 +51,7 @@ export const donations = pgTable(
 		provider: varchar("provider").notNull().default("razorpay"),
 		/** Provider's checkout/session handle, used to resume an abandoned flow. */
 		providerCheckoutId: varchar("provider_checkout_id"),
-		/** Provider's settled payment id. Unique — guards against webhook replay. */
+		/** Provider's settled payment id. Unique - guards against webhook replay. */
 		providerPaymentId: varchar("provider_payment_id"),
 
 		/** Shown to the organization; hidden publicly when anonymous. */

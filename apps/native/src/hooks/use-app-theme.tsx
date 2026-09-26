@@ -56,7 +56,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
 	/*
 	 * Tell NativeWind which scheme is active. The Tailwind config is
-	 * `darkMode: "class"`, which means the `dark:` variant is driven manually —
+	 * `darkMode: "class"`, which means the `dark:` variant is driven manually -
 	 * without this call it never activates on native, so every `components/ui/*`
 	 * primitive would render its light palette inside a dark screen.
 	 */

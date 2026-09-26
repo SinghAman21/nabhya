@@ -117,7 +117,7 @@ describe("AdminService", () => {
 
 		it("suspending an NGO pulls its content off the public feed", async () => {
 			// Volunteers must stop being able to apply the moment an NGO is
-			// suspended — leaving events live would keep taking applications.
+			// suspended - leaving events live would keep taking applications.
 			const admin = await createUser(db, { role: "superadmin" });
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
@@ -390,7 +390,7 @@ describe("AdminService", () => {
 
 	describe("user listing", () => {
 		it("filters by role without duplicating multi-role users", async () => {
-			// The role filter uses EXISTS rather than a join for exactly this —
+			// The role filter uses EXISTS rather than a join for exactly this -
 			// a join would return one row per matching role.
 			const volunteer = await createUser(db, { role: "volunteer" });
 			await createUser(db, { role: "organisation" });

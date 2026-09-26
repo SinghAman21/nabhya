@@ -64,7 +64,7 @@ export function useCreateNeed() {
 			queryClient.invalidateQueries({ queryKey: queryScopes.needs });
 			// The composer can create one of these straight from the feed, and
 			// the ranking pool holds open needs, upcoming events and published
-			// announcements — so the feed is stale the moment one is written,
+			// announcements - so the feed is stale the moment one is written,
 			// whichever surface wrote it.
 			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
 		},

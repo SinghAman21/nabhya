@@ -129,7 +129,7 @@ export class AdminController {
 
 	@Get("organizations/:id")
 	@ApiOperation({
-		summary: "Full organization dossier — documents, stats, recent events",
+		summary: "Full organization dossier - documents, stats, recent events",
 	})
 	getOrganization(@Param("id", ParseUUIDPipe) id: string) {
 		return this.adminService.getOrganizationDetail(id);
@@ -206,7 +206,7 @@ export class AdminController {
 
 	@Get("users/:id")
 	@ApiOperation({
-		summary: "User dossier — documents plus their full participation history",
+		summary: "User dossier - documents plus their full participation history",
 	})
 	getUser(@Param("id", ParseUUIDPipe) id: string) {
 		return this.adminService.getUserDetail(id);
@@ -253,7 +253,7 @@ export class AdminController {
 	 * Bulk routes are `POST`, not `PATCH`: the body names its own targets rather
 	 * than the URL naming one, so there is no single resource being patched.
 	 * They sit above the `:id` routes for the same reason every Nest controller
-	 * puts literals before parameters — `documents/organizations/bulk` would
+	 * puts literals before parameters - `documents/organizations/bulk` would
 	 * otherwise be matched by `:id` and rejected by `ParseUUIDPipe`.
 	 */
 	@Post("documents/organizations/bulk")

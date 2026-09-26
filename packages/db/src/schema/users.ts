@@ -113,7 +113,7 @@ export const usersRelations = relations(users, ({ many }) => ({
 	// Applications and pledges are intentionally not exposed as reverse
 	// relations: both child tables reference users twice (actor + reviewer),
 	// which Drizzle cannot disambiguate without relationName. Query those from
-	// the child side instead — e.g. eventApplications where volunteerId = ?
+	// the child side instead - e.g. eventApplications where volunteerId = ?
 }));
 
 export const rolesRelations = relations(roles, ({ many }) => ({

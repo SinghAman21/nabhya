@@ -15,12 +15,12 @@ export interface RazorpayConfig {
 
 /**
  * Razorpay adapter, used with the native checkout SDK (`react-native-razorpay`)
- * on the client — the client opens an in-app sheet with the order id + key id
+ * on the client - the client opens an in-app sheet with the order id + key id
  * this provider returns, it never navigates to a hosted page.
  *
  * Two things worth knowing:
  *
- * 1. Razorpay's Orders API takes an arbitrary integer amount in paise — no
+ * 1. Razorpay's Orders API takes an arbitrary integer amount in paise - no
  *    whole-rupee restriction.
  * 2. A new order must be created per payment attempt; reusing an order id after
  *    a failed attempt is rejected by Razorpay.
@@ -46,7 +46,7 @@ export class RazorpayPaymentProvider implements PaymentProvider {
 			body: JSON.stringify({
 				amount: input.amountMinor,
 				currency: input.currency,
-				// Donation ids are uuids (36 chars) — well within the 40-char limit.
+				// Donation ids are uuids (36 chars) - well within the 40-char limit.
 				receipt: input.referenceId,
 				notes: { referenceId: input.referenceId },
 			}),
@@ -113,7 +113,7 @@ export class RazorpayPaymentProvider implements PaymentProvider {
 					amountMinor,
 				};
 			// TODO(payments): the exact failed-payment and refund event names below
-			// were not confirmed against a live webhook at implementation time —
+			// were not confirmed against a live webhook at implementation time -
 			// verify them (Razorpay dashboard → Webhooks → event log) during test-mode
 			// QA and correct if different.
 			case "payment.failed":
@@ -142,9 +142,9 @@ export class RazorpayPaymentProvider implements PaymentProvider {
 	/**
 	 * Razorpay webhooks: HMAC-SHA256(rawBody, webhookSecret), hex digest, in the
 	 * `X-Razorpay-Signature` header. Razorpay does not include a timestamp in
-	 * the signature — there is no replay-window check possible here. Idempotency
+	 * the signature - there is no replay-window check possible here. Idempotency
 	 * is instead enforced entirely downstream, by the PENDING-only guard and the
-	 * unique index on `provider_payment_id` in DonationsService — this is
+	 * unique index on `provider_payment_id` in DonationsService - this is
 	 * deliberate, not an oversight.
 	 */
 	private verifySignature(rawBody: string, headers: Record<string, string>) {

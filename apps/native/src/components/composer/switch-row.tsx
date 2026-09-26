@@ -8,7 +8,7 @@ import { focusable } from "@/lib/focus";
 /**
  * A labelled on/off setting with a real native switch.
  *
- * Used for the two booleans the composer owns — Urgent and Pinned — where a
+ * Used for the two booleans the composer owns - Urgent and Pinned - where a
  * chip hid the fact that the control is a toggle. The whole row is tappable;
  * the switch itself is the native one so it looks and behaves like every
  * other toggle on the device.

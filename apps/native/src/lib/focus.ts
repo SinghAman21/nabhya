@@ -31,12 +31,12 @@ export const focusWithin = (
  *
  * RN's own `PressableStateCallbackType` declares only `pressed`, but RNW also
  * supplies `hovered` and `focused`. Reading `hovered` from here is how the app
- * does pointer states — `notification-bell.tsx` and `org-branding.tsx` are the
- * existing examples — and it is strictly better than a `useState` hover hook:
+ * does pointer states - `notification-bell.tsx` and `org-branding.tsx` are the
+ * existing examples - and it is strictly better than a `useState` hover hook:
  * the style callback re-runs without re-rendering the component, so hovering
  * one card in a feed does not re-render that card and its video player.
  *
- * `focused` is present but must not be used to draw a ring — see `focusable`.
+ * `focused` is present but must not be used to draw a ring - see `focusable`.
  */
 export type PressState = {
 	pressed: boolean;

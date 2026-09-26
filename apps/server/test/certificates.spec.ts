@@ -103,7 +103,7 @@ describe("CertificatesService", () => {
 
 	describe("issuing", () => {
 		it("refuses to issue without attendance", async () => {
-			// Attendance is the whole basis of the claim — a certificate for
+			// Attendance is the whole basis of the claim - a certificate for
 			// someone who never turned up is a forgery the platform vouched for.
 			const { owner, event, application } = await scenario({
 				attended: false,

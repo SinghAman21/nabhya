@@ -39,7 +39,7 @@ const FILTERS: Array<{ value: StatusFilter; label: string }> = [
 ];
 
 /**
- * Pledge review for one post — the organisation side of the donation loop.
+ * Pledge review for one post - the organisation side of the donation loop.
  *
  * Accepting advances the need's `fulfilledQuantity` by the pledged amount and
  * auto-closes it once the target is met; completing marks the handover done.
@@ -109,7 +109,7 @@ export function PledgesSheet({
 				<Field
 					label="Note to the volunteer"
 					optional
-					hint="Sent with your next decision — pickup address, timing, a thank-you."
+					hint="Sent with your next decision - pickup address, timing, a thank-you."
 				>
 					<Input
 						placeholder="e.g. Drop off at our Andheri office, Mon–Fri 10–5"
@@ -187,7 +187,7 @@ function PledgeRow({
 }: {
 	pledge: NeedPledge;
 	unit: string | null;
-	/** `people.review` — false only once the role has resolved as denied. */
+	/** `people.review` - false only once the role has resolved as denied. */
 	canReview: boolean;
 	busy: boolean;
 	deciding: Decision | null;

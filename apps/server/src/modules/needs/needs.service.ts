@@ -200,7 +200,7 @@ export class NeedsService {
 					city: needs.city,
 					expiresAt: needs.expiresAt,
 					createdAt: needs.createdAt,
-					// Table-qualified: see the note in EventsService — an unqualified
+					// Table-qualified: see the note in EventsService - an unqualified
 					// "id" binds to need_pledges.id and the count is always zero.
 					pendingPledges: sql<number>`(
 						select count(*)::int from need_pledges np
@@ -302,7 +302,7 @@ export class NeedsService {
 		);
 		const need = await this.requireOwnedNeed(userId, needId);
 
-		// People have committed against this post — close it rather than erase
+		// People have committed against this post - close it rather than erase
 		// the record of what they pledged.
 		const [committed] = await this.db
 			.select({ value: count() })
@@ -612,7 +612,7 @@ export class NeedsService {
 				const reachedTarget =
 					lockedNeed.quantity !== null && fulfilled >= lockedNeed.quantity;
 
-				// A manually CLOSED need stays closed — rejecting a pledge that drops
+				// A manually CLOSED need stays closed - rejecting a pledge that drops
 				// the count below target must not resurrect it to OPEN. Only auto-flip
 				// between OPEN and FULFILLED.
 				const nextStatus = reachedTarget

@@ -29,18 +29,18 @@ import { focusable, type PressState } from "@/lib/focus";
  * Shared rules, all from the mark spec and none of them optional:
  *
  * - **2px lines, ≥8px end markers with a 2px surface ring**, area wash at ~10%
- *   opacity — never a saturated block.
+ *   opacity - never a saturated block.
  * - **Bars cap at 24px thick**, 4px rounded data-end, square at the baseline.
- * - **A 2px surface gap** separates touching marks — every stacked segment. Not
+ * - **A 2px surface gap** separates touching marks - every stacked segment. Not
  *   a stroke around them: a border is ink that is not data.
- * - **Gridlines are solid hairlines** one step off the surface. Never dashed —
+ * - **Gridlines are solid hairlines** one step off the surface. Never dashed -
  *   dashing reads as "projection" when it is just a grid.
  * - **Text never wears the series colour.** Values, labels and legends use text
  *   tokens; a coloured swatch *beside* the text carries identity. The one
  *   exception is a label set inside a filled segment, where the fill's own
  *   luminance decides ink or white.
  * - **A legend whenever there are two or more series**, so identity is never
- *   colour-alone, plus sparing direct labels (the endpoint, the extreme) —
+ *   colour-alone, plus sparing direct labels (the endpoint, the extreme) -
  *   never a number on every point.
  * - **Every value is readable without hover.** The tooltip enhances; the
  *   endpoint labels, the axis and the legend totals are what guarantee it.
@@ -53,7 +53,7 @@ import { focusable, type PressState } from "@/lib/focus";
 /**
  * A number, its label, and optionally what it is doing.
  *
- * The form for a single current value — with a delta when there is a previous
+ * The form for a single current value - with a delta when there is a previous
  * period to compare against, and a sparkline when there is a series behind it.
  * `onPress` makes it the way into the list that clears it, which is what turns
  * the three queue tiles from a readout into the dashboard's primary action.
@@ -112,7 +112,7 @@ export function StatTile({
 					<View style={{ paddingBottom: spacing[1] }}>
 						<Caption
 							weight="medium"
-							// Direction, not judgement — and read from a text token, not
+							// Direction, not judgement - and read from a text token, not
 							// the series hue.
 							color={delta > 0 ? colors.success.ink : colors.text.tertiary}
 						>
@@ -154,7 +154,7 @@ function compact(value: number): string {
 
 const SPARK_HEIGHT = 28;
 
-/** A 12-ish point sparkline. No axis, no labels — it carries shape, not values. */
+/** A 12-ish point sparkline. No axis, no labels - it carries shape, not values. */
 function Sparkline({ values, color }: { values: number[]; color: string }) {
 	const { colors } = useTheme();
 	const [width, setWidth] = useState(0);
@@ -222,7 +222,7 @@ const PAD_TOP = 10;
  * Counts per day, as a line per series over a shared wash.
  *
  * **One axis, always.** Two measures of different magnitude get two charts or an
- * index to a common base — never a second y-scale, which invents a correlation
+ * index to a common base - never a second y-scale, which invents a correlation
  * by choosing where the two scales line up.
  *
  * At most **two series** here. The third validated slot is 2.72:1 on the light
@@ -349,7 +349,7 @@ export function TrendChart({
 					</Svg>
 
 					{/* Y ticks and the date band, as text over the plot rather than
-					    inside the SVG — the type ramp owns its sizes and tracking. */}
+					    inside the SVG - the type ramp owns its sizes and tracking. */}
 					{ticks.map((tick) => (
 						<Caption
 							key={tick}
@@ -415,7 +415,7 @@ export function TrendChart({
 				</>
 			)}
 
-			{/* Legend. Always, at two or more series — identity is never left to
+			{/* Legend. Always, at two or more series - identity is never left to
 			    colour-matching. The window total rides along so the legend is also
 			    the table view for the series as a whole. */}
 			<View
@@ -496,8 +496,8 @@ const SEGMENT_GAP = 2;
 /**
  * Part-to-whole for an *ordered* set of stages.
  *
- * A horizontal stacked bar, coloured from an ordinal ramp — one hue, stepping
- * light to dark — because the order is the meaning: Pending → In review →
+ * A horizontal stacked bar, coloured from an ordinal ramp - one hue, stepping
+ * light to dark - because the order is the meaning: Pending → In review →
  * Verified is a funnel, and a reader should see the progression in the colour
  * rather than have to decode four unrelated hues. A stage that is off the
  * pipeline (Rejected) takes the neutral, so it does not read as further along
@@ -509,7 +509,7 @@ const SEGMENT_GAP = 2;
  * bar without turning the axis on its side.
  *
  * Every value is in the legend under the bar, so nothing depends on reading a
- * segment's width — which also covers the segments too narrow to label inside.
+ * segment's width - which also covers the segments too narrow to label inside.
  */
 export function PipelineBar({ stages }: { stages: PipelineStage[] }) {
 	const { spacing, isDark } = useTheme();
@@ -619,7 +619,7 @@ export function PipelineBar({ stages }: { stages: PipelineStage[] }) {
  * A chart's frame: a title, an optional right-hand control, and the plot.
  *
  * The title carries what is plotted, which is why a single-series chart needs
- * no legend box — a box with one swatch just restates this line.
+ * no legend box - a box with one swatch just restates this line.
  */
 export function ChartCard({
 	title,
@@ -663,7 +663,7 @@ export function ChartCard({
 /**
  * The window switch above the charts.
  *
- * **One control, above everything it scopes** — not a picker per card. Both
+ * **One control, above everything it scopes** - not a picker per card. Both
  * charts re-render against the same slice, so the page can never show a 7-day
  * line beside a 30-day one and leave the reader to notice.
  */
@@ -728,7 +728,7 @@ export function RangeSwitch({
 /**
  * The dashboard's one hero figure.
  *
- * Exactly one per view, in the same sans as everything else — a display or
+ * Exactly one per view, in the same sans as everything else - a display or
  * serif face here reads as off-brand decoration rather than data.
  */
 export function HeroFigure({

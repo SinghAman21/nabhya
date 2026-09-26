@@ -18,7 +18,7 @@ import { verticalScrollbar } from "@/lib/scroll";
 /**
  * Public certificate verification.
  *
- * Deliberately reachable without an account — a certificate is only worth
+ * Deliberately reachable without an account - a certificate is only worth
  * something if the person being shown it can check it independently. The
  * verdict comes first and unmissable; the facts follow.
  */
@@ -87,7 +87,7 @@ export default function VerifyCertificate() {
 					</View>
 
 					<Surface padded={false}>
-						<Row label="Volunteer" value={certificate.volunteerName ?? "—"} />
+						<Row label="Volunteer" value={certificate.volunteerName ?? "-"} />
 						<Row label="Organisation" value={certificate.organizationName} />
 						<Row label="Event" value={certificate.eventTitle} />
 						<Row label="Event date" value={formatDate(certificate.eventDate)} />

@@ -58,7 +58,7 @@ import { useFeedStore } from "@/store/feed-store";
  *
  * `alignSelf: "stretch"` and its own scroller, not `position: sticky`: the rail
  * is a sibling of the feed's `FlatList`, not a child of it, so sticky has no
- * scrolling ancestor to stick to — it only made the column size to its content
+ * scrolling ancestor to stick to - it only made the column size to its content
  * and clip the bottom of "Happening soon" with no way to reach it. Same fix as
  * `(ngo)/feed.tsx`, which is the other caller of this rail.
  */
@@ -279,7 +279,7 @@ export default function Home() {
 	 * Stable handlers, so `FeedCard`'s `memo` can actually hold.
 	 *
 	 * Written inline in `renderItem` these were a new function on every render,
-	 * which fails the memo comparison for every card in the list — so a like,
+	 * which fails the memo comparison for every card in the list - so a like,
 	 * which now writes straight into the query cache, re-rendered every card
 	 * and every video player in it. Each closes only over a mutation's `mutate`,
 	 * which react-query keeps stable, so these dependencies never change.

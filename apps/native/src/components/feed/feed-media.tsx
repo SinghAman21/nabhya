@@ -41,12 +41,12 @@ import type { FeedMedia } from "@/lib/types";
  * - One media per page in a free-scroll row, never a grid and never
  *   snap-paging. A grid crops everything to squares; snap-paging fights the
  *   user's thumb on a mixed photo+video post. Each page is deliberately a
- *   peek narrower than the tile so the next item always shows a sliver —
+ *   peek narrower than the tile so the next item always shows a sliver -
  *   that sliver plus the dots is the affordance that the row scrolls.
  * - Aspect is measured, not guessed. The server sends no dimensions, so each
  *   image reports its natural size on load and each video reads one thumbnail
  *   frame (native only; web falls back to 16:9). Ratios are clamped to
- *   4:5–16:9 so one panorama or skyscraper can't stretch a card to infinity —
+ *   4:5–16:9 so one panorama or skyscraper can't stretch a card to infinity -
  *   extremes get a gentle center-crop, never distortion.
  * - One height per row. Every page in a multi-item carousel shares the first
  *   measured ratio, so swiping doesn't bounce the card taller/shorter per
@@ -56,8 +56,8 @@ import type { FeedMedia } from "@/lib/types";
  *   look identical without it), the time remaining, and a read-only progress
  *   bar. Scrubbing and sound-on playback belong to the fullscreen viewer,
  *   which is one tap away via the expand button.
- * - Nothing ever autoplays. `active` only *pauses* — a card scrolled off
- *   screen stops decoding — because starting a video unasked in a feed of
+ * - Nothing ever autoplays. `active` only *pauses* - a card scrolled off
+ *   screen stops decoding - because starting a video unasked in a feed of
  *   appeals spends the reader's data and their attention without being asked.
  */
 
@@ -99,18 +99,18 @@ export function FeedMediaCarousel({
 	/**
 	 * Tallest the tile may draw, in points. The caller owns this because it is
 	 * a layout decision about the *card*, not about the picture: a 4:5 portrait
-	 * in a 672pt-wide desktop column is 840pt tall — taller than the window, so
+	 * in a 672pt-wide desktop column is 840pt tall - taller than the window, so
 	 * the card's own actions were pushed off screen and the reader had to
 	 * scroll a phone-shaped photo to reach the like button. Capping height, not
 	 * width, is what keeps the picture as large as the column allows while
 	 * bounding it in the direction that actually hurts.
 	 */
 	maxHeight: number;
-	/** False while the card is off screen — see `CarouselVideo`. */
+	/** False while the card is off screen - see `CarouselVideo`. */
 	active?: boolean;
 	/** Opens the card-level fullscreen viewer at the tapped page. The viewer
 	    lives in the card (not here) so opening comments from it can first
-	    dismiss the modal — a sheet opened under a modal would be invisible. */
+	    dismiss the modal - a sheet opened under a modal would be invisible. */
 	onOpenViewer: (index: number) => void;
 }) {
 	const { colors, spacing } = useTheme();
@@ -208,7 +208,7 @@ export function FeedMediaCarousel({
 					accessibilityLabel={`Showing ${page + 1} of ${media.length}`}
 				>
 					{media.map((m) => {
-						// Not `active` — that name is the carousel's viewport prop now.
+						// Not `active` - that name is the carousel's viewport prop now.
 						const isCurrent = media[page]?.id === m.id;
 						return (
 							<View
@@ -342,7 +342,7 @@ function CarouselVideo({
 	/**
 	 * False once the card leaves the viewport. A playing video whose card has
 	 * scrolled away keeps decoding frames and, on a long feed, keeps several
-	 * players alive at once — so this pauses rather than relying on the reader
+	 * players alive at once - so this pauses rather than relying on the reader
 	 * to notice. It never *starts* playback: autoplay in a feed of NGO appeals
 	 * is a choice the reader should make, and on cellular data it is their bill.
 	 */
@@ -528,7 +528,7 @@ function CarouselVideo({
 				</View>
 			)}
 
-			{/* Progress. Read-only on the tile — scrubbing belongs to the viewer. */}
+			{/* Progress. Read-only on the tile - scrubbing belongs to the viewer. */}
 			<View
 				style={{
 					position: "absolute",
@@ -882,7 +882,7 @@ function ViewerVideoPage({ uri, active }: { uri: string; active: boolean }) {
 	}, [active, player]);
 
 	// No pause-on-unmount here: useVideoPlayer releases the native player in
-	// its own cleanup, which runs before ours — touching the player after
+	// its own cleanup, which runs before ours - touching the player after
 	// that throws NotFoundException (native shared object already gone).
 
 	return (

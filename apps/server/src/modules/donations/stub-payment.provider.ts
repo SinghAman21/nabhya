@@ -10,8 +10,8 @@ import type {
 /**
  * Stand-in used when Razorpay credentials are absent.
  *
- * Keeps the whole donation flow exercisable locally — a checkout is issued and
- * the webhook path can be driven by POSTing a plain JSON body — without any
+ * Keeps the whole donation flow exercisable locally - a checkout is issued and
+ * the webhook path can be driven by POSTing a plain JSON body - without any
  * signature. Refused in production by DonationsModule.
  */
 export class StubPaymentProvider implements PaymentProvider {
@@ -20,7 +20,7 @@ export class StubPaymentProvider implements PaymentProvider {
 
 	async createCheckout(input: CheckoutRequest): Promise<CheckoutResult> {
 		this.logger.warn(
-			`Payment stub issued a checkout for donation ${input.referenceId} — no money will move.`,
+			`Payment stub issued a checkout for donation ${input.referenceId} - no money will move.`,
 		);
 		return {
 			providerCheckoutId: `stub_${randomUUID()}`,

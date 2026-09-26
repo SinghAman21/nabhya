@@ -33,7 +33,7 @@ import { verticalScrollbar } from "@/lib/scroll";
  * side), so this screen requires both before it lets you submit.
  *
  * Two steps, each on its own card, and the submit pinned at the bottom so it is
- * always reachable — the selfie step is tall, and burying the button under it
+ * always reachable - the selfie step is tall, and burying the button under it
  * made people think the page ended at the camera.
  *
  * The two cards sit side by side on desktop. Stacked, the camera pushed the ID
@@ -43,7 +43,7 @@ import { verticalScrollbar } from "@/lib/scroll";
  *
  * Both outcomes are stated on the page, not in an `Alert`. A blocking OS dialog
  * over a form is the wrong shape for either: the failure has to stay visible
- * while you retake a photo, and the success has to survive being read — an
+ * while you retake a photo, and the success has to survive being read - an
  * alert you dismiss leaves a screen that looks exactly like the one that had
  * not been submitted yet.
  */
@@ -198,7 +198,7 @@ function VerifyIdentity() {
 
 				<Caption color="quaternary" style={{ textAlign: "center" }}>
 					{submitted
-						? "Nothing else to do here — we'll notify you when it's reviewed."
+						? "Nothing else to do here - we'll notify you when it's reviewed."
 						: done === 2
 							? "Both captured. Ready to submit."
 							: `${done} of 2 captured. Add ${idValue ? "your selfie" : selfieValue ? "your ID" : "both"} to continue.`}

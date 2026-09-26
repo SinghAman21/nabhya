@@ -1,10 +1,10 @@
-# Nabhya — NGO Connect Platform
+# Nabhya - NGO Connect Platform
 
 ## Final Year Project Report
 
 | | |
 |---|---|
-| **Project** | Nabhya — a verified NGO ↔ volunteer platform for India |
+| **Project** | Nabhya - a verified NGO ↔ volunteer platform for India |
 | **Repository** | `SinghAman21/nabhya` (branch `post-review-1`) |
 | **Platform** | Mobile app (Expo / React Native) + REST API (NestJS) + PostgreSQL (Supabase) |
 | **Report date** | July 2026 |
@@ -41,13 +41,13 @@ Nabhya now exposes a **unified server-side recommendation feed** that combines g
 feed posts, published events, open needs/offers, and published announcements. It has three
 separate views:
 
-- **For You** — deterministic ranking over location, cause-category affinity, follows,
+- **For You** - deterministic ranking over location, cause-category affinity, follows,
   recency, urgency and meaningful engagement. It uses Haversine distance when optional
   viewer coordinates exist, otherwise city/state matching; recent impressions down-rank
   rather than permanently hide candidates.
-- **Trending** — public, time-decayed ranking using likes, saves, shares, comments, event
+- **Trending** - public, time-decayed ranking using likes, saves, shares, comments, event
   applications and need pledges. An optional authenticated viewer adds location context.
-- **Following** — reverse-chronological content from explicitly followed verified NGOs;
+- **Following** - reverse-chronological content from explicitly followed verified NGOs;
   it intentionally does not apply seen-content suppression.
 
 The ranking implementation follows a candidate-pipeline approach: fetch each content source,
@@ -71,7 +71,7 @@ future client work.
 
 ## 1. Abstract
 
-Nabhya is a mobile-first platform that connects **verified NGOs** with **volunteers and donors** across India. NGOs register, upload their legal documents (registration certificate, PAN, 80G/12A certificates, etc.), and are manually verified by a platform superadmin before anything they publish becomes publicly visible. Once verified, an NGO can publish **volunteering events** and **"needs"** — items it wants donated (*WANT*, e.g. "200 blankets") or surplus items it is offering to give away (*OFFER*, e.g. "40 school desks"). Item-level giving is the platform's core differentiator over event-only volunteering apps.
+Nabhya is a mobile-first platform that connects **verified NGOs** with **volunteers and donors** across India. NGOs register, upload their legal documents (registration certificate, PAN, 80G/12A certificates, etc.), and are manually verified by a platform superadmin before anything they publish becomes publicly visible. Once verified, an NGO can publish **volunteering events** and **"needs"** - items it wants donated (*WANT*, e.g. "200 blankets") or surplus items it is offering to give away (*OFFER*, e.g. "40 school desks"). Item-level giving is the platform's core differentiator over event-only volunteering apps.
 
 Volunteers browse a public feed of events and needs, apply to events, pledge items against needs, bookmark and review organisations, donate money, and collect **publicly verifiable participation certificates** whose codes anyone can validate without an account.
 
@@ -85,9 +85,9 @@ India has one of the largest NGO ecosystems in the world, but discovery and trus
 
 Nabhya addresses both problems:
 
-- **Trust** — every organisation passes a document-based verification workflow reviewed by a superadmin before it can publish anything. Volunteers can additionally verify their identity (Aadhaar-based document upload). Public listings are server-side filtered so an unverified or suspended NGO can never surface.
-- **Actionable giving** — beyond volunteering at events, the platform models *item-level* giving in both directions: NGOs post what they need, and also what surplus they can give away. A blanket drive and a school-desk giveaway are both first-class objects with quantity tracking.
-- **Recognition** — attendance-gated volunteering certificates with public verification codes make a volunteer's contribution provable to a third party (e.g. a college or employer).
+- **Trust** - every organisation passes a document-based verification workflow reviewed by a superadmin before it can publish anything. Volunteers can additionally verify their identity (Aadhaar-based document upload). Public listings are server-side filtered so an unverified or suspended NGO can never surface.
+- **Actionable giving** - beyond volunteering at events, the platform models *item-level* giving in both directions: NGOs post what they need, and also what surplus they can give away. A blanket drive and a school-desk giveaway are both first-class objects with quantity tracking.
+- **Recognition** - attendance-gated volunteering certificates with public verification codes make a volunteer's contribution provable to a third party (e.g. a college or employer).
 
 ### Scope of this report
 
@@ -99,18 +99,18 @@ This report documents the system as implemented on the `post-review-1` branch: t
 
 ### 3.1 Problem statement
 
-> Design and implement a trustworthy, mobile-first platform where verified NGOs can publish volunteering opportunities and material needs, and where citizens can discover nearby organisations, contribute time / items / money, and receive verifiable recognition — with an administrative layer that performs verification, moderation, and auditing.
+> Design and implement a trustworthy, mobile-first platform where verified NGOs can publish volunteering opportunities and material needs, and where citizens can discover nearby organisations, contribute time / items / money, and receive verifiable recognition - with an administrative layer that performs verification, moderation, and auditing.
 
 ### 3.2 Objectives
 
 1. **Verified onboarding** for two user roles (volunteer, organisation) with a superadmin document-verification queue for both NGO legal documents and volunteer identity documents.
-2. **Event lifecycle management** — draft → publish → applications → accept/reject → attendance → completion — with capacity accounting that is safe under concurrency.
-3. **Item-donation ("needs") lifecycle** — WANT/OFFER posts with quantity/urgency, pledges from users, and transactional fulfilment accounting.
-4. **Public discovery** — an anonymous-accessible feed of events, needs and an NGO directory with proximity ("near me") search, that can only ever show verified + active organisations.
-5. **Engagement layer** — bookmarks, reviews with organisation replies, announcements, public financial-transparency reports, in-app notifications and superadmin broadcast.
-6. **Certificates** — attendance-gated issuance, PDF generation, revocation, and account-less public verification by code.
+2. **Event lifecycle management** - draft → publish → applications → accept/reject → attendance → completion - with capacity accounting that is safe under concurrency.
+3. **Item-donation ("needs") lifecycle** - WANT/OFFER posts with quantity/urgency, pledges from users, and transactional fulfilment accounting.
+4. **Public discovery** - an anonymous-accessible feed of events, needs and an NGO directory with proximity ("near me") search, that can only ever show verified + active organisations.
+5. **Engagement layer** - bookmarks, reviews with organisation replies, announcements, public financial-transparency reports, in-app notifications and superadmin broadcast.
+6. **Certificates** - attendance-gated issuance, PDF generation, revocation, and account-less public verification by code.
 7. **Monetary donations** via Razorpay's native checkout SDK with webhook-driven settlement that never trusts the client's checkout-success callback.
-8. **Operational integrity** — audit trail of every administrative and sensitive action, rate limiting, and a test suite that exercises real SQL semantics (unique indexes, row locks, aggregates).
+8. **Operational integrity** - audit trail of every administrative and sensitive action, rate limiting, and a test suite that exercises real SQL semantics (unique indexes, row locks, aggregates).
 
 ---
 
@@ -180,7 +180,7 @@ flowchart LR
 pnpm workspaces + **Turborepo**; Node ≥ 22, `pnpm@10.10.0`; **Biome** for lint/format; Husky + lint-staged pre-commit hooks.
 
 ```
-apps/native        Expo SDK 56 + Expo Router — the mobile client
+apps/native        Expo SDK 56 + Expo Router - the mobile client
 apps/server        NestJS 11 REST API, global prefix /api, port 3000
 packages/db        Drizzle ORM schema + pg client        (@nabhya/db)
 packages/env       t3-oss/env runtime env validation      (@nabhya/env)
@@ -206,12 +206,12 @@ scripts/           Interactive Supabase setup wizard (pnpm db:setup)
 | | jose | 5.x | JWT verification against remote JWKS |
 | | pdf-lib | 1.17 | Certificate PDF rendering |
 | | AWS SDK v3 (S3 + presigner) | 3.x | Cloudflare R2 object storage (S3-compatible) |
-| Data | PostgreSQL (Supabase) | — | Primary datastore |
+| Data | PostgreSQL (Supabase) | - | Primary datastore |
 | | Drizzle ORM / drizzle-kit | 0.45 | Typed schema, queries, migrations |
-| Auth | Supabase Auth | — | Hosted identity provider issuing JWTs |
+| Auth | Supabase Auth | - | Hosted identity provider issuing JWTs |
 | Validation | Zod | 4.x (catalog) | Single source of truth for all request/response shapes |
 | Testing | Vitest + PGlite | 4.x / 0.5 | Integration tests on real in-process Postgres |
-| Tooling | Biome, Turborepo, tsdown/tsx | — | Lint/format, task graph, esbuild-based build/dev |
+| Tooling | Biome, Turborepo, tsdown/tsx | - | Lint/format, task graph, esbuild-based build/dev |
 
 ### 5.3 Contract-first validation
 
@@ -225,7 +225,7 @@ A deliberate architectural decision: **every request/response shape is a Zod sch
 
 ```mermaid
 flowchart TB
-    subgraph Client["apps/native — Expo mobile app"]
+    subgraph Client["apps/native - Expo mobile app"]
         UI[Screens - Expo Router groups]
         HOOKS[TanStack Query hooks]
         SVC[lib/api services - typed axios]
@@ -239,7 +239,7 @@ flowchart TB
         JWKS[JWKS endpoint]
     end
 
-    subgraph Server["apps/server — NestJS 11 (:3000, prefix /api)"]
+    subgraph Server["apps/server - NestJS 11 (:3000, prefix /api)"]
         THR[ThrottlerGuard - rate limit]
         JWT[JwtGuard - JWKS verify + JIT user sync]
         ROLES[RolesGuard - @Roles OR-semantics]
@@ -251,7 +251,7 @@ flowchart TB
         SVCS -.-> XCUT
     end
 
-    subgraph Shared["packages/shared — Zod contracts"]
+    subgraph Shared["packages/shared - Zod contracts"]
         ZOD[Request/response schemas]
     end
 
@@ -280,7 +280,7 @@ Key properties:
 
 - **Everything is protected by default.** The JWT guard is global; public access is an explicit opt-out per route (`@Public()` / `@OptionalAuth()`).
 - **File bytes never pass through the API.** The client PUTs directly to R2 with a pre-signed URL and only the resulting *object key* is stored (see §9.4).
-- **Cross-cutting concerns are global Nest modules** — database handle, storage provider, audit trail, and notifications are `@Global()` providers injectable anywhere.
+- **Cross-cutting concerns are global Nest modules** - database handle, storage provider, audit trail, and notifications are `@Global()` providers injectable anywhere.
 - **The response envelope is uniform**: every success is `{ success: true, data, timestamp }` (interceptor), every error is `{ statusCode, timestamp, path, message, errors? }` (exception filter), and every list endpoint returns a `Paginated<T>` envelope.
 
 ### 6.2 Server module dependency graph
@@ -326,7 +326,7 @@ flowchart LR
     UP & CERT -.injects.-> STG
 ```
 
-`OrganizationsService` is the linchpin: it exposes `requireOwnedOrganization(userId)` and `requireVerifiedOrganization(userId)`, which every organisation-scoped module uses to resolve the caller's NGO **from the token** — an organisation id is never accepted from the client, and anything that becomes publicly visible additionally requires the NGO to be verified.
+`OrganizationsService` is the linchpin: it exposes `requireOwnedOrganization(userId)` and `requireVerifiedOrganization(userId)`, which every organisation-scoped module uses to resolve the caller's NGO **from the token** - an organisation id is never accepted from the client, and anything that becomes publicly visible additionally requires the NGO to be verified.
 
 ### 6.3 Request lifecycle
 
@@ -355,7 +355,7 @@ sequenceDiagram
     H->>D: business logic (transactions where counters mutate)
     D-->>H: rows
     H-->>C: interceptor wraps → { success, data, timestamp }
-    Note over H: AuditService.record() is fire-and-forget —<br/>an audit failure never fails the business action
+    Note over H: AuditService.record() is fire-and-forget -<br/>an audit failure never fails the business action
 ```
 
 ---
@@ -463,7 +463,7 @@ erDiagram
         uuid organization_id FK
         enum type "WANT/OFFER"
         varchar title
-        integer quantity "nullable — open-ended needs"
+        integer quantity "nullable - open-ended needs"
         varchar unit
         integer fulfilled_quantity "denormalised, lock-guarded"
         enum urgency "LOW/MEDIUM/HIGH"
@@ -492,7 +492,7 @@ erDiagram
     DONATIONS {
         uuid id PK
         uuid organization_id FK
-        uuid donor_user_id FK "nullable — guest donations"
+        uuid donor_user_id FK "nullable - guest donations"
         integer amount_minor "paise, never floats"
         varchar currency
         enum status "PENDING/COMPLETED/FAILED/REFUNDED"
@@ -512,7 +512,7 @@ erDiagram
     }
 ```
 
-*(Join/support tables — `roles`, `user_roles`, `user_documents`, `organization_admins`, `organization_documents`, `categories`, `organization_categories`, `user_categories`, `bookmarks`, `organization_follows`, `feed_interactions`, `feed_comments`, `reviews`, `notifications`, `announcements`, `financial_reports` — are shown as relationships above and detailed in the data dictionary below.)*
+*(Join/support tables - `roles`, `user_roles`, `user_documents`, `organization_admins`, `organization_documents`, `categories`, `organization_categories`, `user_categories`, `bookmarks`, `organization_follows`, `feed_interactions`, `feed_comments`, `reviews`, `notifications`, `announcements`, `financial_reports` - are shown as relationships above and detailed in the data dictionary below.)*
 
 ### 7.2 Data dictionary
 
@@ -553,33 +553,33 @@ erDiagram
 | Table | Columns (key ones) | Constraints & indexes |
 |---|---|---|
 | `events` | org, `title`, `description`, `cover_image`, venue/address/city/state + coordinates, `start_at`, `end_at`, `application_deadline`, `volunteers_needed`, **`accepted_count`** (denormalised), `status`, `created_by` | Indexes: `(status, start_at)` drives the public feed; `organization_id`; `city`. `accepted_count` is only ever mutated inside the application-review transaction |
-| `event_applications` | event, volunteer, `status`, `message`, `review_note`, `reviewed_by/at`, **`attended_at`**, `applied_at` | **Unique `(event_id, volunteer_id)`** — the DB, not application code, is the source of truth for one-application-per-volunteer. `attended_at` gates certificate issuance |
+| `event_applications` | event, volunteer, `status`, `message`, `review_note`, `reviewed_by/at`, **`attended_at`**, `applied_at` | **Unique `(event_id, volunteer_id)`** - the DB, not application code, is the source of truth for one-application-per-volunteer. `attended_at` gates certificate issuance |
 
-#### Needs / item donations (`needs.ts`) — the core differentiator
+#### Needs / item donations (`needs.ts`) - the core differentiator
 
 | Table | Columns (key ones) | Constraints & indexes |
 |---|---|---|
-| `organization_needs` | org, **`type` (WANT / OFFER)**, `title`, `description`, `quantity` (nullable — "as many as possible" is legitimate), `unit`, **`fulfilled_quantity`** (denormalised), `urgency`, `status`, city/state, `expires_at` | Indexes: `(status, type)` drives the public needs feed; org; city |
+| `organization_needs` | org, **`type` (WANT / OFFER)**, `title`, `description`, `quantity` (nullable - "as many as possible" is legitimate), `unit`, **`fulfilled_quantity`** (denormalised), `urgency`, `status`, city/state, `expires_at` | Indexes: `(status, type)` drives the public needs feed; org; city |
 | `need_pledges` | need, user, `quantity`, `message`, `status`, `review_note`, `reviewed_by/at` | On a WANT: "I will supply N"; on an OFFER: "I would like to receive N". Indexes on `(need_id, status)` and user |
 
 #### Certificates (`certificates.ts`)
 
 | Table | Columns (key ones) | Constraints & indexes |
 |---|---|---|
-| `certificates` | `application_id`, `event_id`, `volunteer_id`, `organization_id`, **`code`** (unique, human-quotable, printed on the PDF), `pdf_key`, `note`, `issued_by/at`, `revoked_at`, `revoked_reason` | **Unique on `application_id`** — re-issuing replaces the PDF rather than minting a second code. A revoked code still resolves but reads as void |
+| `certificates` | `application_id`, `event_id`, `volunteer_id`, `organization_id`, **`code`** (unique, human-quotable, printed on the PDF), `pdf_key`, `note`, `issued_by/at`, `revoked_at`, `revoked_reason` | **Unique on `application_id`** - re-issuing replaces the PDF rather than minting a second code. A revoked code still resolves but reads as void |
 
 #### Donations (`donations.ts`)
 
 | Table | Columns (key ones) | Constraints & indexes |
 |---|---|---|
-| `donations` | org, `donor_user_id` (nullable → guest), **`amount_minor`** (integer paise — never floats), `currency`, `status`, `provider`, `provider_checkout_id`, **`provider_payment_id` (unique — webhook replay cannot double-count)**, `message`, `is_anonymous`, `receipt_number` (unique), donor name/email, `completed_at`, `failure_reason` | Created PENDING with a **server-computed amount**; only the provider webhook moves it to COMPLETED |
+| `donations` | org, `donor_user_id` (nullable → guest), **`amount_minor`** (integer paise - never floats), `currency`, `status`, `provider`, `provider_checkout_id`, **`provider_payment_id` (unique - webhook replay cannot double-count)**, `message`, `is_anonymous`, `receipt_number` (unique), donor name/email, `completed_at`, `failure_reason` | Created PENDING with a **server-computed amount**; only the provider webhook moves it to COMPLETED |
 
 #### Engagement (`engagement.ts`)
 
 | Table | Columns (key ones) | Constraints & indexes |
 |---|---|---|
 | `bookmarks` | user, org, `created_at` | Unique `(user, org)` makes the bookmark toggle idempotent under double-taps |
-| `reviews` | org, user, `rating`, `body`, `reply` (org's public response), `replied_at` | Unique `(org, user)` — one review per person, editing updates in place |
+| `reviews` | org, user, `rating`, `body`, `reply` (org's public response), `replied_at` | Unique `(org, user)` - one review per person, editing updates in place |
 | `organization_follows` | user, org, `created_at` | Unique `(user, org)`; separate from a private bookmark and drives the Following feed |
 | `feed_interactions` | user, polymorphic `target_type` + `target_id`, `interaction_type`, `created_at` | Targets POST/EVENT/NEED/ANNOUNCEMENT. LIKE and SAVE are unique per user/target; SHARE and IMPRESSION are append-only analytics events |
 | `feed_comments` | user, polymorphic `target_type` + `target_id`, `body`, timestamps | Indexed by target chronology and author; the service validates target visibility before writes |
@@ -590,7 +590,7 @@ erDiagram
 | Table | Columns (key ones) | Notes |
 |---|---|---|
 | `announcements` | org, `title`, `body`, `cover_image_key`, `status` (DRAFT/PUBLISHED), `is_pinned`, `published_at`, `created_by` | Public org updates; publishing notifies everyone who bookmarked the org |
-| `financial_reports` | org, `type` (ANNUAL_REPORT, AUDITED_STATEMENT, FCRA_RETURN, UTILISATION_CERTIFICATE, OTHER), `title`, `financial_year`, `document_key`, `notes` | **Public by design** — transparency documents a donor uses to decide trust; distinct from the private `organization_documents` |
+| `financial_reports` | org, `type` (ANNUAL_REPORT, AUDITED_STATEMENT, FCRA_RETURN, UTILISATION_CERTIFICATE, OTHER), `title`, `financial_year`, `document_key`, `notes` | **Public by design** - transparency documents a donor uses to decide trust; distinct from the private `organization_documents` |
 
 #### Audit (`audit.ts`)
 
@@ -601,11 +601,11 @@ erDiagram
 ### 7.3 Notable database design decisions
 
 1. **Denormalised counters with pessimistic locking.** `events.accepted_count` and `organization_needs.fulfilled_quantity` exist so public listings avoid per-row aggregates. They are mutated *only* inside a transaction that first takes `SELECT … FOR UPDATE` on the parent row, so concurrent accepts cannot oversell capacity or overshoot fulfilment.
-2. **Uniqueness enforced in the database, not the application.** One application per volunteer per event, one review per user per org, one org per owner, one certificate per participation, one donation per provider payment id — all unique indexes. Application-level checks are treated as UX, not correctness.
-3. **Haversine instead of PostGIS.** "Near me" filters on an indexed latitude bounding box first, then computes haversine distance in SQL — one dependency fewer, accurate enough at city scale.
+2. **Uniqueness enforced in the database, not the application.** One application per volunteer per event, one review per user per org, one org per owner, one certificate per participation, one donation per provider payment id - all unique indexes. Application-level checks are treated as UX, not correctness.
+3. **Haversine instead of PostGIS.** "Near me" filters on an indexed latitude bounding box first, then computes haversine distance in SQL - one dependency fewer, accurate enough at city scale.
 4. **Object-storage keys, not URLs.** Every file column (`document_key`, `pdf_key`, `cover_image_key`, …) stores a key like `org-documents/{orgId}/{uuid}-name`. The owning id is baked into the key, which is how download authorisation works without trusting the client.
-5. **Money is integer minor units** (paise) — floats never touch monetary values.
-6. **Dual-reference reviewer columns.** Applications, pledges and documents reference `users` twice (actor + reviewer). Drizzle cannot disambiguate reverse relations without `relationName`, so `users` deliberately does not expose reverse relations to these tables — they are queried from the child side.
+5. **Money is integer minor units** (paise) - floats never touch monetary values.
+6. **Dual-reference reviewer columns.** Applications, pledges and documents reference `users` twice (actor + reviewer). Drizzle cannot disambiguate reverse relations without `relationName`, so `users` deliberately does not expose reverse relations to these tables - they are queried from the child side.
 7. **Migrations exist and are exercised by tests** (the Vitest suite builds its PGlite database from the committed migrations, so a drift between schema and migrations fails the suite), while local development still uses `drizzle-kit push` on boot (see §14).
 
 ---
@@ -630,7 +630,7 @@ erDiagram
 | Route | Gate | Purpose |
 |---|---|---|
 | `GET /api` | Public | Liveness probe (process up) |
-| `GET /api/health` | Public | Readiness probe — queries the DB and reports storage mode |
+| `GET /api/health` | Public | Readiness probe - queries the DB and reports storage mode |
 
 #### Users & Onboarding
 
@@ -668,7 +668,7 @@ erDiagram
 | `POST /api/events/:id/applications` | volunteer | Apply to an event |
 | `DELETE /api/events/:id/applications/me` | volunteer | Withdraw own application |
 
-#### Org Events (organisation side, `org/*` — org resolved from the token)
+#### Org Events (organisation side, `org/*` - org resolved from the token)
 
 | Route | Gate | Purpose |
 |---|---|---|
@@ -765,7 +765,7 @@ erDiagram
 | Route | Gate | Purpose |
 |---|---|---|
 | `POST /api/donations/checkout` | OptionalAuth *(strict throttle)* | Start a donation (guest or signed-in) |
-| `POST /api/donations/webhook` | Public *(signature-verified, throttle-exempt)* | Provider webhook — the only path to COMPLETED |
+| `POST /api/donations/webhook` | Public *(signature-verified, throttle-exempt)* | Provider webhook - the only path to COMPLETED |
 | `GET /api/me/donations` | auth | Own donation history |
 | `GET /api/me/donations/:id/receipt` | auth | Receipt for a completed donation |
 | `GET /api/org/donations` | organisation | Donations received, with totals |
@@ -777,7 +777,7 @@ erDiagram
 | `POST /api/uploads/intent` | auth *(strict throttle)* | Issue a pre-signed upload ticket |
 | `POST /api/uploads/download-url` | auth | Short-lived signed read URL (ownership-checked) |
 
-#### Admin (superadmin console — all routes `@Roles('superadmin')`)
+#### Admin (superadmin console - all routes `@Roles('superadmin')`)
 
 | Route | Purpose |
 |---|---|
@@ -796,7 +796,7 @@ erDiagram
 - **Response envelope**: success → `{ success: true, data, timestamp }`; error → `{ statusCode, timestamp, path, message, errors? }` with Zod field errors forwarded on 400.
 - **Pagination**: every list endpoint returns `Paginated<T>` (`items`, `page`, `pageSize`, `total`) via shared `paginate`/`toOffset` helpers.
 - **Public listings are safe by construction**: they inner-join `organizations` and filter `verification_status = 'VERIFIED' AND status = 'ACTIVE'`, so an unverified or suspended NGO can never surface through any public route.
-- **Org scoping**: all `org/*` routes resolve the organisation from the JWT via `requireOwnedOrganization` — an org id in a request body is never trusted.
+- **Org scoping**: all `org/*` routes resolve the organisation from the JWT via `requireOwnedOrganization` - an org id in a request body is never trusted.
 - **Rate limiting**: default bucket 120 req/60 s; strict bucket 10 req/60 s on abuse-prone writes (reviews, donation checkout, upload intents); health probes and the payment webhook are exempt.
 
 ---
@@ -831,7 +831,7 @@ sequenceDiagram
     end
     API->>API: reject if SUSPENDED / DELETED
     API->>DB: load roles → request.user.roles
-    Note over API: no default role is assigned —<br/>roles stay empty until POST /users/me/role
+    Note over API: no default role is assigned -<br/>roles stay empty until POST /users/me/role
     API-->>App: response
     Note over App: axios interceptor force-logs-out on any 401
 ```
@@ -877,7 +877,7 @@ sequenceDiagram
     DB->>DB: UPDATE application SET status = ACCEPTED
     DB->>DB: UPDATE event SET accepted_count = accepted_count + 1
     API->>DB: COMMIT
-    Note over DB: two concurrent accepts serialise on the lock —<br/>capacity can never be oversold
+    Note over DB: two concurrent accepts serialise on the lock -<br/>capacity can never be oversold
     API--)V: notification APPLICATION_ACCEPTED
     O->>API: PATCH .../attendance (after the event)
     API->>DB: SET attended_at
@@ -896,9 +896,9 @@ sequenceDiagram
     App->>API: POST /uploads/intent { kind, filename, contentType }
     API->>API: authorise kind for caller, build key<br/>e.g. org-documents/{orgId}/{uuid}-name
     API-->>App: pre-signed PUT URL + object key
-    App->>R2: PUT bytes (plain fetch — no Authorization header,<br/>it would break the signature)
+    App->>R2: PUT bytes (plain fetch - no Authorization header,<br/>it would break the signature)
     App->>API: submit form with the object KEY (never a URL)
-    API->>R2: HEAD object (assertUploaded — verifies existence and size,<br/>since a signed PUT cannot cap body size)
+    API->>R2: HEAD object (assertUploaded - verifies existence and size,<br/>since a signed PUT cannot cap body size)
     API->>API: persist key in the owning row
     Note over API: reads go through POST /uploads/download-url →<br/>short-lived signed GET, authorised by the owner id baked into the key
 ```
@@ -923,8 +923,8 @@ sequenceDiagram
     V->>API: GET /me/certificates/:id/pdf
     API-->>V: short-lived signed download URL
     T->>API: GET /certificates/:code/verify (public)
-    API-->>T: volunteer, event, org, issue date — or REVOKED status
-    Note over API: unique(application_id) — re-issuing replaces the PDF,<br/>never mints a second code for the same participation
+    API-->>T: volunteer, event, org, issue date - or REVOKED status
+    Note over API: unique(application_id) - re-issuing replaces the PDF,<br/>never mints a second code for the same participation
 ```
 
 ### 9.6 Donation settlement (sequence)
@@ -946,15 +946,15 @@ sequenceDiagram
     D->>RZP: completes payment in-app
     RZP-->>App: payment id / order id / signature (fast feedback only)
     RZP->>API: POST /donations/webhook (raw body, signature verified)
-    API->>API: idempotency: provider_payment_id is UNIQUE —<br/>a replayed webhook cannot double-count
+    API->>API: idempotency: provider_payment_id is UNIQUE -<br/>a replayed webhook cannot double-count
     API->>API: donation → COMPLETED, issue receipt_number
     API--)D: receipt available
-    Note over App: the client-side success callback is never trusted —<br/>only the signed webhook can move a donation to COMPLETED
+    Note over App: the client-side success callback is never trusted -<br/>only the signed webhook can move a donation to COMPLETED
 ```
 
 ### 9.7 State machines
 
-**Event lifecycle** — nothing moves an event out of PUBLISHED except the scheduled close-finished job or an explicit cancel:
+**Event lifecycle** - nothing moves an event out of PUBLISHED except the scheduled close-finished job or an explicit cancel:
 
 ```mermaid
 stateDiagram-v2
@@ -1006,7 +1006,7 @@ stateDiagram-v2
 
 ## 10. Client Application Design
 
-The only client today is the Expo app (`apps/native`) — Expo SDK 56, Expo Router file-based routing with typed routes, React Compiler enabled.
+The only client today is the Expo app (`apps/native`) - Expo SDK 56, Expo Router file-based routing with typed routes, React Compiler enabled.
 
 ### 10.1 Layered data access
 
@@ -1044,7 +1044,7 @@ Auth/session state lives in a **persisted Zustand store** backed by `expo-secure
 
 ```mermaid
 flowchart TD
-    START([app launch — src/app/index.tsx]) --> E{email in auth store?}
+    START([app launch - src/app/index.tsx]) --> E{email in auth store?}
     E -->|no| LOGIN["(auth)/login"]
     E -->|yes| R{role chosen?}
     R -->|no| RS[role-select]
@@ -1057,7 +1057,7 @@ flowchart TD
     OO -->|yes| NT["(ngo) tab group"]
 ```
 
-Route-group guards in `(ngo)/_layout.tsx` and `(volunteer)/_layout.tsx` are **client-side conveniences only** — real authorisation is always the server's role guard; the client reading a role from persisted state is UX, not security.
+Route-group guards in `(ngo)/_layout.tsx` and `(volunteer)/_layout.tsx` are **client-side conveniences only** - real authorisation is always the server's role guard; the client reading a role from persisted state is UX, not security.
 
 ### 10.3 Styling
 
@@ -1069,10 +1069,10 @@ Two systems coexist deliberately: NativeWind v4 / Tailwind 3.4 (brand primary `#
 
 | Concern | Mechanism |
 |---|---|
-| **Authentication** | Delegated to Supabase Auth. The API never sees passwords — it statelessly verifies JWTs against the provider's remote JWKS (`jose`), then JIT-syncs the user row. Tokens live in `expo-secure-store` on device |
-| **Authorisation** | Deny-by-default global guard; explicit `@Public`/`@OptionalAuth` opt-outs; `@Roles` guard with descriptive 403s. No default role at signup — an account can do nothing role-gated until it explicitly picks a role |
+| **Authentication** | Delegated to Supabase Auth. The API never sees passwords - it statelessly verifies JWTs against the provider's remote JWKS (`jose`), then JIT-syncs the user row. Tokens live in `expo-secure-store` on device |
+| **Authorisation** | Deny-by-default global guard; explicit `@Public`/`@OptionalAuth` opt-outs; `@Roles` guard with descriptive 403s. No default role at signup - an account can do nothing role-gated until it explicitly picks a role |
 | **Tenant isolation** | Org-scoped routes resolve the organisation from the token (`requireOwnedOrganization`); an org id is never accepted from the client. Public visibility additionally requires `requireVerifiedOrganization` |
-| **Public-surface safety** | Every public list inner-joins `organizations` filtered to `VERIFIED + ACTIVE` — moderation takes effect immediately across the whole public surface |
+| **Public-surface safety** | Every public list inner-joins `organizations` filtered to `VERIFIED + ACTIVE` - moderation takes effect immediately across the whole public surface |
 | **Input validation** | Per-route `ZodValidationPipe` with the shared schemas; 400s carry structured field errors |
 | **Concurrency safety** | Unique indexes for one-per-pair invariants; `SELECT … FOR UPDATE` transactions for capacity and fulfilment counters |
 | **Payments** | Amounts computed server-side in integer paise; state transition to COMPLETED only via the signature-verified webhook (raw-body capture enabled for HMAC); unique `provider_payment_id` defeats webhook replay |
@@ -1088,7 +1088,7 @@ Two systems coexist deliberately: NativeWind v4 / Tailwind 3.4 (brand primary `#
 
 The suite (Vitest 4) lives in `apps/server/test/` (integration) plus `*.spec.ts` beside the source (unit: `roles.guard`, `global-exception.filter`, `storage.keys`).
 
-**The distinctive choice: integration tests run against a real Postgres** — PGlite (Postgres compiled to WASM) runs in-process, no Docker or external service, and the test database is **built from the committed migrations**, so schema/migration drift fails the suite. Mocking the database here would defeat the point: the logic worth testing *is* the unique indexes, the `SELECT … FOR UPDATE` accounting, and the filtered aggregates.
+**The distinctive choice: integration tests run against a real Postgres** - PGlite (Postgres compiled to WASM) runs in-process, no Docker or external service, and the test database is **built from the committed migrations**, so schema/migration drift fails the suite. Mocking the database here would defeat the point: the logic worth testing *is* the unique indexes, the `SELECT … FOR UPDATE` accounting, and the filtered aggregates.
 
 | Spec | Covers |
 |---|---|
@@ -1107,8 +1107,8 @@ Supporting infrastructure: `test/harness.ts` (builds the PGlite database + servi
 
 Two additional guards against a class of silent failures:
 
-- **`pnpm --filter server verify:di`** — esbuild-based toolchains (`tsx`, `tsdown`) do not emit decorator metadata, so a constructor parameter without an explicit `@Inject(Token)` silently resolves to `undefined` and only fails at request time. This script resolves every controller and service at build time and fails on any missing dependency.
-- **Migration-backed test database** — doubles as a continuous check that generated migrations match the Drizzle schema.
+- **`pnpm --filter server verify:di`** - esbuild-based toolchains (`tsx`, `tsdown`) do not emit decorator metadata, so a constructor parameter without an explicit `@Inject(Token)` silently resolves to `undefined` and only fails at request time. This script resolves every controller and service at build time and fails on any missing dependency.
+- **Migration-backed test database** - doubles as a continuous check that generated migrations match the Drizzle schema.
 
 ---
 
@@ -1116,15 +1116,15 @@ Two additional guards against a class of silent failures:
 
 | Aspect | Detail |
 |---|---|
-| **Probes** | `GET /api` = liveness; `GET /api/health` = readiness (queries the DB; its `storage` field reads `stub` when R2 is unconfigured — point the load balancer at this one) |
+| **Probes** | `GET /api` = liveness; `GET /api/health` = readiness (queries the DB; its `storage` field reads `stub` when R2 is unconfigured - point the load balancer at this one) |
 | **Proxy** | `trust proxy = 1` is set; if deployed *without* a proxy it should be removed or all clients share one rate-limit bucket |
-| **Scheduled job** | `POST /api/admin/events/close-finished` must run on a schedule (hourly suffices) — it is the only thing that moves events out of PUBLISHED |
+| **Scheduled job** | `POST /api/admin/events/close-finished` must run on a schedule (hourly suffices) - it is the only thing that moves events out of PUBLISHED |
 | **Server-only endpoints** | Exactly two endpoints have no screen by design: the donations webhook (called by the provider) and close-finished (cron target) |
 | **Env** | Server: `DATABASE_URL`, `DIRECT_URL`, `CORS_ORIGIN`, `NODE_ENV`, `NEON_AUTH_URL`, `NEON_AUTH_JWKS_URL`, `R2_*`. Client: `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_NEON_AUTH_URL`. All validated at boot / import |
-| **Storage modes** | Cloudflare R2 when credentials present; an in-memory stub otherwise (dev only — refused in production so verification documents can never silently vanish) |
+| **Storage modes** | Cloudflare R2 when credentials present; an in-memory stub otherwise (dev only - refused in production so verification documents can never silently vanish) |
 | **Graceful shutdown** | `enableShutdownHooks()` for clean SIGTERM handling |
 | **Docs** | Swagger UI at `/api/docs` with persisted bearer auth |
-| **Bootstrap caveat** | First superadmin cannot be minted over HTTP by design — `grantSuperadmin` is deliberately unrouted and must be invoked via script/seed |
+| **Bootstrap caveat** | First superadmin cannot be minted over HTTP by design - `grantSuperadmin` is deliberately unrouted and must be invoked via script/seed |
 
 ```mermaid
 flowchart LR
@@ -1160,11 +1160,11 @@ flowchart LR
 **Known limitations of the current build**
 
 1. **No web app.** The superadmin console currently ships inside the Expo app; the plan (`notes.md`) is a Next.js `apps/web` where an admin console more naturally belongs.
-2. **Notifications are in-app only** — no email or push delivery yet; a provider integration (e.g. Expo Push + a transactional email service) is the natural next step.
-3. **Pagination controls are unfinished on the client** — every list endpoint returns a `Paginated<T>` envelope, but screens currently render only page 1.
+2. **Notifications are in-app only** - no email or push delivery yet; a provider integration (e.g. Expo Push + a transactional email service) is the natural next step.
+3. **Pagination controls are unfinished on the client** - every list endpoint returns a `Paginated<T>` envelope, but screens currently render only page 1.
 4. **Dev-boot schema push.** Non-production boots still run `drizzle-kit push`; the boot path should switch to applying the generated migrations before real data lands.
 5. **Monetary donations are feature-complete but on hold** pending a go-live decision on the payment provider.
-6. **Client role guards are advisory** (by design) — all real enforcement is server-side, but the UX can briefly flash a wrong group on stale persisted state.
+6. **Client role guards are advisory** (by design) - all real enforcement is server-side, but the UX can briefly flash a wrong group on stale persisted state.
 7. **Tailwind theme is light-mode only**, which is why screens lean on the dark-aware token system instead of the shadcn primitives.
 
 **Future work**
@@ -1174,7 +1174,7 @@ flowchart LR
 - Infinite-scroll pagination on all feeds.
 - Geospatial upgrade (PostGIS) if proximity search outgrows the haversine approach.
 - Analytics dashboards for NGOs (application funnels, donation trends).
-- Vernacular localisation — an India-focused platform ultimately needs Hindi and regional-language support.
+- Vernacular localisation - an India-focused platform ultimately needs Hindi and regional-language support.
 
 ---
 
@@ -1184,8 +1184,8 @@ Nabhya delivers an end-to-end, verified NGO–volunteer platform: a 22-table rel
 
 The engineering choices worth highlighting to an examiner are the ones that trade convenience for correctness: document-gated manual verification before anything becomes public, row-locked counter accounting instead of optimistic updates, webhook-only payment settlement with replay protection, attendance-gated publicly verifiable certificates, direct-to-storage uploads that keep file bytes (and file authorisation) out of the API's trust surface, and an integration test suite that runs real SQL against real migrations rather than mocks.
 
-The platform is feature-complete for its three roles on mobile, with a clear, documented path to production hardening: migration-based boots, a web-based admin console, delivery channels for notifications, and pagination — each already scoped in the codebase's own documentation.
+The platform is feature-complete for its three roles on mobile, with a clear, documented path to production hardening: migration-based boots, a web-based admin console, delivery channels for notifications, and pagination - each already scoped in the codebase's own documentation.
 
 ---
 
-*Appendix — where to look in the repository: schema `packages/db/src/schema/`, shared contracts `packages/shared/src/`, API modules `apps/server/src/modules/`, cross-cutting server infrastructure `apps/server/src/common/`, client screens `apps/native/src/app/`, integration tests `apps/server/test/`, per-role feature checklists `org.md` / `volunteer.md` / `superadmin.md` at the repo root.*
+*Appendix - where to look in the repository: schema `packages/db/src/schema/`, shared contracts `packages/shared/src/`, API modules `apps/server/src/modules/`, cross-cutting server infrastructure `apps/server/src/common/`, client screens `apps/native/src/app/`, integration tests `apps/server/test/`, per-role feature checklists `org.md` / `volunteer.md` / `superadmin.md` at the repo root.*

@@ -1,16 +1,16 @@
 /**
  * Onboarding email-verification template.
  *
- * There is no email provider wired yet (root AGENTS.md — notifications are
+ * There is no email provider wired yet (root AGENTS.md - notifications are
  * in-app only), so this module is deliberately provider-agnostic: a pure
  * render function returning `{ subject, html, text }` that any transport
  * (Resend, SES, Postmark, Supabase's email-template hooks, …) can
- * hand off as-is. No Nest dependencies on purpose — it must stay importable
+ * hand off as-is. No Nest dependencies on purpose - it must stay importable
  * from scripts and tests without booting the app.
  *
  * The HTML is table-based with fully inlined styles so it renders in Outlook
  * and Gmail clipping-safe (< 102KB), uses no remote assets (images are
- * blocked by default in most clients — the wordmark is text), and carries a
+ * blocked by default in most clients - the wordmark is text), and carries a
  * hidden preheader for the inbox preview line.
  */
 
@@ -136,7 +136,7 @@ export function renderVerificationEmail(
                   <td style="padding: 16px 40px 28px 40px;">
                     <p style="margin: 0 0 12px 0; font-family: ${FONT_STACK}; font-size: 15px; line-height: 24px; color: ${BRAND.textSecondary};">${greeting}</p>
                     <p style="margin: 0; font-family: ${FONT_STACK}; font-size: 15px; line-height: 24px; color: ${BRAND.textSecondary};">
-                      Welcome to <strong>Nabhya</strong> — where verified NGOs and volunteers across India find each other. Confirm your email address to finish setting up your account and start making a difference.
+                      Welcome to <strong>Nabhya</strong> - where verified NGOs and volunteers across India find each other. Confirm your email address to finish setting up your account and start making a difference.
                     </p>
                   </td>
                 </tr>
@@ -191,7 +191,7 @@ ${codeBlock}
             <td align="center" style="padding: 28px 24px 0 24px;">
               <p style="margin: 0 0 6px 0; font-family: ${FONT_STACK}; font-size: 12px; line-height: 18px; color: ${BRAND.textQuaternary};">
                 You're receiving this because someone signed up for Nabhya with this address.<br />
-                If it wasn't you, you can safely ignore this email — no account will be activated.
+                If it wasn't you, you can safely ignore this email - no account will be activated.
               </p>
               <p style="margin: 12px 0 0 0; font-family: ${FONT_STACK}; font-size: 12px; line-height: 18px; color: ${BRAND.textQuaternary};">
                 Nabhya · Connecting verified NGOs and volunteers across India
@@ -209,7 +209,7 @@ ${codeBlock}
 	const text = [
 		name ? `Hi ${name},` : "Hi there,",
 		"",
-		"Welcome to Nabhya — where verified NGOs and volunteers across India find each other.",
+		"Welcome to Nabhya - where verified NGOs and volunteers across India find each other.",
 		"Confirm your email address to finish setting up your account:",
 		"",
 		input.verificationUrl,
@@ -217,7 +217,7 @@ ${codeBlock}
 		"",
 		`This link expires in ${expiresInHours} hours. If it has expired, sign in again to request a new one.`,
 		"",
-		"If you didn't sign up for Nabhya, you can safely ignore this email — no account will be activated.",
+		"If you didn't sign up for Nabhya, you can safely ignore this email - no account will be activated.",
 		"",
 		"Nabhya · Connecting verified NGOs and volunteers across India",
 	].join("\n");

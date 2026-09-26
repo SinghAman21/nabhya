@@ -141,7 +141,7 @@ describe("EngagementService", () => {
 			const { org } = await verifiedOrg();
 			const summary = await service.getReviewSummary(org.id);
 
-			// Must be 0, not NaN — this renders directly in the UI.
+			// Must be 0, not NaN - this renders directly in the UI.
 			expect(summary.average).toBe(0);
 			expect(summary.count).toBe(0);
 		});
@@ -155,7 +155,7 @@ describe("EngagementService", () => {
 			});
 
 			await service.replyToReview(owner.id, (review as { id: string }).id, {
-				reply: "Sorry — we've changed our check-in process since.",
+				reply: "Sorry - we've changed our check-in process since.",
 			});
 
 			const stored = await db.query.reviews.findMany({});

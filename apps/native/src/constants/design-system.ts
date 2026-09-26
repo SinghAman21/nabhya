@@ -4,7 +4,7 @@ export const lightColors = {
 		light: "#FFA366",
 		dark: "#E05A1A",
 		/** Label colour on a `primary.main` fill. Warm near-black: 7.44:1.
-		 *  White here was 2.53:1 — the old default failed WCAG AA on every button. */
+		 *  White here was 2.53:1 - the old default failed WCAG AA on every button. */
 		contrast: "#1A0F0A",
 		/** Brand as *text* on a light surface. #FF7E40 is 2.53:1 and unusable
 		 *  for type or icons; this is 7.31:1 on white, 6.71:1 on `primary.tint`. */
@@ -120,7 +120,7 @@ export const darkColors = {
 		light: "#FFA366",
 		dark: "#E05A1A",
 		contrast: "#1A0F0A",
-		/** 9.49:1 on the dark background — the light-mode ink would vanish here. */
+		/** 9.49:1 on the dark background - the light-mode ink would vanish here. */
 		ink: "#FF9A66",
 		tint: "#4A2A20",
 	},
@@ -189,7 +189,7 @@ export const darkColors = {
 		secondary: "#171717",
 		tertiary: "#262626",
 		overlay: "#333333",
-		/** Lifted off the page rather than cut into it — dark mode has no shadows. */
+		/** Lifted off the page rather than cut into it - dark mode has no shadows. */
 		card: "#191919",
 		subtle: "#232323",
 		sheet: "#111111",
@@ -348,7 +348,7 @@ export const shadows = {
 } as const;
 
 /**
- * Card elevation. Deliberately shallow — the surface should separate from the
+ * Card elevation. Deliberately shallow - the surface should separate from the
  * page without announcing itself. Dark mode leans on `background.card` instead,
  * since a shadow on near-black is invisible.
  */

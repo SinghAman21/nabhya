@@ -33,12 +33,12 @@ import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 
 /**
- * Per-user dossier. State first, then the identity documents — the thing a
- * reviewer most often opens this for — then the participation record that tells
+ * Per-user dossier. State first, then the identity documents - the thing a
+ * reviewer most often opens this for - then the participation record that tells
  * them whether this is a real volunteer, then the one decision.
  *
  * A `Drawer` with `xl`, and the decision pinned in the footer, for the same
- * reasons as the NGO dossier — see the note at the top of
+ * reasons as the NGO dossier - see the note at the top of
  * `org-detail-sheet.tsx`. The short version: the reviewer is working down a
  * filtered list and it should stay visible; and an action reachable only after
  * scrolling past a participation history is an action nobody reaches.

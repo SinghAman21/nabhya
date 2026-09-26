@@ -62,7 +62,7 @@ export default function Success() {
 					}}
 				>
 					{isOrganisation
-						? "Your NGO is registered. A reviewer will check your documents — you can start setting up events and needs in the meantime."
+						? "Your NGO is registered. A reviewer will check your documents - you can start setting up events and needs in the meantime."
 						: "Your account is ready. Let's find something worth your time."}
 				</Body>
 

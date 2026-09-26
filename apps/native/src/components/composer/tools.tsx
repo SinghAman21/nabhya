@@ -11,7 +11,7 @@ import { focusable } from "@/lib/focus";
  * the tool-bar button.
  *
  * Lifted out of `post-composer.tsx` because none of it knows anything about
- * posting — they are three generic controls that happen to have been written
+ * posting - they are three generic controls that happen to have been written
  * there first, and keeping them there made the file's shape ("a trigger, a
  * drawer, some field groups") harder to see than it needed to be.
  */

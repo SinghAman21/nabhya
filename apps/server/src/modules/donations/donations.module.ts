@@ -26,7 +26,7 @@ function createPaymentProvider(): PaymentProvider {
 	}
 
 	// Accepting donations that silently go nowhere would be taking money for
-	// nothing — refuse to start rather than pretend.
+	// nothing - refuse to start rather than pretend.
 	if (env.NODE_ENV === "production") {
 		throw new Error(
 			"Payments are not configured. Set RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET " +
@@ -36,7 +36,7 @@ function createPaymentProvider(): PaymentProvider {
 
 	logger.warn(
 		"Payments: stub provider (no Razorpay credentials). Checkouts are " +
-			"simulated and no money moves — set the RAZORPAY_* variables in .env.",
+			"simulated and no money moves - set the RAZORPAY_* variables in .env.",
 	);
 	return new StubPaymentProvider();
 }

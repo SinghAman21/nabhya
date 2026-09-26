@@ -14,7 +14,7 @@ import { storage } from "@/lib/storage";
  * view switch pushed to the far end.
  *
  * This replaced two stacked rows of filter chips. Chips were fine as a
- * *lens* — three or four peers you flick between — and wrong as a filter bar:
+ * *lens* - three or four peers you flick between - and wrong as a filter bar:
  * eleven of them wrapped across two lines, the selected one was the only thing
  * telling you which of two independent axes you were even looking at, and the
  * whole assembly pushed the first row of data 200pt down the page. A closed
@@ -34,7 +34,7 @@ export function Toolbar({
 	onViewChange,
 	children,
 }: {
-	/** Omit the pair to drop the search field — the queue has nothing to search. */
+	/** Omit the pair to drop the search field - the queue has nothing to search. */
 	search?: string;
 	onSearchChange?: (next: string) => void;
 	searchPlaceholder?: string;
@@ -105,7 +105,7 @@ export type TableView = "table" | "grid";
  * app's "never icon-only" rule is genuinely satisfied by convention instead of
  * a word: a rows/grid pair is understood the way a play button is, and both
  * carry real `accessibilityLabel`s. On mobile the control is not rendered at
- * all — a 360dp column has room for one shape, and it is the card.
+ * all - a 360dp column has room for one shape, and it is the card.
  */
 function ViewSwitch({
 	value,
@@ -179,7 +179,7 @@ function ViewSwitch({
  * Starts on `table` before storage answers rather than flashing cards and
  * swapping: `storage.get` is async on both platforms (SecureStore natively,
  * and the adapter keeps one shape), so there is always a first paint with no
- * answer. The table is the right thing to guess — it is the default for a new
+ * answer. The table is the right thing to guess - it is the default for a new
  * reviewer, so guessing it means only the minority who chose cards ever see a
  * change, and they see it on the first frame.
  */
@@ -217,7 +217,7 @@ export function useTableView(screen: string) {
 /**
  * The bar that appears once rows are ticked.
  *
- * In the flow of the page, above the table — not floating over the bottom of
+ * In the flow of the page, above the table - not floating over the bottom of
  * the window. A floating bar covers the last row of the thing you are
  * selecting from, and on a console the selection is often the whole visible
  * page. It says the count first, because "approve" is a very different

@@ -80,7 +80,7 @@ export class JwtGuard implements CanActivate {
 				with: { role: true },
 			});
 
-			// Stable priority order — the join table returns rows in arbitrary
+			// Stable priority order - the join table returns rows in arbitrary
 			// order, and a flip-flopping `role` sends the app's routing gate and
 			// the role-guarded layouts into a redirect loop.
 			const ROLE_PRIORITY: UserRole[] = [
@@ -93,7 +93,7 @@ export class JwtGuard implements CanActivate {
 			).sort((a, b) => ROLE_PRIORITY.indexOf(a) - ROLE_PRIORITY.indexOf(b));
 
 			// Attach fully loaded user to request. `roles` is empty until the user
-			// picks one on the role-select screen — routes that need a role are
+			// picks one on the role-select screen - routes that need a role are
 			// gated by @Roles() rather than by a server-side default.
 			request.user = {
 				id: dbUser.id,
@@ -105,7 +105,7 @@ export class JwtGuard implements CanActivate {
 
 			return true;
 		} catch (error) {
-			// On an optional-auth route a bad token simply means "anonymous" —
+			// On an optional-auth route a bad token simply means "anonymous" -
 			// a stale token in the app must not break the public feed.
 			if (isOptional) return true;
 			if (error instanceof HttpException) throw error;

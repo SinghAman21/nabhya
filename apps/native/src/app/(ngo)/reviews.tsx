@@ -41,7 +41,7 @@ const PAGE_SIZE = 20;
 
 /**
  * Reviews of this org, page by page. The summary rides along on every page;
- * the first page's copy is the one drawn. The reply filter is local — the API
+ * the first page's copy is the one drawn. The reply filter is local - the API
  * has no such parameter.
  */
 function useOrgReviewPages() {
@@ -310,7 +310,7 @@ function ReviewRow({
 	);
 }
 
-/** Five stars in ink — the amber `main` fails contrast as a glyph. */
+/** Five stars in ink - the amber `main` fails contrast as a glyph. */
 function Stars({ rating }: { rating: number }) {
 	const { colors, spacing } = useTheme();
 	return (

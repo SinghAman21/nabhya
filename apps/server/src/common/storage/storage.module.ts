@@ -19,7 +19,7 @@ function createProvider(): StorageProvider {
 	}
 
 	// Silently storing nothing in production would mean accepting verification
-	// documents that vanish — fail loudly at boot instead.
+	// documents that vanish - fail loudly at boot instead.
 	if (env.NODE_ENV === "production") {
 		throw new Error(
 			"Object storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY " +
@@ -29,7 +29,7 @@ function createProvider(): StorageProvider {
 
 	logger.warn(
 		"Object storage: in-memory stub (no Supabase Storage credentials). Uploads are " +
-			"simulated and discarded — set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env " +
+			"simulated and discarded - set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env " +
 			"for real storage.",
 	);
 	return new StubStorageProvider();

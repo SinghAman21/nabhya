@@ -21,7 +21,7 @@ import { verticalScrollbar } from "@/lib/scroll";
  *
  * ## The page is the scroller
  *
- * This used to be the other way round — a `Screen` capped at 1040 and centred,
+ * This used to be the other way round - a `Screen` capped at 1040 and centred,
  * holding a fixed header over a list that owned a `FlatList`. Three things went
  * wrong with that, all visible at once:
  *
@@ -32,7 +32,7 @@ import { verticalScrollbar } from "@/lib/scroll";
  *    labels scrolled away with the rows.
  *
  * So the `ScrollView` is the full-width column. **Consequence: nothing inside a
- * console page may own a vertical scroller** — no `FlatList`, no nested
+ * console page may own a vertical scroller** - no `FlatList`, no nested
  * `ScrollView`. That is why `ConsoleList` renders rows inline. `DataTable`'s
  * horizontal scroller is fine; a different axis cannot compete.
  *
@@ -40,8 +40,8 @@ import { verticalScrollbar } from "@/lib/scroll";
  *
  * There is no `maxWidth` on a console page, deliberately. A cap is right for
  * reading (`WebContent`'s 720) and wrong for a table: the columns are fixed
- * except one, so the width a monitor offers goes to the identity column — the
- * NGO's name — which is exactly the column that wants it. A capped table on a
+ * except one, so the width a monitor offers goes to the identity column - the
+ * NGO's name - which is exactly the column that wants it. A capped table on a
  * 2560px screen is a table with a field of empty page beside it. The desktop
  * rail already takes the first 264.
  *
@@ -49,7 +49,7 @@ import { verticalScrollbar } from "@/lib/scroll";
  *
  * `title` scrolls away and the **toolbar stays**, with the title reappearing
  * *inside* the pinned bar once the big one is gone (`H5` beside the controls) so
- * the page never loses its name. The alternative — pinning the whole header —
+ * the page never loses its name. The alternative - pinning the whole header -
  * spends 96pt of every screen restating a title the reader chose from the rail
  * two seconds ago, while the controls they actually reach for are the ones that
  * scroll off.
@@ -58,8 +58,8 @@ import { verticalScrollbar } from "@/lib/scroll";
  * and the divider popped into existence mid-scroll, which reads as a glitch
  * rather than as chrome settling: one frame the bar is transparent and empty,
  * the next it has a rule and a heading, and the toolbar beside it jumps sideways
- * to make room. One `Animated.Value` drives all three — the title's opacity and
- * a 6pt rise, and the divider's opacity — so they arrive together. 180ms in,
+ * to make room. One `Animated.Value` drives all three - the title's opacity and
+ * a 6pt rise, and the divider's opacity - so they arrive together. 180ms in,
  * 140ms out: slightly quicker to leave than to appear, because on the way back
  * up the reader is heading for the real title and does not want to wait for the
  * stand-in to get out of the way.
@@ -105,14 +105,14 @@ export function AdminScreen({
 }: {
 	title: string;
 	subtitle?: string;
-	/** The page's primary action — a real button with a word on it. */
+	/** The page's primary action - a real button with a word on it. */
 	action?: React.ReactNode;
 	/** The command bar's contents: search, filters, the view switch. */
 	toolbar?: React.ReactNode;
 	children: React.ReactNode;
 	/**
 	 * Called on each approach to the bottom. The page owns this rather than the
-	 * list, because the page is the only thing that scrolls — a list with no
+	 * list, because the page is the only thing that scrolls - a list with no
 	 * scroller of its own has no `onEndReached` to give.
 	 */
 	onNearEnd?: () => void;
@@ -125,7 +125,7 @@ export function AdminScreen({
 	const [collapsed, setCollapsed] = useState(false);
 	const [barHeight, setBarHeight] = useState(0);
 	// Read from a ref, not from state, so the scroll handler does not re-render
-	// the page on every frame it fires — it only sets state on the one frame the
+	// the page on every frame it fires - it only sets state on the one frame the
 	// threshold is actually crossed.
 	const collapsedRef = useRef(false);
 	const handover = useRef(new Animated.Value(0)).current;
@@ -230,7 +230,7 @@ export function AdminScreen({
 				>
 					{/* One row, centred. The toolbar carries no margin of its own
 					    (see `Toolbar`) precisely so both halves sit on the same
-					    centre line — a margin on either one tips the row. */}
+					    centre line - a margin on either one tips the row. */}
 					<View
 						style={{
 							flexDirection: "row",
@@ -277,7 +277,7 @@ export function AdminScreen({
  * "20 of 340 NGOs" rather than "340 organizations": on a paged console the gap
  * between the two is the thing a reviewer needs to know before they sort, since
  * sorting re-runs the query server-side and hands back a different twenty.
- * Silent when there is nothing to count — the empty state says it better.
+ * Silent when there is nothing to count - the empty state says it better.
  */
 export function ResultCount({
 	total,

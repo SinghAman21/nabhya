@@ -25,7 +25,7 @@ import { verticalScrollbar } from "@/lib/scroll";
  * The data hooks in `hooks/use-*.ts` fetch one page with `useQuery`. Rather than
  * rewrite each of them, a screen hands this the same query key and the same
  * service call and gets back every page loaded so far, flattened, plus a
- * `loadMore` that asks for the next one while `meta.hasMore` holds — the same
+ * `loadMore` that asks for the next one while `meta.hasMore` holds - the same
  * shape `use-feed.ts` uses for the home feed.
  *
  * The key is suffixed with `"infinite"` so it never shares a cache entry with the
@@ -85,7 +85,7 @@ export type PagedQuery = UseInfiniteQueryResult<
  * pull to refresh, and a spinner footer while the next page arrives. Fetches
  * the next page when the reader nears the end.
  *
- * `grouped` draws the rows inside one `Surface` divided by hairlines — the
+ * `grouped` draws the rows inside one `Surface` divided by hairlines - the
  * `ListGroup` look for a list too long to render eagerly. The card hugs its
  * content when short and scrolls inside itself when tall.
  *
@@ -114,7 +114,7 @@ export function PagedList<T>({
 	loadMore: () => void;
 	renderItem: (item: T) => React.ReactElement;
 	keyExtractor: (item: T) => string;
-	/** Rendered when the first page is empty — an `EmptyState`. */
+	/** Rendered when the first page is empty - an `EmptyState`. */
 	empty: React.ReactElement;
 	loadingLabel?: string;
 	grouped?: boolean;
@@ -160,7 +160,7 @@ export function PagedList<T>({
 		);
 	}
 
-	// A failed *next* page is its own case — the rows already on screen are
+	// A failed *next* page is its own case - the rows already on screen are
 	// fine, so it is a line at the end rather than an ErrorState over the list.
 	// Everything else is `LoadMoreFooter`, which is also what the non-paged
 	// lists use: one spinner, one explicit "Load more" (`onEndReached` is

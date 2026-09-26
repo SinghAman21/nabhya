@@ -79,8 +79,8 @@ function PledgeSheetContent({
 					onClose();
 					toast.success(
 						isWant
-							? "Offer sent — the organisation will review it and get in touch."
-							: "Claim sent — the organisation will confirm and arrange handover.",
+							? "Offer sent - the organisation will review it and get in touch."
+							: "Claim sent - the organisation will confirm and arrange handover.",
 					);
 				},
 				onError: (e) => setError(apiErrorMessage(e)),

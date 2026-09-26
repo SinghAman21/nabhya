@@ -25,13 +25,13 @@ import { useFeedStore } from "@/store/feed-store";
  *
  * The volunteer side has three destinations and they are not peers: Discover *is*
  * the app, Activity is your own record of it, Profile is you. So there are no nav
- * links — the wordmark is home, search takes the middle, and the two personal
+ * links - the wordmark is home, search takes the middle, and the two personal
  * surfaces sit on the right where account controls are looked for.
  *
  * Roles with real depth keep the sidebar: `(ngo)` has nine grouped destinations,
  * `(admin)` five plus tables. No one person sees both chromes.
  *
- * Search lives here on desktop and in the page on mobile — one field either way,
+ * Search lives here on desktop and in the page on mobile - one field either way,
  * reading the same store, so a filtered feed can never disagree with the input
  * the user can see.
  */
@@ -48,7 +48,7 @@ export function TopBar({
 	profileHref,
 	searchable,
 }: {
-	/** Where the wordmark goes — the default surface, so it needs no nav link. */
+	/** Where the wordmark goes - the default surface, so it needs no nav link. */
 	home: string;
 	activityHref: string;
 	profileHref: string;
@@ -116,7 +116,7 @@ export function TopBar({
 /**
  * Labelled, not a bare bell.
  *
- * A bell would promise notifications, and this goes somewhere wider — pledges,
+ * A bell would promise notifications, and this goes somewhere wider - pledges,
  * donations, applications, certificates and alerts in one timeline. It is also the
  * only notifications entry point on desktop: a bell popover beside it would be a
  * second door into a page that already exists.
@@ -322,7 +322,7 @@ function AccountMenu({ profileHref }: { profileHref: string }) {
 
 	// Web: the inline panel loses the z-index fight with any later sibling that
 	// paints its own stacking context (elevated cards, sticky rails). Portal to
-	// document.body with `position: fixed` — above everything, always.
+	// document.body with `position: fixed` - above everything, always.
 	if (Platform.OS === "web") {
 		return (
 			<>

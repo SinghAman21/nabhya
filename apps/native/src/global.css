@@ -17,7 +17,7 @@
 /*
  * Semantic colour channels for the Tailwind/NativeWind layer.
  *
- * These mirror `src/constants/design-system.ts` — the `useTheme()` tokens are the
+ * These mirror `src/constants/design-system.ts` - the `useTheme()` tokens are the
  * source of truth and these must be kept in step with them. They exist because the
  * `components/ui/*` primitives style through Tailwind class names (`bg-card`,
  * `text-muted-foreground`), and the config used to be hard-coded light hex: every
@@ -25,11 +25,11 @@
  * variables makes the whole layer theme-aware without touching the components.
  *
  * Values are HSL channels (no `hsl()` wrapper) so Tailwind's `/<alpha-value>`
- * opacity modifiers — `bg-input/30`, `ring-ring/50` — still resolve.
+ * opacity modifiers - `bg-input/30`, `ring-ring/50` - still resolve.
  */
 @layer base {
 	:root {
-		/* Tells the browser which way its own widgets go — autofill, date pickers,
+		/* Tells the browser which way its own widgets go - autofill, date pickers,
 		   the default scrollbar before ours applies. Without it Chrome picks a
 		   light autofill tint on a dark form. */
 		color-scheme: light;
@@ -40,7 +40,7 @@
 		--card-foreground: 0 0% 7%;
 		--popover: 0 0% 100%;
 		--popover-foreground: 0 0% 7%;
-		--primary: 19 100% 63%; /* #FF7E40 — fills only */
+		--primary: 19 100% 63%; /* #FF7E40 - fills only */
 		--primary-foreground: 19 44% 7%; /* #1A0F0A on brand = 7.44:1 */
 		--secondary: 0 0% 96%;
 		--secondary-foreground: 0 0% 25%;
@@ -48,11 +48,11 @@
 		--muted-foreground: 0 0% 40%; /* #666666 = 5.74:1 */
 		--accent: 0 0% 96%;
 		--accent-foreground: 0 0% 7%;
-		--destructive: 4 63% 46%; /* #C0342B — white on it = 5.57:1 */
+		--destructive: 4 63% 46%; /* #C0342B - white on it = 5.57:1 */
 		--destructive-foreground: 0 0% 100%;
 		--border: 220 13% 91%;
 		--input: 220 13% 91%;
-		--ring: 17 88% 40%; /* #C2410C — 5.18:1, a focus ring you can see */
+		--ring: 17 88% 40%; /* #C2410C - 5.18:1, a focus ring you can see */
 	}
 
 	.dark:root {
@@ -101,7 +101,7 @@
 
 /*
  * Text fields. react-native-web renders a real <input>, which brings the
- * browser's own focus ring with it — a hard border snapping around the field
+ * browser's own focus ring with it - a hard border snapping around the field
  * the moment it is clicked, on top of whatever the design already draws.
  *
  * **No ring on a text field, at all.** An earlier version kept one on
@@ -109,12 +109,12 @@
  * `:focus-visible` is the keyboard. That is true of buttons and false of text
  * inputs: per spec a text field matches `:focus-visible` even when it was
  * clicked, because the UA assumes typing is about to follow. So the "keyboard
- * only" ring fired on every single click — which is exactly the outline that
+ * only" ring fired on every single click - which is exactly the outline that
  * had to go.
  *
  * Nothing is lost for keyboard users: a focused text field shows a blinking
  * caret, which is a stronger and more specific indicator than a border, and
- * our fields also change fill. Buttons, links and rows keep their ring — those
+ * our fields also change fill. Buttons, links and rows keep their ring - those
  * genuinely need one, and it is `[data-focus="ring"]` above, driven by
  * `lib/focus.ts`, where `:focus-visible` behaves as advertised.
  */
@@ -136,7 +136,7 @@
 		box-shadow: none;
 	}
 
-	/* Composed fields — icon + input + clear button in one shell — used to draw
+	/* Composed fields - icon + input + clear button in one shell - used to draw
 	   the ring on the shell instead. Same problem, since `:focus-within` cannot
 	   tell a click from a tab either. */
 	[data-focus="within"]:focus-within {
@@ -146,7 +146,7 @@
 	/*
 	 * Autofill.
 	 *
-	 * Autofill itself is left alone — this only stops Chrome repainting the field
+	 * Autofill itself is left alone - this only stops Chrome repainting the field
 	 * when it fires. Chrome's autofill background cannot be unset, but
 	 * `background-clip: text` confines it to the glyphs themselves, so the field
 	 * keeps whatever background it already had.
@@ -192,7 +192,7 @@
 }
 
 /*
- * Scrollbars — and the Radix popper z-index — are **not** here.
+ * Scrollbars - and the Radix popper z-index - are **not** here.
  *
  * Two attempts at the scrollbar lived in this file, one inside `@layer base`
  * and one outside it, and neither reached the browser: raw

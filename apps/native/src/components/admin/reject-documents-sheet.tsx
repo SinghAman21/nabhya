@@ -13,8 +13,8 @@ import { useTheme } from "@/hooks/use-theme";
  * One sheet for one document and for forty, because the shape of the decision
  * is identical: the server refuses a rejection without remarks, so there is
  * always a box, and the only thing that changes is the count in the title.
- * Approving needs no sheet at all — it is one press from the row or the bulk
- * bar — which is the asymmetry the queue is built around: the common answer is
+ * Approving needs no sheet at all - it is one press from the row or the bulk
+ * bar - which is the asymmetry the queue is built around: the common answer is
  * cheap and the consequential one asks a question.
  *
  * The remarks are sent to the uploader, so the copy says so. A reviewer typing

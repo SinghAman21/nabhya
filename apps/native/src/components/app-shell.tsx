@@ -12,7 +12,7 @@ import { useAuthStore } from "@/store/auth-store";
  *
  * `(ngo)`, `(volunteer)` and `(admin)` each draw their own chrome in their
  * layout, so every screen inside them has a rail or a top bar on the web. The
- * shared screens do not live in any of those groups — `notifications`,
+ * shared screens do not live in any of those groups - `notifications`,
  * `bookmarks`, `impact`, `edit-profile`, `verify-identity`, `search` and the
  * public `ngos` / `events` / `certificates` stacks all sit on the root stack,
  * because a volunteer, a coordinator, an admin and a signed-out visitor can all
@@ -21,13 +21,13 @@ import { useAuthStore } from "@/store/auth-store";
  * effectively left the app.
  *
  * This puts the chrome back without moving any route. Mobile passes straight
- * through — these are pushed pages, and a pushed page correctly has no tab bar.
+ * through - these are pushed pages, and a pushed page correctly has no tab bar.
  *
  * A signed-out visitor on a public page gets the capped column and no rail,
  * which is the honest answer: there is no navigation to offer them yet.
  */
 
-/** Matches `(ngo)/_layout.tsx` — see the note there on why this is capped. */
+/** Matches `(ngo)/_layout.tsx` - see the note there on why this is capped. */
 const CONTENT_MAX_WIDTH = 1440;
 
 /**
@@ -46,7 +46,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 	const role = useAuthStore((s) => s.role);
 
 	const isOrg = role === "organisation";
-	// The rail's brand line. Fetched only when it will actually be drawn — the
+	// The rail's brand line. Fetched only when it will actually be drawn - the
 	// query key is shared with every other caller, so this is a cache read on
 	// all but the first shared screen of a session.
 	const { data: org } = useMyOrganization(isDesktop && isOrg);
@@ -56,7 +56,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 	/*
 	 * Volunteers get the top bar, not a rail: three destinations do not need
 	 * one, and it is the chrome `(volunteer)/_layout.tsx` gives them. Search is
-	 * off here — only the feed consumes the term, and `app/search.tsx` is its
+	 * off here - only the feed consumes the term, and `app/search.tsx` is its
 	 * own field.
 	 */
 	if (role === "volunteer") {
@@ -122,7 +122,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
  *
  * Applied at the export rather than inside the JSX on purpose: most of these
  * screens return early for their loading and error states, and a wrapper in the
- * markup would have to be repeated in each branch — one of which would
+ * markup would have to be repeated in each branch - one of which would
  * eventually be missed, giving a page that loses its sidebar for as long as it
  * is loading.
  */

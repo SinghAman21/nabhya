@@ -48,7 +48,7 @@ describe("ImpactService", () => {
 
 			expect(impact.eventsAttended).toBe(0);
 			expect(impact.hoursContributed).toBe(0);
-			// Must be 0 rather than NaN — this is divided by application count.
+			// Must be 0 rather than NaN - this is divided by application count.
 			expect(impact.acceptanceRate).toBe(0);
 			expect(impact.firstVolunteeredAt).toBeNull();
 		});
@@ -127,7 +127,7 @@ describe("ImpactService", () => {
 				quantity: 30,
 				status: "ACCEPTED",
 			});
-			// Still pending — must not be counted as donated.
+			// Still pending - must not be counted as donated.
 			await createPledge(db, needB.id, volunteer.id, {
 				quantity: 999,
 				status: "PENDING",

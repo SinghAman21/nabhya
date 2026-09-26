@@ -42,7 +42,7 @@ function useOrgDonationPages() {
 /**
  * Money received through Nabhya. Read-only by design: a donation only becomes
  * COMPLETED through Razorpay's signed webhook, so there is nothing here for
- * the organisation to approve — just to see, thank, and reconcile.
+ * the organisation to approve - just to see, thank, and reconcile.
  */
 export default function OrgDonations() {
 	const { colors, spacing } = useTheme();
