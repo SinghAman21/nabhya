@@ -9,6 +9,8 @@ import {
 } from "@nabhya/db/schema";
 import { env } from "@nabhya/env/server";
 import type {
+	BulkAttendanceInput,
+	BulkResult,
 	CertificateVerification,
 	IssueCertificateInput,
 	MarkAttendanceInput,
@@ -124,6 +126,64 @@ export class CertificatesService {
 		});
 
 		return updated;
+	}
+
+	/**
+	 * Mark a selection present, or issue certificates to a selection that
+	 * already is - the after-event job that took three taps per volunteer.
+	 * Each id goes through the single-row path, so its checks, audit row and
+	 * notification are exactly the same. Already-done rows count as done:
+	 * re-running a half-finished batch should not report the first half as
+	 * failures.
+	 */
+	async bulkAttendance(
+		userId: string,
+		eventId: string,
+		input: BulkAttendanceInput,
+	): Promise<BulkResult> {
+		const issuing = input.action === "ISSUE_CERTIFICATE";
+		await this.organizationsService.requireOrgPermission(
+			userId,
+			issuing ? "certs.issue" : "people.attendance",
+		);
+
+		const done: string[] = [];
+		const failed: BulkResult["failed"] = [];
+		for (const id of [...new Set(input.ids)]) {
+			try {
+				if (issuing) {
+					const existing = await this.db.query.certificates.findFirst({
+						where: and(
+							eq(certificates.applicationId, id),
+							eq(certificates.eventId, eventId),
+						),
+						columns: { id: true },
+					});
+					if (!existing) await this.issue(userId, eventId, id, {});
+				} else {
+					const current = await this.db.query.eventApplications.findFirst({
+						where: and(
+							eq(eventApplications.id, id),
+							eq(eventApplications.eventId, eventId),
+						),
+						columns: { attendedAt: true },
+					});
+					if (!current?.attendedAt) {
+						await this.markAttendance(userId, eventId, id, {
+							attended: true,
+						});
+					}
+				}
+				done.push(id);
+			} catch (error) {
+				failed.push({
+					id,
+					reason:
+						error instanceof Error ? error.message : "Could not be updated",
+				});
+			}
+		}
+		return { done, failed };
 	}
 
 	// ─── Issuance ────────────────────────────────────────────────────────────

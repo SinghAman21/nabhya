@@ -1,5 +1,6 @@
 import type { db as dbType } from "@nabhya/db";
 import {
+	bookmarks,
 	eventApplications,
 	events,
 	follows,
@@ -325,7 +326,14 @@ export class OrganizationsService {
 		);
 	}
 
-	async getPublicById(organizationId: string) {
+	/**
+	 * The public profile. A signed-in caller also gets `viewer` - whether they
+	 * follow and have saved this NGO - so the page can draw Follow and Save in
+	 * their real state. Without it the client guessed "saved" from the first
+	 * 100 bookmarks and had no way at all to know about a follow, which is why
+	 * the page offered neither control.
+	 */
+	async getPublicById(organizationId: string, viewerUserId?: string) {
 		const organization = await this.getById(organizationId);
 
 		if (
@@ -335,7 +343,35 @@ export class OrganizationsService {
 			throw new NotFoundException("Organization not found");
 		}
 
-		return organization;
+		if (!viewerUserId) return { ...organization, viewer: null };
+
+		const [[followRow], [bookmarkRow]] = await Promise.all([
+			this.db
+				.select({ id: follows.id })
+				.from(follows)
+				.where(
+					and(
+						eq(follows.userId, viewerUserId),
+						eq(follows.organizationId, organizationId),
+					),
+				)
+				.limit(1),
+			this.db
+				.select({ id: bookmarks.id })
+				.from(bookmarks)
+				.where(
+					and(
+						eq(bookmarks.userId, viewerUserId),
+						eq(bookmarks.organizationId, organizationId),
+					),
+				)
+				.limit(1),
+		]);
+
+		return {
+			...organization,
+			viewer: { following: !!followRow, bookmarked: !!bookmarkRow },
+		};
 	}
 
 	/**

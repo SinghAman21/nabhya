@@ -1,10 +1,12 @@
 import type {
+	BulkAttendanceInput,
 	IssueCertificateInput,
 	MarkAttendanceInput,
 	PaginationQuery,
 	RevokeCertificateInput,
 } from "@nabhya/shared";
 import {
+	bulkAttendanceSchema,
 	issueCertificateSchema,
 	markAttendanceSchema,
 	paginationQuerySchema,
@@ -36,6 +38,23 @@ export class CertificatesController {
 	) {}
 
 	// ─── Organisation ────────────────────────────────────────────────────────
+
+	@Post("org/events/:eventId/applications/bulk-attendance")
+	@Roles("organisation")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({
+		summary:
+			"Mark a selection of accepted volunteers present, or issue their " +
+			"certificates. Returns per-volunteer outcomes.",
+	})
+	bulkAttendance(
+		@CurrentUser() user: AuthUser,
+		@Param("eventId", ParseUUIDPipe) eventId: string,
+		@Body(new ZodValidationPipe(bulkAttendanceSchema))
+		body: BulkAttendanceInput,
+	) {
+		return this.certificatesService.bulkAttendance(user.id, eventId, body);
+	}
 
 	@Patch("org/events/:eventId/applications/:applicationId/attendance")
 	@Roles("organisation")

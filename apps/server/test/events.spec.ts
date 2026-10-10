@@ -1,4 +1,5 @@
 import { events, organizationAdmins } from "@nabhya/db/schema";
+import { orgEventQuerySchema } from "@nabhya/shared";
 import { ConflictException, ForbiddenException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import {
@@ -463,12 +464,91 @@ describe("EventsService - correlated counts", () => {
 		const accepted = await createUser(db, { role: "volunteer" });
 		await createApplication(db, event.id, accepted.id, { status: "ACCEPTED" });
 
-		const result = await service.listForMyOrganization(owner.id, {
-			page: 1,
-			limit: 20,
-		});
+		const result = await service.listForMyOrganization(
+			owner.id,
+			orgEventQuerySchema.parse({ page: 1, limit: 20 }),
+		);
 
 		expect(result.items).toHaveLength(1);
 		expect(result.items[0]?.pendingApplications).toBe(3);
+	});
+
+	/**
+	 * Sorting the NGO's own list is server-side, so these assert the order of
+	 * the whole set, not of a page. Through the schema rather than a literal:
+	 * `sort` and `dir` have defaults that the validation pipe would apply.
+	 */
+	describe("sorting", () => {
+		const list = (userId: string, input: Record<string, unknown>) =>
+			service.listForMyOrganization(userId, orgEventQuerySchema.parse(input));
+
+		it("keeps the old order (latest start first) when no sort is sent", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const day = 86_400_000;
+			await createEvent(db, org.id, {
+				title: "Soon",
+				startAt: new Date(Date.now() + day),
+			});
+			await createEvent(db, org.id, {
+				title: "Later",
+				startAt: new Date(Date.now() + 9 * day),
+			});
+
+			const result = await list(owner.id, {});
+			expect(result.items.map((e) => e.title)).toEqual(["Later", "Soon"]);
+		});
+
+		it("orders by title in both directions", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			for (const title of ["Mango drive", "Apple drive", "Zinc drive"]) {
+				await createEvent(db, org.id, { title });
+			}
+
+			const up = await list(owner.id, { sort: "title", dir: "asc" });
+			expect(up.items.map((e) => e.title)).toEqual([
+				"Apple drive",
+				"Mango drive",
+				"Zinc drive",
+			]);
+			const down = await list(owner.id, { sort: "title", dir: "desc" });
+			expect(down.items.map((e) => e.title)).toEqual([
+				"Zinc drive",
+				"Mango drive",
+				"Apple drive",
+			]);
+		});
+
+		it("orders by the pending-applicants count, a subquery not a column", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const busy = await createEvent(db, org.id, { title: "Busy" });
+			await createEvent(db, org.id, { title: "Quiet" });
+			for (let i = 0; i < 2; i++) {
+				const volunteer = await createUser(db, { role: "volunteer" });
+				await createApplication(db, busy.id, volunteer.id);
+			}
+
+			const result = await list(owner.id, { sort: "pending", dir: "desc" });
+			expect(result.items.map((e) => e.title)).toEqual(["Busy", "Quiet"]);
+			expect(result.items[0]?.pendingApplications).toBe(2);
+		});
+
+		it("pages deterministically when every row shares the sort key", async () => {
+			// One status for all six, so only the tiebreakers stop page 2 from
+			// repeating rows from page 1.
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const startAt = new Date(Date.now() + 86_400_000);
+			for (let i = 0; i < 6; i++) await createEvent(db, org.id, { startAt });
+
+			const page = (n: number) =>
+				list(owner.id, { sort: "status", dir: "asc", page: n, limit: 3 });
+			const ids = [...(await page(1)).items, ...(await page(2)).items].map(
+				(e) => e.id,
+			);
+			expect(new Set(ids).size).toBe(6);
+		});
 	});
 });

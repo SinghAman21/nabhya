@@ -1,4 +1,5 @@
 import { donations } from "@nabhya/db/schema";
+import { orgDonationQuerySchema } from "@nabhya/shared";
 import { BadRequestException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -213,10 +214,10 @@ describe("DonationsService", () => {
 			{},
 		);
 
-		const listed = await service.listForMyOrganization(owner.id, {
-			page: 1,
-			limit: 20,
-		});
+		const listed = await service.listForMyOrganization(
+			owner.id,
+			orgDonationQuerySchema.parse({ page: 1, limit: 20 }),
+		);
 
 		expect(listed.items).toHaveLength(1);
 		// Anonymity is applied in SQL, so it cannot be bypassed by the client.
@@ -249,5 +250,104 @@ describe("DonationsService", () => {
 		const stats = await service.getStats(org.id);
 		expect(stats.totalMinor).toBe(0);
 		expect(stats.completedCount).toBe(0);
+	});
+
+	/**
+	 * Sorting what an NGO has received. Rows are inserted as settled directly:
+	 * the webhook path is covered above, and these are about the ORDER BY.
+	 */
+	describe("sorting the organisation's list", () => {
+		async function received(
+			organizationId: string,
+			gifts: Array<{
+				amountMinor: number;
+				donorName?: string;
+				isAnonymous?: boolean;
+				createdAt?: Date;
+			}>,
+		) {
+			for (const gift of gifts) {
+				await db.insert(donations).values({
+					organizationId,
+					amountMinor: gift.amountMinor,
+					status: "COMPLETED",
+					donorName: gift.donorName ?? null,
+					isAnonymous: gift.isAnonymous ?? false,
+					...(gift.createdAt ? { createdAt: gift.createdAt } : {}),
+				});
+			}
+		}
+
+		const list = (userId: string, input: Record<string, unknown>) =>
+			service.listForMyOrganization(
+				userId,
+				orgDonationQuerySchema.parse(input),
+			);
+
+		it("keeps the old order (newest first) when no sort is sent", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const hour = 3_600_000;
+			await received(org.id, [
+				{ amountMinor: 1_000, createdAt: new Date(Date.now() - 2 * hour) },
+				{ amountMinor: 2_000, createdAt: new Date(Date.now() - hour) },
+			]);
+
+			const result = await list(owner.id, {});
+			expect(result.items.map((d) => d.amountMinor)).toEqual([2_000, 1_000]);
+		});
+
+		it("orders by amount in both directions", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			await received(org.id, [
+				{ amountMinor: 5_000 },
+				{ amountMinor: 1_000 },
+				{ amountMinor: 9_000 },
+			]);
+
+			const up = await list(owner.id, { sort: "amount", dir: "asc" });
+			expect(up.items.map((d) => d.amountMinor)).toEqual([1_000, 5_000, 9_000]);
+			const down = await list(owner.id, { sort: "amount", dir: "desc" });
+			expect(down.items.map((d) => d.amountMinor)).toEqual([
+				9_000, 5_000, 1_000,
+			]);
+		});
+
+		it("sorts an anonymous gift by the name shown, not the one hidden", async () => {
+			// Ordered by the raw column, "Aarav" would sort first and its row's
+			// position would give away the name the response blanks out.
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			await received(org.id, [
+				{ amountMinor: 1_000, donorName: "Meera" },
+				{ amountMinor: 2_000, donorName: "Aarav", isAnonymous: true },
+				{ amountMinor: 3_000, donorName: "Zoya" },
+			]);
+
+			const result = await list(owner.id, { sort: "donor", dir: "asc" });
+			// Postgres puts NULLs last ascending.
+			expect(result.items.map((d) => d.donorName)).toEqual([
+				"Meera",
+				"Zoya",
+				null,
+			]);
+		});
+
+		it("pages deterministically when every row shares the sort key", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			await received(
+				org.id,
+				Array.from({ length: 6 }, () => ({ amountMinor: 1_000 })),
+			);
+
+			const page = (n: number) =>
+				list(owner.id, { sort: "amount", dir: "asc", page: n, limit: 3 });
+			const ids = [...(await page(1)).items, ...(await page(2)).items].map(
+				(d) => d.id,
+			);
+			expect(new Set(ids).size).toBe(6);
+		});
 	});
 });

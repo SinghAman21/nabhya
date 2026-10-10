@@ -185,6 +185,72 @@ describe("CertificatesService", () => {
 		});
 	});
 
+	describe("bulk actions", () => {
+		async function crowd(count: number, status: "PENDING" | "ACCEPTED") {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const event = await createEvent(db, org.id, { volunteersNeeded: 2 });
+			const applications = [];
+			for (let i = 0; i < count; i++) {
+				const volunteer = await createUser(db, { role: "volunteer" });
+				applications.push(
+					await createApplication(db, event.id, volunteer.id, { status }),
+				);
+			}
+			return { owner, event, ids: applications.map((a) => a.id) };
+		}
+
+		it("accepts in order and reports the applicants past the last place", async () => {
+			const { owner, event, ids } = await crowd(3, "PENDING");
+
+			const result = await eventsService.bulkReviewApplications(
+				owner.id,
+				event.id,
+				{ ids, status: "ACCEPTED" },
+			);
+
+			expect(result.done).toEqual(ids.slice(0, 2));
+			expect(result.failed).toEqual([
+				{ id: ids[2], reason: expect.stringMatching(/places/i) },
+			]);
+		});
+
+		it("marks a selection present, then certifies it, counting repeats as done", async () => {
+			const { owner, event, ids } = await crowd(2, "ACCEPTED");
+
+			const marked = await service.bulkAttendance(owner.id, event.id, {
+				ids,
+				action: "MARK_ATTENDED",
+			});
+			expect(marked).toEqual({ done: ids, failed: [] });
+
+			const issued = await service.bulkAttendance(owner.id, event.id, {
+				ids,
+				action: "ISSUE_CERTIFICATE",
+			});
+			expect(issued).toEqual({ done: ids, failed: [] });
+
+			// A re-run of a finished batch is not a batch of failures.
+			const again = await service.bulkAttendance(owner.id, event.id, {
+				ids,
+				action: "ISSUE_CERTIFICATE",
+			});
+			expect(again).toEqual({ done: ids, failed: [] });
+		});
+
+		it("reports a row that cannot be certified instead of skipping it", async () => {
+			const { owner, event, ids } = await crowd(1, "ACCEPTED");
+
+			const result = await service.bulkAttendance(owner.id, event.id, {
+				ids,
+				action: "ISSUE_CERTIFICATE",
+			});
+
+			expect(result.done).toEqual([]);
+			expect(result.failed[0]?.reason).toMatch(/attended/i);
+		});
+	});
+
 	describe("attendance reversal", () => {
 		it("refuses to un-mark attendance while a certificate exists", async () => {
 			// Otherwise the certificate outlives the evidence behind it.

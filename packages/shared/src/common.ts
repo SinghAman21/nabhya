@@ -19,6 +19,17 @@ export interface PaginationMeta {
 	hasMore: boolean;
 }
 
+/**
+ * Outcome of a bulk action on a selection: which ids succeeded and why each
+ * failure failed. Never a bare count - one row in forty can fail on its own
+ * (already decided, places filled) and "39 done" leaves the fortieth
+ * unexplained. Same contract as the admin queue's `BulkReviewResult`.
+ */
+export interface BulkResult {
+	done: string[];
+	failed: Array<{ id: string; reason: string }>;
+}
+
 export interface Paginated<T> {
 	items: T[];
 	meta: PaginationMeta;

@@ -178,13 +178,36 @@ export function computeUserVerificationStatus(
 	return "PENDING";
 }
 
+/**
+ * Every key is optional: absent means "leave it alone". The required-at-
+ * onboarding fields (name, phone, city, state) can be changed but not blanked;
+ * `profileImage` and `bio` clear on `""` (see `optionalText`).
+ *
+ * Causes and coordinates are here because the onboarding copy promises
+ * "pick causes later from your profile" and the location control fills both -
+ * an edit screen that could not save them made that promise false.
+ */
 export const updateUserProfileSchema = z.object({
-	fullName: z.string().trim().min(2).max(100).optional(),
+	fullName: z
+		.string()
+		.trim()
+		.min(2, "Enter your full name")
+		.max(100, "Name must be under 100 characters")
+		.optional(),
 	phone: phoneSchema.optional(),
 	profileImage: optionalText(500),
 	bio: optionalText(500),
-	city: z.string().trim().min(2).max(80).optional(),
-	state: z.string().trim().min(2).max(80).optional(),
+	city: z.string().trim().min(2, "City is required").max(80).optional(),
+	state: z.string().trim().min(2, "State is required").max(80).optional(),
+	// `null` drops the pin: a city typed over a detected one would otherwise
+	// leave "near me" measuring from the old place. `null` is checked first
+	// because the coercing schemas read it as 0.
+	latitude: z.null().or(latitudeSchema).optional(),
+	longitude: z.null().or(longitudeSchema).optional(),
+	/** Replaces the whole interest set; `[]` clears it. */
+	categoryIds: z.array(z.uuid()).max(5, "Pick up to 5 causes").optional(),
 });
 
 export type UpdateUserProfileInput = z.infer<typeof updateUserProfileSchema>;
+/** What the client sends - the input side, as with `CompleteVolunteerOnboardingPayload`. */
+export type UpdateUserProfilePayload = z.input<typeof updateUserProfileSchema>;

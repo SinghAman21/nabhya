@@ -8,6 +8,8 @@ import {
 import type {
 	ApplicationQuery,
 	ApplyToEventInput,
+	BulkResult,
+	BulkReviewApplicationsInput,
 	CreateEventInput,
 	OrgEventQuery,
 	PublicEventQuery,
@@ -39,6 +41,7 @@ import {
 import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
+import { orderBySort } from "../../common/utils/order";
 import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsService } from "../organizations/organizations.service";
 
@@ -223,7 +226,28 @@ export class EventsService {
 				})
 				.from(events)
 				.where(where)
-				.orderBy(desc(events.startAt))
+				.orderBy(
+					...orderBySort(
+						query.sort,
+						query.dir,
+						{
+							startAt: events.startAt,
+							title: events.title,
+							status: events.status,
+							accepted: events.acceptedCount,
+							// Literal and table-qualified, like the select above: an
+							// interpolated column here would bind to the subquery's own
+							// table and every row would sort as zero.
+							pending: sql`(
+								select count(*)::int from event_applications ea
+								where ea.event_id = events.id and ea.status = 'PENDING'
+							)`,
+							createdAt: events.createdAt,
+						},
+						{ column: events.startAt, dir: "desc" },
+						events.id,
+					),
+				)
 				.limit(limit)
 				.offset(offset),
 			this.db.select({ value: count() }).from(events).where(where),
@@ -681,6 +705,45 @@ export class EventsService {
 	 * Acceptance re-checks capacity inside the transaction with a locked event
 	 * row, so two admins reviewing simultaneously cannot overfill the event.
 	 */
+	/**
+	 * Accept or reject a selection, in order, one transaction each - so places
+	 * fill exactly as they would one tap at a time, and whoever is past the last
+	 * place comes back as a failure with the reason rather than a silent skip.
+	 * The role check runs once up front: a teammate who cannot review gets one
+	 * 403, not fifty identical failures.
+	 */
+	async bulkReviewApplications(
+		userId: string,
+		eventId: string,
+		input: BulkReviewApplicationsInput,
+	): Promise<BulkResult> {
+		await this.organizationsService.requireOrgPermission(
+			userId,
+			"people.review",
+		);
+		await this.requireOwnedEvent(userId, eventId);
+
+		const done: string[] = [];
+		const failed: BulkResult["failed"] = [];
+		// Deduplicated: a selection built across loaded pages can repeat an id.
+		for (const id of [...new Set(input.ids)]) {
+			try {
+				await this.reviewApplication(userId, eventId, id, {
+					status: input.status,
+					...(input.reviewNote ? { reviewNote: input.reviewNote } : {}),
+				});
+				done.push(id);
+			} catch (error) {
+				failed.push({
+					id,
+					reason:
+						error instanceof Error ? error.message : "Could not be reviewed",
+				});
+			}
+		}
+		return { done, failed };
+	}
+
 	async reviewApplication(
 		userId: string,
 		eventId: string,

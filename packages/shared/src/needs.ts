@@ -82,9 +82,31 @@ export const publicNeedQuerySchema = paginationQuerySchema.extend({
 
 export type PublicNeedQuery = z.infer<typeof publicNeedQuerySchema>;
 
+/**
+ * Sorting an NGO's own needs and offers. Server-side for the same reason as
+ * `orgEventSortSchema`; each key maps to a column (or the pending-pledges count)
+ * in `NeedsService`. Defaults to newest first, the order before sorting existed.
+ */
+export const orgNeedSortSchema = z
+	.enum([
+		"createdAt",
+		"title",
+		"status",
+		"urgency",
+		"fulfilled",
+		"pending",
+		"expiresAt",
+	])
+	.default("createdAt");
+export type OrgNeedSort = z.infer<typeof orgNeedSortSchema>;
+
 export const orgNeedQuerySchema = paginationQuerySchema.extend({
 	type: needTypeSchema.optional(),
 	status: needStatusSchema.optional(),
+	sort: orgNeedSortSchema,
+	// Not `sortDirSchema` from `./admin`: that module imports `./feed`, which
+	// imports this one - see the note on `orgEventQuerySchema`.
+	dir: z.enum(["asc", "desc"]).default("desc"),
 });
 
 export type OrgNeedQuery = z.infer<typeof orgNeedQuerySchema>;

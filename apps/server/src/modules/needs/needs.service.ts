@@ -33,6 +33,7 @@ import {
 import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
+import { orderBySort } from "../../common/utils/order";
 import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsService } from "../organizations/organizations.service";
 
@@ -210,7 +211,28 @@ export class NeedsService {
 				})
 				.from(needs)
 				.where(where)
-				.orderBy(desc(needs.createdAt))
+				.orderBy(
+					...orderBySort(
+						query.sort,
+						query.dir,
+						{
+							createdAt: needs.createdAt,
+							title: needs.title,
+							status: needs.status,
+							// Enum order (LOW < MEDIUM < HIGH), which is the order meant.
+							urgency: needs.urgency,
+							fulfilled: needs.fulfilledQuantity,
+							// Table-qualified for the same reason as the select above.
+							pending: sql`(
+								select count(*)::int from need_pledges np
+								where np.need_id = needs.id and np.status = 'PENDING'
+							)`,
+							expiresAt: needs.expiresAt,
+						},
+						{ column: needs.createdAt, dir: "desc" },
+						needs.id,
+					),
+				)
 				.limit(limit)
 				.offset(offset),
 			this.db.select({ value: count() }).from(needs).where(where),

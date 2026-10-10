@@ -141,6 +141,42 @@ describe("UsersService", () => {
 			});
 			expect(saved?.bio).toBeNull();
 		});
+
+		it("replaces causes only when they are sent, and [] clears them", async () => {
+			const user = await createUser(db, { role: "volunteer" });
+			const [cause] = await db
+				.insert(categories)
+				.values({ name: "Education", slug: "education" })
+				.returning();
+			if (!cause) throw new Error("category insert failed");
+
+			await service.updateProfile(user.id, { categoryIds: [cause.id] });
+			// An edit that leaves causes out must not touch them.
+			await service.updateProfile(user.id, { city: "Pune" });
+			expect((await service.getProfile(user.id)).interestCategoryIds).toEqual([
+				cause.id,
+			]);
+
+			await service.updateProfile(user.id, { categoryIds: [] });
+			expect((await service.getProfile(user.id)).interestCategoryIds).toEqual(
+				[],
+			);
+		});
+
+		it("sets a location pin and drops it on null", async () => {
+			const user = await createUser(db);
+			await service.updateProfile(user.id, {
+				latitude: 18.52,
+				longitude: 73.85,
+			});
+			const pinned = await service.getProfile(user.id);
+			expect(Number(pinned.latitude)).toBeCloseTo(18.52);
+
+			await service.updateProfile(user.id, { latitude: null, longitude: null });
+			const cleared = await service.getProfile(user.id);
+			expect(cleared.latitude).toBeNull();
+			expect(cleared.longitude).toBeNull();
+		});
 	});
 
 	describe("setInterests", () => {

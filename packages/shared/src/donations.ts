@@ -52,6 +52,28 @@ export const donationQuerySchema = paginationQuerySchema.extend({
 
 export type DonationQuery = z.infer<typeof donationQuerySchema>;
 
+/**
+ * Sorting what an organisation has received. Its own schema rather than keys on
+ * `donationQuerySchema`, which a donor's own history (`/me/donations`) shares
+ * and which takes no sort - a key that one route honours and the other ignores
+ * is a silent no-op. Defaults to newest first, the order before sorting existed.
+ *
+ * `donor` sorts by the *displayed* name, so an anonymous gift sorts as no name
+ * rather than by the name it hides - ordering by the real column would let the
+ * row's position leak what the response blanks out.
+ */
+export const orgDonationSortSchema = z
+	.enum(["createdAt", "amount", "donor"])
+	.default("createdAt");
+export type OrgDonationSort = z.infer<typeof orgDonationSortSchema>;
+
+export const orgDonationQuerySchema = donationQuerySchema.extend({
+	sort: orgDonationSortSchema,
+	dir: z.enum(["asc", "desc"]).default("desc"),
+});
+
+export type OrgDonationQuery = z.infer<typeof orgDonationQuerySchema>;
+
 export interface DonationStats {
 	totalMinor: number;
 	completedCount: number;

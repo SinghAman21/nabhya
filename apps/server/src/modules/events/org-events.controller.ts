@@ -1,5 +1,6 @@
 import type {
 	ApplicationQuery,
+	BulkReviewApplicationsInput,
 	CreateEventInput,
 	OrgEventQuery,
 	ReviewApplicationInput,
@@ -7,6 +8,7 @@ import type {
 } from "@nabhya/shared";
 import {
 	applicationQuerySchema,
+	bulkReviewApplicationsSchema,
 	createEventSchema,
 	orgEventQuerySchema,
 	reviewApplicationSchema,
@@ -110,6 +112,21 @@ export class OrgEventsController {
 		query: ApplicationQuery,
 	) {
 		return this.eventsService.listApplicants(user.id, id, query);
+	}
+
+	@Post(":id/applications/bulk-review")
+	@ApiOperation({
+		summary:
+			"Accept or reject a selection of applicants. Returns per-applicant " +
+			"outcomes; places fill in order and the overflow reports as failed.",
+	})
+	bulkReviewApplications(
+		@CurrentUser() user: AuthUser,
+		@Param("id", ParseUUIDPipe) id: string,
+		@Body(new ZodValidationPipe(bulkReviewApplicationsSchema))
+		body: BulkReviewApplicationsInput,
+	) {
+		return this.eventsService.bulkReviewApplications(user.id, id, body);
 	}
 
 	@Patch(":id/applications/:applicationId")

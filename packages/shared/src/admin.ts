@@ -48,9 +48,27 @@ export const adminOrgSortSchema = z
 	.default("createdAt");
 export type AdminOrgSort = z.infer<typeof adminOrgSortSchema>;
 
+/**
+ * The NGO directory's verification filter: every real status, plus
+ * `AWAITING` - PENDING and UNDER_REVIEW together.
+ *
+ * `AWAITING` exists because the dashboard's "NGOs awaiting verification" tile
+ * counts both, and it opened a list filtered to PENDING alone, so the tile
+ * could say 7 and the list it led to show 4. "Waiting on a decision" is one
+ * question to a reviewer whether or not someone has already picked the NGO up,
+ * so it is one filter value rather than two selects the client has to OR.
+ */
+export const adminOrgVerificationFilterSchema = z.enum([
+	...orgVerificationStatusSchema.options,
+	"AWAITING",
+]);
+export type AdminOrgVerificationFilter = z.infer<
+	typeof adminOrgVerificationFilterSchema
+>;
+
 export const adminOrgQuerySchema = paginationQuerySchema.extend({
 	search: z.string().trim().max(120).optional(),
-	verificationStatus: orgVerificationStatusSchema.optional(),
+	verificationStatus: adminOrgVerificationFilterSchema.optional(),
 	status: orgStatusSchema.optional(),
 	city: z.string().trim().max(80).optional(),
 	sort: adminOrgSortSchema,

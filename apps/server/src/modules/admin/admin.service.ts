@@ -391,7 +391,13 @@ export class AdminService {
 	async listOrganizations(query: AdminOrgQuery) {
 		const conditions: SQL[] = [];
 
-		if (query.verificationStatus) {
+		// `AWAITING` is the dashboard tile's definition of "waiting on a
+		// decision" - see `adminOrgVerificationFilterSchema`.
+		if (query.verificationStatus === "AWAITING") {
+			conditions.push(
+				inArray(organizations.verificationStatus, ["PENDING", "UNDER_REVIEW"]),
+			);
+		} else if (query.verificationStatus) {
 			conditions.push(
 				eq(organizations.verificationStatus, query.verificationStatus),
 			);

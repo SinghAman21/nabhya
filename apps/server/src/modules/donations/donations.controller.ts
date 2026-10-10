@@ -1,5 +1,13 @@
-import type { CreateDonationInput, DonationQuery } from "@nabhya/shared";
-import { createDonationSchema, donationQuerySchema } from "@nabhya/shared";
+import type {
+	CreateDonationInput,
+	DonationQuery,
+	OrgDonationQuery,
+} from "@nabhya/shared";
+import {
+	createDonationSchema,
+	donationQuerySchema,
+	orgDonationQuerySchema,
+} from "@nabhya/shared";
 import {
 	BadRequestException,
 	Body,
@@ -103,7 +111,8 @@ export class DonationsController {
 	@ApiOperation({ summary: "Donations received, with totals" })
 	listForOrg(
 		@CurrentUser() user: AuthUser,
-		@Query(new ZodValidationPipe(donationQuerySchema)) query: DonationQuery,
+		@Query(new ZodValidationPipe(orgDonationQuerySchema))
+		query: OrgDonationQuery,
 	) {
 		return this.donationsService.listForMyOrganization(user.id, query);
 	}

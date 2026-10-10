@@ -6,6 +6,7 @@ import type {
 	DonationCheckout,
 	DonationQuery,
 	DonationStats,
+	OrgDonationQuery,
 } from "@nabhya/shared";
 import {
 	BadRequestException,
@@ -26,6 +27,7 @@ import {
 import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
+import { orderBySort } from "../../common/utils/order";
 import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsService } from "../organizations/organizations.service";
 import { PAYMENT_PROVIDER_TOKEN, type PaymentProvider } from "./payment.types";
@@ -248,7 +250,7 @@ export class DonationsService {
 	}
 
 	/** What the receiving organization sees. Only settled money is listed. */
-	async listForMyOrganization(userId: string, query: DonationQuery) {
+	async listForMyOrganization(userId: string, query: OrgDonationQuery) {
 		await this.organizationsService.requireOrgPermission(userId, "money.view");
 		const organization =
 			await this.organizationsService.requireOwnedOrganization(userId);
@@ -258,6 +260,10 @@ export class DonationsService {
 			eq(donations.status, query.status ?? "COMPLETED"),
 		);
 		const { limit, offset } = toOffset(query);
+		// The name as the response shows it. Sorting by the raw column would put
+		// an anonymous gift where its hidden name falls, which is the name.
+		const shownDonor = sql`case when ${donations.isAnonymous}
+			then null else ${donations.donorName} end`;
 
 		const [items, [totals], stats] = await Promise.all([
 			this.db
@@ -277,7 +283,19 @@ export class DonationsService {
 				})
 				.from(donations)
 				.where(where)
-				.orderBy(desc(donations.createdAt))
+				.orderBy(
+					...orderBySort(
+						query.sort,
+						query.dir,
+						{
+							createdAt: donations.createdAt,
+							amount: donations.amountMinor,
+							donor: shownDonor,
+						},
+						{ column: donations.createdAt, dir: "desc" },
+						donations.id,
+					),
+				)
 				.limit(limit)
 				.offset(offset),
 			this.db.select({ value: count() }).from(donations).where(where),

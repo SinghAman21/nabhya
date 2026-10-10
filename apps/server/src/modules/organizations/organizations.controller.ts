@@ -28,7 +28,12 @@ import {
 	ApiTags,
 } from "@nestjs/swagger";
 import { z } from "zod";
-import { CurrentUser, Public, Roles } from "../../common/decorators";
+import {
+	CurrentUser,
+	OptionalAuth,
+	Public,
+	Roles,
+} from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthUser } from "../../common/types";
 import { OrganizationsService } from "./organizations.service";
@@ -127,10 +132,17 @@ export class OrganizationsController {
 
 	// ─── Public detail ───────────────────────────────────────────────────────
 
-	@Public()
+	@OptionalAuth()
 	@Get(":id")
-	@ApiOperation({ summary: "Get a verified organization's public profile" })
-	getPublicById(@Param("id", ParseUUIDPipe) id: string) {
-		return this.organizationsService.getPublicById(id);
+	@ApiOperation({
+		summary:
+			"Get a verified organization's public profile. Signed-in callers also " +
+			"receive whether they follow and have saved it.",
+	})
+	getPublicById(
+		@Param("id", ParseUUIDPipe) id: string,
+		@CurrentUser() user: AuthUser | undefined,
+	) {
+		return this.organizationsService.getPublicById(id, user?.id);
 	}
 }

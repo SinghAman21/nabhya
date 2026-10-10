@@ -19,6 +19,18 @@ export const issueCertificateSchema = z.object({
 
 export type IssueCertificateInput = z.infer<typeof issueCertificateSchema>;
 
+/**
+ * After the event: mark a selection of accepted volunteers present, or issue
+ * certificates to a selection that already is. Hours stay per person (the
+ * whole event unless edited on the row) and so does a certificate note.
+ */
+export const bulkAttendanceSchema = z.object({
+	ids: z.array(z.uuid()).min(1).max(50),
+	action: z.enum(["MARK_ATTENDED", "ISSUE_CERTIFICATE"]),
+});
+
+export type BulkAttendanceInput = z.infer<typeof bulkAttendanceSchema>;
+
 export const revokeCertificateSchema = z.object({
 	reason: z
 		.string()

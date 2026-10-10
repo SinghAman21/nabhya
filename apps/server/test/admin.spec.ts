@@ -465,6 +465,38 @@ describe("AdminService", () => {
 		});
 	});
 
+	describe("organization listing", () => {
+		it("filters AWAITING to pending and under review together", async () => {
+			// The dashboard tile counts both; the list it opens must match it.
+			for (const verificationStatus of [
+				"PENDING",
+				"UNDER_REVIEW",
+				"VERIFIED",
+				"REJECTED",
+			] as const) {
+				const owner = await createUser(db, { role: "organisation" });
+				await createOrganization(db, owner.id, {
+					name: verificationStatus,
+					verificationStatus,
+				});
+			}
+
+			const result = await service.listOrganizations(
+				adminOrgQuerySchema.parse({
+					verificationStatus: "AWAITING",
+					sort: "name",
+					dir: "asc",
+				}),
+			);
+
+			expect(result.items.map((o) => o.verificationStatus)).toEqual([
+				"PENDING",
+				"UNDER_REVIEW",
+			]);
+			expect(result.meta.total).toBe(2);
+		});
+	});
+
 	describe("user listing", () => {
 		it("filters by role without duplicating multi-role users", async () => {
 			// The role filter uses EXISTS rather than a join for exactly this -

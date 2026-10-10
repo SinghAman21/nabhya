@@ -79,6 +79,10 @@ export class UsersService {
 			bio: user.bio,
 			city: user.city,
 			state: user.state,
+			// The volunteer's own pin, when "use my location" set one - what
+			// "NGOs near me" measures from before falling back to the city.
+			latitude: user.latitude,
+			longitude: user.longitude,
 			emailVerified: user.emailVerified,
 			verificationStatus: user.verificationStatus,
 			status: user.status,
@@ -104,6 +108,12 @@ export class UsersService {
 				...(input.bio !== undefined && { bio: input.bio }),
 				...(input.city !== undefined && { city: input.city }),
 				...(input.state !== undefined && { state: input.state }),
+				...(input.latitude !== undefined && {
+					latitude: input.latitude === null ? null : String(input.latitude),
+				}),
+				...(input.longitude !== undefined && {
+					longitude: input.longitude === null ? null : String(input.longitude),
+				}),
 				updatedAt: new Date(),
 			})
 			.where(eq(users.id, userId))
@@ -111,6 +121,10 @@ export class UsersService {
 
 		if (!updated) {
 			throw new NotFoundException("User not found");
+		}
+
+		if (input.categoryIds !== undefined) {
+			await this.setInterests(userId, input.categoryIds);
 		}
 
 		void this.audit.record({

@@ -1,4 +1,5 @@
 import { needs } from "@nabhya/db/schema";
+import { orgNeedQuerySchema } from "@nabhya/shared";
 import {
 	BadRequestException,
 	ConflictException,
@@ -354,11 +355,76 @@ describe("NeedsService - correlated counts", () => {
 		const accepted = await createUser(db, { role: "volunteer" });
 		await createPledge(db, need.id, accepted.id, { status: "ACCEPTED" });
 
-		const result = await service.listForMyOrganization(owner.id, {
-			page: 1,
-			limit: 20,
-		});
+		const result = await service.listForMyOrganization(
+			owner.id,
+			orgNeedQuerySchema.parse({ page: 1, limit: 20 }),
+		);
 
 		expect(result.items[0]?.pendingPledges).toBe(2);
+	});
+
+	/** Server-side sorting; see the matching block in `events.spec.ts`. */
+	describe("sorting", () => {
+		const list = (userId: string, input: Record<string, unknown>) =>
+			service.listForMyOrganization(userId, orgNeedQuerySchema.parse(input));
+
+		it("keeps the old order (newest first) when no sort is sent", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const older = await createNeed(db, org.id);
+			const newer = await createNeed(db, org.id);
+			await db
+				.update(needs)
+				.set({ createdAt: new Date(Date.now() - 86_400_000) })
+				.where(eq(needs.id, older.id));
+
+			const result = await list(owner.id, {});
+			expect(result.items.map((n) => n.id)).toEqual([newer.id, older.id]);
+		});
+
+		it("orders by fulfilled quantity in both directions", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			for (const fulfilledQuantity of [40, 5, 90]) {
+				const need = await createNeed(db, org.id);
+				await db
+					.update(needs)
+					.set({ fulfilledQuantity })
+					.where(eq(needs.id, need.id));
+			}
+
+			const up = await list(owner.id, { sort: "fulfilled", dir: "asc" });
+			expect(up.items.map((n) => n.fulfilledQuantity)).toEqual([5, 40, 90]);
+			const down = await list(owner.id, { sort: "fulfilled", dir: "desc" });
+			expect(down.items.map((n) => n.fulfilledQuantity)).toEqual([90, 40, 5]);
+		});
+
+		it("orders by the pending-pledges count, a subquery not a column", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const busy = await createNeed(db, org.id);
+			const quiet = await createNeed(db, org.id);
+			for (let i = 0; i < 2; i++) {
+				const volunteer = await createUser(db, { role: "volunteer" });
+				await createPledge(db, busy.id, volunteer.id);
+			}
+
+			const result = await list(owner.id, { sort: "pending", dir: "desc" });
+			expect(result.items.map((n) => n.id)).toEqual([busy.id, quiet.id]);
+		});
+
+		it("pages deterministically when every row shares the sort key", async () => {
+			// Every factory need is MEDIUM, so only the tiebreakers order them.
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			for (let i = 0; i < 6; i++) await createNeed(db, org.id);
+
+			const page = (n: number) =>
+				list(owner.id, { sort: "urgency", dir: "asc", page: n, limit: 3 });
+			const ids = [...(await page(1)).items, ...(await page(2)).items].map(
+				(n) => n.id,
+			);
+			expect(new Set(ids).size).toBe(6);
+		});
 	});
 });

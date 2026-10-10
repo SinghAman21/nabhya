@@ -259,7 +259,7 @@ describe("HTTP surface", () => {
 	it("exposes the expected number of endpoints", () => {
 		// A bare count, so adding or deleting a route is a deliberate act that
 		// shows up in the diff rather than passing unnoticed.
-		expect(routes.length).toBe(117);
+		expect(routes.length).toBe(119);
 	});
 
 	it("mounts every route under the /api prefix", () => {
@@ -372,7 +372,6 @@ describe("HTTP surface", () => {
 				"GET /api/health",
 				"GET /api/needs",
 				"GET /api/organizations",
-				"GET /api/organizations/:id",
 				"GET /api/organizations/:id/announcements",
 				"GET /api/organizations/:id/impact",
 				"GET /api/organizations/:id/reports",
@@ -393,6 +392,9 @@ describe("HTTP surface", () => {
 			[
 				"GET /api/events/:id",
 				"GET /api/needs/:id",
+				// Anyone can read an NGO's page; a signed-in caller also learns
+				// whether they follow and have saved it.
+				"GET /api/organizations/:id",
 				// Guest donations: a signed-in donor gets the receipt attached to
 				// their account, an anonymous one still gets to give.
 				"POST /api/donations/checkout",

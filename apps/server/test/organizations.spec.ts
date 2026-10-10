@@ -1,4 +1,4 @@
-import { organizations } from "@nabhya/db/schema";
+import { bookmarks, follows, organizations } from "@nabhya/db/schema";
 import { NotFoundException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -83,6 +83,27 @@ describe("OrganizationsService", () => {
 			await expect(service.getPublicById(org.id)).rejects.toBeInstanceOf(
 				NotFoundException,
 			);
+		});
+
+		it("tells a signed-in viewer whether they follow and saved it", async () => {
+			const org = await orgAt(null);
+			const viewer = await createUser(db, { role: "volunteer" });
+
+			const anonymous = await service.getPublicById(org.id);
+			expect(anonymous.viewer).toBeNull();
+
+			const before = await service.getPublicById(org.id, viewer.id);
+			expect(before.viewer).toEqual({ following: false, bookmarked: false });
+
+			await db
+				.insert(follows)
+				.values({ userId: viewer.id, organizationId: org.id });
+			await db
+				.insert(bookmarks)
+				.values({ userId: viewer.id, organizationId: org.id });
+
+			const after = await service.getPublicById(org.id, viewer.id);
+			expect(after.viewer).toEqual({ following: true, bookmarked: true });
 		});
 	});
 
