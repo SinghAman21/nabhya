@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { View } from "react-native";
 import { Input, type InputProps } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Pressable } from "@/components/ui/pressable";
 import { Caption } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { focusable } from "@/lib/focus";
+import { announce } from "@/lib/motion";
 
 // ── useZodForm ──────────────────────────────────────────────────────
 
@@ -34,6 +35,13 @@ interface FormFieldProps
 	 * Pass this instead of `secureTextEntry` - the toggle owns that prop.
 	 */
 	revealable?: boolean;
+	/**
+	 * A constraint the value must meet ("At least 8 characters"), shown under
+	 * the field before anything is typed. Not a placeholder: a placeholder
+	 * vanishes on the first keystroke, so the rule was only ever seen again as
+	 * the error it was meant to prevent. The error replaces it while one shows.
+	 */
+	hint?: string;
 }
 
 export function FormField({
@@ -41,6 +49,7 @@ export function FormField({
 	name,
 	label,
 	revealable,
+	hint,
 	...inputProps
 }: FormFieldProps) {
 	const { colors, spacing } = useTheme();
@@ -62,6 +71,14 @@ export function FormField({
 							value={value}
 							onChangeText={onChange}
 							onBlur={onBlur}
+							// The visible label is a sibling, not a <label for>, so the
+							// field would otherwise be announced by its placeholder -
+							// which is an example ("you@example.com"), not a name.
+							// The hint rides along so the rule is heard before typing.
+							accessibilityLabel={label}
+							{...(error?.message || hint
+								? { accessibilityHint: error?.message ?? hint }
+								: {})}
 							{...inputProps}
 							{...(revealable
 								? {
@@ -101,16 +118,37 @@ export function FormField({
 							</Pressable>
 						) : null}
 					</View>
-					{error?.message && (
+					{error?.message ? (
+						<ErrorLine message={error.message} />
+					) : hint ? (
 						<Caption
-							color={colors.error.ink as string}
+							color="tertiary"
 							style={{ marginTop: spacing[1.5], marginLeft: spacing[0.5] }}
 						>
-							{error.message}
+							{hint}
 						</Caption>
-					)}
+					) : null}
 				</View>
 			)}
 		/>
+	);
+}
+
+/** A field's error, read out when it appears - see `announce` in `lib/motion.ts`. */
+function ErrorLine({ message }: { message: string }) {
+	const { colors, spacing } = useTheme();
+
+	useEffect(() => {
+		announce(message);
+	}, [message]);
+
+	return (
+		<Caption
+			accessibilityLiveRegion="polite"
+			color={colors.error.ink as string}
+			style={{ marginTop: spacing[1.5], marginLeft: spacing[0.5] }}
+		>
+			{message}
+		</Caption>
 	);
 }

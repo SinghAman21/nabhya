@@ -1,5 +1,11 @@
-import { ArrowDown, ArrowUp, Minus } from "lucide-react-native";
-import { View, type ViewStyle } from "react-native";
+import {
+	ArrowDown,
+	ArrowUp,
+	ArrowUpDown,
+	ChevronRight,
+	Minus,
+} from "lucide-react-native";
+import { Platform, View, type ViewStyle } from "react-native";
 import { useStickyOffset } from "@/components/admin/list-chrome";
 import { Pressable } from "@/components/ui/pressable";
 import { Caption } from "@/components/ui/typography";
@@ -70,6 +76,12 @@ import { focusable, type PressState } from "@/lib/focus";
  *   does not re-order `items` - the list is paged, so sorting in the browser
  *   sorts twenty of three hundred rows. `sortKey` is what makes a header
  *   pressable; a column without one is not sortable and shows no affordance.
+ *   A sortable header that is *not* the current sort shows a faint two-way
+ *   arrow: with nothing at rest, "Joined" and "Standing" looked identical and
+ *   the only way to learn which headers sorted was to hover each one.
+ * - **An openable row says so before it is hovered.** A trailing chevron on
+ *   every row that opens a record, and a spoken label (`rowLabel`) - a row
+ *   announced as "button" with six cells of text read out is not a name.
  */
 
 export interface TableColumn<T> {
@@ -117,6 +129,14 @@ const CELL_INSET = 16;
 /** The tick column. Inside `CELL_INSET`, so the box lines up with the labels. */
 const TICK_WIDTH = 28;
 
+/** The resting "this row opens" chevron at the end of an openable row. */
+const CUE_WIDTH = 14;
+
+/** The DOM id of a row, so a keyboard cursor can scroll it into view. */
+export function tableRowId(key: string) {
+	return `table-row-${key}`;
+}
+
 /**
  * The column labels stay put while the rows scroll past.
  *
@@ -151,6 +171,8 @@ export function DataTable<T, K extends string>({
 	onSelectionChange,
 	wide = true,
 	rowHref,
+	rowLabel,
+	activeKey,
 }: {
 	columns: Array<TableColumn<T>>;
 	rows: T[];
@@ -171,6 +193,14 @@ export function DataTable<T, K extends string>({
 	wide?: boolean;
 	/** Announced as a link rather than a button when a row navigates. */
 	rowHref?: boolean;
+	/** What an openable row is called to a screen reader ("Open Asha Trust"). */
+	rowLabel?: (row: T) => string;
+	/**
+	 * The keyboard cursor's row (the queue's J/K), drawn with a 2pt rule down
+	 * its leading edge. A rule rather than the selection tint: the cursor and the
+	 * selection are independent, and a ticked row under the cursor must show both.
+	 */
+	activeKey?: string;
 }) {
 	const { colors, spacing, borderRadius, elevation, isDark } = useTheme();
 	const stickyOffset = useStickyOffset();
@@ -185,7 +215,8 @@ export function DataTable<T, K extends string>({
 		) +
 		visible.length * spacing[3] +
 		CELL_INSET * 2 +
-		(selectable ? TICK_WIDTH + spacing[3] : 0);
+		(selectable ? TICK_WIDTH + spacing[3] : 0) +
+		(onRowPress ? CUE_WIDTH + spacing[3] : 0);
 
 	const pageKeys = rows.map(rowKey);
 	const allSelected =
@@ -331,9 +362,16 @@ export function DataTable<T, K extends string>({
 								>
 									{column.header}
 								</Caption>
-								{/* The arrow appears only on the sorted column. An arrow
-								    on every header is eight arrows saying nothing; the
-								    hover background is what advertises the rest. */}
+								{/* The sorted column gets a solid arrow; every other
+								    sortable one a faint two-way arrow, so "can I sort by
+								    this?" is answered at rest, not only on hover. */}
+								{!isSorted && (
+									<ArrowUpDown
+										size={11}
+										color={colors.text.quaternary as string}
+										strokeWidth={2}
+									/>
+								)}
 								{isSorted &&
 									(sort?.dir === "asc" ? (
 										<ArrowUp
@@ -352,11 +390,13 @@ export function DataTable<T, K extends string>({
 						</View>
 					);
 				})}
+				{onRowPress && <View style={{ width: CUE_WIDTH }} />}
 			</View>
 
 			{rows.map((row, index) => {
 				const key = rowKey(row);
 				const selected = selection?.has(key) ?? false;
+				const active = activeKey === key;
 				const last = index === rows.length - 1;
 
 				const cells = (
@@ -375,6 +415,19 @@ export function DataTable<T, K extends string>({
 								{column.render(row)}
 							</View>
 						))}
+						{onRowPress && (
+							<View
+								accessibilityElementsHidden
+								importantForAccessibility="no-hide-descendants"
+								style={{ width: CUE_WIDTH, alignItems: "flex-end" }}
+							>
+								<ChevronRight
+									size={14}
+									color={colors.text.quaternary as string}
+									strokeWidth={2}
+								/>
+							</View>
+						)}
 					</>
 				);
 
@@ -383,18 +436,29 @@ export function DataTable<T, K extends string>({
 					alignItems: "center" as const,
 					gap: spacing[3],
 					minHeight: ROW_HEIGHT,
-					paddingHorizontal: CELL_INSET,
+					// Less the cursor rule's 2pt, so the cells stay on the header's x.
+					paddingLeft: CELL_INSET - 2,
+					paddingRight: CELL_INSET,
 					paddingVertical: spacing[2.5],
 					// The last row drops its rule so nothing paints across the card's
 					// rounded bottom corners.
 					borderBottomWidth: last ? 0 : 1,
 					borderBottomColor: colors.border.hairline,
+					// The cursor rule is a left border on every row, transparent
+					// unless active, so moving the cursor never shifts a cell.
+					borderLeftWidth: 2,
+					borderLeftColor: active ? colors.primary.ink : "transparent",
 				};
+				// RNW renders `nativeID` as the DOM id; native has nothing to scroll
+				// to by id and ignores it.
+				const domId =
+					Platform.OS === "web" ? { nativeID: tableRowId(key) } : {};
 
 				if (!onRowPress) {
 					return (
 						<View
 							key={key}
+							{...domId}
 							style={[
 								base,
 								selected ? { backgroundColor: colors.primary.tint } : null,
@@ -413,8 +477,10 @@ export function DataTable<T, K extends string>({
 					// still does not open it.
 					<Pressable
 						key={key}
+						{...domId}
 						onPress={() => onRowPress(row)}
 						accessibilityRole={rowHref ? "link" : "button"}
+						{...(rowLabel ? { accessibilityLabel: rowLabel(row) } : {})}
 						{...focusable}
 						style={(state) => {
 							const { hovered, pressed } = state as PressState;
@@ -444,8 +510,13 @@ export function DataTable<T, K extends string>({
  * reviewer has ticked four of twenty. A two-state box has to lie about that,
  * and the lie matters - an unchecked header next to four ticked rows reads as
  * "nothing selected".
+ *
+ * Also the NGO applicant sheet's tick. Without `onPress` it is only the box,
+ * for a control whose whole row is already the pressable (a labelled
+ * "Attended" checkbox) - two nested checkboxes would be two tab stops and
+ * two announcements for one state.
  */
-function Tick({
+export function Tick({
 	checked,
 	partial,
 	onPress,
@@ -453,11 +524,39 @@ function Tick({
 }: {
 	checked: boolean;
 	partial?: boolean;
-	onPress: () => void;
+	onPress?: () => void;
 	label: string;
 }) {
 	const { colors } = useTheme();
 	const on = checked || partial;
+	const mark = partial ? (
+		<Minus
+			size={12}
+			color={colors.primary.contrast as string}
+			strokeWidth={3}
+		/>
+	) : checked ? (
+		<CheckMark color={colors.primary.contrast as string} />
+	) : null;
+
+	if (!onPress) {
+		return (
+			<View
+				style={{
+					width: 17,
+					height: 17,
+					borderRadius: 5,
+					alignItems: "center",
+					justifyContent: "center",
+					borderWidth: on ? 0 : 1.5,
+					borderColor: colors.border.medium,
+					backgroundColor: on ? colors.primary.main : "transparent",
+				}}
+			>
+				{mark}
+			</View>
+		);
+	}
 
 	return (
 		<Pressable
@@ -483,15 +582,7 @@ function Tick({
 				};
 			}}
 		>
-			{partial ? (
-				<Minus
-					size={12}
-					color={colors.primary.contrast as string}
-					strokeWidth={3}
-				/>
-			) : checked ? (
-				<CheckMark color={colors.primary.contrast as string} />
-			) : null}
+			{mark}
 		</Pressable>
 	);
 }

@@ -12,6 +12,7 @@ import { useToggleBookmark } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage, engagementApi, queryKeys } from "@/lib/api";
 import { focusable } from "@/lib/focus";
+import { READING_COLUMN } from "@/lib/reading-column";
 import type { BookmarkListItem } from "@/lib/types";
 
 /**
@@ -37,7 +38,7 @@ function Bookmarks() {
 			// one tap, and a dialog in front of it would cost more than the
 			// mistake does.
 			onSuccess: () =>
-				toast.success(`${name} removed.`, {
+				toast.success(`${name} removed from your shortlist.`, {
 					label: "Undo",
 					onPress: () => toggle.mutate(item.organization.id),
 				}),
@@ -46,10 +47,10 @@ function Bookmarks() {
 	};
 
 	return (
-		<Screen>
+		<Screen style={READING_COLUMN}>
 			<ScreenHeader
 				back
-				title="Saved NGOs"
+				title="Shortlisted NGOs"
 				subtitle="Find them again in one tap."
 			/>
 
@@ -62,8 +63,8 @@ function Bookmarks() {
 				empty={
 					<EmptyState
 						icon={Bookmark}
-						title="No saved NGOs yet"
-						description="Tap the bookmark on any NGO's page and it will be kept here."
+						title="No shortlisted NGOs yet"
+						description="Tap the bookmark on any NGO's page to shortlist it here."
 						action={
 							<Button
 								size="sm"
@@ -80,8 +81,8 @@ function Bookmarks() {
 						style={{
 							flexDirection: "row",
 							alignItems: "center",
-							gap: spacing[3],
-							paddingRight: spacing[4],
+							gap: spacing[1],
+							paddingRight: spacing[2],
 						}}
 					>
 						<Pressable
@@ -137,11 +138,17 @@ function Bookmarks() {
 						<Pressable
 							onPress={() => remove(item)}
 							disabled={toggle.isPending}
-							hitSlop={10}
 							accessibilityRole="button"
-							accessibilityLabel={`Remove ${item.organization.organizationName} from saved`}
+							accessibilityLabel={`Remove ${item.organization.organizationName} from your shortlist`}
 							accessibilityState={{ disabled: toggle.isPending }}
 							{...focusable}
+							// A sized target, not a caption with hitSlop: the slop reached
+							// ~36pt and the focus ring hugged the bare word.
+							style={{
+								minHeight: 44,
+								paddingHorizontal: spacing[2],
+								justifyContent: "center",
+							}}
 						>
 							<Caption weight="medium" color="tertiary">
 								Remove

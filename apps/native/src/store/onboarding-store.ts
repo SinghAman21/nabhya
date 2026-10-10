@@ -92,6 +92,21 @@ const emptyVolunteer: VolunteerDraft = {
 	profileImagePreview: "",
 };
 
+/**
+ * Whether a draft holds anything the person typed or picked - the test for
+ * "signing out now would throw work away", which `useSignOut` does by
+ * clearing both drafts.
+ */
+export function draftHasContent(draft: OrgDraft | VolunteerDraft): boolean {
+	return Object.values(draft).some((value) =>
+		Array.isArray(value)
+			? value.length > 0
+			: typeof value === "string"
+				? value.trim() !== ""
+				: value !== undefined,
+	);
+}
+
 interface OnboardingState {
 	org: OrgDraft;
 	volunteer: VolunteerDraft;

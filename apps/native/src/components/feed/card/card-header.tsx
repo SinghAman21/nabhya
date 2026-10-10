@@ -5,7 +5,7 @@ import { Pressable } from "@/components/ui/pressable";
 import { Caption, H5, Label } from "@/components/ui/typography";
 import { useStoredImageUrl } from "@/hooks/use-stored-image";
 import { useTheme } from "@/hooks/use-theme";
-import { focusable } from "@/lib/focus";
+import { focusable, type PressState } from "@/lib/focus";
 import { formatRelative } from "@/lib/format";
 import type { FeedItem } from "@/lib/types";
 
@@ -58,7 +58,8 @@ export function CardHeader({
 	const { colors, spacing, borderRadius } = useTheme();
 	const org = item.organization;
 	const name = org?.organizationName ?? item.author?.fullName ?? "Volunteer";
-	const place = item.city ?? item.state ?? "India";
+	// "City, State" - a city alone is ambiguous across a national feed.
+	const place = [item.city, item.state].filter(Boolean).join(", ") || "India";
 	const initial = name.charAt(0).toUpperCase() || "N";
 	const avatarUrl = useAvatarSource(org?.logo ?? item.author?.profileImage);
 	const following = item.isFollowing;
@@ -151,7 +152,12 @@ export function CardHeader({
 						)}
 					</View>
 					<Caption color="quaternary" numberOfLines={1}>
-						{place} · {formatRelative(item.postedAt)}
+						{/*
+						 * "Posted" is said out loud because a need's urgency is now its
+						 * deadline, in the facts block. Bare, "3 days ago" read as how
+						 * long the need had left; it is only how old the post is.
+						 */}
+						{place} · Posted {formatRelative(item.postedAt)}
 					</Caption>
 				</View>
 			</Pressable>
@@ -165,6 +171,10 @@ export function CardHeader({
 			 * marker appeared on most cards and became a permanent word of chrome
 			 * saying something the reader already knew. Unfollowing lives on the
 			 * NGO page, which the name above links to.
+			 *
+			 * Because the control vanishes, the *caller* toasts "Following X" with
+			 * Undo once the request lands - it owns the mutation and so knows when
+			 * it succeeded; the header only knows it was pressed.
 			 */}
 			{org && !following && onToggleFollow && (
 				<Pressable
@@ -173,21 +183,24 @@ export function CardHeader({
 					accessibilityLabel={`Follow ${org.organizationName}`}
 					hitSlop={10}
 					{...focusable}
-					style={({ pressed }) => ({
-						paddingHorizontal: spacing[2],
-						paddingVertical: spacing[1],
-						borderRadius: borderRadius.sm,
-						// A word, not a filled pill. A brand-tinted button on every card
-						// made the header the loudest thing in a list of forty, and it
-						// competed with the card's own action for the same attention.
-						backgroundColor: pressed
-							? (colors.background.subtle as string)
-							: "transparent",
-					})}
+					style={(state) => {
+						const { pressed, hovered } = state as PressState;
+						return {
+							paddingHorizontal: spacing[3],
+							paddingVertical: spacing[1.5],
+							borderRadius: borderRadius.full,
+							// A compact neutral pill, not a word and not a brand fill. As a
+							// bare word it did not read as a control at the end of the
+							// header row; as a brand-tinted button it was the loudest thing
+							// in a list of forty. `background.subtle` is the same inset
+							// grey as the need's facts block.
+							backgroundColor: (pressed || hovered
+								? colors.background.overlay
+								: colors.background.subtle) as string,
+						};
+					}}
 				>
-					<Caption weight="semibold" color="secondary">
-						Follow
-					</Caption>
+					<Caption weight="semibold">Follow</Caption>
 				</Pressable>
 			)}
 

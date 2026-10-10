@@ -117,6 +117,19 @@ export default function Login() {
 				onSubmitEditing={onSubmit}
 				accessibilityLabel="Password"
 			/>
+			<Button
+				variant="link"
+				size="sm"
+				onPress={() =>
+					router.push({
+						pathname: "/(auth)/forgot-password",
+						params: { email: form.getValues("email") },
+					})
+				}
+				style={{ alignSelf: "flex-end" }}
+			>
+				Forgot password?
+			</Button>
 
 			<AuthError
 				message={failure?.message ?? null}

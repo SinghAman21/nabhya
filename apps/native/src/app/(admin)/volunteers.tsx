@@ -1,4 +1,4 @@
-import type { AdminUserSort, SortDir } from "@nabhya/shared";
+import type { AdminUserSort } from "@nabhya/shared";
 import { Users } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
@@ -15,10 +15,15 @@ import {
 	StatusPill,
 	verificationTone,
 } from "@/components/status-pill";
+import { Button } from "@/components/ui/button";
 import { Body, Caption } from "@/components/ui/typography";
 import { useAdminUsersPaged } from "@/hooks/use-admin-lists";
+import {
+	useParamSearch,
+	useParamSort,
+	useParamState,
+} from "@/hooks/use-admin-params";
 import { useTheme } from "@/hooks/use-theme";
-import { useDebounced } from "@/hooks/useDebounced";
 import { formatDate } from "@/lib/format";
 import type { AdminUserListItem } from "@/lib/types";
 
@@ -40,6 +45,17 @@ const STANDING = [
 	{ value: "ANY" as const, label: "Any" },
 	{ value: "ACTIVE" as const, label: "Active" },
 	{ value: "SUSPENDED" as const, label: "Suspended" },
+];
+
+const IDENTITY_VALUES = IDENTITY.map((option) => option.value);
+const STANDING_VALUES = STANDING.map((option) => option.value);
+const SORT_KEYS: AdminUserSort[] = [
+	"createdAt",
+	"name",
+	"email",
+	"verificationStatus",
+	"applications",
+	"pledges",
 ];
 
 /**
@@ -65,20 +81,42 @@ const STANDING = [
  * Two axes remain, and they are independent, which is why they are two selects
  * rather than one chip row: identity state and account standing. A volunteer can
  * be verified *and* suspended.
+ *
+ * Both, the sort and the search live in the URL (`useParamState`), so a
+ * reload or a shared link lands on the same list.
  */
 export default function AdminVolunteers() {
 	const { colors, spacing } = useTheme();
-	const [identity, setIdentity] = useState<IdFilter>("ANY");
-	const [standing, setStanding] = useState<Standing>("ANY");
-	const [search, setSearch] = useState("");
-	const [sort, setSort] = useState<{ sort: AdminUserSort; dir: SortDir }>({
-		sort: "createdAt",
-		dir: "desc",
-	});
+	const [identity, setIdentity] = useParamState<IdFilter>(
+		"identity",
+		"ANY",
+		IDENTITY_VALUES,
+	);
+	const [standing, setStanding] = useParamState<Standing>(
+		"standing",
+		"ANY",
+		STANDING_VALUES,
+	);
+	const {
+		text: search,
+		setText: setSearch,
+		debounced: debouncedSearch,
+	} = useParamSearch();
+	const [sort, setSort] = useParamSort<AdminUserSort>(
+		{ sort: "createdAt", dir: "desc" },
+		SORT_KEYS,
+	);
 	const [selected, setSelected] = useState<string | null>(null);
 	const [view, setView] = useTableView("people");
 
-	const debouncedSearch = useDebounced(search.trim());
+	const filtered =
+		!!debouncedSearch || identity !== "ANY" || standing !== "ANY";
+	const clearFilters = () => {
+		setSearch("");
+		setIdentity("ANY");
+		setStanding("ANY");
+	};
+
 	const list = useAdminUsersPaged({
 		// Not a filter the reader can change - see the note above.
 		role: "volunteer",
@@ -218,6 +256,7 @@ export default function AdminVolunteers() {
 				columns={columns}
 				rowKey={(user) => user.id}
 				onRowPress={(user) => setSelected(user.id)}
+				rowLabel={(user) => `Open ${user.fullName ?? user.email}`}
 				sort={sort}
 				onSortChange={setSort}
 				loadingLabel="Loading volunteers"
@@ -225,16 +264,34 @@ export default function AdminVolunteers() {
 					<UserCard user={user} onPress={() => setSelected(user.id)} />
 				)}
 				empty={
+					// Three cases, three sentences. It said "No volunteers yet" over
+					// "No volunteers match these filters" - a title claiming the
+					// platform is empty above a line saying a filter hid them.
 					<EmptyState
 						icon={Users}
 						title={
-							debouncedSearch ? "No matching volunteers" : "No volunteers yet"
+							debouncedSearch
+								? "No matching volunteers"
+								: filtered
+									? "Nothing matches"
+									: "No volunteers yet"
 						}
 						description={
 							debouncedSearch
 								? "Try part of the name, or the email address."
-								: "No volunteers match these filters."
+								: filtered
+									? "No volunteers match these filters."
+									: "Volunteers appear here once they sign up."
 						}
+						{...(filtered
+							? {
+									action: (
+										<Button size="sm" variant="outline" onPress={clearFilters}>
+											Clear filters
+										</Button>
+									),
+								}
+							: {})}
 					/>
 				}
 			/>

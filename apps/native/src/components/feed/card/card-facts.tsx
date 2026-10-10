@@ -1,3 +1,4 @@
+import { Clock, type LucideIcon, MapPin } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
 import { Caption, Label } from "@/components/ui/typography";
@@ -13,10 +14,10 @@ import type { FeedEventItem, FeedNeedItem } from "@/lib/types";
  * mistake: a hairline stretched across 800pt of desktop column reads as a
  * divider, not as a measurement, and at 3pt it had no substance to read.
  *
- * A gauge is now **short and thick** - 8pt tall, capped at 120pt wide, sitting
- * at the end of the line it belongs to. A progress bar is a thing you compare
- * two lengths in, so it wants to be small enough to take in at once; the width
- * of a paragraph is exactly the wrong size for it.
+ * A gauge is **thick** - 8pt. An event's is also **short**, 120pt at the end of
+ * its line. A need's used to be too, and at desktop width that put the count
+ * and its bar ~450pt apart; it now spans its own inset block, directly under
+ * the count - see `NeedFacts`.
  */
 
 const DAY_MS = 86_400_000;
@@ -29,6 +30,12 @@ const GAUGE_HEIGHT = 8;
 
 const MONTH = new Intl.DateTimeFormat("en-IN", { month: "short" });
 const DAY = new Intl.DateTimeFormat("en-IN", { day: "numeric" });
+/** "Sat, 18 Oct" - a need's deadline. */
+const DEADLINE = new Intl.DateTimeFormat("en-IN", {
+	weekday: "short",
+	day: "numeric",
+	month: "short",
+});
 const WEEKDAY_TIME = new Intl.DateTimeFormat("en-IN", {
 	weekday: "short",
 	hour: "numeric",
@@ -41,21 +48,26 @@ function Gauge({
 	label,
 	max,
 	now,
+	width,
+	track,
 }: {
 	ratio: number;
 	fill: string;
 	label: string;
 	max: number;
 	now: number;
+	/** Omit to span the parent - the need block. Events pass `GAUGE_WIDTH`. */
+	width?: number;
+	track?: string;
 }) {
 	const { colors } = useTheme();
 	return (
 		<View
 			style={{
-				width: GAUGE_WIDTH,
+				...(width !== undefined ? { width } : { alignSelf: "stretch" }),
 				height: GAUGE_HEIGHT,
 				borderRadius: 999,
-				backgroundColor: colors.background.subtle,
+				backgroundColor: track ?? colors.background.subtle,
 				overflow: "hidden",
 			}}
 			accessibilityRole="progressbar"
@@ -105,7 +117,14 @@ function GaugeRow({
 			<Caption color="secondary" weight="medium" numberOfLines={1}>
 				{text}
 			</Caption>
-			<Gauge ratio={ratio} fill={fill} label={label} max={max} now={now} />
+			<Gauge
+				ratio={ratio}
+				fill={fill}
+				label={label}
+				max={max}
+				now={now}
+				width={GAUGE_WIDTH}
+			/>
 		</View>
 	);
 }
@@ -113,14 +132,27 @@ function GaugeRow({
 /* ── Need ── */
 
 /**
- * "20 of 52 blankets", and a gauge.
+ * One inset block that reads as a sentence: how many are still needed, how
+ * far along, where to bring them, and by when.
  *
- * There used to be a "32 to go" beside it. Two ways of saying one number is
- * one too many, and the gauge already shows the remainder as the unfilled part
- * of itself.
+ * This replaced a 120pt gauge pinned to the far end of a "20 of 52" line. On a
+ * phone that was fine; at desktop width the count sat at the left edge and the
+ * bar ~450pt away at the right, so the two halves of one measurement were read
+ * separately, if at all. The count now leads and the bar sits **directly under
+ * it, spanning the block** - the block is narrow enough (it is inside the
+ * card's padding, and inset again) that a full-width bar no longer reads as a
+ * divider, which was the reason the short gauge existed.
+ *
+ * It leads with the **remainder** ("32 blankets still needed"), not the
+ * progress. The remainder is what a volunteer can act on; "20 of 52" is kept,
+ * muted, on the same line for the reader who wants the whole.
+ *
+ * The block is `background.subtle` - a neutral inset, not a tone. The rule
+ * against tinted blocks (see the card shell) is about colour carrying a label;
+ * this carries facts and is grey in both schemes.
  */
 export function NeedFacts({ item }: { item: FeedNeedItem }) {
-	const { colors, spacing } = useTheme();
+	const { colors, spacing, borderRadius } = useTheme();
 	// Read once per mount. Recomputing `Date.now()` on every render made
 	// "closing soon" a value that could flip mid-interaction.
 	const [now] = useState(() => Date.now());
@@ -128,40 +160,134 @@ export function NeedFacts({ item }: { item: FeedNeedItem }) {
 
 	const target = need.quantity ?? 0;
 	const done = need.fulfilledQuantity ?? 0;
+	const remaining = Math.max(0, target - done);
 	const ratio = target > 0 ? Math.min(1, done / target) : 0;
-	const complete = target > 0 && ratio >= 1;
+	const complete = target > 0 && remaining === 0;
 	const unit = need.unit ? ` ${need.unit}` : "";
 
 	const expiresAt = need.expiresAt ? new Date(need.expiresAt) : null;
-	const msLeft = expiresAt ? expiresAt.getTime() - now : null;
+	const validExpiry =
+		expiresAt && !Number.isNaN(expiresAt.getTime()) ? expiresAt : null;
+	const msLeft = validExpiry ? validExpiry.getTime() - now : null;
 	const expired = msLeft !== null && msLeft <= 0;
 	const closingSoon = msLeft !== null && msLeft > 0 && msLeft < CLOSING_SOON_MS;
+	const closesToday =
+		validExpiry !== null &&
+		!expired &&
+		new Date(now).toDateString() === validExpiry.toDateString();
 
-	if (target === 0 && !expiresAt) return null;
+	const deadline = validExpiry
+		? expired
+			? "Closed"
+			: closesToday
+				? "Closes today"
+				: `By ${DEADLINE.format(validExpiry)}`
+		: null;
+	const dropOff = item.city ? `Drop off in ${item.city}` : null;
 
-	const closingNote = expired ? "Closed" : closingSoon ? "Closing soon" : null;
+	if (target === 0 && !deadline && !dropOff) return null;
 
 	return (
-		<View style={{ gap: spacing[2] }}>
+		<View
+			style={{
+				gap: spacing[2],
+				paddingHorizontal: spacing[3.5],
+				paddingVertical: spacing[3],
+				borderRadius: borderRadius.md,
+				backgroundColor: colors.background.subtle,
+			}}
+		>
 			{target > 0 && (
-				<GaugeRow
-					text={`${done} of ${target}${unit}`}
-					ratio={ratio}
-					fill={
-						(complete ? colors.success.main : colors.primary.main) as string
-					}
-					label={`${done} of ${target}${unit} collected`}
-					max={target}
-					now={done}
-				/>
+				<>
+					<View
+						style={{
+							flexDirection: "row",
+							alignItems: "baseline",
+							justifyContent: "space-between",
+							gap: spacing[3],
+						}}
+					>
+						<Label weight="bold" numberOfLines={1} style={{ flexShrink: 1 }}>
+							{complete
+								? `Target met - ${target}${unit}`
+								: `${remaining}${unit} still needed`}
+						</Label>
+						<Caption color="quaternary" numberOfLines={1}>
+							{done} of {target}
+						</Caption>
+					</View>
+					<Gauge
+						ratio={ratio}
+						fill={
+							(complete ? colors.success.main : colors.primary.main) as string
+						}
+						// Inside the subtle block, the card's usual track colour would
+						// vanish into its own ground; `border.medium` is one step darker
+						// in light and one lighter in dark.
+						track={colors.border.medium as string}
+						label={`${done} of ${target}${unit} collected`}
+						max={target}
+						now={done}
+					/>
+				</>
 			)}
-			{closingNote && (
-				<Caption
-					color={closingSoon ? (colors.error.ink as string) : "tertiary"}
+			{(dropOff || deadline) && (
+				<View
+					style={{
+						flexDirection: "row",
+						flexWrap: "wrap",
+						columnGap: spacing[4],
+						rowGap: spacing[1.5],
+					}}
 				>
-					{closingNote}
-				</Caption>
+					{dropOff && <Fact icon={MapPin} text={dropOff} />}
+					{deadline && (
+						<Fact
+							icon={Clock}
+							text={deadline}
+							// Closing soon keeps its old weight: the error ink, now on
+							// the deadline itself rather than on a separate line.
+							{...(closingSoon ? { color: colors.error.ink as string } : {})}
+						/>
+					)}
+				</View>
 			)}
+		</View>
+	);
+}
+
+function Fact({
+	icon: Icon,
+	text,
+	color,
+}: {
+	icon: LucideIcon;
+	text: string;
+	color?: string;
+}) {
+	const { colors, spacing } = useTheme();
+	return (
+		<View
+			style={{
+				flexDirection: "row",
+				alignItems: "center",
+				gap: spacing[1.5],
+				flexShrink: 1,
+			}}
+		>
+			<Icon
+				size={16}
+				color={color ?? (colors.text.quaternary as string)}
+				strokeWidth={2}
+			/>
+			<Caption
+				color={color ?? "secondary"}
+				weight={color ? "semibold" : "normal"}
+				numberOfLines={1}
+				style={{ flexShrink: 1 }}
+			>
+				{text}
+			</Caption>
 		</View>
 	);
 }

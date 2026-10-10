@@ -142,7 +142,8 @@ export function PropertyChip({
 						? { expanded: false, disabled: !!disabled }
 						: { checked: on, disabled: !!disabled }
 				}
-				hitSlop={4}
+				// 32pt chip, 44pt target.
+				hitSlop={6}
 				{...focusable}
 				style={({ pressed, hovered }) => ({
 					flexDirection: "row",
@@ -173,7 +174,7 @@ export function PropertyChip({
 					disabled={disabled}
 					accessibilityRole="button"
 					accessibilityLabel={`Remove ${label}`}
-					hitSlop={6}
+					hitSlop={8}
 					{...focusable}
 					style={({ pressed, hovered }) => ({
 						alignSelf: "stretch",

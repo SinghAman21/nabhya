@@ -1,5 +1,5 @@
 import { ChevronLeft } from "lucide-react-native";
-import { Children, type ReactNode } from "react";
+import { Children, type ReactNode, useEffect, useRef } from "react";
 import {
 	KeyboardAvoidingView,
 	Platform,
@@ -99,6 +99,22 @@ export function WizardShell({
 	const { colors, spacing } = useTheme();
 	const { isDesktop, width } = useMedia();
 	const insets = useSafeAreaInsets();
+	const scrollRef = useRef<ScrollView>(null);
+
+	/*
+	 * Back to the top on a new step, and when a submit fails. Every step renders
+	 * into this one `ScrollView`, so it kept the last step's offset: finishing
+	 * the long address step dropped you halfway down the next one, past its
+	 * title. And the error `Banner` sits above the form, while the button that
+	 * produced it is pinned at the bottom - a failed submit from a scrolled
+	 * step put the only explanation off-screen.
+	 */
+	useEffect(() => {
+		scrollRef.current?.scrollTo({ y: 0, animated: false });
+	}, [step]);
+	useEffect(() => {
+		if (error) scrollRef.current?.scrollTo({ y: 0, animated: true });
+	}, [error]);
 
 	// The aside only earns its column when the window can hold both at full
 	// width; below that it goes back to the end of the form, as on a phone.
@@ -106,6 +122,7 @@ export function WizardShell({
 
 	const body = (
 		<ScrollView
+			ref={scrollRef}
 			style={{ flex: 1 }}
 			contentContainerStyle={{
 				paddingHorizontal: spacing[5],
@@ -334,13 +351,17 @@ function WizardProgress({
 /* -------------------------------------------------------------------------- */
 
 /**
- * Back on the left at a fixed width, the step's one primary action filling the
- * rest. `secondary` is for the one place a wizard offers a real alternative
- * (skipping the NGO wizard to browse first), drawn as a quiet full-width row
- * under the pair rather than as a third button competing in it.
+ * The step's one primary action, full width. `secondary` is for the one place a
+ * wizard offers a real alternative (skipping the NGO wizard to browse first),
+ * drawn as a quiet full-width row under it rather than as a second button
+ * competing with it.
+ *
+ * There is no Back here. It used to sit beside the primary action while the
+ * progress row also carried a chevron, so every step after the first offered
+ * two Back controls doing the same thing. The chevron stays because it is where
+ * every pushed page in the app puts its way back (`ScreenHeader`).
  */
 export function WizardFooter({
-	onBack,
 	primaryLabel,
 	onPrimary,
 	loading,
@@ -348,7 +369,6 @@ export function WizardFooter({
 	note,
 	secondary,
 }: {
-	onBack?: () => void;
 	primaryLabel: string;
 	onPrimary: () => void;
 	loading?: boolean;
@@ -361,26 +381,9 @@ export function WizardFooter({
 
 	return (
 		<View style={{ gap: spacing[2] }}>
-			<View style={{ flexDirection: "row", gap: spacing[3] }}>
-				{onBack ? (
-					<Button
-						variant="outline"
-						onPress={onBack}
-						disabled={loading}
-						style={{ flexBasis: 104, flexGrow: 0 }}
-					>
-						Back
-					</Button>
-				) : null}
-				<Button
-					onPress={onPrimary}
-					loading={loading}
-					disabled={disabled}
-					style={{ flex: 1 }}
-				>
-					{primaryLabel}
-				</Button>
-			</View>
+			<Button onPress={onPrimary} loading={loading} disabled={disabled}>
+				{primaryLabel}
+			</Button>
 			{note ? (
 				<Caption
 					color="quaternary"

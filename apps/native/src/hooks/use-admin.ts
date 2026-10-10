@@ -40,6 +40,25 @@ export function useAdminOverview() {
 	});
 }
 
+/**
+ * Documents waiting on a superadmin, for the Queue row's badge in the rail.
+ *
+ * The overview's own query with a `select`, not a new endpoint: same cache
+ * entry as the dashboard, so the badge and the dashboard's tiles can never
+ * disagree, and every moderation mutation's `queryScopes.admin` invalidation
+ * already refreshes it. `enabled` so a rail without the row never asks.
+ */
+export function usePendingDocumentCount(enabled: boolean) {
+	return useQuery({
+		queryKey: queryKeys.adminOverview,
+		queryFn: adminApi.overview,
+		enabled,
+		select: (overview) =>
+			overview.documents.pendingOrgDocuments +
+			overview.documents.pendingUserDocuments,
+	});
+}
+
 export function useAdminAnalytics(query: Partial<AdminAnalyticsQuery> = {}) {
 	return useQuery({
 		queryKey: queryKeys.adminAnalytics(query),

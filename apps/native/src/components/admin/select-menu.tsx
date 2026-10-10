@@ -35,6 +35,11 @@ export interface SelectOption<T extends string> {
 	hint?: string;
 }
 
+/** On the web a ref to a host component is its DOM node. */
+function domFocus(node: View | null) {
+	(node as unknown as HTMLElement | null)?.focus?.();
+}
+
 export function SelectMenu<T extends string>({
 	label,
 	value,
@@ -55,17 +60,77 @@ export function SelectMenu<T extends string>({
 	const { colors, spacing, borderRadius, elevation, isDark } = useTheme();
 	const [open, setOpen] = useState(false);
 	const wrapper = useRef<View>(null);
+	const trigger = useRef<View>(null);
+	const optionRefs = useRef<Array<View | null>>([]);
 
 	const active = options.find((option) => option.value === value);
+	const selectedIndex = Math.max(
+		0,
+		options.findIndex((option) => option.value === value),
+	);
 
-	// Escape closes, and a click anywhere else closes. Both are document-level
-	// on the web and neither exists on native, where the panel is dismissed by
-	// picking something or tapping the trigger again.
+	/**
+	 * Closing hands focus back to the trigger. Without it, Escape or a pick left
+	 * focus on a menu item that had just been unmounted, which on the web drops
+	 * it to `<body>`: the next Tab started from the top of the page, and a
+	 * keyboard reviewer lost their place in the toolbar on every filter change.
+	 */
+	const close = () => {
+		setOpen(false);
+		if (Platform.OS === "web") domFocus(trigger.current);
+	};
+
+	// Opening puts focus on the current value, so the arrows start from where
+	// the reader already is rather than from the top of the list.
+	useEffect(() => {
+		if (Platform.OS !== "web" || !open) return;
+		const frame = requestAnimationFrame(() =>
+			domFocus(optionRefs.current[selectedIndex] ?? null),
+		);
+		return () => cancelAnimationFrame(frame);
+	}, [open, selectedIndex]);
+
+	// Escape closes, a click anywhere else closes, and the arrows move between
+	// options (Enter and Space press the focused one - that is the Pressable's
+	// own keyboard handling). All document-level on the web and none of it
+	// exists on native, where the panel is dismissed by picking something or
+	// tapping the trigger again.
 	useEffect(() => {
 		if (Platform.OS !== "web" || !open) return;
 
 		const onKey = (event: KeyboardEvent) => {
-			if (event.key === "Escape") setOpen(false);
+			if (event.key === "Escape") {
+				event.preventDefault();
+				setOpen(false);
+				domFocus(trigger.current);
+				return;
+			}
+			if (event.key === "Tab") {
+				setOpen(false);
+				return;
+			}
+			const nodes = optionRefs.current.slice(0, options.length);
+			const current = nodes.findIndex(
+				(node) =>
+					(node as unknown as Element | null) === document.activeElement,
+			);
+			let next: number | null = null;
+			if (event.key === "ArrowDown") {
+				next = current < 0 ? 0 : (current + 1) % nodes.length;
+			} else if (event.key === "ArrowUp") {
+				next =
+					current < 0
+						? nodes.length - 1
+						: (current - 1 + nodes.length) % nodes.length;
+			} else if (event.key === "Home") {
+				next = 0;
+			} else if (event.key === "End") {
+				next = nodes.length - 1;
+			}
+			if (next !== null) {
+				event.preventDefault();
+				domFocus(nodes[next] ?? null);
+			}
 		};
 		// Capture phase: the trigger's own press handler runs on bubble, so a
 		// bubble-phase listener here would close the panel and let the trigger
@@ -84,11 +149,12 @@ export function SelectMenu<T extends string>({
 			document.removeEventListener("keydown", onKey);
 			document.removeEventListener("pointerdown", onPointerDown, true);
 		};
-	}, [open]);
+	}, [open, options.length]);
 
 	return (
 		<View ref={wrapper} style={{ position: "relative" }}>
 			<Pressable
+				ref={trigger}
 				onPress={() => setOpen((previous) => !previous)}
 				accessibilityRole="button"
 				accessibilityLabel={`${label}: ${active?.label ?? "any"}`}
@@ -140,14 +206,17 @@ export function SelectMenu<T extends string>({
 						...elevation.card,
 					}}
 				>
-					{options.map((option) => {
+					{options.map((option, index) => {
 						const selected = option.value === value;
 						return (
 							<Pressable
 								key={option.value}
+								ref={(node) => {
+									optionRefs.current[index] = node;
+								}}
 								onPress={() => {
 									onChange(option.value);
-									setOpen(false);
+									close();
 								}}
 								accessibilityRole="menuitem"
 								accessibilityState={{ selected }}

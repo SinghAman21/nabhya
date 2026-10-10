@@ -30,7 +30,7 @@ export function SwitchRow({
 	disabled?: boolean;
 	tone?: "primary" | "error";
 }) {
-	const { colors, spacing, borderRadius } = useTheme();
+	const { colors, spacing, borderRadius, isDark } = useTheme();
 	const accent = tone === "error" ? colors.error : colors.primary;
 
 	return (
@@ -82,7 +82,12 @@ export function SwitchRow({
 						? colors.error.main
 						: colors.primary.main) as string,
 				}}
-				thumbColor={"#FFFFFF"}
+				// Light on both tracks in both schemes, as `ui/switch` draws it:
+				// the card colour in light mode, the foreground in dark, where a
+				// card-coloured thumb would sink into the dark "off" track.
+				thumbColor={
+					(isDark ? colors.text.primary : colors.background.card) as string
+				}
 			/>
 		</Pressable>
 	);

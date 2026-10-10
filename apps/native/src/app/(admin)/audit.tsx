@@ -1,4 +1,4 @@
-import type { AuditLogSort, SortDir } from "@nabhya/shared";
+import type { AuditLogSort } from "@nabhya/shared";
 import { ScrollText } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
@@ -6,14 +6,23 @@ import { AuditRow, auditTone } from "@/components/admin/audit-row";
 import { ConsoleList } from "@/components/admin/console-list";
 import type { TableColumn } from "@/components/admin/data-table";
 import { AdminScreen } from "@/components/admin/list-chrome";
+import { OrgDetailSheet } from "@/components/admin/org-detail-sheet";
 import { SelectMenu } from "@/components/admin/select-menu";
 import { Toolbar } from "@/components/admin/toolbar";
+import { UserDetailSheet } from "@/components/admin/user-detail-sheet";
 import { EmptyState } from "@/components/screen-shell";
 import { humanizeStatus } from "@/components/status-pill";
+import { Button } from "@/components/ui/button";
+import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption } from "@/components/ui/typography";
 import { useAuditLogsPaged } from "@/hooks/use-admin-lists";
+import {
+	useParamSearch,
+	useParamSort,
+	useParamState,
+} from "@/hooks/use-admin-params";
 import { useTheme } from "@/hooks/use-theme";
-import { useDebounced } from "@/hooks/useDebounced";
+import { focusable, type PressState } from "@/lib/focus";
 import { formatDateTime } from "@/lib/format";
 import type { AuditLogEntry } from "@/lib/types";
 
@@ -26,6 +35,17 @@ const ENTITIES = [
 	{ value: "EVENT" as const, label: "Events" },
 	{ value: "DONATION" as const, label: "Donations" },
 ];
+
+const ENTITY_VALUES = ENTITIES.map((option) => option.value);
+const SORT_KEYS: AuditLogSort[] = ["createdAt", "action"];
+
+/** What an entity is called in the "On" column - the console's own nouns. */
+const ENTITY_NOUN: Record<string, string> = {
+	ORGANIZATION: "NGO",
+	USER: "Account",
+	EVENT: "Event",
+	DONATION: "Donation",
+};
 
 /**
  * The audit log.
@@ -45,19 +65,37 @@ const ENTITIES = [
  * destructive, constructive, or neither. An operations admin scans this for the
  * one suspension among a hundred approvals, and that is a job for peripheral
  * vision, not for reading.
+ *
+ * **"On" opens the record when the console has one to open.** An NGO or an
+ * account entry is a link to the same drawer the directories use; it was a
+ * truncated UUID that could only be copied. Events and donations have no
+ * console drawer, so they stay plain text. Filters, the search and the sort
+ * live in the URL, like every console list.
  */
 export default function AdminAuditLog() {
 	const { colors, spacing } = useTheme();
-	const [entity, setEntity] = useState<EntityFilter>("ALL");
-	const [search, setSearch] = useState("");
-	const [sort, setSort] = useState<{ sort: AuditLogSort; dir: SortDir }>({
-		sort: "createdAt",
-		dir: "desc",
-	});
+	const [entity, setEntity] = useParamState<EntityFilter>(
+		"on",
+		"ALL",
+		ENTITY_VALUES,
+	);
+	const {
+		text: search,
+		setText: setSearch,
+		debounced: debouncedSearch,
+	} = useParamSearch();
+	const [sort, setSort] = useParamSort<AuditLogSort>(
+		{ sort: "createdAt", dir: "desc" },
+		SORT_KEYS,
+	);
+	const [openOrg, setOpenOrg] = useState<string | null>(null);
+	const [openUser, setOpenUser] = useState<string | null>(null);
 
 	// The server matches `action` against SCREAMING_SNAKE values, so "suspend
 	// org" has to become "SUSPEND_ORG" before it can match anything.
-	const action = useDebounced(search.trim().toUpperCase().replace(/\s+/g, "_"));
+	const toAction = (text: string) => text.toUpperCase().replace(/\s+/g, "_");
+	const action = toAction(debouncedSearch);
+	const filtered = !!action || entity !== "ALL";
 	const list = useAuditLogsPaged({
 		...(action ? { action } : {}),
 		...(entity === "ALL" ? {} : { entityName: entity }),
@@ -119,13 +157,12 @@ export default function AdminAuditLog() {
 			minWidth: 180,
 			wideOnly: true,
 			render: (entry) => (
-				<Caption color="quaternary" numberOfLines={1}>
-					{entry.entityName
-						? `${humanizeStatus(entry.entityName)}${
-								entry.entityId ? ` ${entry.entityId.slice(0, 8)}` : ""
-							}`
-						: "-"}
-				</Caption>
+				<EntityCell
+					entry={entry}
+					onOpen={(name, id) =>
+						name === "ORGANIZATION" ? setOpenOrg(id) : setOpenUser(id)
+					}
+				/>
 			),
 		},
 		{
@@ -155,9 +192,7 @@ export default function AdminAuditLog() {
 					search={search}
 					onSearchChange={setSearch}
 					searchPlaceholder="Filter by action, e.g. suspend"
-					searchPending={
-						search.trim().toUpperCase().replace(/\s+/g, "_") !== action
-					}
+					searchPending={toAction(search.trim()) !== action}
 					autoCapitalize="characters"
 				>
 					<SelectMenu
@@ -189,17 +224,98 @@ export default function AdminAuditLog() {
 				loadingLabel="Loading the log"
 				renderCard={(entry) => <AuditRow entry={entry} />}
 				empty={
+					// "Nothing recorded" only when nothing is filtered: over a filter
+					// it claimed the log was empty when the filter had hidden it.
 					<EmptyState
 						icon={ScrollText}
-						title="Nothing recorded"
+						title={filtered ? "No matching entries" : "Nothing recorded"}
 						description={
-							action
-								? "No actions match that filter."
+							filtered
+								? "No actions match these filters."
 								: "Moderation and lifecycle actions appear here as they happen."
 						}
+						{...(filtered
+							? {
+									action: (
+										<Button
+											size="sm"
+											variant="outline"
+											onPress={() => {
+												setSearch("");
+												setEntity("ALL");
+											}}
+										>
+											Clear filters
+										</Button>
+									),
+								}
+							: {})}
 					/>
 				}
 			/>
+
+			{/* Siblings, one at a time - a drawer is never opened from inside
+			    another (see `OrgDetailSheet`'s `onOpenOwner`). */}
+			<OrgDetailSheet
+				organizationId={openOrg}
+				onClose={() => setOpenOrg(null)}
+				onOpenOwner={(userId) => {
+					setOpenOrg(null);
+					setOpenUser(userId);
+				}}
+			/>
+			<UserDetailSheet userId={openUser} onClose={() => setOpenUser(null)} />
 		</AdminScreen>
+	);
+}
+
+/**
+ * The "On" cell: the entity's noun and a short id, as a link when the console
+ * has a drawer for it. The short id stays - two entries on the same NGO are
+ * told apart by it at a glance - but it is no longer the whole cell.
+ */
+function EntityCell({
+	entry,
+	onOpen,
+}: {
+	entry: AuditLogEntry;
+	onOpen: (name: "ORGANIZATION" | "USER", id: string) => void;
+}) {
+	const { colors } = useTheme();
+
+	if (!entry.entityName) {
+		return <Caption color="quaternary">-</Caption>;
+	}
+
+	const noun =
+		ENTITY_NOUN[entry.entityName] ?? humanizeStatus(entry.entityName);
+	const text = entry.entityId ? `${noun} ${entry.entityId.slice(0, 8)}` : noun;
+	const name = entry.entityName;
+	const id = entry.entityId;
+
+	if (!id || (name !== "ORGANIZATION" && name !== "USER")) {
+		return (
+			<Caption color="quaternary" numberOfLines={1}>
+				{text}
+			</Caption>
+		);
+	}
+
+	return (
+		<Pressable
+			onPress={() => onOpen(name, id)}
+			accessibilityRole="link"
+			accessibilityLabel={`Open this ${noun.toLowerCase()}`}
+			hitSlop={6}
+			{...focusable}
+			style={(state) => {
+				const { pressed, hovered } = state as PressState;
+				return { opacity: pressed ? 0.6 : hovered ? 0.85 : 1 };
+			}}
+		>
+			<Caption weight="medium" color={colors.primary.ink} numberOfLines={1}>
+				{text}
+			</Caption>
+		</Pressable>
 	);
 }

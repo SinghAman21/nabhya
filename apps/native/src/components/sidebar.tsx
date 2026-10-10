@@ -17,12 +17,14 @@ import {
 } from "@/components/appearance-row";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H5 } from "@/components/ui/typography";
+import { usePendingDocumentCount } from "@/hooks/use-admin";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useSignOut } from "@/hooks/use-auth";
 import { useUnreadCount } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
-import { focusable } from "@/lib/focus";
+import { currentPage, focusable } from "@/lib/focus";
+import { motionDuration, useReducedMotion } from "@/lib/motion";
 import { storage } from "@/lib/storage";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -56,7 +58,7 @@ export interface NavItem {
 	 * Named rather than passed as a number so `nav-items.ts` stays static data
 	 * and the one query behind it runs only for rails that carry the row.
 	 */
-	badge?: "unread-notifications";
+	badge?: "unread-notifications" | "pending-documents";
 }
 
 const EXPANDED_WIDTH = 264;
@@ -162,6 +164,7 @@ function RailRow({
 			accessibilityRole={role}
 			accessibilityLabel={accessibilityLabel ?? label}
 			{...(role === "link" ? { accessibilityState: { selected: active } } : {})}
+			{...(role === "link" ? currentPage(active) : {})}
 			{...focusable}
 			style={(state) => {
 				const { pressed, hovered } = state as PressState;
@@ -601,6 +604,8 @@ export function Sidebar({
 	const router = useRouter();
 	const { isDesktop } = useMedia();
 	const insets = useSafeAreaInsets();
+	// With reduced motion the rail and the drawer snap rather than slide.
+	const reduce = useReducedMotion();
 
 	const sections = useMemo(() => groupBySection(navItems), [navItems]);
 
@@ -610,12 +615,23 @@ export function Sidebar({
 	);
 	const { data: unreadData } = useUnreadCount(!!email && wantsUnread);
 	const unread = unreadData?.unreadCount ?? 0;
-	const badgeFor = (item: NavItem) =>
-		item.badge === "unread-notifications" && unread > 0
-			? unread > 99
-				? "99+"
-				: String(unread)
-			: undefined;
+	// The superadmin's Queue row: documents waiting on a decision.
+	const wantsPending = navItems.some(
+		(item) => item.badge === "pending-documents",
+	);
+	const { data: pendingDocuments = 0 } = usePendingDocumentCount(
+		!!email && wantsPending,
+	);
+	const badgeCount = (item: NavItem) =>
+		item.badge === "unread-notifications"
+			? unread
+			: item.badge === "pending-documents"
+				? pendingDocuments
+				: 0;
+	const badgeFor = (item: NavItem) => {
+		const count = badgeCount(item);
+		return count > 0 ? (count > 99 ? "99+" : String(count)) : undefined;
+	};
 
 	/* ---- Collapse ---- */
 
@@ -640,13 +656,13 @@ export function Sidebar({
 		storage.set(COLLAPSE_KEY, next ? "1" : "0");
 		Animated.timing(openness, {
 			toValue: next ? 0 : 1,
-			duration: 260,
+			duration: motionDuration(260, reduce),
 			// Decelerating: quick to commit, settling into place. No overshoot -
 			// a rail that bounces past its width reads as a glitch, not physics.
 			easing: Easing.bezier(0.22, 1, 0.36, 1),
 			useNativeDriver: false,
 		}).start();
-	}, [collapsed, openness]);
+	}, [collapsed, openness, reduce]);
 
 	const railWidth = openness.interpolate({
 		inputRange: [0, 1],
@@ -678,7 +694,7 @@ export function Sidebar({
 			setDrawerMounted(true);
 			Animated.timing(drawerAnim, {
 				toValue: 1,
-				duration: 300,
+				duration: motionDuration(300, reduce),
 				easing: Easing.bezier(0.22, 1, 0.36, 1),
 				useNativeDriver: true,
 			}).start();
@@ -686,13 +702,13 @@ export function Sidebar({
 		}
 		Animated.timing(drawerAnim, {
 			toValue: 0,
-			duration: 220,
+			duration: motionDuration(220, reduce),
 			easing: Easing.in(Easing.cubic),
 			useNativeDriver: true,
 		}).start(({ finished }) => {
 			if (finished) setDrawerMounted(false);
 		});
-	}, [mobileOpen, drawerAnim]);
+	}, [mobileOpen, drawerAnim, reduce]);
 
 	const drawerTranslateX = drawerAnim.interpolate({
 		inputRange: [0, 1],
@@ -732,7 +748,9 @@ export function Sidebar({
 							dot={animated && collapsed && !!badgeFor(item)}
 							accessibilityLabel={
 								badgeFor(item)
-									? `${item.label}, ${badgeFor(item)} unread`
+									? `${item.label}, ${badgeFor(item)} ${
+											item.badge === "pending-documents" ? "waiting" : "unread"
+										}`
 									: undefined
 							}
 							{...(animated ? { labelOpacity } : {})}
@@ -843,6 +861,8 @@ export function Sidebar({
 							onPress={() => setMobileOpen(false)}
 							accessibilityRole="button"
 							accessibilityLabel="Close navigation menu"
+							// Not a tab stop: the drawer's own X is the keyboard's way out.
+							focusable={false}
 							style={{ flex: 1 }}
 						/>
 					</Animated.View>

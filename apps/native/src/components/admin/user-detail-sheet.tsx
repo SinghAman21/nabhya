@@ -3,17 +3,12 @@ import { useState } from "react";
 import { View } from "react-native";
 import { UserActivityTimeline } from "@/components/admin/activity-timeline";
 import { DocumentReviewRow } from "@/components/admin/document-review-row";
-import {
-	FactGroup,
-	ReasonField,
-	Section,
-} from "@/components/admin/sheet-parts";
+import { FactGroup, ReasonStep, Section } from "@/components/admin/sheet-parts";
 import {
 	Banner,
 	ErrorState,
 	LoadingState,
 	MetricRow,
-	SectionTitle,
 	Surface,
 } from "@/components/screen-shell";
 import {
@@ -51,8 +46,8 @@ export function UserDetailSheet({
 	onClose: () => void;
 }) {
 	const { spacing } = useTheme();
-	const [reason, setReason] = useState("");
-	const [reasonError, setReasonError] = useState<string | null>(null);
+	// The footer's "why?" step for a suspension - see `ReasonStep`.
+	const [asking, setAsking] = useState(false);
 
 	const query = useAdminUser(userId ?? undefined);
 	const setStatus = useSetUserStatus();
@@ -61,51 +56,36 @@ export function UserDetailSheet({
 	const suspended = user?.status === "SUSPENDED";
 
 	const close = () => {
-		setReason("");
-		setReasonError(null);
+		setAsking(false);
 		onClose();
 	};
 
-	const changeReason = (text: string) => {
-		setReason(text);
-		if (reasonError && text.trim()) setReasonError(null);
+	const suspend = (reason: string) => {
+		if (!userId) return;
+		setStatus.mutate(
+			{ id: userId, input: { status: "SUSPENDED", reason } },
+			{
+				onSuccess: () => {
+					setAsking(false);
+					toast.success("Account suspended.");
+				},
+				onError: (error) => toast.error(apiErrorMessage(error)),
+			},
+		);
 	};
 
-	const toggleSuspension = async () => {
-		if (!userId || !user) return;
-		const suspending = user.status !== "SUSPENDED";
-		const text = reason.trim();
-
-		if (suspending && !text) {
-			setReasonError("Add a reason before suspending this account.");
-			return;
-		}
-		setReasonError(null);
-
+	const reinstate = async () => {
+		if (!userId) return;
 		const ok = await confirm({
-			title: suspending ? "Suspend account?" : "Reinstate account?",
-			message: suspending
-				? "They will be signed out and blocked from the app until reinstated."
-				: "They will regain access immediately.",
-			confirmLabel: suspending ? "Suspend" : "Reinstate",
-			destructive: suspending,
+			title: "Reinstate account?",
+			message: "They will regain access immediately.",
+			confirmLabel: "Reinstate",
 		});
 		if (!ok) return;
 		setStatus.mutate(
+			{ id: userId, input: { status: "ACTIVE" } },
 			{
-				id: userId,
-				input: {
-					status: suspending ? "SUSPENDED" : "ACTIVE",
-					reason: text || undefined,
-				},
-			},
-			{
-				onSuccess: () => {
-					setReason("");
-					toast.success(
-						suspending ? "Account suspended." : "Account reinstated.",
-					);
-				},
+				onSuccess: () => toast.success("Account reinstated."),
 				onError: (error) => toast.error(apiErrorMessage(error)),
 			},
 		);
@@ -119,10 +99,20 @@ export function UserDetailSheet({
 			title={user?.fullName ?? "Account"}
 			subtitle={user?.email}
 			footer={
-				user ? (
+				user && asking ? (
+					<ReasonStep
+						title={`Why suspend ${user.fullName ?? user.email}?`}
+						consequence="They are signed out and blocked from the app until reinstated. The reason is recorded in the audit log."
+						placeholder="e.g. Repeated no-shows reported by three NGOs"
+						confirmLabel="Suspend"
+						pending={setStatus.isPending}
+						onCancel={() => setAsking(false)}
+						onConfirm={suspend}
+					/>
+				) : user ? (
 					<Button
 						variant={suspended ? "outline" : "destructive"}
-						onPress={toggleSuspension}
+						onPress={suspended ? reinstate : () => setAsking(true)}
 						loading={setStatus.isPending}
 					>
 						{suspended ? "Reinstate account" : "Suspend account"}
@@ -328,15 +318,6 @@ export function UserDetailSheet({
 					<Section title="Timeline">
 						{userId ? <UserActivityTimeline userId={userId} /> : null}
 					</Section>
-
-					<SectionTitle>Decision</SectionTitle>
-					<ReasonField
-						value={reason}
-						onChangeText={changeReason}
-						placeholder="Why is this account being actioned?"
-						requiredFor="suspend"
-						error={reasonError}
-					/>
 				</>
 			)}
 		</Drawer>

@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { Building2, MapPin, Search } from "lucide-react-native";
+import { Building2, MapPin } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
 import { PAGE_SIZE, PagedList, usePagedQuery } from "@/components/paged-list";
@@ -10,15 +10,17 @@ import {
 	Screen,
 	ScreenHeader,
 } from "@/components/screen-shell";
+import { SearchField } from "@/components/search-field";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, Label } from "@/components/ui/typography";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useDebounced } from "@/hooks/useDebounced";
 import { orgDirectoryApi, queryKeys } from "@/lib/api";
-import { focusable, focusWithin } from "@/lib/focus";
+import { cityCoordinates } from "@/lib/cities";
+import { focusable } from "@/lib/focus";
+import { READING_COLUMN } from "@/lib/reading-column";
 import { useAuthStore } from "@/store/auth-store";
 
 type Mode = "all" | "nearby";
@@ -41,12 +43,18 @@ const MODES: Array<{ value: Mode; label: string }> = [
 /**
  * Public NGO directory.
  *
- * "Near me" uses the coordinates on the signed-in user's own organisation or
- * their saved city - the app never asks for device location, which would be a
- * heavy permission for a browse screen.
+ * "Near me" measures from the pin the person saved ("use my location" at
+ * onboarding or in Edit profile), else from the centre of their saved city,
+ * else from their organisation's city - the app never asks for device location
+ * here, which would be a heavy permission for a browse screen.
+ *
+ * It used to send Mumbai's coordinates for everyone and enable itself only for
+ * an account that owned an organisation, so a volunteer - the person the tab
+ * is for - always got "we don't know where you are", and the fix it offered
+ * (add your city) changed nothing.
  */
 export default function NgoDirectory() {
-	const { colors, spacing, borderRadius } = useTheme();
+	const { colors, spacing } = useTheme();
 	const router = useRouter();
 	const [mode, setMode] = useState<Mode>("all");
 	const [search, setSearch] = useState("");
@@ -63,15 +71,24 @@ export default function NgoDirectory() {
 		enabled: mode === "all",
 	});
 
-	const hasFix = !!me?.organization;
+	const pin =
+		me?.latitude && me.longitude
+			? { latitude: Number(me.latitude), longitude: Number(me.longitude) }
+			: null;
+	const origin =
+		pin ?? cityCoordinates(me?.city) ?? cityCoordinates(me?.organization?.city);
+	const originLabel = pin
+		? "your saved location"
+		: (me?.city ?? me?.organization?.city ?? "");
+	const hasFix = !!origin;
 	const nearby = usePagedQuery({
-		queryKey: queryKeys.nearby({ limit: PAGE_SIZE }),
+		queryKey: queryKeys.nearby({ ...origin, limit: PAGE_SIZE }),
 		fetchPage: (page) =>
 			orgDirectoryApi.nearby({
 				page,
 				limit: PAGE_SIZE,
-				latitude: 19.076,
-				longitude: 72.8777,
+				latitude: origin?.latitude ?? 0,
+				longitude: origin?.longitude ?? 0,
 				radiusKm: 25,
 			}),
 		// Only once we actually have a fix; otherwise the query never runs.
@@ -102,43 +119,25 @@ export default function NgoDirectory() {
 	const active = showingNearby ? nearby : list;
 
 	return (
-		<Screen>
+		<Screen style={READING_COLUMN}>
 			<ScreenHeader
 				back
 				title="NGOs"
 				subtitle="Verified organisations you can support"
 			/>
 
-			<View
-				{...focusWithin}
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[2],
-					backgroundColor: colors.background.subtle,
-					borderRadius: borderRadius.lg,
-					paddingHorizontal: spacing[3.5],
-					marginBottom: spacing[3],
-				}}
-			>
-				<Search size={18} color={colors.text.quaternary as string} />
-				<Input
-					placeholder="Search by name"
-					value={search}
-					onChangeText={setSearch}
-					autoCapitalize="none"
-					autoCorrect={false}
-					returnKeyType="search"
-					accessibilityLabel="Search NGOs"
-					style={{
-						flex: 1,
-						backgroundColor: "transparent",
-						borderWidth: 0,
-						paddingHorizontal: 0,
-						paddingVertical: spacing[3],
-					}}
-				/>
-			</View>
+			{/* Search is a name filter on All NGOs; "Near me" takes no term, so the
+			    field is only drawn where typing in it does something. */}
+			{mode === "all" ? (
+				<View style={{ marginBottom: spacing[3] }}>
+					<SearchField
+						value={search}
+						onChange={setSearch}
+						placeholder="Search NGOs by name"
+						pending={search.trim() !== debouncedSearch}
+					/>
+				</View>
+			) : null}
 
 			<FilterChips options={MODES} value={mode} onChange={setMode} />
 
@@ -146,7 +145,13 @@ export default function NgoDirectory() {
 				<EmptyState
 					icon={MapPin}
 					title="We don't know where you are yet"
-					description="Add your city in your profile and we'll show the NGOs closest to you."
+					description={
+						email
+							? me?.city
+								? `We can't place ${me.city} on the map yet. Use "my current location" in your profile and we'll measure from there.`
+								: "Add your city in your profile and we'll show the NGOs closest to you."
+							: "Sign in and add your city, and we'll show the NGOs closest to you."
+					}
 					action={
 						email ? (
 							<Button
@@ -154,7 +159,7 @@ export default function NgoDirectory() {
 								variant="outline"
 								onPress={() => router.push("/edit-profile")}
 							>
-								Add your city
+								{me?.city ? "Set your location" : "Add your city"}
 							</Button>
 						) : (
 							<Button
@@ -178,10 +183,7 @@ export default function NgoDirectory() {
 					header={
 						showingNearby ? (
 							<View style={{ marginBottom: spacing[3] }}>
-								<Banner
-									tone="info"
-									title="Within 25 km of your saved location"
-								/>
+								<Banner tone="info" title={`Within 25 km of ${originLabel}`} />
 							</View>
 						) : undefined
 					}

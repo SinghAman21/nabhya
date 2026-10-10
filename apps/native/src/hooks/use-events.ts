@@ -1,6 +1,7 @@
 import type {
 	ApplicationQuery,
 	ApplyToEventInput,
+	BulkReviewApplicationsInput,
 	CreateEventInput,
 	OrgEventQuery,
 	PublicEventQuery,
@@ -118,6 +119,20 @@ export function useDeleteEvent() {
 			queryClient.invalidateQueries({ queryKey: queryScopes.orgEvents });
 			queryClient.invalidateQueries({ queryKey: queryKeys.orgOverview });
 			queryClient.invalidateQueries({ queryKey: queryScopes.events });
+		},
+	});
+}
+
+/** Accept or reject a selection; returns per-applicant outcomes. */
+export function useBulkReviewApplications(eventId: string) {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (input: BulkReviewApplicationsInput) =>
+			orgEventsApi.bulkReview(eventId, input),
+		// Settled, not success: a partial failure still changed rows.
+		onSettled: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.orgEvents });
+			queryClient.invalidateQueries({ queryKey: queryKeys.orgOverview });
 		},
 	});
 }

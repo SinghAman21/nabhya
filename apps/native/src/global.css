@@ -58,11 +58,15 @@
 	.dark:root {
 		color-scheme: dark;
 
-		--background: 0 0% 4%;
+		/* `background.warm` and `background.card`. These were 4% and 9% -
+		   #0A0A0A and #171717 - so a Tailwind-styled primitive (a Select's
+		   trigger, a DropdownMenu panel) sat a visible step off the inline-styled
+		   card and page around it. */
+		--background: 0 0% 5%; /* #0E0E0E */
 		--foreground: 0 0% 96%;
-		--card: 0 0% 9%;
+		--card: 0 0% 10%; /* #191919 */
 		--card-foreground: 0 0% 96%;
-		--popover: 0 0% 9%;
+		--popover: 0 0% 10%;
 		--popover-foreground: 0 0% 96%;
 		--primary: 19 100% 63%;
 		--primary-foreground: 19 44% 7%;

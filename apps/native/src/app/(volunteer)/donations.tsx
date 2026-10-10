@@ -16,6 +16,7 @@ import {
 } from "@/components/screen-shell";
 import {
 	humanizeStatus,
+	pledgeStatusLabel,
 	pledgeTone,
 	StatusPill,
 } from "@/components/status-pill";
@@ -28,6 +29,7 @@ import { useWithdrawPledge } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage, donationsApi, needsApi, queryKeys } from "@/lib/api";
 import { formatDateTime, formatRelative } from "@/lib/format";
+import { READING_COLUMN } from "@/lib/reading-column";
 import type { MyDonation } from "@/lib/types";
 
 type Tab = "items" | "money";
@@ -49,7 +51,7 @@ export default function Donations() {
 	const [tab, setTab] = useState<Tab>("items");
 
 	return (
-		<Screen>
+		<Screen style={READING_COLUMN}>
 			<ScreenHeader back title="Your giving" />
 
 			<FilterChips options={TABS} value={tab} onChange={setTab} />
@@ -114,15 +116,44 @@ function ItemPledges() {
 				const amount = item.quantity
 					? `${item.quantity}${item.need?.unit ? ` ${item.need.unit}` : ""}`
 					: null;
+				// Amber for waiting, green for "they said yes" - the same split
+				// `applications.tsx` makes, so an acceptance never reads as a problem.
 				const next =
 					item.status === "PENDING"
-						? "Waiting for the NGO to review"
+						? { text: "Waiting for the NGO to review", ink: colors.warning.ink }
 						: item.status === "ACCEPTED"
-							? "Accepted - arrange the handover with the NGO"
+							? {
+									text: "Accepted - the NGO will message you to arrange the handover",
+									ink: colors.success.ink,
+								}
 							: null;
 
+				// Withdraw rides in `footer`, outside the card's press target.
+				const withdrawButton =
+					item.status === "PENDING" ? (
+						<Button
+							size="sm"
+							variant="outline"
+							onPress={() => confirmWithdraw(item.need.id)}
+							// This row only - one shared flag spun every row at once.
+							loading={
+								withdraw.isPending &&
+								withdraw.variables?.needId === item.need.id
+							}
+							disabled={withdraw.isPending}
+							style={{ alignSelf: "flex-start", marginTop: spacing[3] }}
+						>
+							Withdraw pledge
+						</Button>
+					) : undefined;
+
 				return (
-					<Surface>
+					<Surface
+						// The need's page carries the full post and its progress; the
+						// card was a dead end before.
+						onPress={() => router.push(`/needs/${item.need.id}`)}
+						footer={withdrawButton}
+					>
 						<View
 							style={{
 								flexDirection: "row",
@@ -136,7 +167,7 @@ function ItemPledges() {
 								{item.organization?.organizationName}
 							</Caption>
 							<StatusPill
-								label={humanizeStatus(item.status)}
+								label={pledgeStatusLabel(item.status)}
 								tone={pledgeTone(item.status)}
 							/>
 						</View>
@@ -148,11 +179,8 @@ function ItemPledges() {
 						</Caption>
 
 						{next && (
-							<Caption
-								color={colors.warning.ink}
-								style={{ marginTop: spacing[2] }}
-							>
-								{next}
+							<Caption color={next.ink} style={{ marginTop: spacing[2] }}>
+								{next.text}
 							</Caption>
 						)}
 
@@ -160,16 +188,6 @@ function ItemPledges() {
 							<Caption color="secondary" style={{ marginTop: spacing[2] }}>
 								“{item.reviewNote}”
 							</Caption>
-						)}
-						{item.status === "PENDING" && (
-							<Button
-								size="sm"
-								variant="outline"
-								onPress={() => confirmWithdraw(item.need.id)}
-								loading={withdraw.isPending}
-							>
-								Withdraw pledge
-							</Button>
 						)}
 					</Surface>
 				);
@@ -229,6 +247,7 @@ function DonationCard({
 	onReceipt: () => void;
 }) {
 	const { colors, spacing } = useTheme();
+	const router = useRouter();
 	const tone =
 		item.status === "COMPLETED"
 			? "success"
@@ -262,6 +281,21 @@ function DonationCard({
 				<Caption color={colors.warning.ink} style={{ marginTop: spacing[2] }}>
 					Waiting for the payment to be confirmed
 				</Caption>
+			)}
+			{item.status === "FAILED" && (
+				<>
+					<Caption color="tertiary" style={{ marginTop: spacing[2] }}>
+						Nothing was charged.
+					</Caption>
+					<Button
+						size="sm"
+						variant="outline"
+						onPress={() => router.push(`/ngos/${item.organization.id}`)}
+						style={{ alignSelf: "flex-start", marginTop: spacing[3] }}
+					>
+						Try again
+					</Button>
+				</>
 			)}
 
 			{/* Only completed payments have a receipt - the server refuses one for

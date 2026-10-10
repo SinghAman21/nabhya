@@ -1,8 +1,10 @@
 import type { PostTag } from "@nabhya/shared";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import {
 	Building2,
 	CalendarDays,
+	ChevronRight,
 	FileText,
 	HandCoins,
 	HeartHandshake,
@@ -39,7 +41,13 @@ import { useOrgAccess } from "@/hooks/use-org-access";
 import { useMyOrganization, useOrgOverview } from "@/hooks/use-organization";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
-import { apiErrorMessage } from "@/lib/api";
+import {
+	apiErrorMessage,
+	engagementApi,
+	orgEventsApi,
+	orgNeedsApi,
+	queryKeys,
+} from "@/lib/api";
 import { focusable } from "@/lib/focus";
 import { orgVerificationCopy } from "@/lib/org-verification";
 import { verticalScrollbar } from "@/lib/scroll";
@@ -49,13 +57,15 @@ import { useAuthStore } from "@/store/auth-store";
  * The organisation's home tab, in the order a coordinator needs it:
  *
  * 1. Anything blocking them - verification, while it is not done.
- * 2. Anything they came here to *do* - post, ask for something, run an event.
- *    A dashboard that only reports is a wall the coordinator has to walk
- *    around; these are the three creation acts in the product and they open
- *    in place, not two navigations away.
- * 3. Anything waiting on them - pending applicants and pledges, with counts
- *    and a tap straight to the screen where the decision is made.
- * 4. The numbers - one `MetricRow`, and public impact once verified.
+ * 2. Anything waiting on them - pending applicants, pledges and unanswered
+ *    reviews, with counts and a tap straight to where the decision is made.
+ *    This answers "what needs me now", so it comes before the creation
+ *    tiles on a phone too: it used to sit under them, a screen down on a
+ *    small device, behind three buttons the coordinator had not come for.
+ * 3. Anything they came here to *do* - post, ask for something, run an event.
+ *    These open in place, not two navigations away.
+ * 4. The numbers - each one a row that opens the list it counts, and public
+ *    impact once verified.
  * 5. Whatever the surrounding chrome does not already offer.
  *
  * That last point is why the "Manage" list differs by platform, and it is not
@@ -95,6 +105,7 @@ export default function NgoDashboard() {
 	// Whole-org counts from the server. These used to be summed from page 1
 	// of the events and needs lists, which undercounted past 20 rows.
 	const overviewQuery = useOrgOverview();
+	const access = useOrgAccess();
 	const impactQuery = useOrganizationImpact(isVerified ? org?.id : undefined);
 
 	/* Creation, in place. Each sheet is the same one its own screen opens, so
@@ -112,6 +123,51 @@ export default function NgoDashboard() {
 	const publishedEvents = overview?.publishedEvents ?? 0;
 	const waiting = pendingApplications + pendingPledges;
 
+	/*
+	 * "Applicants to review" should open the applicants, not a list of every
+	 * event to hunt through. Neither list screen takes a status filter, but both
+	 * take `?review=<id>` (the notification deep link), and the overview says
+	 * how many parents the pending rows sit on. When that is one, find it on the
+	 * first page and go straight to its sheet; when it is several, or the one
+	 * is not on page 1, the list is still the honest destination - every row
+	 * there carries its own "to review" pill. Only fetched when it can help.
+	 */
+	const pendingEventQuery = useQuery({
+		queryKey: queryKeys.orgEvents({ dashboard: "pending-lookup" }),
+		queryFn: () => orgEventsApi.list({ page: 1, limit: 20 }),
+		enabled: eventsWithApplicants === 1,
+		select: (page) =>
+			page.items.find((item) => (item.pendingApplications ?? 0) > 0)?.id,
+	});
+	const pendingNeedQuery = useQuery({
+		queryKey: queryKeys.orgNeeds({ dashboard: "pending-lookup" }),
+		queryFn: () => orgNeedsApi.list({ page: 1, limit: 20 }),
+		enabled: needsWithPledges === 1,
+		select: (page) =>
+			page.items.find((item) => (item.pendingPledges ?? 0) > 0)?.id,
+	});
+	/*
+	 * Reviews with no public reply. The overview does not count them, but the
+	 * org's review list returns `awaitingReplyCount` for the whole org with
+	 * any page, so one row is enough. Under the reviews scope, so a reply
+	 * anywhere refreshes it. Gated on content.publish: a role that cannot
+	 * reply has no decision to make here.
+	 */
+	const canReply = !access.blocked("content.publish");
+	const reviewsQuery = useQuery({
+		queryKey: queryKeys.orgReviews({ dashboard: "awaiting-count" }),
+		queryFn: () =>
+			engagementApi.listMyOrgReviews({ awaitingReply: true, limit: 1 }),
+		enabled: canReply,
+		select: (page) => page.awaitingReplyCount,
+	});
+	const awaitingReplies = canReply ? (reviewsQuery.data ?? 0) : 0;
+
+	const pendingEventId =
+		eventsWithApplicants === 1 ? pendingEventQuery.data : undefined;
+	const pendingNeedId =
+		needsWithPledges === 1 ? pendingNeedQuery.data : undefined;
+
 	const refreshing =
 		orgQuery.isRefetching ||
 		overviewQuery.isRefetching ||
@@ -121,6 +177,7 @@ export default function NgoDashboard() {
 		orgQuery.refetch();
 		overviewQuery.refetch();
 		if (isVerified) impactQuery.refetch();
+		if (canReply) reviewsQuery.refetch();
 	};
 
 	const impact = impactQuery.data;
@@ -137,7 +194,6 @@ export default function NgoDashboard() {
 	// Each tile asks `useOrgAccess` the same question the server will: a post
 	// and a need go public on creation, so they need verification as well as
 	// the role; an event can be drafted first, so it needs only the role.
-	const access = useOrgAccess();
 	const postBlocked = access.blocked("content.publish", { public: true });
 	const needBlocked = postBlocked;
 	const eventBlocked =
@@ -165,9 +221,10 @@ export default function NgoDashboard() {
 	/*
 	 * Three acts on one surface, hairline-divided - the same language as
 	 * `MetricRow`, so the page reads as two rows of one thing rather than a
-	 * card wall. Posting needs a verified org (the API enforces it on both the
-	 * post and the upload-intent route); needs and events can be drafted
-	 * before that, so only the first tile is gated.
+	 * card wall. A post and a need both go public the moment they are created
+	 * (the API checks verification on the post, its upload-intent route and
+	 * the need), so those two tiles share one gate; only an event can be
+	 * drafted before verification, so its tile asks for the role alone.
 	 */
 	const quickActions = (
 		<View>
@@ -212,11 +269,11 @@ export default function NgoDashboard() {
 	const decisions = (
 		<View>
 			<SectionTitle>Needs your decision</SectionTitle>
-			{waiting === 0 ? (
+			{waiting + awaitingReplies === 0 ? (
 				<Surface>
 					<H5>All caught up</H5>
 					<Caption color="tertiary" style={{ marginTop: spacing[0.5] }}>
-						New applicants and pledges will appear here for review.
+						New applicants, pledges and reviews to answer will appear here.
 					</Caption>
 				</Surface>
 			) : (
@@ -227,7 +284,16 @@ export default function NgoDashboard() {
 							label={`${pendingApplications} applicant${pendingApplications === 1 ? "" : "s"} to review`}
 							hint={`Across ${eventsWithApplicants} event${eventsWithApplicants === 1 ? "" : "s"}`}
 							value={<Count value={pendingApplications} />}
-							onPress={() => router.push("/(ngo)/events")}
+							onPress={() =>
+								router.push(
+									pendingEventId
+										? {
+												pathname: "/(ngo)/events",
+												params: { review: pendingEventId },
+											}
+										: "/(ngo)/events",
+								)
+							}
 						/>
 					)}
 					{pendingPledges > 0 && (
@@ -236,7 +302,30 @@ export default function NgoDashboard() {
 							label={`${pendingPledges} pledge${pendingPledges === 1 ? "" : "s"} to review`}
 							hint={`On ${needsWithPledges} post${needsWithPledges === 1 ? "" : "s"} - people offering what you asked for`}
 							value={<Count value={pendingPledges} />}
-							onPress={() => router.push("/(ngo)/needs")}
+							onPress={() =>
+								router.push(
+									pendingNeedId
+										? {
+												pathname: "/(ngo)/needs",
+												params: { review: pendingNeedId },
+											}
+										: "/(ngo)/needs",
+								)
+							}
+						/>
+					)}
+					{awaitingReplies > 0 && (
+						<ListRow
+							icon={Star}
+							label={`${awaitingReplies} review${awaitingReplies === 1 ? "" : "s"} to answer`}
+							hint="Your reply shows publicly under each one"
+							value={<Count value={awaitingReplies} />}
+							onPress={() =>
+								router.push({
+									pathname: "/(ngo)/reviews",
+									params: { show: "awaiting" },
+								})
+							}
 						/>
 					)}
 				</ListGroup>
@@ -244,20 +333,29 @@ export default function NgoDashboard() {
 		</View>
 	);
 
+	// No "Waiting on you" here: it was the sum of the rows directly above, the
+	// same number printed twice on one screen. Each count is a row that opens
+	// the list it counts - as two big numerals they were a report you could
+	// read but not act on, one navigation away from the thing they described.
 	const numbers = (
 		<View>
 			<SectionTitle>At a glance</SectionTitle>
-			<MetricRow
-				stats={[
-					{ label: "Published events", value: publishedEvents },
-					{ label: "Open needs", value: openNeeds },
-					{
-						label: "Waiting on you",
-						value: waiting,
-						...(waiting > 0 ? { tone: "warning" as const } : {}),
-					},
-				]}
-			/>
+			<ListGroup>
+				<ListRow
+					icon={CalendarDays}
+					label="Published events"
+					value={<Count value={publishedEvents} tone="neutral" />}
+					accessibilityLabel={`${publishedEvents} published events. Open events`}
+					onPress={() => router.push("/(ngo)/events")}
+				/>
+				<ListRow
+					icon={HeartHandshake}
+					label="Open needs"
+					value={<Count value={openNeeds} tone="neutral" />}
+					accessibilityLabel={`${openNeeds} open needs. Open needs`}
+					onPress={() => router.push("/(ngo)/needs")}
+				/>
+			</ListGroup>
 		</View>
 	);
 
@@ -424,8 +522,8 @@ export default function NgoDashboard() {
 	) : (
 		<>
 			{verification}
-			{quickActions}
 			{decisions}
+			{quickActions}
 			{numbers}
 			{impactBlock}
 			{manage}
@@ -537,8 +635,17 @@ function ActionTile({
 	);
 }
 
-/** A count that reads as a count, not as a badge competing with the label. */
-function Count({ value }: { value: number }) {
+/**
+ * A count that reads as a count, not as a badge competing with the label.
+ * Warning ink for work waiting on the reader; neutral for a plain tally.
+ */
+function Count({
+	value,
+	tone = "warning",
+}: {
+	value: number;
+	tone?: "warning" | "neutral";
+}) {
 	const { colors, spacing } = useTheme();
 
 	return (
@@ -549,16 +656,13 @@ function Count({ value }: { value: number }) {
 				gap: spacing[2],
 			}}
 		>
-			<H5 color={colors.warning.ink}>{value}</H5>
-			<View
-				style={{
-					width: 7,
-					height: 7,
-					borderRightWidth: 1.5,
-					borderTopWidth: 1.5,
-					borderColor: colors.text.quaternary as string,
-					transform: [{ rotate: "45deg" }],
-				}}
+			<H5 color={tone === "warning" ? colors.warning.ink : undefined}>
+				{value}
+			</H5>
+			<ChevronRight
+				size={16}
+				strokeWidth={1.75}
+				color={colors.text.quaternary as string}
 			/>
 		</View>
 	);

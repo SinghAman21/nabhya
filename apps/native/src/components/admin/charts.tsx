@@ -1,6 +1,6 @@
 import { TREND_WINDOWS, type TrendWindow } from "@nabhya/shared";
-import { useMemo, useState } from "react";
-import { View } from "react-native";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
+import { Platform, View } from "react-native";
 import Svg, { Circle, Line, Path } from "react-native-svg";
 import { vizPalette } from "@/components/admin/viz-tokens";
 import { Surface } from "@/components/screen-shell";
@@ -232,22 +232,75 @@ const PAD_TOP = 10;
  * Hover is a crosshair with a readout, and it is an enhancement: the endpoint
  * values are directly labelled and the legend carries each series' window
  * total, so nothing is only reachable by pointing at it.
+ *
+ * **The chart is one tab stop, not one per day.** The per-day hit zones were
+ * each a focusable button, so tabbing past a 90-day chart took 90 presses and
+ * focus never moved the crosshair. Now the plot is a single focusable
+ * (`adjustable`) that the arrow keys walk, day by day, with Home / End for the
+ * ends: focus puts the crosshair on the last day and the readout under the
+ * legend says what it points at. The hit zones stay, for the pointer only.
+ *
+ * **An all-zero window says so.** A flat line on the zero gridline looks
+ * like a chart that failed to draw; `emptyNote` sits over it instead.
  */
 export function TrendChart({
 	labels,
 	series,
 	totals,
+	emptyNote = "Nothing in this window",
 }: {
 	/** One per point. Only the first, middle and last are drawn. */
 	labels: string[];
 	series: TrendSeries[];
 	/** Window total per series key, for the legend. */
 	totals?: Record<string, number>;
+	/** Shown over the plot when every value in the window is zero. */
+	emptyNote?: string;
 }) {
 	const { colors, spacing, isDark } = useTheme();
 	const viz = vizPalette(isDark);
 	const [width, setWidth] = useState(0);
 	const [hover, setHover] = useState<number | null>(null);
+	const [focused, setFocused] = useState(false);
+
+	const allZero = series.every((line) => line.values.every((v) => v === 0));
+	const describe = (index: number) =>
+		`${labels[index] ?? ""}: ${series
+			.map((line) => `${line.values[index] ?? 0} ${line.label}`)
+			.join(", ")}`;
+
+	// Arrow keys walk the days while the plot has focus. Document-level and
+	// web-only, the same way `SelectMenu` listens - RNW gives a `View` no key
+	// events of its own. Native screen readers use `accessibilityActions`.
+	const step = (by: number | "start" | "end") => {
+		const last = labels.length - 1;
+		if (last < 0) return;
+		setHover((current) => {
+			if (by === "start") return 0;
+			if (by === "end") return last;
+			return Math.min(last, Math.max(0, (current ?? last) + by));
+		});
+	};
+	const onKey = useEffectEvent((event: KeyboardEvent) => {
+		const moves: Record<string, number | "start" | "end"> = {
+			ArrowLeft: -1,
+			ArrowRight: 1,
+			ArrowDown: -1,
+			ArrowUp: 1,
+			Home: "start",
+			End: "end",
+		};
+		const by = moves[event.key];
+		if (by === undefined) return;
+		event.preventDefault();
+		step(by);
+	});
+	useEffect(() => {
+		if (Platform.OS !== "web" || !focused) return;
+		const listener = (event: KeyboardEvent) => onKey(event);
+		document.addEventListener("keydown", listener);
+		return () => document.removeEventListener("keydown", listener);
+	}, [focused]);
 
 	const plotWidth = Math.max(width - PAD_LEFT - PAD_RIGHT, 1);
 	const plotHeight = CHART_HEIGHT - PAD_TOP - AXIS_BAND;
@@ -386,9 +439,51 @@ export function TrendChart({
 						<Caption color="quaternary">{labels[count - 1]}</Caption>
 					</View>
 
-					{/* The hover surface. One hit zone per point, each at least 24px
-					    wide where the data allows, so a 4px dot is never the target. */}
-					<View
+					{allZero && (
+						<View
+							pointerEvents="none"
+							style={{
+								position: "absolute",
+								left: PAD_LEFT,
+								right: PAD_RIGHT,
+								top: PAD_TOP,
+								height: plotHeight,
+								alignItems: "center",
+								justifyContent: "center",
+							}}
+						>
+							<Caption color="tertiary">{emptyNote}</Caption>
+						</View>
+					)}
+
+					{/* The hover surface: one focusable for the keyboard (see the
+					    note above), holding one hit zone per point for the pointer,
+					    each at least 24px wide where the data allows so a 4px dot is
+					    never the target. The zones are not focusable. */}
+					<Pressable
+						accessibilityRole="adjustable"
+						accessibilityLabel={`${series.map((line) => line.label).join(" and ")} per day. ${
+							allZero ? emptyNote : "Use the arrow keys to read each day."
+						}`}
+						accessibilityValue={{
+							text: hover !== null ? describe(hover) : describe(count - 1),
+						}}
+						accessibilityActions={[
+							{ name: "increment" },
+							{ name: "decrement" },
+						]}
+						onAccessibilityAction={(event) =>
+							step(event.nativeEvent.actionName === "increment" ? 1 : -1)
+						}
+						onFocus={() => {
+							setFocused(true);
+							setHover((current) => current ?? count - 1);
+						}}
+						onBlur={() => {
+							setFocused(false);
+							setHover(null);
+						}}
+						{...focusable}
 						style={{
 							position: "absolute",
 							left: PAD_LEFT,
@@ -396,6 +491,7 @@ export function TrendChart({
 							top: PAD_TOP,
 							height: plotHeight,
 							flexDirection: "row",
+							borderRadius: 4,
 						}}
 					>
 						{labels.map((label, index) => (
@@ -403,15 +499,15 @@ export function TrendChart({
 								key={label}
 								onPress={() => setHover(index)}
 								onHoverIn={() => setHover(index)}
-								onHoverOut={() => setHover(null)}
-								accessibilityRole="button"
-								accessibilityLabel={`${label}: ${series
-									.map((line) => `${line.values[index] ?? 0} ${line.label}`)
-									.join(", ")}`}
+								onHoverOut={() => {
+									if (!focused) setHover(null);
+								}}
+								focusable={false}
+								accessible={false}
 								style={{ flex: 1 }}
 							/>
 						))}
-					</View>
+					</Pressable>
 				</>
 			)}
 

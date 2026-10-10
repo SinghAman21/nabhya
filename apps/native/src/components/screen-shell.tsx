@@ -1,6 +1,9 @@
 import type { LucideIcon } from "lucide-react-native";
+import { useEffect, useRef } from "react";
 import {
 	ActivityIndicator,
+	Animated,
+	Easing,
 	Platform,
 	ScrollView,
 	type StyleProp,
@@ -15,6 +18,7 @@ import { typography } from "@/constants/design-system";
 import { useTheme } from "@/hooks/use-theme";
 import { useGridColumns } from "@/hooks/useMedia";
 import { focusable } from "@/lib/focus";
+import { useReducedMotion } from "@/lib/motion";
 
 /**
  * Shared screen furniture.
@@ -733,14 +737,20 @@ export function LoadingState({ label }: { label?: string }) {
 export function ErrorState({
 	message,
 	onRetry,
+	title = "Something went wrong",
 }: {
 	message: string;
 	onRetry?: () => void;
+	/** Defaults to "Something went wrong". Name the thing when you can. */
+	title?: string;
 }) {
 	const { colors, spacing } = useTheme();
 
 	return (
 		<View
+			// Announced when it replaces a list: a spinner that silently turns
+			// into an error is, to a screen reader, a spinner that stopped.
+			accessibilityLiveRegion="polite"
 			style={{
 				alignItems: "center",
 				paddingVertical: spacing[14],
@@ -748,7 +758,7 @@ export function ErrorState({
 			}}
 		>
 			<Body weight="bold" color={colors.error.ink}>
-				Something went wrong
+				{title}
 			</Body>
 			<Caption
 				color="tertiary"
@@ -761,12 +771,210 @@ export function ErrorState({
 					onPress={onRetry}
 					accessibilityRole="button"
 					hitSlop={8}
-					style={{ marginTop: spacing[4] }}
+					{...focusable}
+					style={(state) => {
+						const { pressed } = state as PressState;
+						// 44pt tall, so the target is the row and not just the word.
+						return {
+							marginTop: spacing[2],
+							minHeight: 44,
+							justifyContent: "center",
+							paddingHorizontal: spacing[3],
+							opacity: pressed ? 0.6 : 1,
+						};
+					}}
 				>
 					<Label color={colors.primary.ink}>Try again</Label>
 				</Pressable>
 			)}
 		</View>
+	);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Skeleton                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One placeholder block, the shape of the text or media it stands in for.
+ *
+ * `LoadingState` is a centred spinner in 112pt of padding, which is right for
+ * a page whose shape is unknown and wrong for a list: the spinner sits where
+ * the first row will be, then the rows arrive taller and the header above them
+ * stays put while everything below it jumps. A skeleton holds the rows' height
+ * from the first frame, so loading only changes what is *in* the boxes.
+ *
+ * The pulse is one shared opacity loop per `SkeletonList`, not one per block,
+ * and it holds still when the person has asked for reduced motion - a page of
+ * throbbing grey bars is exactly the motion that setting exists to stop.
+ */
+export function Skeleton({
+	width = "100%",
+	height = 12,
+	radius,
+	style,
+}: {
+	width?: number | `${number}%`;
+	height?: number;
+	/** Defaults to a pill for text-height blocks and `md` for anything taller. */
+	radius?: number;
+	style?: StyleProp<ViewStyle>;
+}) {
+	const { colors, borderRadius } = useTheme();
+
+	return (
+		<View
+			style={[
+				{
+					width,
+					height,
+					borderRadius: radius ?? (height <= 16 ? 999 : borderRadius.md),
+					backgroundColor: colors.background.subtle,
+				},
+				style,
+			]}
+		/>
+	);
+}
+
+/**
+ * A list's worth of placeholder rows, for the first load of a list.
+ *
+ * `row` is a `ListGroup` line (title and hint inside one surface, divided by
+ * hairlines); `card` is a `Surface` per item with a title, two lines of body
+ * and a short footer - roughly the height of the cards the paged screens draw,
+ * so the first page lands without moving the scroll extent much.
+ */
+export function SkeletonList({
+	count = 4,
+	variant = "card",
+	columns = 1,
+	label = "Loading",
+}: {
+	count?: number;
+	variant?: "card" | "row";
+	/** Lays the cards out as a grid, matching a `numColumns` list. */
+	columns?: number;
+	/** Spoken in place of the blocks, which mean nothing to a screen reader. */
+	label?: string;
+}) {
+	const { colors, spacing } = useTheme();
+	const reduce = useReducedMotion();
+	const pulse = useRef(new Animated.Value(1)).current;
+
+	useEffect(() => {
+		if (reduce) {
+			pulse.setValue(1);
+			return;
+		}
+		const loop = Animated.loop(
+			Animated.sequence([
+				Animated.timing(pulse, {
+					toValue: 0.55,
+					duration: 700,
+					easing: Easing.inOut(Easing.quad),
+					useNativeDriver: Platform.OS !== "web",
+				}),
+				Animated.timing(pulse, {
+					toValue: 1,
+					duration: 700,
+					easing: Easing.inOut(Easing.quad),
+					useNativeDriver: Platform.OS !== "web",
+				}),
+			]),
+		);
+		loop.start();
+		return () => loop.stop();
+	}, [pulse, reduce]);
+
+	const items = Array.from({ length: count }, (_, index) => index);
+
+	const body =
+		variant === "row" ? (
+			<Surface padded={false} style={{ overflow: "hidden" }}>
+				{items.map((index) => (
+					<View key={index}>
+						{index > 0 && (
+							<View
+								style={{
+									height: 1,
+									marginLeft: spacing[4],
+									backgroundColor: colors.border.hairline,
+								}}
+							/>
+						)}
+						<View
+							style={{
+								minHeight: 56,
+								justifyContent: "center",
+								paddingHorizontal: spacing[4],
+								paddingVertical: spacing[3.5],
+								gap: spacing[2],
+							}}
+						>
+							<Skeleton width={index % 2 ? "45%" : "60%"} height={12} />
+							<Skeleton width="30%" height={10} />
+						</View>
+					</View>
+				))}
+			</Surface>
+		) : (
+			<View
+				style={{
+					flexDirection: columns > 1 ? "row" : "column",
+					flexWrap: columns > 1 ? "wrap" : "nowrap",
+					...(columns > 1
+						? { marginHorizontal: -spacing[1.5] }
+						: { gap: spacing[3] }),
+				}}
+			>
+				{items.map((index) => (
+					<View
+						key={index}
+						style={
+							columns > 1
+								? { width: `${100 / columns}%`, padding: spacing[1.5] }
+								: undefined
+						}
+					>
+						<Surface>
+							<View
+								style={{
+									flexDirection: "row",
+									alignItems: "center",
+									gap: spacing[3],
+								}}
+							>
+								<Skeleton width={36} height={36} radius={999} />
+								<View style={{ flex: 1, gap: spacing[1.5] }}>
+									<Skeleton width="45%" height={12} />
+									<Skeleton width="25%" height={10} />
+								</View>
+							</View>
+							<View style={{ gap: spacing[2], marginTop: spacing[4] }}>
+								<Skeleton width="92%" height={12} />
+								<Skeleton width={index % 2 ? "70%" : "80%"} height={12} />
+							</View>
+							<Skeleton
+								width={112}
+								height={36}
+								style={{ marginTop: spacing[4] }}
+							/>
+						</Surface>
+					</View>
+				))}
+			</View>
+		);
+
+	return (
+		<Animated.View
+			accessible
+			accessibilityRole="progressbar"
+			accessibilityLabel={label}
+			style={{ opacity: pulse }}
+		>
+			{body}
+		</Animated.View>
 	);
 }
 

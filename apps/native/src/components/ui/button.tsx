@@ -1,4 +1,4 @@
-import { ActivityIndicator, type ViewStyle } from "react-native";
+import { ActivityIndicator, View, type ViewStyle } from "react-native";
 import { Pressable } from "@/components/ui/pressable";
 import { Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
@@ -99,6 +99,11 @@ export function Button({
 
 	return (
 		<Pressable
+			// `sm` draws at 38pt, under the 44pt touch minimum. Four points of
+			// slop on every side make the *target* 46 without changing the drawn
+			// size - it sits in table rows and footers where 44 would look
+			// bloated. A caller's own `hitSlop` still wins (spread below).
+			hitSlop={size === "sm" ? 4 : undefined}
 			disabled={disabled || loading}
 			accessibilityRole="button"
 			accessibilityState={{
@@ -144,17 +149,37 @@ export function Button({
 			}}
 			{...props}
 		>
+			{/* The label stays laid out while loading, just invisible, and the
+			    spinner sits over it. Swapping one for the other collapsed every
+			    button sized to its label to a 20pt spinner mid-press, which
+			    shifted the whole row it sat in. */}
+			<Label
+				color={resolveColor(colors, v.text)}
+				weight={variant === "link" ? "medium" : "bold"}
+				numberOfLines={1}
+				style={loading ? { opacity: 0 } : undefined}
+			>
+				{children}
+			</Label>
 			{loading ? (
-				<ActivityIndicator size="small" color={resolveColor(colors, v.text)} />
-			) : (
-				<Label
-					color={resolveColor(colors, v.text)}
-					weight={variant === "link" ? "medium" : "bold"}
-					numberOfLines={1}
+				<View
+					pointerEvents="none"
+					style={{
+						position: "absolute",
+						top: 0,
+						right: 0,
+						bottom: 0,
+						left: 0,
+						alignItems: "center",
+						justifyContent: "center",
+					}}
 				>
-					{children}
-				</Label>
-			)}
+					<ActivityIndicator
+						size="small"
+						color={resolveColor(colors, v.text)}
+					/>
+				</View>
+			) : null}
 		</Pressable>
 	);
 }

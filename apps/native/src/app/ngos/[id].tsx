@@ -55,9 +55,9 @@ import {
 } from "@/hooks/use-directory";
 import { useOpenDocument } from "@/hooks/use-documents";
 import {
-	useBookmarks,
 	useDeleteMyReview,
 	useToggleBookmark,
+	useToggleFollow,
 } from "@/hooks/use-engagement";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
@@ -130,15 +130,18 @@ export default function NgoProfilePage() {
 	const [donateOpen, setDonateOpen] = useState(false);
 
 	const email = useAuthStore((s) => s.email);
+	const role = useAuthStore((s) => s.role);
 	const org = useOrganization(id);
 	const impact = useOrganizationImpact(id);
 	const toggleBookmark = useToggleBookmark();
-	// The detail payload carries no saved flag; the caller's bookmark list is
-	// short and already cached, so read it from there.
-	const bookmarks = useBookmarks({ limit: 100 });
-	const bookmarked =
-		!!email &&
-		(bookmarks.data?.items ?? []).some((row) => row.organization.id === id);
+	const toggleFollow = useToggleFollow();
+	// The detail carries the caller's own state (`viewer`); null when signed out.
+	const bookmarked = !!org.data?.viewer?.bookmarked;
+	const following = !!org.data?.viewer?.following;
+	// Following and saving are volunteer acts on the server. A signed-out
+	// visitor still sees them (they lead to sign-in); an NGO or admin account
+	// browsing a peer's page does not, since every press would 403.
+	const canEngage = !email || role === "volunteer";
 
 	const requireSignIn = (next: () => void) => {
 		if (!email) {
@@ -148,12 +151,50 @@ export default function NgoProfilePage() {
 		next();
 	};
 
+	// "Shortlist", the word Profile and `bookmarks.tsx` use - this page said
+	// "Save", which is what the feed calls a different list. The toast says
+	// where the shortlist lives, since nothing on this page leads there.
 	const onBookmark = () =>
-		requireSignIn(() =>
+		requireSignIn(() => {
+			const name = org.data?.organizationName ?? "This NGO";
 			toggleBookmark.mutate(id, {
+				onSuccess: () =>
+					bookmarked
+						? toast.success(`${name} removed from your shortlist.`, {
+								label: "Undo",
+								onPress: () => toggleBookmark.mutate(id),
+							})
+						: toast.success(`${name} added to your shortlist.`, {
+								label: "View",
+								onPress: () => router.push("/bookmarks"),
+							}),
 				onError: (error) => toast.error(apiErrorMessage(error)),
-			}),
-		);
+			});
+		});
+
+	const onFollow = () =>
+		requireSignIn(() => {
+			const name = org.data?.organizationName ?? "this NGO";
+			toggleFollow.mutate(
+				{ organizationId: id, following },
+				{
+					onSuccess: () =>
+						following
+							? toast.success(`Unfollowed ${name}.`, {
+									label: "Undo",
+									onPress: () =>
+										toggleFollow.mutate({
+											organizationId: id,
+											following: false,
+										}),
+								})
+							: toast.success(
+									`Following ${name} - its posts show in your Following feed.`,
+								),
+					onError: (error) => toast.error(apiErrorMessage(error)),
+				},
+			);
+		});
 
 	const data = org.data;
 	const gutter = spacing[5];
@@ -164,21 +205,41 @@ export default function NgoProfilePage() {
 	const logoOverlap = Math.round(logoSize * 0.45);
 
 	const donateButton = (
+		// No sign-in wall: guests give with a receipt email (optional-auth checkout).
 		<Button
-			onPress={() => requireSignIn(() => setDonateOpen(true))}
+			onPress={() => setDonateOpen(true)}
 			accessibilityLabel={`Donate to ${data?.organizationName ?? "this NGO"}`}
 		>
-			{email ? "Donate" : "Sign in to donate"}
+			Donate
 		</Button>
 	);
 
-	const saveControl = (
+	const followButton = canEngage ? (
+		<Button
+			variant={following ? "outline" : "default"}
+			size={isDesktop ? "default" : "sm"}
+			onPress={onFollow}
+			loading={toggleFollow.isPending}
+			accessibilityLabel={
+				following
+					? `Following ${data?.organizationName ?? "this NGO"}. Tap to unfollow`
+					: `Follow ${data?.organizationName ?? "this NGO"}`
+			}
+			accessibilityState={{ selected: following }}
+		>
+			{following ? "Following" : "Follow"}
+		</Button>
+	) : null;
+
+	const saveControl = !canEngage ? null : (
 		<Pressable
 			onPress={onBookmark}
 			hitSlop={8}
 			disabled={toggleBookmark.isPending}
 			accessibilityRole="button"
-			accessibilityLabel={bookmarked ? "Remove from saved" : "Save this NGO"}
+			accessibilityLabel={
+				bookmarked ? "Remove from your shortlist" : "Add to your shortlist"
+			}
 			accessibilityState={{
 				selected: bookmarked,
 				disabled: toggleBookmark.isPending,
@@ -228,11 +289,23 @@ export default function NgoProfilePage() {
 					/>
 				</View>
 
-				<H2 accessibilityRole="header">{data.organizationName}</H2>
-				<Caption color="tertiary" style={{ marginTop: spacing[1] }}>
-					{location}
-					{data.foundingYear ? ` · Since ${data.foundingYear}` : ""}
-				</Caption>
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "flex-start",
+						gap: spacing[3],
+					}}
+				>
+					<View style={{ flex: 1, minWidth: 0 }}>
+						<H2 accessibilityRole="header">{data.organizationName}</H2>
+						<Caption color="tertiary" style={{ marginTop: spacing[1] }}>
+							{location}
+							{data.foundingYear ? ` · Since ${data.foundingYear}` : ""}
+						</Caption>
+					</View>
+					{/* Desktop has the action card; a phone follows from the hero. */}
+					{isDesktop ? null : followButton}
+				</View>
 
 				<View
 					style={{
@@ -291,14 +364,17 @@ export default function NgoProfilePage() {
 		<Surface>
 			<View style={{ gap: spacing[3] }}>
 				{donateButton}
-				<Button
-					variant="outline"
-					onPress={onBookmark}
-					loading={toggleBookmark.isPending}
-					accessibilityState={{ selected: bookmarked }}
-				>
-					{bookmarked ? "Saved" : "Save this NGO"}
-				</Button>
+				{followButton}
+				{canEngage ? (
+					<Button
+						variant="outline"
+						onPress={onBookmark}
+						loading={toggleBookmark.isPending}
+						accessibilityState={{ selected: bookmarked }}
+					>
+						{bookmarked ? "Shortlisted" : "Add to shortlist"}
+					</Button>
+				) : null}
 				<Caption color="quaternary">
 					Donations are collected by Nabhya and passed to the organisation. You
 					get a receipt either way.

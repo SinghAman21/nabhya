@@ -13,6 +13,8 @@ import type {
 	ApplicationQuery,
 	ApplyToEventInput,
 	AuditLogQuery,
+	BulkResult,
+	BulkReviewApplicationsInput,
 	BulkReviewDocumentsInput,
 	BulkReviewResult,
 	CompleteOrgOnboardingPayload,
@@ -49,7 +51,7 @@ import type {
 	UpdateEventInput,
 	UpdateNeedInput,
 	UpdateOrganizationInput,
-	UpdateUserProfileInput,
+	UpdateUserProfilePayload,
 	UploadIntentInput,
 	UploadOrgDocumentInput,
 	UploadTicketResponse,
@@ -103,7 +105,7 @@ import { http } from "./http";
 
 export const usersApi = {
 	me: () => http.get<MyProfile>(USERS.ME),
-	updateProfile: (input: UpdateUserProfileInput) =>
+	updateProfile: (input: UpdateUserProfilePayload) =>
 		http.patch<MyProfile>(USERS.ME, input),
 	selectRole: (role: SelectableRole) =>
 		http.post<{ role: SelectableRole; roles: string[] }>(USERS.ROLE, { role }),
@@ -230,6 +232,8 @@ export const orgEventsApi = {
 			ORG_EVENTS.reviewApplication(id, applicationId),
 			input,
 		),
+	bulkReview: (id: string, input: BulkReviewApplicationsInput) =>
+		http.post<BulkResult>(ORG_EVENTS.bulkReview(id), input),
 };
 
 export const needsApi = {

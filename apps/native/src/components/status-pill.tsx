@@ -1,5 +1,5 @@
 import { View } from "react-native";
-import { Caption } from "@/components/ui/typography";
+import { Micro } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 
 export type PillTone = "neutral" | "success" | "warning" | "error" | "info";
@@ -51,9 +51,9 @@ export function StatusPill({
 				backgroundColor: bg,
 			}}
 		>
-			<Caption weight="medium" color={ink} style={{ fontSize: 12 }}>
+			<Micro weight="medium" color={ink}>
 				{label}
-			</Caption>
+			</Micro>
 		</View>
 	);
 }
@@ -122,6 +122,16 @@ export function eventStatusTone(status: string): PillTone {
 		default:
 			return "neutral";
 	}
+}
+
+/**
+ * A pledge's status in the words both sides use. COMPLETED is the moment the
+ * NGO has the items in hand, so it reads "Received" - the NGO's sheet always
+ * said that while the volunteer's own lists said "Completed" for the same row.
+ * Every pledge pill goes through here so the two cannot drift again.
+ */
+export function pledgeStatusLabel(status: string): string {
+	return status === "COMPLETED" ? "Received" : humanizeStatus(status);
 }
 
 /** "UNDER_REVIEW" → "Under review" */

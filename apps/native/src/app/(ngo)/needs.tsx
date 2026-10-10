@@ -1,9 +1,20 @@
-import type { NeedType, OrgNeedQuery } from "@nabhya/shared";
+import type {
+	NeedStatus,
+	NeedType,
+	OrgNeedQuery,
+	OrgNeedSort,
+} from "@nabhya/shared";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { HeartHandshake } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
+import { ConsoleList } from "@/components/admin/console-list";
+import type { TableColumn, TableSort } from "@/components/admin/data-table";
+import { AdminScreen } from "@/components/admin/list-chrome";
+import { SelectMenu, type SelectOption } from "@/components/admin/select-menu";
+import { Toolbar, useTableView } from "@/components/admin/toolbar";
 import { NeedFormSheet } from "@/components/need-form-sheet";
+import { PendingCount, RowActions } from "@/components/ngo/table-cells";
 import { PagedList, usePagedQuery } from "@/components/paged-list";
 import { PledgesSheet } from "@/components/pledges-sheet";
 import {
@@ -24,32 +35,67 @@ import { useDeleteNeed, usePublicNeed } from "@/hooks/use-needs";
 import { useOrgAccess } from "@/hooks/use-org-access";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
-import { useGridColumns } from "@/hooks/useMedia";
+import { useGridColumns, useMedia } from "@/hooks/useMedia";
 import { apiErrorMessage, orgNeedsApi, queryKeys } from "@/lib/api";
 import { focusable } from "@/lib/focus";
-import { formatProgress, formatRelative } from "@/lib/format";
+import { formatDate, formatProgress, formatRelative } from "@/lib/format";
 import type { OrgNeedListItem } from "@/lib/types";
 
 type TypeFilter = "ALL" | NeedType;
+type StatusFilter = "ANY" | NeedStatus;
 
-const FILTERS: Array<{ value: TypeFilter; label: string }> = [
+const FILTERS: Array<SelectOption<TypeFilter>> = [
 	{ value: "ALL", label: "All" },
-	{ value: "WANT", label: "We need" },
-	{ value: "OFFER", label: "We're giving" },
+	{ value: "WANT", label: "We need", hint: "Asking for something" },
+	{ value: "OFFER", label: "We're giving", hint: "Surplus you can pass on" },
 ];
 
+/**
+ * Desktop only - the endpoint has always taken `status`, and on a page of
+ * forty posts "which are still open" is the second question after "which
+ * kind". A separate axis from type, so a second select rather than more chips.
+ */
+const STATUSES: Array<SelectOption<StatusFilter>> = [
+	{ value: "ANY", label: "Any" },
+	{ value: "OPEN", label: "Open", hint: "Taking pledges" },
+	{ value: "FULFILLED", label: "Fulfilled" },
+	{ value: "CLOSED", label: "Closed" },
+];
+
+/**
+ * The organisation's needs and offers.
+ *
+ * Phones keep the cards. Desktop gets the console's table (`AdminScreen` +
+ * `ConsoleList`): how far along each post is, and how many pledges are
+ * waiting on a decision, are numbers to compare down a column, and a sortable
+ * header answers "what needs me" without reading every card. Sorting is a
+ * server round trip (`orgNeedQuerySchema`), because the list pages at 20.
+ * See `(ngo)/events.tsx`, which has the same two shapes.
+ */
 export default function NgoNeeds() {
 	const { spacing } = useTheme();
 	const router = useRouter();
+	const { isDesktop } = useMedia();
 	const [filter, setFilter] = useState<TypeFilter>("ALL");
+	const [statusFilter, setStatusFilter] = useState<StatusFilter>("ANY");
+	const [sort, setSort] = useState<TableSort<OrgNeedSort>>({
+		sort: "createdAt",
+		dir: "desc",
+	});
+	const [view, setView] = useTableView("ngo-needs");
 	const [sheetOpen, setSheetOpen] = useState(false);
 	const [editing, setEditing] = useState<OrgNeedListItem | null>(null);
 	const [reviewing, setReviewing] = useState<OrgNeedListItem | null>(null);
 	const { data: me } = useMe();
 	const access = useOrgAccess();
 
-	const filters: Partial<OrgNeedQuery> =
-		filter === "ALL" ? {} : { type: filter };
+	const filters: Partial<OrgNeedQuery> = {
+		...(filter === "ALL" ? {} : { type: filter }),
+		// Never set on a phone, which has no status control.
+		...(statusFilter === "ANY" ? {} : { status: statusFilter }),
+		sort: sort.sort,
+		dir: sort.dir,
+	};
 	// Under the `["org","needs"]` prefix, so every needs mutation refreshes it.
 	const { query, items, first, loadMore } = usePagedQuery({
 		queryKey: queryKeys.orgNeeds(filters),
@@ -101,79 +147,68 @@ export default function NgoNeeds() {
 
 	const openCreate = () => setSheetOpen(true);
 
-	return (
-		<Screen>
-			<ScreenHeader
-				title="Needs"
-				subtitle={
-					total > 0 ? `${total} post${total === 1 ? "" : "s"}` : undefined
-				}
-				action={
-					<Button size="sm" onPress={openCreate} disabled={!!createBlocked}>
-						New need
-					</Button>
-				}
-			/>
+	const subtitle =
+		total > 0 ? `${total} post${total === 1 ? "" : "s"}` : undefined;
+	const newNeed = (
+		<Button size="sm" onPress={openCreate} disabled={!!createBlocked}>
+			New need
+		</Button>
+	);
 
-			{createBlocked && (
-				<View style={{ marginBottom: spacing[4] }}>
-					{access.isVerified || access.isSuspended ? (
-						<Banner tone="info" title="View only" description={createBlocked} />
-					) : (
-						<Banner
-							tone="warning"
-							title="Verification needed to post"
-							description="Needs and offers go into every volunteer's feed, so they unlock once your documents are approved."
-							onPress={() => router.push("/(ngo)/verification")}
-						/>
-					)}
-				</View>
+	const banner = createBlocked ? (
+		<View style={{ marginBottom: spacing[4] }}>
+			{access.isVerified || access.isSuspended ? (
+				<Banner tone="info" title="View only" description={createBlocked} />
+			) : (
+				<Banner
+					tone="warning"
+					title="Verification needed to post"
+					description="Needs and offers go into every volunteer's feed, so they unlock once your documents are approved."
+					onPress={() => router.push("/(ngo)/verification")}
+				/>
 			)}
+		</View>
+	) : null;
 
-			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
+	const renderCard = (item: OrgNeedListItem) => (
+		<NeedRow
+			need={item}
+			onReview={() => setReviewing(item)}
+			onEdit={canEdit ? () => setEditing(item) : undefined}
+			onDelete={canRemove ? () => confirmDelete(item) : undefined}
+		/>
+	);
 
-			<PagedList
-				query={query}
-				items={items}
-				loadMore={loadMore}
-				loadingLabel="Loading your posts"
-				numColumns={columns}
-				noun="posts"
-				keyExtractor={(item) => item.id}
-				renderItem={(item) => (
-					<NeedRow
-						need={item}
-						onReview={() => setReviewing(item)}
-						onEdit={canEdit ? () => setEditing(item) : undefined}
-						onDelete={canRemove ? () => confirmDelete(item) : undefined}
-					/>
-				)}
-				empty={
-					<EmptyState
-						icon={HeartHandshake}
-						title={
-							filter === "ALL"
-								? "Nothing posted yet"
-								: filter === "WANT"
-									? "No requests yet"
-									: "No offers yet"
-						}
-						description={
-							createBlocked
-								? "Posts your team makes will show here with their pledges."
-								: "Ask for what your programme needs, or list surplus you can pass on. Each post shows here with its pledges."
-						}
-						action={
-							createBlocked ? undefined : (
-								<Button onPress={openCreate}>
-									{filter === "OFFER" ? "Offer something" : "Post a need"}
-								</Button>
-							)
-						}
-					/>
-				}
-			/>
+	const filtered = statusFilter !== "ANY";
+	const empty = (
+		<EmptyState
+			icon={HeartHandshake}
+			title={
+				filtered
+					? `No ${statusFilter.toLowerCase()} posts`
+					: filter === "ALL"
+						? "Nothing posted yet"
+						: filter === "WANT"
+							? "No requests yet"
+							: "No offers yet"
+			}
+			description={
+				createBlocked || filtered
+					? "Posts your team makes will show here with their pledges."
+					: "Ask for what your programme needs, or list surplus you can pass on. Each post shows here with its pledges."
+			}
+			action={
+				createBlocked || filtered ? undefined : (
+					<Button onPress={openCreate}>
+						{filter === "OFFER" ? "Offer something" : "Post a need"}
+					</Button>
+				)
+			}
+		/>
+	);
 
+	const sheets = (
+		<>
 			<PledgesSheet need={reviewingLive} onClose={() => setReviewing(null)} />
 
 			<NeedFormSheet
@@ -186,8 +221,197 @@ export default function NgoNeeds() {
 				defaultCity={me?.organization?.city}
 				defaultState={me?.organization?.state}
 			/>
+		</>
+	);
+
+	if (isDesktop) {
+		return (
+			<AdminScreen
+				title="Needs"
+				subtitle={subtitle}
+				action={newNeed}
+				toolbar={
+					<Toolbar view={view} onViewChange={setView}>
+						<SelectMenu
+							label="Type"
+							value={filter}
+							options={FILTERS}
+							onChange={setFilter}
+						/>
+						<SelectMenu
+							label="Status"
+							value={statusFilter}
+							options={STATUSES}
+							onChange={setStatusFilter}
+							minWidth={180}
+						/>
+					</Toolbar>
+				}
+				onNearEnd={loadMore}
+				refreshing={query.isRefetching && !query.isFetchingNextPage}
+				onRefresh={() => query.refetch()}
+			>
+				{banner}
+				<ConsoleList
+					query={query}
+					items={items}
+					total={total}
+					loadMore={loadMore}
+					noun="post"
+					view={view}
+					columns={needColumns({
+						onEdit: canEdit ? setEditing : undefined,
+						onDelete: canRemove ? confirmDelete : undefined,
+					})}
+					rowKey={(need) => need.id}
+					// Opens the pledges, as the card does.
+					onRowPress={(need) => setReviewing(need)}
+					sort={sort}
+					onSortChange={setSort}
+					loadingLabel="Loading your posts"
+					renderCard={renderCard}
+					empty={empty}
+				/>
+				{sheets}
+			</AdminScreen>
+		);
+	}
+
+	return (
+		<Screen>
+			<ScreenHeader title="Needs" subtitle={subtitle} action={newNeed} />
+
+			{banner}
+
+			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
+
+			<PagedList
+				query={query}
+				items={items}
+				loadMore={loadMore}
+				loadingLabel="Loading your posts"
+				numColumns={columns}
+				noun="posts"
+				keyExtractor={(item) => item.id}
+				renderItem={renderCard}
+				empty={empty}
+			/>
+
+			{sheets}
 		</Screen>
 	);
+}
+
+/**
+ * The desktop table's columns: the post flexes, and progress, pledges waiting,
+ * urgency and age are fixed, sortable columns. Type and a non-open status are
+ * pills - the only colour in the row, as in the console.
+ */
+function needColumns({
+	onEdit,
+	onDelete,
+}: {
+	/** Undefined when the viewer's role cannot change posts. */
+	onEdit?: (need: OrgNeedListItem) => void;
+	onDelete?: (need: OrgNeedListItem) => void;
+}): Array<TableColumn<OrgNeedListItem>> {
+	return [
+		{
+			key: "title",
+			header: "Post",
+			sortKey: "title",
+			minWidth: 240,
+			render: (need) => (
+				<View style={{ minWidth: 0, alignSelf: "stretch" }}>
+					<Body weight="medium" numberOfLines={1}>
+						{need.title}
+					</Body>
+					<Caption color="quaternary" numberOfLines={1}>
+						{need.description}
+					</Caption>
+				</View>
+			),
+		},
+		{
+			key: "type",
+			header: "Type",
+			width: 120,
+			render: (need) => (
+				<StatusPill
+					label={need.type === "WANT" ? "We need" : "We're giving"}
+					tone={need.type === "WANT" ? "info" : "success"}
+				/>
+			),
+		},
+		{
+			key: "status",
+			header: "Status",
+			sortKey: "status",
+			width: 104,
+			render: (need) =>
+				need.status === "OPEN" ? (
+					<Caption color="quaternary">Open</Caption>
+				) : (
+					<StatusPill label={humanizeStatus(need.status)} tone="neutral" />
+				),
+		},
+		{
+			key: "progress",
+			header: "Progress",
+			sortKey: "fulfilled",
+			width: 150,
+			align: "end",
+			render: (need) => (
+				<Caption color="tertiary" numberOfLines={1}>
+					{formatProgress(need.fulfilledQuantity, need.quantity, need.unit)}
+				</Caption>
+			),
+		},
+		{
+			key: "pending",
+			header: "To review",
+			sortKey: "pending",
+			width: 96,
+			align: "end",
+			render: (need) => <PendingCount count={need.pendingPledges} />,
+		},
+		{
+			key: "urgency",
+			header: "Urgency",
+			sortKey: "urgency",
+			width: 96,
+			wideOnly: true,
+			render: (need) =>
+				need.urgency === "HIGH" ? (
+					<StatusPill label="Urgent" tone="error" />
+				) : (
+					<Caption color="quaternary">{humanizeStatus(need.urgency)}</Caption>
+				),
+		},
+		{
+			key: "posted",
+			header: "Posted",
+			sortKey: "createdAt",
+			width: 104,
+			align: "end",
+			render: (need) => (
+				<Caption color="quaternary">{formatDate(need.createdAt)}</Caption>
+			),
+		},
+		{
+			key: "actions",
+			header: "",
+			width: 120,
+			align: "end",
+			render: (need) => (
+				<RowActions
+					name={need.title}
+					{...(onEdit ? { onEdit: () => onEdit(need) } : {})}
+					{...(onDelete ? { onDelete: () => onDelete(need) } : {})}
+				/>
+			),
+		},
+	];
 }
 
 /**

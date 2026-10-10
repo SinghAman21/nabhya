@@ -36,6 +36,8 @@ export const ORG_EVENTS = {
 	applications: (id: string) => `${API_PREFIX}/org/events/${id}/applications`,
 	reviewApplication: (id: string, applicationId: string) =>
 		`${API_PREFIX}/org/events/${id}/applications/${applicationId}`,
+	bulkReview: (id: string) =>
+		`${API_PREFIX}/org/events/${id}/applications/bulk-review`,
 } as const;
 
 export const NEEDS = {
@@ -146,6 +148,8 @@ export const CERTIFICATES = {
 	issue: (eventId: string, applicationId: string) =>
 		`${API_PREFIX}/org/events/${eventId}/applications/${applicationId}/certificate`,
 	revoke: (id: string) => `${API_PREFIX}/org/certificates/${id}/revoke`,
+	bulkAttendance: (eventId: string) =>
+		`${API_PREFIX}/org/events/${eventId}/applications/bulk-attendance`,
 } as const;
 
 export const DONATIONS = {

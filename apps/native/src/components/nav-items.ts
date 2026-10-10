@@ -80,6 +80,11 @@ export const NGO_NAV_ITEMS: NavItem[] = [
 	},
 ];
 
+/**
+ * The phone's tab bar in `(admin)/_layout.tsx` lists these screens in this
+ * order too; change one and change the other, or the same five places sit in
+ * two different orders depending on the window width.
+ */
 export const ADMIN_NAV_ITEMS: NavItem[] = [
 	{ label: "Overview", href: "/(admin)", icon: LayoutDashboard },
 	{
@@ -87,6 +92,9 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
 		href: "/(admin)/queue",
 		icon: FileCheck2,
 		section: "Review",
+		// Documents waiting on a decision - the one number that says whether
+		// this page needs opening, visible from every other page.
+		badge: "pending-documents",
 	},
 	// Two populations, two screens, no overlap: `organizations` is the NGO
 	// *organisations* and `volunteers` is volunteers only. An NGO's own user

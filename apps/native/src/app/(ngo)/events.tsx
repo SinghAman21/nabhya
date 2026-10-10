@@ -1,10 +1,16 @@
-import type { EventStatus, OrgEventQuery } from "@nabhya/shared";
+import type { EventStatus, OrgEventQuery, OrgEventSort } from "@nabhya/shared";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { CalendarDays } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
+import { ConsoleList } from "@/components/admin/console-list";
+import type { TableColumn, TableSort } from "@/components/admin/data-table";
+import { AdminScreen } from "@/components/admin/list-chrome";
+import { SelectMenu, type SelectOption } from "@/components/admin/select-menu";
+import { Toolbar, useTableView } from "@/components/admin/toolbar";
 import { ApplicantsSheet } from "@/components/applicants-sheet";
 import { EventFormSheet } from "@/components/event-form-sheet";
+import { PendingCount, RowActions } from "@/components/ngo/table-cells";
 import { PagedList, usePagedQuery } from "@/components/paged-list";
 import {
 	Banner,
@@ -28,7 +34,7 @@ import { useDeleteEvent, useOrgEvent } from "@/hooks/use-events";
 import { useOrgAccess } from "@/hooks/use-org-access";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
-import { useGridColumns } from "@/hooks/useMedia";
+import { useGridColumns, useMedia } from "@/hooks/useMedia";
 import { apiErrorMessage, orgEventsApi, queryKeys } from "@/lib/api";
 import { focusable } from "@/lib/focus";
 import { formatDateRange } from "@/lib/format";
@@ -36,26 +42,55 @@ import type { OrgEventListItem } from "@/lib/types";
 
 type StatusFilter = "ALL" | EventStatus;
 
-const FILTERS: Array<{ value: StatusFilter; label: string }> = [
+const FILTERS: Array<SelectOption<StatusFilter>> = [
 	{ value: "ALL", label: "All" },
-	{ value: "PUBLISHED", label: "Published" },
-	{ value: "DRAFT", label: "Drafts" },
-	{ value: "COMPLETED", label: "Past" },
+	{ value: "PUBLISHED", label: "Published", hint: "Open to volunteers" },
+	{ value: "DRAFT", label: "Drafts", hint: "Only your team can see these" },
+	{ value: "COMPLETED", label: "Past", hint: "Attendance and certificates" },
 	{ value: "CANCELLED", label: "Cancelled" },
 ];
 
+/**
+ * The organisation's events.
+ *
+ * Two shapes, chosen by the window rather than by a setting:
+ *
+ * - **Phone: the cards.** One event per card with its fill bar, tapped to open
+ *   the applicants - a phone is used to act on one event, not to compare them.
+ * - **Desktop: the console's table** (`AdminScreen` + `ConsoleList`, the same
+ *   pieces the superadmin uses). An NGO running twenty events wants to answer
+ *   "which one has people waiting" and "which is short of volunteers", and a
+ *   card puts that number at a different place in every box. A column puts it
+ *   in one place, and a sortable header puts the answer at the top. The status
+ *   filter is a `SelectMenu`, not a chip row, for the reason `toolbar.tsx`
+ *   gives; the page is the one scroller, so the header row sticks under it.
+ *
+ * Sorting is a server round trip (`sort`/`dir` on `orgEventQuerySchema`): the
+ * list pages at 20, so a browser re-sort would order a page, not the list. The
+ * phone sends the same default the server would apply, so both shapes share a
+ * cache entry until someone on desktop presses a header.
+ */
 export default function NgoEvents() {
 	const { spacing } = useTheme();
 	const router = useRouter();
+	const { isDesktop } = useMedia();
 	const [filter, setFilter] = useState<StatusFilter>("ALL");
+	const [sort, setSort] = useState<TableSort<OrgEventSort>>({
+		sort: "startAt",
+		dir: "desc",
+	});
+	const [view, setView] = useTableView("ngo-events");
 	const [formOpen, setFormOpen] = useState(false);
 	const [editing, setEditing] = useState<OrgEventListItem | null>(null);
 	const [reviewing, setReviewing] = useState<OrgEventListItem | null>(null);
 	const { data: me } = useMe();
 	const access = useOrgAccess();
 
-	const filters: Partial<OrgEventQuery> =
-		filter === "ALL" ? {} : { status: filter };
+	const filters: Partial<OrgEventQuery> = {
+		...(filter === "ALL" ? {} : { status: filter }),
+		sort: sort.sort,
+		dir: sort.dir,
+	};
 	// Under the `["org","events"]` prefix, so every event mutation refreshes it.
 	const { query, items, first, loadMore } = usePagedQuery({
 		queryKey: queryKeys.orgEvents(filters),
@@ -135,87 +170,73 @@ export default function NgoEvents() {
 
 	const openCreate = () => setFormOpen(true);
 
-	return (
-		<Screen>
-			<ScreenHeader
-				title="Events"
-				subtitle={
-					total > 0 ? `${total} event${total === 1 ? "" : "s"}` : undefined
-				}
-				action={
-					<Button size="sm" onPress={openCreate} disabled={!canDraft}>
-						New event
-					</Button>
-				}
-			/>
+	const subtitle =
+		total > 0 ? `${total} event${total === 1 ? "" : "s"}` : undefined;
+	const newEvent = (
+		<Button size="sm" onPress={openCreate} disabled={!canDraft}>
+			New event
+		</Button>
+	);
 
-			{publishBlocked && (
-				<View style={{ marginBottom: spacing[4] }}>
-					{!access.isVerified && !access.isSuspended ? (
-						<Banner
-							tone="warning"
-							title="Drafts only until you're verified"
-							description="You can plan events now. Publishing them to volunteers unlocks once your documents are approved."
-							onPress={() => router.push("/(ngo)/verification")}
-						/>
-					) : (
-						<Banner
-							tone="info"
-							title={canDraft ? "Drafts only" : "View only"}
-							description={publishBlocked}
-						/>
-					)}
-				</View>
+	const banner = publishBlocked ? (
+		<View style={{ marginBottom: spacing[4] }}>
+			{!access.isVerified && !access.isSuspended ? (
+				<Banner
+					tone="warning"
+					title="Drafts only until you're verified"
+					description="You can plan events now. Publishing them to volunteers unlocks once your documents are approved."
+					onPress={() => router.push("/(ngo)/verification")}
+				/>
+			) : (
+				<Banner
+					tone="info"
+					title={canDraft ? "Drafts only" : "View only"}
+					description={publishBlocked}
+				/>
 			)}
+		</View>
+	) : null;
 
-			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
+	const renderCard = (item: OrgEventListItem) => (
+		<EventRow
+			event={item}
+			onReview={() => setReviewing(item)}
+			onEdit={canEdit(item) ? () => setEditing(item) : undefined}
+			onDelete={canRemove ? () => confirmDelete(item) : undefined}
+		/>
+	);
 
-			<PagedList
-				query={query}
-				items={items}
-				loadMore={loadMore}
-				loadingLabel="Loading your events"
-				numColumns={columns}
-				noun="events"
-				keyExtractor={(item) => item.id}
-				renderItem={(item) => (
-					<EventRow
-						event={item}
-						onReview={() => setReviewing(item)}
-						onEdit={canEdit(item) ? () => setEditing(item) : undefined}
-						onDelete={canRemove ? () => confirmDelete(item) : undefined}
-					/>
-				)}
-				empty={
-					<EmptyState
-						icon={CalendarDays}
-						title={
-							filter === "DRAFT"
-								? "No drafts"
-								: filter === "COMPLETED"
-									? "No past events yet"
-									: filter === "PUBLISHED"
-										? "Nothing published yet"
-										: filter === "CANCELLED"
-											? "Nothing cancelled"
-											: "No events yet"
-						}
-						description={
-							filter === "COMPLETED"
-								? "Events move here once they finish. You can still mark attendance and issue certificates."
-								: "Each event lists here with how many places are filled and who is waiting for a decision."
-						}
-						action={
-							filter === "COMPLETED" ||
-							filter === "CANCELLED" ||
-							!canDraft ? undefined : (
-								<Button onPress={openCreate}>Create an event</Button>
-							)
-						}
-					/>
-				}
-			/>
+	const empty = (
+		<EmptyState
+			icon={CalendarDays}
+			title={
+				filter === "DRAFT"
+					? "No drafts"
+					: filter === "COMPLETED"
+						? "No past events yet"
+						: filter === "PUBLISHED"
+							? "Nothing published yet"
+							: filter === "CANCELLED"
+								? "Nothing cancelled"
+								: "No events yet"
+			}
+			description={
+				filter === "COMPLETED"
+					? "Events move here once they finish. You can still mark attendance and issue certificates."
+					: "Each event lists here with how many places are filled and who is waiting for a decision."
+			}
+			action={
+				filter === "COMPLETED" ||
+				filter === "CANCELLED" ||
+				!canDraft ? undefined : (
+					<Button onPress={openCreate}>Create an event</Button>
+				)
+			}
+		/>
+	);
 
+	const sheets = (
+		<>
 			<EventFormSheet
 				visible={formOpen || !!editing}
 				event={editing}
@@ -238,8 +259,178 @@ export default function NgoEvents() {
 				}
 				onClose={() => setReviewing(null)}
 			/>
+		</>
+	);
+
+	if (isDesktop) {
+		return (
+			<AdminScreen
+				title="Events"
+				subtitle={subtitle}
+				action={newEvent}
+				toolbar={
+					<Toolbar view={view} onViewChange={setView}>
+						<SelectMenu
+							label="Status"
+							value={filter}
+							options={FILTERS}
+							onChange={setFilter}
+						/>
+					</Toolbar>
+				}
+				onNearEnd={loadMore}
+				refreshing={query.isRefetching && !query.isFetchingNextPage}
+				onRefresh={() => query.refetch()}
+			>
+				{banner}
+				<ConsoleList
+					query={query}
+					items={items}
+					total={total}
+					loadMore={loadMore}
+					noun="event"
+					view={view}
+					columns={eventColumns({
+						canEdit,
+						canRemove,
+						onEdit: setEditing,
+						onDelete: confirmDelete,
+					})}
+					rowKey={(event) => event.id}
+					// The row opens its applicants, as the card does - that is the
+					// decision this screen exists for.
+					onRowPress={(event) => setReviewing(event)}
+					sort={sort}
+					onSortChange={setSort}
+					loadingLabel="Loading your events"
+					renderCard={renderCard}
+					empty={empty}
+				/>
+				{sheets}
+			</AdminScreen>
+		);
+	}
+
+	return (
+		<Screen>
+			<ScreenHeader title="Events" subtitle={subtitle} action={newEvent} />
+
+			{banner}
+
+			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
+
+			<PagedList
+				query={query}
+				items={items}
+				loadMore={loadMore}
+				loadingLabel="Loading your events"
+				numColumns={columns}
+				noun="events"
+				keyExtractor={(item) => item.id}
+				renderItem={renderCard}
+				empty={empty}
+			/>
+
+			{sheets}
 		</Screen>
 	);
+}
+
+/**
+ * The desktop table's columns. The identity column flexes; everything you
+ * compare down the page - when, how full, how many waiting - is a fixed,
+ * sortable column. Edit and Remove stay on the row, as on the card, and are
+ * dropped (not disabled) for a role that cannot use them.
+ */
+function eventColumns({
+	canEdit,
+	canRemove,
+	onEdit,
+	onDelete,
+}: {
+	canEdit: (event: OrgEventListItem) => boolean;
+	canRemove: boolean;
+	onEdit: (event: OrgEventListItem) => void;
+	onDelete: (event: OrgEventListItem) => void;
+}): Array<TableColumn<OrgEventListItem>> {
+	return [
+		{
+			key: "title",
+			header: "Event",
+			sortKey: "title",
+			minWidth: 220,
+			render: (event) => (
+				<View style={{ minWidth: 0, alignSelf: "stretch" }}>
+					<Body weight="medium" numberOfLines={1}>
+						{event.title}
+					</Body>
+					{event.city && (
+						<Caption color="quaternary" numberOfLines={1}>
+							{event.city}
+						</Caption>
+					)}
+				</View>
+			),
+		},
+		{
+			key: "status",
+			header: "Status",
+			sortKey: "status",
+			width: 116,
+			render: (event) => (
+				<StatusPill
+					label={humanizeStatus(event.status)}
+					tone={eventStatusTone(event.status)}
+				/>
+			),
+		},
+		{
+			key: "when",
+			header: "When",
+			sortKey: "startAt",
+			width: 190,
+			render: (event) => (
+				<Caption color="tertiary" numberOfLines={2}>
+					{formatDateRange(event.startAt, event.endAt)}
+				</Caption>
+			),
+		},
+		{
+			key: "filled",
+			header: "Volunteers",
+			sortKey: "accepted",
+			width: 104,
+			align: "end",
+			render: (event) => (
+				<Caption color="tertiary">
+					{event.acceptedCount} of {event.volunteersNeeded}
+				</Caption>
+			),
+		},
+		{
+			key: "pending",
+			header: "To review",
+			sortKey: "pending",
+			width: 96,
+			align: "end",
+			render: (event) => <PendingCount count={event.pendingApplications} />,
+		},
+		{
+			key: "actions",
+			header: "",
+			width: 150,
+			align: "end",
+			render: (event) => (
+				<RowActions
+					onEdit={canEdit(event) ? () => onEdit(event) : undefined}
+					editLabel={event.status === "DRAFT" ? "Edit & publish" : "Edit"}
+					editTone={event.status === "DRAFT" ? "brand" : "default"}
+					onDelete={canRemove ? () => onDelete(event) : undefined}
+					name={event.title}
+				/>
+			),
+		},
+	];
 }
 
 /**

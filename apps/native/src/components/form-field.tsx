@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { type StyleProp, View, type ViewStyle } from "react-native";
 import { Caption, Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
+import { announce } from "@/lib/motion";
 
 /**
  * The one form-field recipe for the NGO screens and sheets.
@@ -47,6 +49,10 @@ export function Field({
 
 export function FieldError({ message }: { message?: string | null }) {
 	const { colors, spacing } = useTheme();
+	// iOS ignores `accessibilityLiveRegion`; see `announce` in `lib/motion.ts`.
+	useEffect(() => {
+		announce(message);
+	}, [message]);
 	if (!message) return null;
 	return (
 		<Caption

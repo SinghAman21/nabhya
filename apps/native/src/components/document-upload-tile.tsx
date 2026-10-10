@@ -2,23 +2,52 @@ import type { UploadPurpose } from "@nabhya/shared";
 import { Check, FileText, Upload } from "lucide-react-native";
 import { ActivityIndicator, View } from "react-native";
 import { Surface } from "@/components/screen-shell";
-import {
-	humanizeStatus,
-	StatusPill,
-	verificationTone,
-} from "@/components/status-pill";
+import { StatusPill, verificationTone } from "@/components/status-pill";
+import { TextAction } from "@/components/text-action";
+import { Button } from "@/components/ui/button";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption } from "@/components/ui/typography";
 import { useOpenDocument } from "@/hooks/use-documents";
 import { useTheme } from "@/hooks/use-theme";
 import { useFileUpload } from "@/hooks/use-upload";
 import { focusable } from "@/lib/focus";
+import { formatDate } from "@/lib/format";
 import type { AdminOrgDocument } from "@/lib/types";
+
+/**
+ * What each review state means to the person who uploaded the file - the pill
+ * word and the line under the title. "Submitted" for every state left a
+ * rejected copy looking like the job was done.
+ */
+const STATE_COPY: Record<
+	"PENDING" | "VERIFIED" | "REJECTED",
+	{ pill: string; line: (uploaded: string) => string }
+> = {
+	PENDING: {
+		pill: "Waiting for review",
+		line: (uploaded) => `Uploaded ${uploaded} · a reviewer will check it`,
+	},
+	VERIFIED: {
+		pill: "Approved",
+		line: (uploaded) => `Uploaded ${uploaded} · nothing more to do`,
+	},
+	REJECTED: {
+		pill: "Sent back",
+		line: () => "Upload a corrected copy to reopen review",
+	},
+};
 
 /**
  * One document slot: shows what's already submitted and its review state, or a
  * dashed target to upload into. Picking a file uploads it straight to storage
  * and reports the resulting object key back to the parent.
+ *
+ * A **sent-back** document is the one state with something to do, so it is
+ * the one that gets a real button ("Upload a new copy") and the reviewer's
+ * note under a label saying whose words they are. Every other state keeps
+ * View / Replace as quiet text actions - replacing an approved PAN card is
+ * rare, and a primary button on it would invite resetting a review for
+ * nothing.
  */
 export function DocumentUploadTile({
 	title,
@@ -52,6 +81,10 @@ export function DocumentUploadTile({
 	};
 
 	if (existing) {
+		const state = existing.verificationStatus ?? "PENDING";
+		const copy = STATE_COPY[state];
+		const sentBack = state === "REJECTED";
+
 		return (
 			<Surface>
 				<View
@@ -73,57 +106,71 @@ export function DocumentUploadTile({
 					>
 						<FileText size={18} color={colors.text.secondary as string} />
 					</View>
-					<View style={{ flex: 1 }}>
+					<View style={{ flex: 1, minWidth: 0 }}>
 						<Body weight="medium" numberOfLines={1}>
 							{title}
 						</Body>
-						<Caption color="tertiary">Submitted</Caption>
+						<Caption
+							color={sentBack ? (colors.error.ink as string) : "tertiary"}
+							numberOfLines={2}
+						>
+							{copy.line(formatDate(existing.uploadedAt))}
+						</Caption>
 					</View>
-					<StatusPill
-						label={humanizeStatus(existing.verificationStatus)}
-						tone={verificationTone(existing.verificationStatus)}
-					/>
+					<StatusPill label={copy.pill} tone={verificationTone(state)} />
 				</View>
 
 				{existing.remarks && (
-					<Caption color="secondary" style={{ marginTop: spacing[2] }}>
-						“{existing.remarks}”
-					</Caption>
+					<View
+						style={{
+							marginTop: spacing[3],
+							paddingLeft: spacing[3],
+							borderLeftWidth: 2,
+							borderLeftColor: sentBack
+								? (colors.error.ink as string)
+								: colors.border.dark,
+							gap: spacing[0.5],
+						}}
+					>
+						<Caption weight="medium" color="tertiary">
+							Reviewer's note
+						</Caption>
+						<Caption color="secondary">{existing.remarks}</Caption>
+					</View>
 				)}
 
 				<View
 					style={{
 						flexDirection: "row",
-						gap: spacing[4],
+						alignItems: "center",
+						flexWrap: "wrap",
+						gap: spacing[3],
 						marginTop: spacing[3],
 					}}
 				>
-					<Pressable
-						onPress={() => openDocument.mutate(existing.documentKey)}
-						hitSlop={8}
-						accessibilityRole="button"
-						accessibilityLabel={`View ${title}`}
-						{...focusable}
-					>
-						<Caption weight="medium" color={colors.primary.ink as string}>
-							{openDocument.isPending ? "Opening…" : "View"}
-						</Caption>
-					</Pressable>
-					{!readOnly && (
-						<Pressable
+					{sentBack && !readOnly ? (
+						<Button
+							size="sm"
 							onPress={pick}
-							disabled={busy}
-							hitSlop={8}
-							accessibilityRole="button"
-							accessibilityLabel={`Replace ${title}`}
-							accessibilityState={{ disabled: Boolean(busy) }}
-							{...focusable}
+							loading={!!busy}
+							accessibilityLabel={`Upload a new copy of ${title}`}
 						>
-							<Caption weight="medium" color="secondary">
-								{busy ? "Uploading…" : "Replace"}
-							</Caption>
-						</Pressable>
-					)}
+							Upload a new copy
+						</Button>
+					) : null}
+					<TextAction
+						label={openDocument.isPending ? "Opening…" : "View file"}
+						onPress={() => openDocument.mutate(existing.documentKey)}
+						accessibilityLabel={`View the ${title} you uploaded`}
+					/>
+					{!sentBack && !readOnly ? (
+						<TextAction
+							label={busy ? "Uploading…" : "Replace"}
+							disabled={!!busy}
+							onPress={pick}
+							accessibilityLabel={`Replace ${title}`}
+						/>
+					) : null}
 				</View>
 
 				{error && (
@@ -148,7 +195,7 @@ export function DocumentUploadTile({
 			{...focusable}
 			style={({ pressed }) => ({
 				borderWidth: 2,
-				borderColor: pressed ? colors.primary.main : colors.border.medium,
+				borderColor: pressed ? colors.primary.ink : colors.border.medium,
 				borderStyle: "dashed",
 				borderRadius: borderRadius.lg,
 				padding: spacing[6],

@@ -43,3 +43,19 @@ export type PressState = {
 	hovered?: boolean;
 	focused?: boolean;
 };
+
+/**
+ * Marks the nav row for the page you are on, for assistive tech on the web.
+ *
+ * The rail, the top bar and the tab bar all set `accessibilityState.selected`
+ * on the active row, which react-native-web renders as `aria-selected` - valid
+ * on a tab, meaningless on a link, so a screen reader walking the sidebar heard
+ * eleven identical links and no "current page". `aria-current="page"` is the
+ * attribute for that. Native keeps `selected`, which VoiceOver and TalkBack do
+ * read.
+ */
+export function currentPage(active: boolean) {
+	return (
+		Platform.OS === "web" && active ? { "aria-current": "page" } : {}
+	) as ViewProps;
+}

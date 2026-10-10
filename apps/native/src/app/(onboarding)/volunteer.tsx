@@ -34,6 +34,7 @@ import { ErrorState, LoadingState, Screen } from "@/components/screen-shell";
 import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { confirm } from "@/components/ui/overlay";
 import { Caption } from "@/components/ui/typography";
 import { useSignOut } from "@/hooks/use-auth";
 import {
@@ -46,6 +47,7 @@ import { apiErrorMessage } from "@/lib/api";
 import { verticalScrollbar } from "@/lib/scroll";
 import { useAuthStore } from "@/store/auth-store";
 import {
+	draftHasContent,
 	useOnboardingStore,
 	type VolunteerDraft,
 } from "@/store/onboarding-store";
@@ -68,7 +70,7 @@ const COPY = [
 	},
 	{
 		title: "Check and finish",
-		lede: "Tap any line to change it. Everything here is editable later.",
+		lede: "Tap any line to change it. Finishing creates your profile - you can verify your identity straight after, or later.",
 	},
 ] as const;
 
@@ -179,6 +181,16 @@ export default function VolunteerOnboarding() {
 		volunteerInterestsStepSchema,
 	];
 
+	// Set when a step is opened from the review screen's Edit, so Continue
+	// validates that one step and returns to review instead of walking
+	// through every step after it.
+	const [returnToReview, setReturnToReview] = useState(false);
+	const reviewStep = STEPS.length - 1;
+	const editFromReview = (target: number) => {
+		setReturnToReview(true);
+		setStep(target);
+	};
+
 	const advance = () => {
 		setSubmitError(null);
 		const schema = stepSchema[step];
@@ -190,10 +202,16 @@ export default function VolunteerOnboarding() {
 			}
 		}
 		setErrors({});
+		if (returnToReview) {
+			setReturnToReview(false);
+			setStep(reviewStep);
+			return;
+		}
 		setStep(Math.min(step + 1, STEPS.length - 1));
 	};
 
 	const back = () => {
+		setReturnToReview(false);
 		setErrors({});
 		setSubmitError(null);
 		setStep(Math.max(step - 1, 0));
@@ -220,6 +238,7 @@ export default function VolunteerOnboarding() {
 			// on a review screen with no fields on it.
 			setErrors(result.errors);
 			const firstBad = Object.keys(result.errors)[0] ?? "";
+			setReturnToReview(true);
 			setStep(
 				["fullName", "phone", "profileImage"].includes(firstBad)
 					? 0
@@ -310,6 +329,23 @@ export default function VolunteerOnboarding() {
 		);
 	}
 
+	// Signing out clears the draft (`useSignOut`), so a filled-in form asks
+	// first - otherwise one stray tap throws away the whole registration.
+	const signOutFromWizard = async () => {
+		if (draftHasContent(draft)) {
+			const ok = await confirm({
+				title: "Sign out and discard your draft?",
+				message:
+					"Everything you've entered so far is cleared from this device.",
+				confirmLabel: "Sign out",
+				cancelLabel: "Keep my draft",
+				destructive: true,
+			});
+			if (!ok) return;
+		}
+		signOut.mutate();
+	};
+
 	const copy = COPY[step] ?? COPY[0];
 
 	return (
@@ -319,42 +355,54 @@ export default function VolunteerOnboarding() {
 			title={copy.title}
 			lede={copy.lede}
 			error={submitError}
-			{...(step > 0 ? { onBack: back } : {})}
+			// Withheld mid-submit, as in the NGO wizard: stepping back while
+			// "Finish setup" is in flight leaves the review behind a live request.
+			{...(step > 0 && !complete.isPending ? { onBack: back } : {})}
 			exit={
 				step === 0 ? (
 					<TextAction
 						label={signOut.isPending ? "Signing out…" : "Not you? Sign out"}
-						onPress={() => signOut.mutate()}
+						onPress={signOutFromWizard}
 						disabled={signOut.isPending}
 					/>
 				) : null
 			}
+			// Not on the review - see the NGO wizard: the lede already says what
+			// finishing does, and a reassurance block under the list is a third
+			// layer of help between the reader and the button.
 			aside={
-				<WizardAside
-					title="Why we ask"
-					points={[
-						{
-							icon: HeartHandshake,
-							title: "NGOs read this before they accept you",
-							body: "A name, a city and a line about yourself is what a coordinator has to go on when they pick who comes on Saturday.",
-						},
-						{
-							icon: MapPin,
-							title: "Your city, not your GPS",
-							body: "We ask instead of tracking. The feed opens on the city you set and All India is always one tap away.",
-						},
-						{
-							icon: ShieldCheck,
-							title: "Nothing here is public",
-							body: "Your phone number is shared with an NGO only once they accept you for something.",
-						},
-					]}
-				/>
+				step === STEPS.length - 1 ? undefined : (
+					<WizardAside
+						title="Why we ask"
+						points={[
+							{
+								icon: HeartHandshake,
+								title: "NGOs read this before they accept you",
+								body: "A name, a city and a line about yourself is what a coordinator has to go on when they pick who comes on Saturday.",
+							},
+							{
+								icon: MapPin,
+								title: "Your city, not your GPS",
+								body: "We ask instead of tracking. The feed opens on the city you set and All India is always one tap away.",
+							},
+							{
+								icon: ShieldCheck,
+								title: "Nothing here is public",
+								body: "Your phone number is shared with an NGO only once they accept you for something.",
+							},
+						]}
+					/>
+				)
 			}
 			footer={
 				<WizardFooter
-					{...(step > 0 ? { onBack: back } : {})}
-					primaryLabel={step === STEPS.length - 1 ? "Finish setup" : "Continue"}
+					primaryLabel={
+						step === STEPS.length - 1
+							? "Finish setup"
+							: returnToReview
+								? "Back to review"
+								: "Continue"
+					}
 					onPrimary={step === STEPS.length - 1 ? submit : advance}
 					loading={complete.isPending}
 					// Holding the form for an upload beats losing the photo: the
@@ -362,11 +410,7 @@ export default function VolunteerOnboarding() {
 					disabled={photoUploading}
 					{...(photoUploading
 						? { note: "Waiting for your photo to finish uploading…" }
-						: step === 2 && draft.categoryIds.length === 0
-							? {
-									note: "You can skip causes - your feed will use your city only.",
-								}
-							: {})}
+						: {})}
 				/>
 			}
 		>
@@ -416,20 +460,13 @@ export default function VolunteerOnboarding() {
 			{step === 3 && (
 				<ReviewStep
 					draft={draft}
-					onEdit={setStep}
+					onEdit={editFromReview}
 					categoryNames={(categories.data ?? [])
 						.filter((category) => draft.categoryIds.includes(category.id))
 						.map((category) => category.name)
 						.join(", ")}
 				/>
 			)}
-
-			{step === 3 ? (
-				<Caption color="quaternary" style={{ marginTop: spacing[2] }}>
-					Finishing creates your volunteer profile. You can verify your identity
-					straight after, or whenever you're ready.
-				</Caption>
-			) : null}
 		</WizardShell>
 	);
 }
@@ -631,7 +668,7 @@ function ReviewStep({
 						onEdit: () => onEdit(1),
 					},
 					{
-						label: "Coordinates",
+						label: "Location pin",
 						value:
 							draft.latitude !== undefined && draft.longitude !== undefined
 								? "Saved - nearby NGOs will rank first"

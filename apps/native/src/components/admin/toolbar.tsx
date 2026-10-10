@@ -217,11 +217,15 @@ export function useTableView(screen: string) {
 /**
  * The bar that appears once rows are ticked.
  *
- * In the flow of the page, above the table - not floating over the bottom of
- * the window. A floating bar covers the last row of the thing you are
- * selecting from, and on a console the selection is often the whole visible
- * page. It says the count first, because "approve" is a very different
- * decision at 3 than at 47.
+ * In the pinned command bar, under the filters - not floating over the bottom
+ * of the window, and not in the flow of the page. A floating bar covers the
+ * last row of the thing you are selecting from, and on a console the selection
+ * is often the whole visible page; in the page flow it scrolled away with the
+ * title, so a reviewer who ticked rows forty lines down had to scroll back up
+ * to act on them. The caller passes it as part of `AdminScreen`'s `toolbar`,
+ * which pins, and the table's sticky header follows the bar's measured height
+ * down as it grows. It says the count first, because "approve" is a very
+ * different decision at 3 than at 47.
  *
  * `Clear` is a real control and sits at the end. Untangling a selection by
  * clicking twenty ticks off again is the single most annoying thing a table
@@ -251,7 +255,8 @@ export function BulkBar({
 				gap: spacing[2],
 				paddingVertical: spacing[2],
 				paddingHorizontal: spacing[3],
-				marginBottom: spacing[3],
+				// No margin: it sits in the pinned bar, which owns the spacing -
+				// the same reason `Toolbar` carries none.
 				borderRadius: borderRadius.md,
 				backgroundColor: colors.background.subtle,
 			}}

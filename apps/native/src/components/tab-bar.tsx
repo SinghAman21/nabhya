@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Pressable } from "@/components/ui/pressable";
 import { fonts } from "@/constants/fonts";
 import { useTheme } from "@/hooks/use-theme";
+import { focusable } from "@/lib/focus";
 import { HEADERLESS } from "@/lib/navigation";
 
 /** Bar height above the home-indicator inset. */
@@ -73,6 +74,17 @@ export function AppTabBar({ state, descriptors, navigation }: TabBarProps) {
 				const color = (
 					focused ? colors.text.primary : colors.text.quaternary
 				) as string;
+				// React Navigation's own option, honoured so a layout can pass a
+				// count (the admin Queue, a role's unread notifications) without
+				// this bar growing a second convention. The hand-drawn bar used to
+				// drop it on the floor.
+				const rawBadge = options.tabBarBadge;
+				const badge =
+					rawBadge === undefined || rawBadge === null || rawBadge === ""
+						? undefined
+						: typeof rawBadge === "number" && rawBadge > 99
+							? "99+"
+							: String(rawBadge);
 
 				const onPress = () => {
 					const event = navigation.emit({
@@ -94,7 +106,11 @@ export function AppTabBar({ state, descriptors, navigation }: TabBarProps) {
 						}
 						accessibilityRole="tab"
 						accessibilityState={{ selected: focused }}
-						accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
+						accessibilityLabel={
+							options.tabBarAccessibilityLabel ??
+							(badge ? `${label}, ${badge}` : label)
+						}
+						{...focusable}
 						style={({ pressed }) => ({
 							flex: 1,
 							alignItems: "center",
@@ -112,6 +128,39 @@ export function AppTabBar({ state, descriptors, navigation }: TabBarProps) {
 							}}
 						>
 							{options.tabBarIcon?.({ focused, color, size: 23 })}
+							{badge ? (
+								<View
+									pointerEvents="none"
+									style={{
+										position: "absolute",
+										top: -4,
+										left: 14,
+										minWidth: 18,
+										height: 18,
+										paddingHorizontal: 5,
+										borderRadius: 9,
+										alignItems: "center",
+										justifyContent: "center",
+										// The rail's badge recipe: ink on the brand tint, never
+										// a filled orange dot carrying white text.
+										backgroundColor: colors.primary.tint,
+										borderWidth: 1.5,
+										borderColor: colors.background.card,
+									}}
+								>
+									<Text
+										maxFontSizeMultiplier={1}
+										style={{
+											fontFamily: fonts.sansBold,
+											fontSize: 10,
+											lineHeight: 12,
+											color: colors.primary.ink,
+										}}
+									>
+										{badge}
+									</Text>
+								</View>
+							) : null}
 						</View>
 						<Text
 							numberOfLines={1}

@@ -19,6 +19,7 @@ import { useMyImpact } from "@/hooks/use-directory";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
+import { READING_COLUMN } from "@/lib/reading-column";
 import { verticalScrollbar } from "@/lib/scroll";
 
 /**
@@ -46,7 +47,7 @@ function Impact() {
 		impact.applicationsSubmitted === 0;
 
 	return (
-		<Screen>
+		<Screen style={READING_COLUMN}>
 			<ScreenHeader
 				back
 				title="Your impact"

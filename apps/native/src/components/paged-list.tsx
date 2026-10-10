@@ -1,6 +1,7 @@
 import type { Paginated } from "@nabhya/shared";
 import {
 	type InfiniteData,
+	keepPreviousData,
 	type UseInfiniteQueryResult,
 	useInfiniteQuery,
 } from "@tanstack/react-query";
@@ -12,7 +13,12 @@ import {
 	View,
 } from "react-native";
 import { LoadMoreFooter } from "@/components/load-more-footer";
-import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
+import {
+	ErrorState,
+	LoadingState,
+	SkeletonList,
+	Surface,
+} from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
 import { Caption } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
@@ -38,10 +44,19 @@ export function usePagedQuery<P extends Paginated<unknown>>({
 	queryKey,
 	fetchPage,
 	enabled = true,
+	keepPrevious = false,
 }: {
 	queryKey: readonly unknown[];
 	fetchPage: (page: number) => Promise<P>;
 	enabled?: boolean;
+	/**
+	 * Hold the previous key's rows up while a new filter or sort loads
+	 * (`query.isPlaceholderData` is true meanwhile). For a table whose controls
+	 * re-key the query - without it every header press blanks the page to a
+	 * spinner and back. Off by default: a list that changes *what* it is (a
+	 * different NGO's posts) must not show the last one's rows.
+	 */
+	keepPrevious?: boolean;
 }) {
 	const query = useInfiniteQuery({
 		queryKey: [...queryKey, "infinite"],
@@ -50,6 +65,7 @@ export function usePagedQuery<P extends Paginated<unknown>>({
 		getNextPageParam: (last) =>
 			last.meta.hasMore ? last.meta.page + 1 : undefined,
 		enabled,
+		...(keepPrevious ? { placeholderData: keepPreviousData } : {}),
 	});
 
 	const items = useMemo(
@@ -108,6 +124,7 @@ export function PagedList<T>({
 	numColumns,
 	noun,
 	extraBottomPadding = 0,
+	loadingShape = "skeleton",
 }: {
 	query: PagedQuery;
 	items: T[];
@@ -124,6 +141,13 @@ export function PagedList<T>({
 	/** Plural noun for the footer's closing line, e.g. "organizations". */
 	noun?: string;
 	extraBottomPadding?: number;
+	/**
+	 * What the first load draws. `skeleton` (the default) holds the rows'
+	 * height - hairline rows when `grouped`, cards otherwise, in the same grid -
+	 * so the page does not jump when the first page lands. `spinner` is the old
+	 * centred `LoadingState`, for a list whose rows look nothing like a card.
+	 */
+	loadingShape?: "skeleton" | "spinner";
 }) {
 	const { colors, spacing } = useTheme();
 
@@ -131,7 +155,16 @@ export function PagedList<T>({
 		return (
 			<>
 				{header}
-				<LoadingState label={loadingLabel} />
+				{loadingShape === "spinner" ? (
+					<LoadingState label={loadingLabel} />
+				) : (
+					<SkeletonList
+						variant={grouped ? "row" : "card"}
+						columns={grouped ? 1 : (numColumns ?? 1)}
+						count={grouped ? 6 : Math.max(3, (numColumns ?? 1) * 2)}
+						label={loadingLabel ?? "Loading"}
+					/>
+				)}
 			</>
 		);
 	}

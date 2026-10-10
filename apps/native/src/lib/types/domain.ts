@@ -46,6 +46,9 @@ export interface MyProfile {
 	bio: string | null;
 	city: string | null;
 	state: string | null;
+	/** Decimal columns arrive as strings. */
+	latitude: string | null;
+	longitude: string | null;
 	emailVerified: boolean | null;
 	verificationStatus: DocVerificationStatus | null;
 	status: UserStatus | null;
@@ -609,6 +612,14 @@ export interface PublicOrganization {
 	createdAt: string;
 	categories: Category[];
 	owner?: { id: string; fullName: string | null; email: string };
+}
+
+/**
+ * `GET /organizations/:id`. `viewer` is null for a signed-out visitor and
+ * otherwise says whether the caller follows and has saved this NGO.
+ */
+export interface PublicOrganizationDetail extends PublicOrganization {
+	viewer: { following: boolean; bookmarked: boolean } | null;
 }
 
 export interface SearchResults {

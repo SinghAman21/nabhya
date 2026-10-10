@@ -34,8 +34,10 @@ import {
 	LoadingState,
 	Screen,
 } from "@/components/screen-shell";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
-import { Caption, H2, Label } from "@/components/ui/typography";
+import { Caption, H2 } from "@/components/ui/typography";
 import { typography } from "@/constants/design-system";
 import { useToggleFollow } from "@/hooks/use-engagement";
 import {
@@ -264,6 +266,11 @@ export default function Home() {
 			onAllIndia={() => setCity(ALL_INDIA)}
 			onBrowseNgos={() => router.push("/ngos")}
 			onForYou={() => setTab("for_you")}
+			filtered={categoryIds.length > 0 || content !== "all"}
+			onClearFilters={() => {
+				setCategoryIds([]);
+				setContent("all");
+			}}
 		/>
 	) : feed.isFetchingNextPage ? (
 		<View style={{ paddingVertical: spacing[6], alignItems: "center" }}>
@@ -284,9 +291,33 @@ export default function Home() {
 	 * and every video player in it. Each closes only over a mutation's `mutate`,
 	 * which react-query keeps stable, so these dependencies never change.
 	 */
+	// The card's Follow disappears on press, so without a toast nothing says
+	// it worked or offers a way back - unfollowing otherwise lives on the NGO
+	// page. The name is looked up through a ref so the handler stays stable for
+	// the memoised `FeedCard` while pages load.
+	const itemsRef = useRef(items);
+	useEffect(() => {
+		itemsRef.current = items;
+	}, [items]);
 	const handleToggleFollow = useCallback(
 		(organizationId: string, following: boolean) =>
-			toggleFollow.mutate({ organizationId, following }),
+			toggleFollow.mutate(
+				{ organizationId, following },
+				{
+					onSuccess: () => {
+						if (following) return;
+						const name = itemsRef.current.find(
+							(row) => row.organization?.id === organizationId,
+						)?.organization?.organizationName;
+						toast.success(name ? `Following ${name}` : "Following", {
+							label: "Undo",
+							onPress: () =>
+								toggleFollow.mutate({ organizationId, following: true }),
+						});
+					},
+					onError: (error) => toast.error(apiErrorMessage(error)),
+				},
+			),
 		[toggleFollow.mutate],
 	);
 	const handleToggleLike = useCallback(
@@ -409,6 +440,8 @@ function FeedEmpty({
 	onAllIndia,
 	onBrowseNgos,
 	onForYou,
+	filtered,
+	onClearFilters,
 }: {
 	tab: FeedTab;
 	search: string;
@@ -416,16 +449,19 @@ function FeedEmpty({
 	onAllIndia: () => void;
 	onBrowseNgos: () => void;
 	onForYou: () => void;
+	/** A cause or content filter from the sheet is narrowing the feed. */
+	filtered: boolean;
+	onClearFilters: () => void;
 }) {
-	const { colors } = useTheme();
 	const scoped = city !== ALL_INDIA;
 
+	// `Button` rather than a bare Pressable around a Label: it brings the focus
+	// ring, the 38pt target and the disabled/pressed states a hand-rolled link
+	// had none of.
 	const link = (label: string, onPress: () => void) => (
-		<Pressable onPress={onPress} accessibilityRole="button" hitSlop={8}>
-			<Label weight="semibold" color={colors.primary.ink}>
-				{label}
-			</Label>
-		</Pressable>
+		<Button variant="link" size="sm" onPress={onPress}>
+			{label}
+		</Button>
 	);
 
 	if (search) {
@@ -435,6 +471,24 @@ function FeedEmpty({
 				title="No matching posts"
 				description="Try a different word, or a wider area."
 				{...(scoped ? { action: link("Show all of India", onAllIndia) } : {})}
+			/>
+		);
+	}
+
+	// A filter set in the sheet is out of sight once the sheet closes, so an
+	// empty feed under one read as "nothing here" - and the offered fix
+	// (widen the city) left the real cause in place.
+	if (filtered) {
+		return (
+			<EmptyState
+				icon={HeartHandshake}
+				title="Nothing matches your filters"
+				description={
+					scoped
+						? `No posts in ${city} for the causes or kinds you picked.`
+						: "No posts for the causes or kinds you picked."
+				}
+				action={link("Clear filters", onClearFilters)}
 			/>
 		);
 	}

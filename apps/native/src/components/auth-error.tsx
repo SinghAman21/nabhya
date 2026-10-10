@@ -1,9 +1,11 @@
 import { AlertCircle } from "lucide-react-native";
+import { useEffect } from "react";
 import { View } from "react-native";
 import { Pressable } from "@/components/ui/pressable";
 import { BodySmall, Caption } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { focusable } from "@/lib/focus";
+import { announce } from "@/lib/motion";
 
 /**
  * A failed sign-in or sign-up, said where it happened.
@@ -32,6 +34,11 @@ export function AuthError({
 	action?: { label: string; onPress: () => void };
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
+
+	// The live region covers Android and the web; iOS needs telling.
+	useEffect(() => {
+		announce(message);
+	}, [message]);
 
 	if (!message) return null;
 

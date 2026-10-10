@@ -4,16 +4,11 @@ import { View } from "react-native";
 import { OrgActivityTimeline } from "@/components/admin/activity-timeline";
 import { DocumentReviewRow } from "@/components/admin/document-review-row";
 import { OrgPostsSection } from "@/components/admin/org-posts-section";
-import {
-	FactGroup,
-	ReasonField,
-	Section,
-} from "@/components/admin/sheet-parts";
+import { FactGroup, ReasonStep, Section } from "@/components/admin/sheet-parts";
 import {
 	Banner,
 	ErrorState,
 	LoadingState,
-	SectionTitle,
 	Surface,
 } from "@/components/screen-shell";
 import {
@@ -40,9 +35,11 @@ import { formatDate } from "@/lib/format";
  * Full NGO dossier with the moderation actions attached.
  *
  * Read top to bottom the way a reviewer works: state, then the facts they
- * check against the documents, then the documents themselves, then the
- * decision - always in the same order (approve, under review, reject, suspend)
- * so the hand learns where each button is.
+ * check against the documents, then the documents themselves - straight after
+ * the facts, since they are what the panel is opened for (they used to come
+ * last, below the timeline and every post) - then the history. The decision is
+ * always in the same order (approve, under review, reject, suspend) so the
+ * hand learns where each button is.
  *
  * **A `Drawer`, not a `Sheet`, and `xl`.** Opening an NGO is not leaving the
  * list - the reviewer is working *down* a filtered directory, and the row they
@@ -56,14 +53,18 @@ import { formatDate } from "@/lib/format";
  * buttons at the bottom of the scroll, which meant the action was only
  * reachable after scrolling past every fact - and a stack of four 100%-wide
  * buttons reads as a menu, not a decision. Pinned, sized to their labels, and
- * in a row, they are always there and the primary one is obvious. The reason
- * box stays in the body directly above them, because it is a *field*: it has to
- * survive being read and corrected, which is exactly what a footer does not do.
+ * in a row, they are always there and the primary one is obvious.
+ *
+ * **A reason is asked for when it is needed, where the press happened.**
+ * Reject and Suspend turn the footer into a `ReasonStep`. The reason used to be
+ * a field at the end of the body, so pressing Reject with it empty put an
+ * error on a field below the fold and the button looked dead.
  */
 export function OrgDetailSheet({
 	organizationId,
 	onClose,
 	onOpenOwner,
+	onNext,
 }: {
 	organizationId: string | null;
 	onClose: () => void;
@@ -74,10 +75,21 @@ export function OrgDetailSheet({
 	 * up fighting the outer one's for every toast.
 	 */
 	onOpenOwner?: (userId: string) => void;
+	/**
+	 * Opens the row after this one in the list the drawer was opened from, or
+	 * is absent on the last row. A reviewer works *down* a filtered directory,
+	 * and closing the drawer, finding the next row and opening it again is three
+	 * moves per NGO. With this, a verification decision moves straight on to the
+	 * next NGO - the decided one usually leaves the "Awaiting" filter anyway -
+	 * and "Next" skips one without deciding. Suspension does not advance: it is
+	 * not part of working the queue, and the reviewer will want to see the
+	 * result.
+	 */
+	onNext?: () => void;
 }) {
 	const { spacing } = useTheme();
-	const [reason, setReason] = useState("");
-	const [reasonError, setReasonError] = useState<string | null>(null);
+	// Which reason-needing decision the footer is asking about, if any.
+	const [step, setStep] = useState<"REJECT" | "SUSPEND" | null>(null);
 
 	const query = useAdminOrganization(organizationId ?? undefined);
 	const review = useReviewOrganization();
@@ -87,82 +99,63 @@ export function OrgDetailSheet({
 	const busy = review.isPending || setStatus.isPending;
 
 	const close = () => {
-		setReason("");
-		setReasonError(null);
+		setStep(null);
 		onClose();
 	};
 
-	const changeReason = (text: string) => {
-		setReason(text);
-		if (reasonError && text.trim()) setReasonError(null);
+	const DECIDED: Record<"UNDER_REVIEW" | "VERIFIED" | "REJECTED", string> = {
+		VERIFIED: "Organization verified.",
+		UNDER_REVIEW: "Marked under review.",
+		REJECTED: "Organization rejected. They have been told why.",
 	};
 
 	const decide = (
 		verificationStatus: "UNDER_REVIEW" | "VERIFIED" | "REJECTED",
+		reason?: string,
 	) => {
 		if (!organizationId) return;
-		const text = reason.trim();
-		if (verificationStatus === "REJECTED" && !text) {
-			setReasonError(
-				"Tell the organization what is missing or wrong so they can fix it.",
-			);
-			return;
-		}
-		setReasonError(null);
 		review.mutate(
 			{
 				id: organizationId,
-				input: { verificationStatus, reason: text || undefined },
+				input: { verificationStatus, ...(reason ? { reason } : {}) },
 			},
 			{
 				onSuccess: () => {
-					setReason("");
-					toast.success(
-						verificationStatus === "VERIFIED"
-							? "Organization verified."
-							: "Organization rejected.",
-					);
+					setStep(null);
+					toast.success(DECIDED[verificationStatus]);
+					onNext?.();
 				},
 				onError: (error) => toast.error(apiErrorMessage(error)),
 			},
 		);
 	};
 
-	const toggleSuspension = async () => {
-		if (!organizationId || !org) return;
-		const suspending = org.status !== "SUSPENDED";
-		const text = reason.trim();
+	const suspend = (reason: string) => {
+		if (!organizationId) return;
+		setStatus.mutate(
+			{ id: organizationId, input: { status: "SUSPENDED", reason } },
+			{
+				onSuccess: () => {
+					setStep(null);
+					toast.success("Organization suspended.");
+				},
+				onError: (error) => toast.error(apiErrorMessage(error)),
+			},
+		);
+	};
 
-		if (suspending && !text) {
-			setReasonError("Add a reason before suspending this organization.");
-			return;
-		}
-		setReasonError(null);
-
+	const reinstate = async () => {
+		if (!organizationId) return;
 		const ok = await confirm({
-			title: suspending ? "Suspend organization?" : "Reinstate organization?",
-			message: suspending
-				? "Their published events will be cancelled and their open needs closed. Volunteers who applied will be notified."
-				: "They will be able to publish again.",
-			confirmLabel: suspending ? "Suspend" : "Reinstate",
-			destructive: suspending,
+			title: "Reinstate organization?",
+			message: "They will be able to publish again.",
+			confirmLabel: "Reinstate",
 		});
 		if (!ok) return;
 		setStatus.mutate(
+			{ id: organizationId, input: { status: "ACTIVE" } },
 			{
-				id: organizationId,
-				input: {
-					status: suspending ? "SUSPENDED" : "ACTIVE",
-					reason: text || undefined,
-				},
-			},
-			{
-				onSuccess: () => {
-					setReason("");
-					toast.success(
-						suspending ? "Organization suspended." : "Organization reinstated.",
-					);
-				},
+				onSuccess: () => toast.success("Organization reinstated."),
 				onError: (error) => toast.error(apiErrorMessage(error)),
 			},
 		);
@@ -182,7 +175,27 @@ export function OrgDetailSheet({
 					: (org?.email ?? undefined)
 			}
 			footer={
-				org ? (
+				org && step === "REJECT" ? (
+					<ReasonStep
+						title={`Why reject ${org.organizationName}?`}
+						consequence="The organization reads this and can fix what's wrong and resubmit."
+						placeholder="e.g. The registration certificate is cut off on page 2"
+						confirmLabel="Reject"
+						pending={review.isPending}
+						onCancel={() => setStep(null)}
+						onConfirm={(reason) => decide("REJECTED", reason)}
+					/>
+				) : org && step === "SUSPEND" ? (
+					<ReasonStep
+						title={`Why suspend ${org.organizationName}?`}
+						consequence="Their published events are cancelled and open needs closed; volunteers who applied are notified. The reason is recorded in the audit log."
+						placeholder="e.g. Reported for collecting fees from volunteers"
+						confirmLabel="Suspend"
+						pending={setStatus.isPending}
+						onCancel={() => setStep(null)}
+						onConfirm={suspend}
+					/>
+				) : org ? (
 					<DecisionBar>
 						{org.verificationStatus !== "VERIFIED" && (
 							<Button
@@ -193,7 +206,7 @@ export function OrgDetailSheet({
 									review.variables?.input.verificationStatus === "VERIFIED"
 								}
 							>
-								Approve
+								{onNext ? "Approve & next" : "Approve"}
 							</Button>
 						)}
 						{org.verificationStatus === "PENDING" && (
@@ -212,7 +225,7 @@ export function OrgDetailSheet({
 						{org.verificationStatus !== "REJECTED" && (
 							<Button
 								variant="outline"
-								onPress={() => decide("REJECTED")}
+								onPress={() => setStep("REJECT")}
 								disabled={busy}
 								loading={
 									review.isPending &&
@@ -222,13 +235,23 @@ export function OrgDetailSheet({
 								Reject
 							</Button>
 						)}
+						{onNext && (
+							<Button
+								variant="ghost"
+								onPress={onNext}
+								disabled={busy}
+								accessibilityLabel="Skip to the next organization"
+							>
+								Next
+							</Button>
+						)}
 						{/* Suspension sits apart, at the far end: it is the one action
 						    here that is not part of the verification decision, and a
 						    destructive button beside "Approve" invites the wrong tap. */}
 						<View style={{ flexGrow: 1 }} />
 						<Button
 							variant={suspended ? "outline" : "destructive"}
-							onPress={toggleSuspension}
+							onPress={suspended ? reinstate : () => setStep("SUSPEND")}
 							disabled={busy}
 							loading={setStatus.isPending}
 						>
@@ -297,6 +320,33 @@ export function OrgDetailSheet({
 								{ label: "Registered", value: formatDate(org.createdAt) },
 							]}
 						/>
+					</Section>
+
+					<Section
+						title={`Documents${org.documents.length ? ` (${org.documents.length})` : ""}`}
+					>
+						{org.documents.length === 0 ? (
+							<Surface>
+								<Caption color="tertiary">
+									Nothing uploaded yet. The NGO must submit its registration
+									documents before it can be verified.
+								</Caption>
+							</Surface>
+						) : (
+							<View style={{ gap: spacing[2] }}>
+								{org.documents.map((document) => (
+									<DocumentReviewRow
+										key={document.id}
+										document={document}
+										kind="organization"
+										label={
+											ORG_DOCUMENT_LABELS[document.documentType] ??
+											humanizeStatus(document.documentType)
+										}
+									/>
+								))}
+							</View>
+						)}
 					</Section>
 
 					{(org.description || org.mission) && (
@@ -404,42 +454,6 @@ export function OrgDetailSheet({
 							<OrgPostsSection organizationId={organizationId} />
 						) : null}
 					</Section>
-
-					<Section
-						title={`Documents${org.documents.length ? ` (${org.documents.length})` : ""}`}
-					>
-						{org.documents.length === 0 ? (
-							<Surface>
-								<Caption color="tertiary">
-									Nothing uploaded yet. The NGO must submit its registration
-									documents before it can be verified.
-								</Caption>
-							</Surface>
-						) : (
-							<View style={{ gap: spacing[2] }}>
-								{org.documents.map((document) => (
-									<DocumentReviewRow
-										key={document.id}
-										document={document}
-										kind="organization"
-										label={
-											ORG_DOCUMENT_LABELS[document.documentType] ??
-											humanizeStatus(document.documentType)
-										}
-									/>
-								))}
-							</View>
-						)}
-					</Section>
-
-					<SectionTitle>Decision</SectionTitle>
-					<ReasonField
-						value={reason}
-						onChangeText={changeReason}
-						placeholder="Explain what's missing or wrong"
-						requiredFor="reject or suspend"
-						error={reasonError}
-					/>
 				</>
 			)}
 		</Drawer>

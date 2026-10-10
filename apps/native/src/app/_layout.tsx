@@ -10,6 +10,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { OverlayHost } from "@/components/ui/overlay";
 import { ThemeProvider } from "@/hooks/use-app-theme";
 import { queryClient } from "@/lib/api";
+import { useDocumentTitle } from "@/lib/document-title";
 import { HEADERLESS } from "@/lib/navigation";
 import { storage } from "@/lib/storage";
 import { useAuthStore } from "@/store/auth-store";
@@ -68,11 +69,11 @@ export default function RootLayout() {
 							<Stack.Screen name="impact" />
 							<Stack.Screen name="edit-profile" />
 							<Stack.Screen name="verify-identity" />
-							<Stack.Screen name="success" />
 							<Stack.Screen name="search" />
 							<Stack.Screen name="feed" />
 							<Stack.Screen name="team/invites/[token]" />
 						</Stack>
+						<DocumentTitle />
 						<PortalHost />
 						{/* Toasts and confirmations. Every open sheet mounts its own
 						    host, which takes over while it is up - see the host-stack
@@ -83,4 +84,10 @@ export default function RootLayout() {
 			</ThemeProvider>
 		</QueryClientProvider>
 	);
+}
+
+/** The browser tab's title - see `lib/document-title.ts`. Renders nothing. */
+function DocumentTitle() {
+	useDocumentTitle();
+	return null;
 }

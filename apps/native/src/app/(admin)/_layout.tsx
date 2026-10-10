@@ -41,10 +41,13 @@ const SHELL_HEIGHT: ViewStyle =
  * Superadmin console. The client-side role check here is convenience only -
  * every /api/admin route is guarded by @Roles("superadmin") on the server.
  *
- * There is no content-width cap here, unlike `(ngo)`: each admin screen caps
- * itself at `AdminScreen`'s 1040 and goes two-up inside that rather than
- * growing wider, so a cap on the shell would only be a second number to keep
- * in sync with the first.
+ * There is no content-width cap here, unlike `(ngo)`, and none in the screens
+ * either: `AdminScreen` is full width by design, because a table's flexing
+ * column is what should take a wide monitor's slack (see `list-chrome.tsx`).
+ *
+ * The phone tabs are in the rail's order (`ADMIN_NAV_ITEMS`): Overview, Queue,
+ * then the two directories, then Activity. They used to put Queue fourth, so
+ * the same screen moved two places when a window crossed the breakpoint.
  */
 export default function AdminLayout() {
 	const role = useAuthStore((s) => s.role);
@@ -94,6 +97,15 @@ export default function AdminLayout() {
 					}}
 				/>
 				<Tabs.Screen
+					name="queue"
+					options={{
+						title: "Queue",
+						tabBarIcon: ({ color, size }) => (
+							<FileCheck2 size={size} color={color} />
+						),
+					}}
+				/>
+				<Tabs.Screen
 					name="organizations"
 					options={{
 						title: "NGOs",
@@ -108,15 +120,6 @@ export default function AdminLayout() {
 						title: "Volunteers",
 						tabBarIcon: ({ color, size }) => (
 							<Users size={size} color={color} />
-						),
-					}}
-				/>
-				<Tabs.Screen
-					name="queue"
-					options={{
-						title: "Queue",
-						tabBarIcon: ({ color, size }) => (
-							<FileCheck2 size={size} color={color} />
 						),
 					}}
 				/>

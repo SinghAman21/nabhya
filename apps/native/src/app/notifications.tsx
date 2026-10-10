@@ -12,6 +12,7 @@ import { notificationsApi, queryKeys } from "@/lib/api";
 import { focusable } from "@/lib/focus";
 import { formatRelative } from "@/lib/format";
 import { notificationDestination } from "@/lib/notification-destination";
+import { READING_COLUMN } from "@/lib/reading-column";
 import type { NotificationItem } from "@/lib/types";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -39,7 +40,7 @@ function Notifications() {
 	};
 
 	return (
-		<Screen>
+		<Screen style={READING_COLUMN}>
 			<ScreenHeader
 				back
 				title="Notifications"
@@ -48,10 +49,14 @@ function Notifications() {
 					unread > 0 ? (
 						<Pressable
 							onPress={() => markRead.mutate({})}
-							hitSlop={8}
 							accessibilityRole="button"
 							accessibilityLabel="Mark all notifications as read"
 							{...focusable}
+							style={{
+								minHeight: 44,
+								paddingHorizontal: spacing[2],
+								justifyContent: "center",
+							}}
 						>
 							<Caption weight="medium" color={colors.primary.ink}>
 								Mark all read

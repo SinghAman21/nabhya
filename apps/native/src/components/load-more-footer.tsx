@@ -3,6 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Caption } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 
+/** A `sm` button (38) and its 20pt of air either side. */
+const FOOTER_HEIGHT = 78;
+
 /**
  * Footer for a paginated `FlatList`. Every list endpoint returns a
  * `Paginated<T>` envelope; this is the one place the "next page" affordance is
@@ -29,9 +32,23 @@ export function LoadMoreFooter({
 
 	if (count === 0) return null;
 
+	// The spinner and the button occupy the same box, so pressing "Load more"
+	// swaps one for the other without nudging the rows above it.
+	const slot = {
+		minHeight: FOOTER_HEIGHT,
+		paddingVertical: spacing[5],
+		alignItems: "center",
+		justifyContent: "center",
+	} as const;
+
 	if (loading) {
 		return (
-			<View style={{ paddingVertical: spacing[6], alignItems: "center" }}>
+			<View
+				style={slot}
+				accessible
+				accessibilityRole="progressbar"
+				accessibilityLabel="Loading more"
+			>
 				<ActivityIndicator
 					size="small"
 					color={colors.text.quaternary as string}
@@ -42,7 +59,7 @@ export function LoadMoreFooter({
 
 	if (hasMore) {
 		return (
-			<View style={{ paddingVertical: spacing[5], alignItems: "center" }}>
+			<View style={slot}>
 				<Button variant="outline" size="sm" onPress={onLoadMore}>
 					Load more
 				</Button>

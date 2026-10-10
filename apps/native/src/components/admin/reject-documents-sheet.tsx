@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { Field } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,12 @@ import { useTheme } from "@/hooks/use-theme";
  * The remarks are sent to the uploader, so the copy says so. A reviewer typing
  * "bad scan" into a box with no audience is writing a note to nobody; the same
  * reviewer told it reaches the NGO writes "the second page is cut off".
+ *
+ * **The remarks survive a failed request.** Confirming no longer clears the
+ * box: the parent closes the sheet (`count` → 0) only once the rejection has
+ * gone through, and that close is what clears it. It used to clear on press,
+ * so a 500 or a dropped connection left the sheet open, the error toast up,
+ * and the reviewer's paragraph gone.
  */
 export function RejectDocumentsSheet({
 	count,
@@ -37,6 +43,15 @@ export function RejectDocumentsSheet({
 	const [remarks, setRemarks] = useState("");
 	const [error, setError] = useState<string | null>(null);
 
+	// Cleared whenever the sheet goes away - dismissed, or closed by the parent
+	// after a successful rejection - and never while it is still showing.
+	useEffect(() => {
+		if (count === 0) {
+			setRemarks("");
+			setError(null);
+		}
+	}, [count]);
+
 	const close = () => {
 		setRemarks("");
 		setError(null);
@@ -51,7 +66,6 @@ export function RejectDocumentsSheet({
 		}
 		setError(null);
 		onConfirm(text);
-		setRemarks("");
 	};
 
 	return (

@@ -34,6 +34,9 @@ export const lightColors = {
 		border: "#22C55E",
 		/** Text/icon grade on this tone's `bg` (6.81:1). `main` is a fill colour. */
 		ink: "#166534",
+		/** Icon/label colour *on* a `success.main` fill (6.5:1). White there is
+		 *  2.3:1 - the verified badge's tick used to be hardcoded white. */
+		contrast: "#052E16",
 	},
 	error: {
 		main: "#EF4444",
@@ -111,6 +114,19 @@ export const lightColors = {
 		orange: "#D96D57",
 		white: "#FFFFFF",
 	},
+	/**
+	 * The dark brand panel beside sign-in / sign-up (`auth-split-layout.tsx`).
+	 * Dark in both schemes - it is the logotype's ground, not a surface.
+	 */
+	brand: {
+		surface: "#0A0A0A",
+		ink: "#FFFFFF",
+		/** Body copy on `surface` (7.8:1). */
+		muted: "#A3A3A3",
+		/** Small print on `surface` (6.1:1). */
+		faint: "#8F8F8F",
+		rule: "#222222",
+	},
 	shadow: "#00000050",
 } as const;
 
@@ -146,6 +162,7 @@ export const darkColors = {
 		border: "#22C55E",
 		/** Text/icon grade on this tone's dark `bg` (9.65:1). */
 		ink: "#6EE7A0",
+		contrast: "#052E16",
 	},
 	error: {
 		main: "#EF4444",
@@ -215,7 +232,41 @@ export const darkColors = {
 		orange: "#D96D57",
 		white: "#FFFFFF",
 	},
+	brand: {
+		/** Lifted and warmed off `background.warm` (#0E0E0E). The light-mode
+		 *  #0A0A0A sat 1% away from it, so in dark mode the phone's brand bar
+		 *  vanished into the form below it. */
+		surface: "#1F1712",
+		ink: "#FFFFFF",
+		/** 7.0:1 on this surface. */
+		muted: "#A3A3A3",
+		/** 5.5:1 on this surface. */
+		faint: "#8F8F8F",
+		rule: "#3A2E26",
+	},
 	shadow: "#00000080",
+} as const;
+
+/**
+ * Chrome drawn *over* photos and video - feed tiles and the fullscreen viewer.
+ * One set for both schemes on purpose: the ground is the picture, not the
+ * theme, so a scrim that flipped to white in light mode would wash the image
+ * out. White ink on a 55% black scrim reads on any frame.
+ */
+export const mediaColors = {
+	ink: "#FFFFFF",
+	/** Secondary text over the viewer's black ground (the "2 / 5" counter). */
+	inkMuted: "#A3A3A3",
+	scrim: "rgba(0,0,0,0.55)",
+	scrimPressed: "rgba(0,0,0,0.75)",
+	/** The unfilled part of the video scrubber. */
+	track: "rgba(255,255,255,0.25)",
+	/** Letterbox behind a video tile before the first frame. */
+	stage: "#111111",
+	/** The fullscreen viewer's ground. */
+	viewer: "#000000",
+	/** A liked heart over media - `error.light`, readable on black in both modes. */
+	liked: "#F87171",
 } as const;
 
 export const typography = {

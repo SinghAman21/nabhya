@@ -12,6 +12,7 @@ import { useToggleFollow } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage, engagementApi, queryKeys } from "@/lib/api";
 import { focusable } from "@/lib/focus";
+import { READING_COLUMN } from "@/lib/reading-column";
 import type { BookmarkListItem } from "@/lib/types";
 
 /**
@@ -52,7 +53,7 @@ function Following() {
 	};
 
 	return (
-		<Screen>
+		<Screen style={READING_COLUMN}>
 			<ScreenHeader
 				back
 				title="Following"
@@ -74,7 +75,7 @@ function Following() {
 					<EmptyState
 						icon={UserCheck}
 						title="Not following anyone yet"
-						description="Follow an NGO from any of its posts and its updates, needs and events show up in your Following feed."
+						description="Follow an NGO from its page or any of its posts, and its updates, needs and events show up in your Following feed."
 						action={
 							<Button
 								size="sm"
@@ -91,8 +92,8 @@ function Following() {
 						style={{
 							flexDirection: "row",
 							alignItems: "center",
-							gap: spacing[3],
-							paddingRight: spacing[4],
+							gap: spacing[1],
+							paddingRight: spacing[2],
 						}}
 					>
 						<Pressable
@@ -148,11 +149,17 @@ function Following() {
 						<Pressable
 							onPress={() => unfollow(item)}
 							disabled={toggle.isPending}
-							hitSlop={10}
 							accessibilityRole="button"
 							accessibilityLabel={`Unfollow ${item.organization.organizationName}`}
 							accessibilityState={{ disabled: toggle.isPending }}
 							{...focusable}
+							// A sized target, not a caption with hitSlop: the slop reached
+							// ~36pt and the focus ring hugged the bare word.
+							style={{
+								minHeight: 44,
+								paddingHorizontal: spacing[2],
+								justifyContent: "center",
+							}}
 						>
 							<Caption weight="medium" color="tertiary">
 								Unfollow

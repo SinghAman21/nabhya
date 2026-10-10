@@ -300,6 +300,19 @@ function haversineKm(
 }
 
 /**
+ * A listed city's centre, for proximity search when the person saved a city but
+ * never a pin. `null` for anything off the list - better no "near me" than one
+ * measured from the wrong place.
+ */
+export function cityCoordinates(
+	city: string | null | undefined,
+): { latitude: number; longitude: number } | null {
+	if (!city) return null;
+	const coords = CITY_COORDS[normaliseCityName(city)];
+	return coords ? { latitude: coords[0], longitude: coords[1] } : null;
+}
+
+/**
  * The listed city nearest to a coordinate, if one is close enough to be
  * plausible.
  *

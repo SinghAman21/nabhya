@@ -2,10 +2,16 @@ import type {
 	CompleteOrgOnboardingPayload,
 	CompleteVolunteerOnboardingPayload,
 	SelectableRole,
-	UpdateUserProfileInput,
+	UpdateUserProfilePayload,
 } from "@nabhya/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { categoriesApi, onboardingApi, queryKeys, usersApi } from "@/lib/api";
+import {
+	categoriesApi,
+	onboardingApi,
+	queryKeys,
+	queryScopes,
+	usersApi,
+} from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 
 /** The authenticated user's profile - the client's source of truth for role. */
@@ -37,10 +43,15 @@ export function useCategories() {
 export function useUpdateProfile() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (input: UpdateUserProfileInput) =>
+		mutationFn: (input: UpdateUserProfilePayload) =>
 			usersApi.updateProfile(input),
-		onSuccess: () => {
+		onSuccess: (_data, input) => {
 			queryClient.invalidateQueries({ queryKey: queryKeys.me });
+			// "For you" ranks on interests and the home feed scopes to the profile
+			// city, so either changing leaves every cached feed page stale.
+			if (input.categoryIds !== undefined || input.city !== undefined) {
+				queryClient.invalidateQueries({ queryKey: queryScopes.feed });
+			}
 		},
 	});
 }

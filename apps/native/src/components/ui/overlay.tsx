@@ -8,12 +8,14 @@ import {
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { TAB_BAR_HEIGHT } from "@/components/tab-bar";
 import { Button } from "@/components/ui/button";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H4, Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { focusable } from "@/lib/focus";
+import { announce } from "@/lib/motion";
 
 /**
  * Transient feedback and confirmations, as app furniture rather than OS chrome.
@@ -84,12 +86,61 @@ const TOAST_MS: Record<ToastTone, number> = {
 	error: 6000,
 };
 
+/**
+ * A toast that carries an action - nearly always Undo - stays at least this
+ * long. At the success tone's 3.2s the button was gone before most people had
+ * read the sentence that explains what it would undo.
+ */
+const ACTION_MIN_MS = 6000;
+
+/** What a paused toast gets back when the pointer leaves, at the least. */
+const RESUME_MIN_MS = 1500;
+
 /** Three at once is already a wall of text; older ones drop off the top. */
 const MAX_TOASTS = 3;
 
 let toasts: ToastRecord[] = [];
 let nextId = 1;
-const timers = new Map<number, ReturnType<typeof setTimeout>>();
+
+/**
+ * Each toast's countdown. `handle` is null while paused, and `remaining` is
+ * what is left of its time - so pointing at a toast (or tabbing to its Undo)
+ * stops the clock rather than racing it, which WCAG 2.2.1 asks of anything
+ * that disappears on a timer.
+ */
+const timers = new Map<
+	number,
+	{
+		handle: ReturnType<typeof setTimeout> | null;
+		remaining: number;
+		startedAt: number;
+	}
+>();
+
+function arm(id: number, ms: number) {
+	timers.set(id, {
+		handle: setTimeout(() => dismissToast(id), ms),
+		remaining: ms,
+		startedAt: Date.now(),
+	});
+}
+
+function pauseToasts() {
+	const now = Date.now();
+	for (const timer of timers.values()) {
+		if (!timer.handle) continue;
+		clearTimeout(timer.handle);
+		timer.handle = null;
+		timer.remaining = Math.max(0, timer.remaining - (now - timer.startedAt));
+	}
+}
+
+function resumeToasts() {
+	for (const [id, timer] of timers) {
+		if (timer.handle) continue;
+		arm(id, Math.max(RESUME_MIN_MS, timer.remaining));
+	}
+}
 
 /* -- Confirmation --------------------------------------------------------- */
 
@@ -146,7 +197,7 @@ function getSnapshot() {
 function dismissToast(id: number) {
 	const timer = timers.get(id);
 	if (timer) {
-		clearTimeout(timer);
+		if (timer.handle) clearTimeout(timer.handle);
 		timers.delete(id);
 	}
 	toasts = toasts.filter((item) => item.id !== id);
@@ -162,11 +213,9 @@ function push(tone: ToastTone, message: string, action?: ToastAction) {
 		...toasts,
 		{ id, tone, message: trimmed, ...(action ? { action } : {}) },
 	].slice(-MAX_TOASTS);
-	timers.set(
-		id,
-		setTimeout(() => dismissToast(id), TOAST_MS[tone]),
-	);
+	arm(id, action ? Math.max(TOAST_MS[tone], ACTION_MIN_MS) : TOAST_MS[tone]);
 	publish();
+	announce(trimmed);
 }
 
 export const toast = {
@@ -266,6 +315,22 @@ export function OverlayHost() {
 	);
 }
 
+/**
+ * Pointer and focus handlers that pause the countdown, on the web only.
+ * `View` forwards these on react-native-web (mouse and focus props both reach
+ * the DOM node) but React Native's own types do not declare them.
+ */
+const PAUSE_ON_ATTENTION = (
+	Platform.OS === "web"
+		? {
+				onMouseEnter: pauseToasts,
+				onMouseLeave: resumeToasts,
+				onFocus: pauseToasts,
+				onBlur: resumeToasts,
+			}
+		: {}
+) as object;
+
 function ToastStack({ toasts: items }: { toasts: ToastRecord[] }) {
 	const { spacing } = useTheme();
 	const { isDesktop } = useMedia();
@@ -278,11 +343,16 @@ function ToastStack({ toasts: items }: { toasts: ToastRecord[] }) {
 			// `box-none` so the gap between toasts stays tappable -- a toast sits
 			// over content a person may be trying to reach.
 			pointerEvents="box-none"
+			{...PAUSE_ON_ATTENTION}
 			style={{
 				position: "absolute",
 				left: 0,
 				right: 0,
-				bottom: insets.bottom + spacing[4],
+				// On a phone the bottom edge is where the tab bar, a sheet's pinned
+				// footer and a pushed page's action bar all live - a toast at
+				// `insets.bottom + 16` sat squarely on the tab labels. It clears a
+				// bar's height instead; desktop has nothing down there.
+				bottom: insets.bottom + spacing[4] + (isDesktop ? 0 : TAB_BAR_HEIGHT),
 				alignItems: isDesktop ? "flex-end" : "center",
 				paddingHorizontal: spacing[4],
 				gap: spacing[2],
@@ -308,7 +378,9 @@ function ToastRow({ toast: item }: { toast: ToastRecord }) {
 
 	return (
 		<View
-			accessibilityLiveRegion="polite"
+			// An error interrupts; a confirmation waits its turn. On the web this
+			// is `aria-live`, on Android the live region - iOS is `announce()`.
+			accessibilityLiveRegion={item.tone === "error" ? "assertive" : "polite"}
 			style={{
 				flexDirection: "row",
 				alignItems: "flex-start",
@@ -380,17 +452,46 @@ function ConfirmDialog({ record }: { record: ConfirmRecord }) {
 	const destructive = record.destructive !== false;
 
 	const cancel = useCallback(() => settleConfirm(false), []);
+	const cancelRef = useRef<View>(null);
 
-	// Escape closes it on the web, where a dialog with no keyboard exit is a
-	// trap for anyone not using a mouse.
+	/*
+	 * Escape cancels it on the web, where a dialog with no keyboard exit is a
+	 * trap for anyone not using a mouse - and *only* it. Most confirms are
+	 * raised from inside a sheet or drawer, which is an RNW `Modal`, and that
+	 * Modal closes itself on Escape **keyup** from a `document` listener. A
+	 * plain window keydown handler cancelled the confirm and then let the keyup
+	 * through, so one Escape dismissed the question *and* the sheet it was
+	 * asked from. Listening in the capture phase on `window` runs first, and
+	 * stopping propagation there keeps the key from every listener below.
+	 */
 	useEffect(() => {
 		if (Platform.OS !== "web" || typeof window === "undefined") return;
-		const onKey = (event: KeyboardEvent) => {
-			if (event.key === "Escape") cancel();
+		const swallow = (event: KeyboardEvent) => {
+			if (event.key !== "Escape") return;
+			event.stopPropagation();
+			if (event.type === "keyup") cancel();
 		};
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
+		window.addEventListener("keydown", swallow, true);
+		window.addEventListener("keyup", swallow, true);
+		return () => {
+			window.removeEventListener("keydown", swallow, true);
+			window.removeEventListener("keyup", swallow, true);
+		};
 	}, [cancel]);
+
+	/*
+	 * Focus moves into the dialog, onto Cancel - the safe choice for a
+	 * question that is nearly always "delete this?" - and goes back to whatever
+	 * raised it when the dialog closes. Without this a keyboard user's focus
+	 * stayed on the button behind the scrim: Enter pressed it again, and Tab
+	 * walked the page underneath.
+	 */
+	useEffect(() => {
+		if (Platform.OS !== "web" || typeof document === "undefined") return;
+		const previous = document.activeElement as HTMLElement | null;
+		(cancelRef.current as unknown as HTMLElement | null)?.focus?.();
+		return () => previous?.focus?.();
+	}, []);
 
 	return (
 		<View
@@ -422,6 +523,8 @@ function ConfirmDialog({ record }: { record: ConfirmRecord }) {
 
 			<View
 				accessibilityViewIsModal
+				role="alertdialog"
+				aria-label={record.title}
 				style={{
 					width: "100%",
 					maxWidth: 420,
@@ -450,6 +553,7 @@ function ConfirmDialog({ record }: { record: ConfirmRecord }) {
 				    up, and the row reads in the order the decision is made. */}
 				<View style={{ flexDirection: "row", gap: spacing[3] }}>
 					<Button
+						ref={cancelRef}
 						variant="outline"
 						onPress={cancel}
 						style={{ flex: 1 }}

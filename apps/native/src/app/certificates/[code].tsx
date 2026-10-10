@@ -8,12 +8,15 @@ import {
 	ScreenHeader,
 	Surface,
 } from "@/components/screen-shell";
+import { Button } from "@/components/ui/button";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useVerifyCertificate } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
+import { READING_COLUMN } from "@/lib/reading-column";
 import { verticalScrollbar } from "@/lib/scroll";
+import { publicUrl, shareLink } from "@/lib/share-link";
 
 /**
  * Public certificate verification.
@@ -30,8 +33,32 @@ export default function VerifyCertificate() {
 	const certificate = query.data;
 
 	return (
-		<Screen>
-			<ScreenHeader back title="Verify certificate" />
+		<Screen style={READING_COLUMN}>
+			<ScreenHeader
+				back
+				title="Verify certificate"
+				// This page *is* the proof, so it is the thing to pass on - to an
+				// employer, a college, a LinkedIn post.
+				{...(certificate?.valid
+					? {
+							action: (
+								<Button
+									size="sm"
+									variant="outline"
+									onPress={() =>
+										shareLink({
+											message: `Volunteering certificate for ${certificate.eventTitle} with ${certificate.organizationName}, verified on Nabhya.`,
+											url: publicUrl(`/certificates/${certificate.code}`),
+										})
+									}
+									accessibilityLabel="Share this certificate's verification link"
+								>
+									Share
+								</Button>
+							),
+						}
+					: {})}
+			/>
 
 			{query.isLoading ? (
 				<LoadingState label="Checking the code" />

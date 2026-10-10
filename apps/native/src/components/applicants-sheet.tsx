@@ -1,7 +1,8 @@
-import type { ApplicationStatus } from "@nabhya/shared";
+import type { ApplicationStatus, BulkResult } from "@nabhya/shared";
 import { Users } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
+import { Tick } from "@/components/admin/data-table";
 import { ContactActions } from "@/components/contact-actions";
 import { Field, useFieldInputStyle } from "@/components/form-field";
 import { InitialAvatar } from "@/components/initial-avatar";
@@ -22,17 +23,23 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { confirm, toast } from "@/components/ui/overlay";
+import { Pressable } from "@/components/ui/pressable";
 import { Sheet, SheetFlatList } from "@/components/ui/sheet";
-import { Body, BodySmall, Caption } from "@/components/ui/typography";
+import { Body, BodySmall, Caption, Label } from "@/components/ui/typography";
 import {
+	useBulkAttendance,
 	useIssueCertificate,
 	useMarkAttendance,
 	useRevokeCertificate,
 } from "@/hooks/use-engagement";
-import { useReviewApplication } from "@/hooks/use-events";
-import { useMyTeamRole } from "@/hooks/use-my-team-role";
+import {
+	useBulkReviewApplications,
+	useReviewApplication,
+} from "@/hooks/use-events";
+import { useOrgAccess } from "@/hooks/use-org-access";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage, orgEventsApi, queryKeys } from "@/lib/api";
+import { focusable } from "@/lib/focus";
 import { formatRelative } from "@/lib/format";
 import type { EventApplicant } from "@/lib/types";
 
@@ -45,7 +52,41 @@ const FILTERS: Array<{ value: StatusFilter; label: string }> = [
 	{ value: "ALL", label: "All" },
 ];
 
-/** Applicant review for a single event - accept or reject in place. */
+type BulkAction = "ACCEPT" | "REJECT" | "MARK_ATTENDED" | "ISSUE_CERTIFICATE";
+
+/** Which applicants a filter's selection can act on. */
+const SELECTABLE: Partial<Record<StatusFilter, ApplicationStatus>> = {
+	PENDING: "PENDING",
+	ACCEPTED: "ACCEPTED",
+};
+
+/**
+ * Applicant review for a single event: decide, then - after the event - mark
+ * attendance and issue certificates.
+ *
+ * ## Selection
+ *
+ * Reviewing fifty applicants used to be fifty Accept taps, and certifying
+ * thirty volunteers about ninety (mark attended, issue, confirm). The Pending
+ * and Accepted filters now take a tick per row and a select-all, and the
+ * pinned footer acts on the selection through the server's bulk endpoints,
+ * which apply each row through the single-row path and report per-row
+ * outcomes. Rows that fail stay ticked with the reason on them, so "18 of 20"
+ * names the two. Filters are four peers, so they stay chips.
+ *
+ * ## Notes travel with one person
+ *
+ * The note used to be a single field above the list, "sent with your next
+ * decision" - so a note written with one applicant in mind went to whoever was
+ * clicked next. It now lives on the row it is for.
+ *
+ * ## Who may do what
+ *
+ * Every control asks `useOrgAccess()`: review is `people.review`, attendance
+ * `people.attendance`, issuing `certs.issue`, revoking `certs.revoke`. Attendance
+ * and certificates used to check nothing, so a Viewer saw "Mark attended" and
+ * a Manager saw "Revoke", and both got a 403.
+ */
 export function ApplicantsSheet({
 	eventId,
 	eventTitle,
@@ -58,12 +99,11 @@ export function ApplicantsSheet({
 	onClose: () => void;
 }) {
 	const { colors, spacing } = useTheme();
-	const inputStyle = useFieldInputStyle();
-	const [filter, setFilter] = useState<StatusFilter>("PENDING");
-	const [note, setNote] = useState("");
+	const [filter, setFilterState] = useState<StatusFilter>("PENDING");
+	const [selected, setSelected] = useState<Set<string>>(new Set());
+	// Per-row reasons from the last bulk action, shown on the row itself.
+	const [failures, setFailures] = useState<Record<string, string>>({});
 
-	// Paged: an event with more than 20 applicants used to show the first
-	// 20 and nothing to reach the rest.
 	const params = filter === "ALL" ? {} : { status: filter };
 	const { query, items, loadMore } = usePagedQuery({
 		queryKey: queryKeys.orgEventApplicants(eventId ?? "", params),
@@ -76,41 +116,154 @@ export function ApplicantsSheet({
 		enabled: !!eventId,
 	});
 	const review = useReviewApplication(eventId ?? "");
+	const bulkReview = useBulkReviewApplications(eventId ?? "");
+	const bulkAttendance = useBulkAttendance(eventId ?? "");
 
-	// Accepting or rejecting is `people.review`. Allowed while the role is
-	// still resolving; the server still 403s anything the role cannot do.
-	const teamRole = useMyTeamRole();
-	const canReview = teamRole.isLoading ? true : teamRole.can("people.review");
+	const access = useOrgAccess();
+	const blocked = {
+		review: access.blocked("people.review"),
+		attendance: access.blocked("people.attendance"),
+		issue: access.blocked("certs.issue"),
+		revoke: access.blocked("certs.revoke"),
+	};
+
+	const selectableStatus = SELECTABLE[filter];
+	const selectable = selectableStatus
+		? items.filter((item) => item.status === selectableStatus)
+		: [];
+	const allSelected =
+		selectable.length > 0 && selectable.every((item) => selected.has(item.id));
+
+	const clearSelection = () => {
+		setSelected(new Set());
+		setFailures({});
+	};
+
+	const setFilter = (next: StatusFilter) => {
+		setFilterState(next);
+		clearSelection();
+	};
 
 	const close = () => {
-		setNote("");
-		setFilter("PENDING");
+		setFilterState("PENDING");
+		clearSelection();
 		onClose();
 	};
 
-	const decide = (
+	const toggle = (id: string) =>
+		setSelected((current) => {
+			const next = new Set(current);
+			if (next.has(id)) next.delete(id);
+			else next.add(id);
+			return next;
+		});
+
+	const toggleAll = () =>
+		setSelected(
+			allSelected ? new Set() : new Set(selectable.map((item) => item.id)),
+		);
+
+	const decide = async (
 		applicant: EventApplicant,
 		status: "ACCEPTED" | "REJECTED",
+		note: string,
 	) => {
+		const who = applicant.volunteer.fullName ?? "The volunteer";
+		if (status === "REJECTED") {
+			// A decision the volunteer is notified of and cannot be taken back
+			// from here, so it is confirmed by name.
+			const ok = await confirm({
+				title: `Reject ${who}?`,
+				message: note
+					? "They'll be told it's a no this time, with your note."
+					: "They'll be told it's a no this time.",
+				confirmLabel: "Reject",
+				cancelLabel: "Keep pending",
+			});
+			if (!ok) return;
+		}
 		review.mutate(
 			{
 				applicationId: applicant.id,
 				input: { status, reviewNote: note.trim() || undefined },
 			},
 			{
-				onSuccess: () => {
-					setNote("");
-					const who = applicant.volunteer.fullName ?? "The volunteer";
+				onSuccess: () =>
 					toast.success(
 						status === "ACCEPTED"
 							? `${who} accepted. They have been notified.`
-							: `${who} declined.`,
-					);
-				},
+							: `${who} declined. They have been notified.`,
+					),
 				onError: (error) => toast.error(apiErrorMessage(error)),
 			},
 		);
 	};
+
+	const report = (result: BulkResult, verb: string) => {
+		setFailures(Object.fromEntries(result.failed.map((f) => [f.id, f.reason])));
+		// Keep the failures ticked so a retry is one press away.
+		setSelected(new Set(result.failed.map((f) => f.id)));
+		if (result.failed.length === 0) {
+			toast.success(`${result.done.length} ${verb}.`);
+		} else {
+			toast.error(
+				`${result.done.length} ${verb}. ${result.failed.length} couldn't be - the reason is on each row still ticked.`,
+			);
+		}
+	};
+
+	const runBulk = async (action: BulkAction) => {
+		const ids = [...selected];
+		const n = ids.length;
+		const people = `${n} ${n === 1 ? "applicant" : "applicants"}`;
+
+		if (action === "REJECT") {
+			const ok = await confirm({
+				title: `Reject ${people}?`,
+				message: "Each of them is told it's a no this time.",
+				confirmLabel: `Reject ${n}`,
+				cancelLabel: "Keep pending",
+			});
+			if (!ok) return;
+		}
+		if (action === "ISSUE_CERTIFICATE") {
+			const ok = await confirm({
+				title: `Issue ${n} ${n === 1 ? "certificate" : "certificates"}?`,
+				message:
+					"Each volunteer is notified and gets a verifiable certificate for the hours recorded on their row (the whole event if none). A certificate can be revoked later, never deleted.",
+				confirmLabel: "Issue",
+			});
+			if (!ok) return;
+		}
+
+		const onError = (error: unknown) => toast.error(apiErrorMessage(error));
+		if (action === "ACCEPT" || action === "REJECT") {
+			bulkReview.mutate(
+				{ ids, status: action === "ACCEPT" ? "ACCEPTED" : "REJECTED" },
+				{
+					onSuccess: (result) =>
+						report(result, action === "ACCEPT" ? "accepted" : "declined"),
+					onError,
+				},
+			);
+		} else {
+			bulkAttendance.mutate(
+				{ ids, action },
+				{
+					onSuccess: (result) =>
+						report(
+							result,
+							action === "MARK_ATTENDED"
+								? "marked attended"
+								: "certificates issued",
+						),
+					onError,
+				},
+			);
+		}
+	};
+
+	const bulkBusy = bulkReview.isPending || bulkAttendance.isPending;
 
 	const header = (
 		<View style={{ paddingTop: spacing[1], paddingBottom: spacing[2] }}>
@@ -126,22 +279,55 @@ export function ApplicantsSheet({
 					: "All places are filled - raise the volunteer count to accept more."}
 			</Caption>
 			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
-			{filter === "PENDING" && (
-				<Field
-					label="Note to the volunteer"
-					optional
-					hint="Sent with your next decision. Where to meet, what to bring, or why not this time."
+			{selectable.length > 1 ? (
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						gap: spacing[3],
+						paddingHorizontal: spacing[4],
+						paddingBottom: spacing[1],
+					}}
 				>
-					<Input
-						placeholder="e.g. Meet at Gate 3 by 8am, wear closed shoes"
-						value={note}
-						onChangeText={setNote}
-						style={inputStyle}
+					<Tick
+						checked={allSelected}
+						partial={!allSelected && selected.size > 0}
+						onPress={toggleAll}
+						label={
+							allSelected ? "Clear selection" : "Select every applicant shown"
+						}
 					/>
-				</Field>
-			)}
+					<Caption color="tertiary">
+						{selected.size > 0
+							? `${selected.size} of ${selectable.length} selected`
+							: `Select all ${selectable.length} shown`}
+					</Caption>
+				</View>
+			) : null}
 		</View>
 	);
+
+	const footer =
+		selected.size > 0 ? (
+			<BulkBar
+				count={selected.size}
+				mode={filter === "ACCEPTED" ? "attendance" : "review"}
+				blocked={blocked}
+				placesLeft={remainingPlaces}
+				busy={bulkBusy}
+				pending={
+					bulkReview.isPending
+						? bulkReview.variables?.status === "ACCEPTED"
+							? "ACCEPT"
+							: "REJECT"
+						: bulkAttendance.isPending
+							? (bulkAttendance.variables?.action ?? null)
+							: null
+				}
+				onRun={runBulk}
+				onClear={clearSelection}
+			/>
+		) : undefined;
 
 	return (
 		<Sheet
@@ -151,6 +337,8 @@ export function ApplicantsSheet({
 			subtitle={eventTitle}
 			scrollable={false}
 			detents={["60%", "92%"]}
+			wide
+			footer={footer}
 		>
 			{query.isLoading ? (
 				<LoadingState label="Loading applicants" />
@@ -196,14 +384,17 @@ export function ApplicantsSheet({
 							applicant={item}
 							eventId={eventId ?? ""}
 							canAccept={remainingPlaces > 0}
-							canReview={canReview}
-							busy={review.isPending}
+							blocked={blocked}
+							selectable={item.status === selectableStatus}
+							selected={selected.has(item.id)}
+							onToggleSelect={() => toggle(item.id)}
+							failure={failures[item.id] ?? null}
 							deciding={
 								review.isPending && review.variables?.applicationId === item.id
 									? review.variables.input.status
 									: null
 							}
-							onDecide={(status) => decide(item, status)}
+							onDecide={(status, note) => decide(item, status, note)}
 						/>
 					)}
 				/>
@@ -212,27 +403,142 @@ export function ApplicantsSheet({
 	);
 }
 
+type Blocked = Record<
+	"review" | "attendance" | "issue" | "revoke",
+	string | null
+>;
+
+/**
+ * The pinned action row for a selection. Pending selections are decided;
+ * accepted ones are marked present or certified. A role that cannot take an
+ * action sees it disabled with the reason, not hidden.
+ */
+function BulkBar({
+	count,
+	mode,
+	blocked,
+	placesLeft,
+	busy,
+	pending,
+	onRun,
+	onClear,
+}: {
+	count: number;
+	mode: "review" | "attendance";
+	blocked: Blocked;
+	placesLeft: number;
+	busy: boolean;
+	pending: BulkAction | null;
+	onRun: (action: BulkAction) => void;
+	onClear: () => void;
+}) {
+	const { spacing } = useTheme();
+
+	const reason =
+		mode === "review"
+			? blocked.review
+			: (blocked.attendance ?? blocked.issue ?? null);
+	const acceptNote =
+		mode === "review" && !blocked.review && count > placesLeft
+			? placesLeft === 0
+				? "No places left - only Reject is open."
+				: `Only ${placesLeft} place${placesLeft === 1 ? "" : "s"} left - the rest will be reported back.`
+			: null;
+
+	return (
+		<View style={{ gap: spacing[2] }}>
+			<View
+				style={{
+					flexDirection: "row",
+					alignItems: "center",
+					justifyContent: "space-between",
+				}}
+			>
+				<Label weight="semibold">{count} selected</Label>
+				<Button variant="link" size="sm" onPress={onClear} disabled={busy}>
+					Clear
+				</Button>
+			</View>
+			{mode === "review" ? (
+				<View style={{ flexDirection: "row", gap: spacing[2] }}>
+					<Button
+						style={{ flex: 1 }}
+						disabled={busy || !!blocked.review || placesLeft === 0}
+						loading={pending === "ACCEPT"}
+						onPress={() => onRun("ACCEPT")}
+					>
+						{`Accept ${count}`}
+					</Button>
+					<Button
+						variant="outline"
+						style={{ flex: 1 }}
+						disabled={busy || !!blocked.review}
+						loading={pending === "REJECT"}
+						onPress={() => onRun("REJECT")}
+					>
+						{`Reject ${count}`}
+					</Button>
+				</View>
+			) : (
+				<View style={{ flexDirection: "row", gap: spacing[2] }}>
+					<Button
+						variant="outline"
+						style={{ flex: 1 }}
+						disabled={busy || !!blocked.attendance}
+						loading={pending === "MARK_ATTENDED"}
+						onPress={() => onRun("MARK_ATTENDED")}
+					>
+						Mark attended
+					</Button>
+					<Button
+						style={{ flex: 1 }}
+						disabled={busy || !!blocked.issue}
+						loading={pending === "ISSUE_CERTIFICATE"}
+						onPress={() => onRun("ISSUE_CERTIFICATE")}
+					>
+						Issue certificates
+					</Button>
+				</View>
+			)}
+			{reason || acceptNote ? (
+				<Caption color="tertiary">{reason ?? acceptNote}</Caption>
+			) : null}
+		</View>
+	);
+}
+
 function ApplicantRow({
 	applicant,
 	eventId,
 	canAccept,
-	canReview,
-	busy,
+	blocked,
+	selectable,
+	selected,
+	onToggleSelect,
+	failure,
 	deciding,
 	onDecide,
 }: {
 	applicant: EventApplicant;
 	eventId: string;
 	canAccept: boolean;
-	/** `people.review` - false only once the role has resolved as denied. */
-	canReview: boolean;
-	busy: boolean;
+	blocked: Blocked;
+	/** Whether this row can join the current filter's selection. */
+	selectable: boolean;
+	selected: boolean;
+	onToggleSelect: () => void;
+	/** Why the last bulk action failed on this row, if it did. */
+	failure: string | null;
 	/** Which decision is in flight for *this* row, if any. */
 	deciding: "ACCEPTED" | "REJECTED" | null;
-	onDecide: (status: "ACCEPTED" | "REJECTED") => void;
+	onDecide: (status: "ACCEPTED" | "REJECTED", note: string) => void;
 }) {
 	const { colors, spacing } = useTheme();
+	const inputStyle = useFieldInputStyle();
+	const [note, setNote] = useState("");
+	const [noteOpen, setNoteOpen] = useState(false);
 	const isPending = applicant.status === "PENDING";
+	const busy = deciding !== null;
 	const name = applicant.volunteer.fullName ?? "Unnamed volunteer";
 	const verified = applicant.volunteer.verificationStatus === "VERIFIED";
 	// City only: contact details wait for acceptance (`ContactActions`).
@@ -245,6 +551,13 @@ function ApplicantRow({
 			<View
 				style={{ flexDirection: "row", alignItems: "center", gap: spacing[3] }}
 			>
+				{selectable ? (
+					<Tick
+						checked={selected}
+						onPress={onToggleSelect}
+						label={selected ? `Deselect ${name}` : `Select ${name}`}
+					/>
+				) : null}
 				<InitialAvatar name={applicant.volunteer.fullName} />
 				<View style={{ flex: 1, minWidth: 0 }}>
 					<Body weight="bold" numberOfLines={1}>
@@ -262,6 +575,15 @@ function ApplicantRow({
 					tone={applicationTone(applicant.status)}
 				/>
 			</View>
+
+			{failure ? (
+				<Caption
+					color={colors.error.ink as string}
+					style={{ marginTop: spacing[2] }}
+				>
+					{failure}
+				</Caption>
+			) : null}
 
 			{applicant.message && (
 				<View
@@ -288,29 +610,58 @@ function ApplicantRow({
 						phone={applicant.volunteer.phone}
 						email={applicant.volunteer.email}
 					/>
-					<AttendanceControls applicant={applicant} eventId={eventId} />
+					<AttendanceControls
+						applicant={applicant}
+						eventId={eventId}
+						blocked={blocked}
+					/>
 				</>
 			)}
 
 			{isPending && (
 				<>
-					{!canReview ? (
+					{blocked.review ? (
 						<Caption color="tertiary" style={{ marginTop: spacing[4] }}>
-							Your role doesn't allow reviews. Ask an owner or admin.
+							{blocked.review}
 						</Caption>
-					) : null}
+					) : noteOpen ? (
+						<Field
+							label={`Note to ${name}`}
+							optional
+							hint="Sent with your decision. Where to meet, what to bring, or why not this time."
+							style={{ marginTop: spacing[4], marginBottom: 0 }}
+						>
+							<Input
+								placeholder="e.g. Meet at Gate 3 by 8am, wear closed shoes"
+								value={note}
+								onChangeText={setNote}
+								style={inputStyle}
+								autoFocus
+							/>
+						</Field>
+					) : (
+						<Button
+							variant="link"
+							size="sm"
+							onPress={() => setNoteOpen(true)}
+							style={{ alignSelf: "flex-start", marginTop: spacing[2] }}
+							accessibilityLabel={`Add a note for ${name}`}
+						>
+							Add a note
+						</Button>
+					)}
 					<View
 						style={{
 							flexDirection: "row",
 							gap: spacing[2],
-							marginTop: spacing[4],
+							marginTop: spacing[3],
 						}}
 					>
 						<Button
 							style={{ flex: 1 }}
-							disabled={busy || !canAccept || !canReview}
+							disabled={busy || !canAccept || !!blocked.review}
 							loading={deciding === "ACCEPTED"}
-							onPress={() => onDecide("ACCEPTED")}
+							onPress={() => onDecide("ACCEPTED", note)}
 							accessibilityLabel={`Accept ${name}`}
 						>
 							Accept
@@ -318,9 +669,9 @@ function ApplicantRow({
 						<Button
 							variant="outline"
 							style={{ flex: 1 }}
-							disabled={busy || !canReview}
+							disabled={busy || !!blocked.review}
 							loading={deciding === "REJECTED"}
-							onPress={() => onDecide("REJECTED")}
+							onPress={() => onDecide("REJECTED", note)}
 							accessibilityLabel={`Reject ${name}`}
 						>
 							Reject
@@ -337,14 +688,18 @@ function ApplicantRow({
  *
  * Attendance is deliberately an explicit confirmation rather than something
  * inferred from the event's end date, and the server refuses to issue a
- * certificate without it.
+ * certificate without it. It is a checkbox, not a button that relabels itself
+ * ("Attended ✓"), because it is a state you set and can see - and un-ticking
+ * now says so.
  */
 function AttendanceControls({
 	applicant,
 	eventId,
+	blocked,
 }: {
 	applicant: EventApplicant;
 	eventId: string;
+	blocked: Blocked;
 }) {
 	const { colors, spacing } = useTheme();
 	const inputStyle = useFieldInputStyle();
@@ -358,6 +713,7 @@ function AttendanceControls({
 	const attended = !!applicant.attendedAt;
 	const certificate = applicant.certificate;
 	const busy = attendance.isPending || issue.isPending || revoke.isPending;
+	const name = applicant.volunteer.fullName ?? "this volunteer";
 
 	// Issue #8. The certificate prints these hours and is rendered once, at
 	// issue, so they are editable only until then. Blank means the whole event.
@@ -408,9 +764,16 @@ function AttendanceControls({
 	};
 
 	const toggleAttendance = () => {
+		const next = !attended;
 		attendance.mutate(
-			{ applicationId: applicant.id, attended: !attended },
+			{ applicationId: applicant.id, attended: next },
 			{
+				onSuccess: () =>
+					toast.success(
+						next
+							? `${name} marked attended.`
+							: `Attendance removed for ${name}.`,
+					),
 				onError: (error) => toast.error(apiErrorMessage(error)),
 			},
 		);
@@ -468,7 +831,8 @@ function AttendanceControls({
 								: `Attended · ${recorded} h`}
 						</Caption>
 					</View>
-					{!certificate.revokedAt && (
+					{/* A role that cannot revoke loses the control, not just its use. */}
+					{!certificate.revokedAt && !blocked.revoke && (
 						<Button
 							variant="outline"
 							size="sm"
@@ -485,38 +849,55 @@ function AttendanceControls({
 					style={{
 						flexDirection: "row",
 						alignItems: "center",
-						gap: spacing[2],
+						gap: spacing[3],
 						flexWrap: "wrap",
 					}}
 				>
-					<Button
-						variant="outline"
-						size="sm"
+					<Pressable
 						onPress={toggleAttendance}
-						disabled={busy}
-						loading={attendance.isPending}
-						accessibilityState={{ checked: attended }}
+						disabled={busy || !!blocked.attendance}
+						accessibilityRole="checkbox"
+						accessibilityState={{
+							checked: attended,
+							disabled: busy || !!blocked.attendance,
+						}}
+						accessibilityLabel={`${name} attended`}
+						{...focusable}
+						style={{
+							flexDirection: "row",
+							alignItems: "center",
+							gap: spacing[2],
+							minHeight: 44,
+							opacity: blocked.attendance ? 0.5 : 1,
+						}}
 					>
-						{attended ? "Attended ✓" : "Mark attended"}
-					</Button>
+						<Tick checked={attended} label={`${name} attended`} />
+						<Label>Attended</Label>
+					</Pressable>
 					{attended && (
 						<Button
 							size="sm"
 							onPress={() => setShowNote((v) => !v)}
-							disabled={busy}
+							disabled={busy || !!blocked.issue}
 						>
 							Issue certificate
 						</Button>
 					)}
-					{!attended && (
+					{!attended && !blocked.attendance && (
 						<Caption color="quaternary" style={{ flex: 1 }}>
-							Confirm attendance after the event to issue a certificate.
+							Tick after the event to issue a certificate.
 						</Caption>
 					)}
 				</View>
 			)}
 
-			{attended && !certificate && (
+			{!certificate && (blocked.attendance || (attended && blocked.issue)) ? (
+				<Caption color="tertiary">
+					{blocked.attendance ?? blocked.issue}
+				</Caption>
+			) : null}
+
+			{attended && !certificate && !blocked.attendance && (
 				<View
 					style={{
 						flexDirection: "row",
@@ -541,7 +922,7 @@ function AttendanceControls({
 							onChangeText={(value) => setHours(value.replace(/[^\d.]/g, ""))}
 							keyboardType="decimal-pad"
 							maxLength={5}
-							accessibilityLabel={`Hours ${applicant.volunteer.fullName ?? "this volunteer"} served`}
+							accessibilityLabel={`Hours ${name} served`}
 							style={[inputStyle, { maxWidth: 140 }]}
 						/>
 					</Field>
@@ -560,7 +941,7 @@ function AttendanceControls({
 				</View>
 			)}
 
-			{showNote && !certificate && (
+			{showNote && !certificate && !blocked.issue && (
 				<View style={{ marginTop: spacing[2] }}>
 					<Field
 						label="Note on the certificate"

@@ -1,5 +1,6 @@
 import type {
 	BroadcastInput,
+	BulkAttendanceInput,
 	DonationQuery,
 	MarkReadInput,
 	NotificationQuery,
@@ -73,6 +74,8 @@ export function useToggleBookmark() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.bookmarks });
 			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
+			// The NGO page reads its saved state from the detail's `viewer`.
+			queryClient.invalidateQueries({ queryKey: queryScopes.organizations });
 		},
 	});
 }
@@ -185,6 +188,19 @@ export function useMarkAttendance(eventId: string) {
 				...(hours !== undefined ? { hours } : {}),
 			}),
 		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryScopes.orgEvents });
+			queryClient.invalidateQueries({ queryKey: queryKeys.orgOverview });
+		},
+	});
+}
+
+/** Mark a selection present, or certify it; returns per-volunteer outcomes. */
+export function useBulkAttendance(eventId: string) {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (input: BulkAttendanceInput) =>
+			certificatesApi.bulkAttendance(eventId, input),
+		onSettled: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.orgEvents });
 			queryClient.invalidateQueries({ queryKey: queryKeys.orgOverview });
 		},

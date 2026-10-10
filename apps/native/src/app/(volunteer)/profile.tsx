@@ -3,9 +3,9 @@ import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import {
 	Award,
-	Bell,
 	Bookmark,
 	BookmarkCheck,
+	CalendarCheck,
 	ChevronRight,
 	HandCoins,
 	Moon,
@@ -216,13 +216,20 @@ export default function VolunteerProfile() {
 					onPress={() => router.push("/impact")}
 				/>
 				<ListRow
+					icon={CalendarCheck}
+					label="Applications"
+					hint="Events you've applied to"
+					onPress={() => router.push("/(volunteer)/applications")}
+				/>
+				<ListRow
 					icon={Award}
 					label="Certificates"
 					onPress={() => router.push("/certificates")}
 				/>
 				<ListRow
 					icon={HandCoins}
-					label="Donations"
+					label="Giving"
+					hint="Items pledged and money donated"
 					onPress={() => router.push("/(volunteer)/donations")}
 				/>
 				<ListRow
@@ -233,8 +240,10 @@ export default function VolunteerProfile() {
 				/>
 				<ListRow
 					icon={Bookmark}
-					label="Saved NGOs"
-					hint="Your private shortlist"
+					// "Shortlisted", not "Saved": "Saved posts" sits right below it
+					// and the two are different lists (an NGO vs a feed row).
+					label="Shortlisted NGOs"
+					hint="Private - only you see it"
 					onPress={() => router.push("/bookmarks")}
 				/>
 				<ListRow
@@ -262,17 +271,14 @@ export default function VolunteerProfile() {
 						<Caption color="tertiary">
 							{isVerified
 								? "Verified"
-								: hasSubmitted
-									? "Under review"
-									: "Not started"}
+								: rejected
+									? "Needs another look"
+									: hasSubmitted
+										? "Under review"
+										: "Not started"}
 						</Caption>
 					}
 					onPress={() => router.push("/verify-identity")}
-				/>
-				<ListRow
-					icon={Bell}
-					label="Notifications"
-					onPress={() => router.push("/notifications")}
 				/>
 				<ListRow
 					icon={Moon}
@@ -458,7 +464,11 @@ function Avatar({
 						justifyContent: "center",
 					}}
 				>
-					<ShieldCheck size={11} color="#FFFFFF" strokeWidth={2.5} />
+					<ShieldCheck
+						size={11}
+						color={colors.success.contrast}
+						strokeWidth={2.5}
+					/>
 				</View>
 			)}
 		</View>

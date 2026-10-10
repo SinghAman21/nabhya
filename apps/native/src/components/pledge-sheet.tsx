@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 import { Button } from "@/components/ui/button";
@@ -5,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption, Label } from "@/components/ui/typography";
+import { VerificationNote } from "@/components/verification-note";
 import { useCreatePledge } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
@@ -45,6 +47,7 @@ function PledgeSheetContent({
 	const [message, setMessage] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const pledge = useCreatePledge(need.id);
+	const router = useRouter();
 
 	const isWant = need.type === "WANT";
 	const remaining =
@@ -77,10 +80,16 @@ function PledgeSheetContent({
 			{
 				onSuccess: () => {
 					onClose();
+					// Where to watch for the answer, not just that it went: the NGO's
+					// decision arrives as an Activity row, and nothing else says so.
 					toast.success(
 						isWant
-							? "Offer sent - the organisation will review it and get in touch."
-							: "Claim sent - the organisation will confirm and arrange handover.",
+							? "Offer sent. You'll see the NGO's answer in Activity."
+							: "Request sent. You'll see the NGO's answer in Activity.",
+						{
+							label: "View",
+							onPress: () => router.push("/(volunteer)/activity"),
+						},
 					);
 				},
 				onError: (e) => setError(apiErrorMessage(e)),
@@ -100,6 +109,7 @@ function PledgeSheetContent({
 				</Button>
 			}
 		>
+			<VerificationNote onNavigate={onClose} />
 			<View
 				style={{
 					padding: spacing[3.5],

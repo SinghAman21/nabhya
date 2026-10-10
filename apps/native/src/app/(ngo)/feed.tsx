@@ -35,7 +35,6 @@ import { Button } from "@/components/ui/button";
 import { confirm, toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
 import { Label } from "@/components/ui/typography";
-import { useToggleFollow } from "@/hooks/use-engagement";
 import {
 	useDeleteFeedPost,
 	useFeed,
@@ -149,7 +148,6 @@ export default function NgoFeed() {
 	const insets = useSafeAreaInsets();
 	const categories = useCategories();
 	const { data: me } = useMe(isOrg);
-	const toggleFollow = useToggleFollow();
 	const like = useFeedReaction("like");
 	const save = useFeedReaction("save");
 	const deletePost = useDeleteFeedPost();
@@ -250,11 +248,6 @@ export default function NgoFeed() {
 	 * and every video player in it. Each closes only over a mutation's `mutate`,
 	 * which react-query keeps stable, so these dependencies never change.
 	 */
-	const handleToggleFollow = useCallback(
-		(organizationId: string, following: boolean) =>
-			toggleFollow.mutate({ organizationId, following }),
-		[toggleFollow.mutate],
-	);
 	const handleToggleLike = useCallback(
 		(row: FeedItem, isLiked: boolean) =>
 			like.mutate({ item: row, on: !isLiked }),
@@ -402,7 +395,8 @@ export default function NgoFeed() {
 				<FeedCard
 					item={item}
 					onRespond={setResponding}
-					onToggleFollow={handleToggleFollow}
+					// No Follow here: the server lets only volunteers follow, so on
+					// an NGO account the control was a button that always 403'd.
 					onToggleLike={handleToggleLike}
 					onToggleSave={handleToggleSave}
 					// Only a post has a delete route, and the server lets its
@@ -510,9 +504,6 @@ export default function NgoFeed() {
 			<NeedPreviewDrawer
 				item={responding}
 				onClose={() => setResponding(null)}
-				onToggleFollow={(organizationId, following) =>
-					toggleFollow.mutate({ organizationId, following })
-				}
 			/>
 			<PostComposer
 				key={composer?.tag ?? "POST"}
@@ -542,7 +533,7 @@ function ComposeButton({
 	bottom: number;
 	onPress: () => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { colors, spacing, elevation } = useTheme();
 
 	return (
 		<Pressable
@@ -565,7 +556,9 @@ function ComposeButton({
 				backgroundColor: pressed
 					? (colors.primary.dark as string)
 					: (colors.primary.main as string),
-				shadowColor: "#000",
+				// The raised token's ink with this button's own, heavier lift: it
+				// floats over a scrolling feed, not a page.
+				shadowColor: elevation.raised.shadowColor,
 				shadowOffset: { width: 0, height: 4 },
 				shadowOpacity: 0.18,
 				shadowRadius: 12,

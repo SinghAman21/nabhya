@@ -4,6 +4,7 @@ import { Waypoints } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { RefreshControl, ScrollView, View } from "react-native";
 import {
+	Banner,
 	EmptyState,
 	ErrorState,
 	FilterChips,
@@ -16,6 +17,7 @@ import {
 	applicationTone,
 	humanizeStatus,
 	type PillTone,
+	pledgeStatusLabel,
 	pledgeTone,
 	StatusPill,
 } from "@/components/status-pill";
@@ -34,6 +36,8 @@ import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { focusable } from "@/lib/focus";
 import { formatDateRange, formatRelative } from "@/lib/format";
+import { notificationDestination } from "@/lib/notification-destination";
+import { READING_COLUMN } from "@/lib/reading-column";
 import { verticalScrollbar } from "@/lib/scroll";
 
 /*
@@ -47,7 +51,12 @@ import { verticalScrollbar } from "@/lib/scroll";
  *
  * Known limit: five endpoints, five first pages, merged and sorted here. That is
  * correct for the volumes one volunteer generates and wrong in general - a true
- * merged cursor is server work, tracked as step 1 in `ui-redesign.md`.
+ * merged cursor is server work, tracked as step 1 in `ui-redesign.md`. Until
+ * then the Events and Giving filters link to the full paged lists.
+ *
+ * One source failing does not blank the timeline: what loaded is shown, with a
+ * banner naming what didn't. Every row opens something - a pledge its need, an
+ * alert wherever `notificationDestination` sends it (marking it read).
  */
 
 type Filter = "ALL" | "GIVING" | "EVENTS" | "ALERTS";
@@ -77,9 +86,19 @@ interface Entry {
 	status?: { label: string; tone: PillTone };
 	/** What happens next, when the volunteer is waiting on someone else. */
 	next?: string;
+	/** Green once the NGO has said yes; amber while it is still deciding. */
+	nextTone?: "waiting" | "yes";
 	unread?: boolean;
 	href?: string;
+	/** Set on an alert, so opening it also marks it read. */
+	notificationId?: string;
 }
+
+/** The full, paged list behind a filter's first page. */
+const FULL_LIST: Partial<Record<Filter, { label: string; href: string }>> = {
+	EVENTS: { label: "All applications", href: "/(volunteer)/applications" },
+	GIVING: { label: "All giving", href: "/(volunteer)/donations" },
+};
 
 export default function Activity() {
 	const { colors, spacing } = useTheme();
@@ -93,10 +112,19 @@ export default function Activity() {
 	const alerts = useNotifications({ limit: 20 });
 	const markRead = useMarkNotificationsRead();
 
-	const sources = [pledges, donations, applications, certificates, alerts];
-	const isLoading = sources.some((source) => source.isLoading);
-	const isRefetching = sources.some((source) => source.isRefetching);
-	const error = sources.find((source) => source.isError)?.error;
+	const sources = [
+		{ name: "pledges", query: pledges },
+		{ name: "donations", query: donations },
+		{ name: "applications", query: applications },
+		{ name: "certificates", query: certificates },
+		{ name: "alerts", query: alerts },
+	];
+	const isLoading = sources.some(({ query }) => query.isLoading);
+	const isRefetching = sources.some(({ query }) => query.isRefetching);
+	const failed = sources.filter(({ query }) => query.isError);
+	// Only a total failure replaces the timeline; a partial one is a banner.
+	const error =
+		failed.length === sources.length ? failed[0]?.query.error : undefined;
 
 	const entries = useMemo<Entry[]>(() => {
 		const all: Entry[] = [];
@@ -113,15 +141,19 @@ export default function Activity() {
 				title: pledge.need.title,
 				detail: `Pledged ${amount} to ${pledge.organization.organizationName}`,
 				status: {
-					label: humanizeStatus(pledge.status),
+					label: pledgeStatusLabel(pledge.status),
 					tone: pledgeTone(pledge.status),
 				},
 				...(pledge.status === "PENDING"
-					? { next: "Waiting for the NGO to review" }
+					? { next: "Waiting for the NGO to review", nextTone: "waiting" }
 					: {}),
 				...(pledge.status === "ACCEPTED"
-					? { next: "Accepted - arrange handover with the NGO" }
+					? {
+							next: "Accepted - the NGO will message you to arrange the handover",
+							nextTone: "yes",
+						}
 					: {}),
+				href: `/needs/${pledge.need.id}`,
 			});
 		}
 
@@ -162,10 +194,13 @@ export default function Activity() {
 					tone: applicationTone(application.status),
 				},
 				...(application.status === "PENDING"
-					? { next: "Waiting for the NGO to review" }
+					? { next: "Waiting for the NGO to review", nextTone: "waiting" }
 					: {}),
 				...(application.status === "ACCEPTED"
-					? { next: "You're in - turn up and get marked present" }
+					? {
+							next: "You're in - the organiser will message you the details",
+							nextTone: "yes",
+						}
 					: {}),
 				href: `/events/${application.event.id}`,
 			});
@@ -195,6 +230,11 @@ export default function Activity() {
 				title: alert.title,
 				detail: alert.body ?? "",
 				unread: !alert.readAt,
+				notificationId: alert.id,
+				...(() => {
+					const href = notificationDestination(alert, "volunteer");
+					return href ? { href } : {};
+				})(),
 			});
 		}
 
@@ -216,11 +256,20 @@ export default function Activity() {
 	const unread = entries.filter((entry) => entry.unread).length;
 
 	const refetchAll = () => {
-		for (const source of sources) source.refetch();
+		for (const { query } of sources) query.refetch();
 	};
 
+	const open = (entry: Entry) => {
+		if (entry.notificationId && entry.unread) {
+			markRead.mutate({ ids: [entry.notificationId] });
+		}
+		if (entry.href) router.push(entry.href as never);
+	};
+
+	const fullList = FULL_LIST[filter];
+
 	return (
-		<Screen>
+		<Screen style={READING_COLUMN}>
 			<ScreenHeader
 				title="Activity"
 				subtitle={
@@ -234,8 +283,15 @@ export default function Activity() {
 								<Pressable
 									onPress={() => markRead.mutate({})}
 									accessibilityRole="button"
-									hitSlop={8}
+									accessibilityLabel="Mark all alerts read"
 									{...focusable}
+									style={{
+										minHeight: 44,
+										minWidth: 44,
+										paddingHorizontal: spacing[2],
+										justifyContent: "center",
+										alignItems: "center",
+									}}
 								>
 									<Caption weight="medium" color={colors.primary.ink}>
 										Mark read
@@ -247,6 +303,28 @@ export default function Activity() {
 			/>
 
 			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
+
+			{failed.length > 0 && !error ? (
+				<View style={{ marginBottom: spacing[4] }}>
+					<Banner
+						tone="warning"
+						title={`Couldn't load your ${failed.map((f) => f.name).join(" and ")}`}
+						description="Everything else is up to date. Tap to try again."
+						onPress={refetchAll}
+					/>
+				</View>
+			) : null}
+
+			{fullList && !isLoading && !error ? (
+				<Button
+					variant="link"
+					size="sm"
+					onPress={() => router.push(fullList.href as never)}
+					style={{ alignSelf: "flex-end", marginBottom: spacing[2] }}
+				>
+					{`${fullList.label} →`}
+				</Button>
+			) : null}
 
 			{isLoading ? (
 				<LoadingState label="Loading your activity" />
@@ -313,10 +391,8 @@ export default function Activity() {
 									<TimelineRow
 										key={entry.id}
 										entry={entry}
-										{...(entry.href
-											? {
-													onPress: () => router.push(entry.href as never),
-												}
+										{...(entry.href || entry.notificationId
+											? { onPress: () => open(entry) }
 											: {})}
 									/>
 								))}
@@ -382,7 +458,12 @@ function TimelineRow({
 					</Caption>
 				)}
 				{entry.next && (
-					<Caption color={colors.warning.ink} numberOfLines={2}>
+					<Caption
+						color={
+							entry.nextTone === "yes" ? colors.success.ink : colors.warning.ink
+						}
+						numberOfLines={2}
+					>
 						{entry.next}
 					</Caption>
 				)}

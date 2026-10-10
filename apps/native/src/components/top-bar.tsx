@@ -1,6 +1,6 @@
 import { useRouter, useSegments } from "expo-router/build/hooks";
 import { History, LogOut, User } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Platform, View } from "react-native";
 import {
@@ -16,7 +16,7 @@ import { useAppTheme } from "@/hooks/use-app-theme";
 import { useSignOut } from "@/hooks/use-auth";
 import { useUnreadCount } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
-import { focusable } from "@/lib/focus";
+import { currentPage, focusable } from "@/lib/focus";
 import { useAuthStore } from "@/store/auth-store";
 import { useFeedStore } from "@/store/feed-store";
 
@@ -141,6 +141,7 @@ function ActivityButton({
 				unread > 0 ? `Activity, ${unread} unread` : "Activity"
 			}
 			accessibilityState={{ selected: active }}
+			{...currentPage(active)}
 			{...focusable}
 			style={(state) => {
 				const { pressed, hovered } = state as PressState;
@@ -241,6 +242,26 @@ function AccountMenu({ profileHref }: { profileHref: string }) {
 	// Viewport position of the trigger, so the panel can be portalled to
 	// document.body on web and escape every ancestor stacking context.
 	const [anchor, setAnchor] = useState({ x: 0, y: 0, width: 40, height: 40 });
+	const triggerRef = useRef<View>(null);
+
+	/*
+	 * A menu closes on Escape and hands focus back to the button that opened
+	 * it. It had neither: the portalled panel sat open until something was
+	 * clicked, and a keyboard user who tabbed into it had no way out but
+	 * through it.
+	 */
+	useEffect(() => {
+		if (!open || Platform.OS !== "web" || typeof window === "undefined") {
+			return;
+		}
+		const onKey = (event: KeyboardEvent) => {
+			if (event.key !== "Escape") return;
+			setOpen(false);
+			(triggerRef.current as unknown as HTMLElement | null)?.focus?.();
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [open]);
 
 	const initials = useMemo(() => {
 		if (!user?.name) return user?.email?.charAt(0).toUpperCase() ?? "?";
@@ -258,6 +279,7 @@ function AccountMenu({ profileHref }: { profileHref: string }) {
 			collapsable={false}
 		>
 			<Pressable
+				ref={triggerRef}
 				onPress={() => setOpen((value) => !value)}
 				accessibilityRole="button"
 				accessibilityLabel="Account menu"
@@ -334,6 +356,7 @@ function AccountMenu({ profileHref }: { profileHref: string }) {
 							onPress={() => setOpen(false)}
 							accessibilityRole="button"
 							accessibilityLabel="Close account menu"
+							focusable={false}
 							style={
 								{
 									position: "fixed",
@@ -487,11 +510,26 @@ function Divider() {
 /* Content                                                                    */
 /* -------------------------------------------------------------------------- */
 
-/** Centres and caps the page under a top bar. */
+/**
+ * Centres and caps the page under a top bar.
+ *
+ * `minHeight: 0` on both links of the chain, for the reason in AGENTS.md ->
+ * "A flex chain that never reaches the viewport": a flex item is floored at
+ * its content height, so without it a tall page grew this box past the window
+ * and its `ScrollView` had nothing to scroll. `AppShell`'s rail branch already
+ * did this; the volunteer branch did not.
+ */
 export function TopBarContent({ children }: { children: React.ReactNode }) {
 	return (
-		<View style={{ flex: 1, alignItems: "center" }}>
-			<View style={{ flex: 1, width: "100%", maxWidth: CONTENT_MAX_WIDTH }}>
+		<View style={{ flex: 1, minHeight: 0, alignItems: "center" }}>
+			<View
+				style={{
+					flex: 1,
+					minHeight: 0,
+					width: "100%",
+					maxWidth: CONTENT_MAX_WIDTH,
+				}}
+			>
 				{children}
 			</View>
 		</View>

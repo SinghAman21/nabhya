@@ -203,6 +203,60 @@ export function Label({ className, ...props }: TypographyProps) {
 	);
 }
 
+/**
+ * Pill and badge text - status pills, the duration chip on a video tile.
+ * A step below `Caption` because a 13pt label inside a 24pt pill crowds its
+ * padding; those call sites used to reach it with a `fontSize` override, which
+ * left them on Caption's 18pt line height and its Dynamic Type ceiling.
+ */
+export function Micro({ className, ...props }: TypographyProps) {
+	return (
+		<BaseText
+			family="sans"
+			size={12}
+			lineHeight={16}
+			maxScale={1.4}
+			className={className}
+			{...props}
+		/>
+	);
+}
+
+/**
+ * The NABHYA wordmark, spaced out as a logotype rather than set as a word.
+ * The only place in the app with positive tracking, so it lives here rather
+ * than as a `letterSpacing` override on an `H1` and a `Label` at the call site.
+ * `lg` is the desktop brand panel, `sm` the phone's brand bar.
+ */
+export function Wordmark({
+	size = "lg",
+	className,
+	...props
+}: TypographyProps & { size?: "lg" | "sm" }) {
+	return size === "lg" ? (
+		<BaseText
+			family="display"
+			size={34}
+			lineHeight={40}
+			tracking={3}
+			maxScale={1.2}
+			className={className}
+			{...props}
+		/>
+	) : (
+		<BaseText
+			family="sans"
+			size={15}
+			lineHeight={20}
+			weight="bold"
+			tracking={2}
+			maxScale={1.2}
+			className={className}
+			{...props}
+		/>
+	);
+}
+
 export function Mono({ className, ...props }: TypographyProps) {
 	return (
 		<BaseText
@@ -225,6 +279,8 @@ export const Typography = {
 	BodySmall,
 	Caption,
 	Label,
+	Micro,
+	Wordmark,
 	Mono,
 };
 export default Typography;

@@ -321,7 +321,8 @@ function QuickAdd({
 			accessibilityRole="button"
 			accessibilityLabel={accessibilityLabel}
 			accessibilityState={{ disabled: !!disabled }}
-			hitSlop={4}
+			// 28pt chip, 44pt target.
+			hitSlop={8}
 			{...focusable}
 			style={({ pressed, hovered }) => ({
 				minHeight: 28,

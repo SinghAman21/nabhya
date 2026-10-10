@@ -172,6 +172,21 @@ tap to edit and the other had a read-only table; one had a dead step.
 - **An easily-reversed removal takes an Undo toast, not a confirmation.**
   `bookmarks.tsx` is the example - a dialog in front of one tap costs more than
   the mistake does.
+- **Toasts wait for the reader.** A toast with an action stays at least 6s
+  (Undo at the success tone's 3.2s vanished before its sentence was read), and
+  on the web pointing at the stack or tabbing into it pauses every countdown.
+  On a phone the stack sits a tab bar's height up, clear of the tab labels and
+  pinned footers. Errors are `assertive`, the rest `polite`.
+- **Escape on a confirm cancels only the confirm.** It is handled in the
+  capture phase on `window` and stops there, because the sheet or drawer it
+  was raised from is an RNW `Modal` that closes itself on Escape keyup. Focus
+  moves to Cancel on open and returns to the trigger on close. Do not add your
+  own Escape listener to a `Modal`-hosted container - the Modal already calls
+  `onRequestClose` and traps focus; `Drawer` had one and closed twice per press.
+- **iOS needs `announce()`.** `accessibilityLiveRegion` is Android and web
+  only, so VoiceOver heard no toast, no `FieldError`, no `AuthError`. Each now
+  calls `announce()` from `lib/motion.ts`, which speaks on iOS and is a no-op
+  elsewhere so nothing is read twice.
 
 ### Auth screens
 
@@ -241,9 +256,33 @@ and, on web, toggles `.dark` on `<html>`. Both are required - without the first,
 `dark:` never fires on native; without the second, the CSS variables never swap.
 
 Screens compose `components/screen-shell.tsx` (`ScreenHeader`, `Surface`,
-`EmptyState`, `LoadingState`, `ErrorState`, `FilterChips`) + `status-pill.tsx` -
-reuse these rather than rebuilding layouts.
+`EmptyState`, `LoadingState`, `ErrorState`, `FilterChips`, `Skeleton`,
+`SkeletonList`) + `status-pill.tsx` - reuse these rather than rebuilding layouts.
 
+- **A list's first load is a skeleton, not a spinner.** `PagedList` draws
+  `SkeletonList` while `isLoading` - hairline rows when `grouped`, cards (in the
+  same grid) otherwise - so the first page lands without the header staying put
+  while everything under it jumps. `loadingShape="spinner"` opts a list back
+  into `LoadingState`. Keep `LoadingState` for a page whose shape is unknown.
+  `LoadMoreFooter`'s spinner and button share one 78pt slot for the same reason.
+- **Motion respects the OS setting.** `useReducedMotion()` / `motionDuration()`
+  in `lib/motion.ts` - the drawer, the rail collapse, the mobile nav drawer and
+  the skeleton pulse snap or hold still when it is on. RNW's CSS animations
+  (a web `Modal`'s slide) are flattened by a `prefers-reduced-motion` rule in
+  `lib/web-styles.ts`, which exempts spinners and form fields. A new
+  `Animated.timing` takes `motionDuration(ms, reduce)`.
+- **`Button` holds its width while loading.** The label stays laid out at
+  `opacity: 0` under the spinner; swapping it out collapsed a label-sized
+  button mid-press. `sm` (38pt drawn) carries a 4pt `hitSlop` so its target is
+  46 - pass your own `hitSlop` to override.
+- **`FormField` names its input.** It passes `label` as the input's
+  `accessibilityLabel` and the hint or error as `accessibilityHint`, so a field
+  is no longer announced by its placeholder. Callers that pass their own
+  `accessibilityLabel` still win.
+- **Every web page has a title.** `lib/document-title.ts` maps route segments
+  (groups kept - `(ngo)`, `(admin)` and the NGO wizard are all `/`) to the
+  browser tab's title; Expo Router turns React Navigation's own handling off.
+  A new route gets a line in `TITLES`.
 - **Pushed pages** render `<ScreenHeader back title=… />`: a 40pt chevron on the
   left and the title on the same row. Never place `<BackButton />` on its own
   line above a heading. The two hero pages (`events/[id]`, `ngos/[id]`) draw their
@@ -357,6 +396,18 @@ every click. A focused field already shows a caret, which is a stronger
 indicator than a border. Buttons, links and rows keep theirs
 (`[data-focus="ring"]`, driven by `lib/focus.ts`), where `:focus-visible`
 behaves as advertised.
+
+**Scrims are not tab stops.** The dismiss `Pressable` behind a sheet, a
+drawer, the mobile nav drawer and the account menu passes `focusable={false}`:
+on the web it was the first Tab stop in every dialog, a full-screen "button"
+with no ring. Escape and the visible Close cover the keyboard.
+
+**The current nav row says so.** `currentPage(active)` from `lib/focus.ts` adds
+`aria-current="page"` on the web - `accessibilityState.selected` becomes
+`aria-selected`, which means nothing on a link. The rail and the top bar use
+it; the tab bar keeps `selected`, which is right for a tab. `AppTabBar` honours
+React Navigation's `tabBarBadge` (brand tint, 99+ cap) and reads the count in
+the tab's label.
 
 **`components/ui/tooltip.tsx` is a hover aid, never the label.** Web only -
 there is no hover on a phone - so it cannot be the sole explanation of a
@@ -534,10 +585,12 @@ before changing a screen. In short:
   scrolling past every fact, and a stack of four 100%-wide buttons reads as a
   menu rather than a decision. Suspension sits at the far end of the row, apart
   from the verification buttons: it is the one action that is not part of that
-  decision, and a destructive button beside "Approve" invites the wrong tap. The
-  **reason field stays in the body**, directly above them - it is a field, and a
-  field has to survive being read and corrected, which is what a pinned footer
-  does not do.
+  decision, and a destructive button beside "Approve" invites the wrong tap.
+  **A reason is asked for in the footer, at the press** (`ReasonStep` in
+  `sheet-parts.tsx`): Reject and Suspend swap the buttons for a "why?" field
+  with Cancel / confirm. It used to be a field at the end of the body, so an
+  empty-reason Reject set an error below the fold and the button looked dead.
+  The step keeps its text if the request fails.
 - **The queue is the only screen with bulk actions, deliberately.** Approving a
   routine document is repetitive and reversible; suspending an NGO is neither
   and belongs in a dossier with the whole record on screen. **Approve is one

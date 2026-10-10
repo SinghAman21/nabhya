@@ -8,7 +8,7 @@ import {
 import { useRef } from "react";
 import { Animated, Easing, View } from "react-native";
 import { Pressable } from "@/components/ui/pressable";
-import { Caption } from "@/components/ui/typography";
+import { Caption, Micro } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { focusable, type PressState } from "@/lib/focus";
 import type { FeedItem } from "@/lib/types";
@@ -24,7 +24,13 @@ import type { FeedItem } from "@/lib/types";
  * others did is not. The comment count survives, above zero only, because it
  * promises something to read rather than scoring the post.
  *
- * Grouped rather than evenly spaced: like, comment and share sit together on
+ * Two shapes. **Beside a CTA** (needs and open events) it is four 40pt icons
+ * at the end of the CTA's own row, with no rule above: a separate labelled row
+ * under a one-button card spent a whole line, and a hairline, on four glyphs.
+ * **Without a CTA** (stories, updates) there is nothing to share a line with,
+ * so the labelled row below stays.
+ *
+ * In the labelled row, grouped rather than evenly spaced: like, comment and share sit together on
  * the left because they are all things done to the conversation; save sits
  * alone on the right because it is a thing done for yourself.
  *
@@ -32,6 +38,9 @@ import type { FeedItem } from "@/lib/types";
  * hook re-rendered the whole card - and its video player - every time the
  * pointer crossed one of these four buttons.
  */
+
+/** The icon-only footer's hit target. */
+const ICON_TARGET = 40;
 
 function formatCount(n: number): string {
 	if (n < 1000) return String(n);
@@ -51,6 +60,7 @@ function Reaction({
 	activeColor,
 	onPress,
 	compact,
+	iconOnly = false,
 	animateOnPress = false,
 }: {
 	icon: LucideIcon;
@@ -64,6 +74,8 @@ function Reaction({
 	activeColor?: string;
 	onPress?: () => void;
 	compact: boolean;
+	/** A 40x40 target with no verb - the footer beside the CTA. */
+	iconOnly?: boolean;
 	animateOnPress?: boolean;
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
@@ -106,6 +118,25 @@ function Reaction({
 			{...focusable}
 			style={(state) => {
 				const { pressed, hovered } = state as PressState;
+				const fill =
+					pressed || hovered
+						? (colors.background.subtle as string)
+						: "transparent";
+				if (iconOnly) {
+					return {
+						flexDirection: "row",
+						alignItems: "center",
+						justifyContent: "center",
+						gap: spacing[0.5],
+						// 40 square; a comment count widens it rather than being
+						// squeezed into a corner badge that "12" would overrun.
+						minWidth: ICON_TARGET,
+						height: ICON_TARGET,
+						paddingHorizontal: showCount ? spacing[2] : 0,
+						borderRadius: borderRadius.md,
+						backgroundColor: fill,
+					};
+				}
 				return {
 					flexDirection: "row",
 					alignItems: "center",
@@ -113,23 +144,26 @@ function Reaction({
 					paddingHorizontal: compact ? spacing[2] : spacing[2.5],
 					paddingVertical: spacing[1.5],
 					borderRadius: borderRadius.md,
-					backgroundColor:
-						pressed || hovered
-							? (colors.background.subtle as string)
-							: "transparent",
+					backgroundColor: fill,
 					minHeight: 34,
 				};
 			}}
 		>
 			<Animated.View style={{ transform: [{ scale }] }}>
 				<Icon
-					size={18}
+					size={iconOnly ? 20 : 18}
 					color={color}
 					strokeWidth={1.8}
 					fill={active ? color : "transparent"}
 				/>
 			</Animated.View>
-			{text || showCount ? (
+			{iconOnly ? (
+				showCount ? (
+					<Micro weight="semibold" style={{ color }}>
+						{formatCount(count)}
+					</Micro>
+				) : null
+			) : text || showCount ? (
 				<Caption weight="medium" style={{ color }}>
 					{text}
 					{showCount ? `${text ? "  " : ""}${formatCount(count)}` : ""}
@@ -148,6 +182,11 @@ export interface CardActionsProps {
 	/** Wide card: there is room for the verb beside each icon. */
 	showLabels: boolean;
 	headline: string;
+	/**
+	 * Icons only, no rule above, no verbs - for the footer row that shares its
+	 * line with the card's CTA. The card passes it whenever there is a CTA.
+	 */
+	iconOnly?: boolean;
 	onToggleLike?: () => void;
 	onToggleSave?: () => void;
 	onComment: () => void;
@@ -161,6 +200,7 @@ export function CardActions({
 	compact,
 	showLabels,
 	headline,
+	iconOnly = false,
 	onToggleLike,
 	onToggleSave,
 	onComment,
@@ -168,6 +208,59 @@ export function CardActions({
 }: CardActionsProps) {
 	const { colors, spacing } = useTheme();
 	const { comments } = item.engagement;
+
+	if (iconOnly) {
+		return (
+			<View
+				style={{
+					flexDirection: "row",
+					alignItems: "center",
+					// The last icon's own padding would indent it from the card's
+					// right edge; pull the group out by the glyph's inset.
+					marginRight: -spacing[2.5],
+				}}
+			>
+				<Reaction
+					icon={Heart}
+					active={liked}
+					label={liked ? "Unlike this post" : "Like this post"}
+					activeColor={colors.error.main as string}
+					compact
+					iconOnly
+					animateOnPress
+					{...(onToggleLike ? { onPress: onToggleLike } : {})}
+				/>
+				<Reaction
+					icon={MessageCircle}
+					count={comments}
+					label={
+						comments > 0
+							? `Read ${comments} comments on ${headline}`
+							: `Comment on ${headline}`
+					}
+					compact
+					iconOnly
+					onPress={onComment}
+				/>
+				<Reaction
+					icon={Share2}
+					label={`Share ${headline}`}
+					compact
+					iconOnly
+					onPress={onShare}
+				/>
+				<Reaction
+					icon={Bookmark}
+					active={saved}
+					label={saved ? "Remove from saved" : "Save this post"}
+					activeColor={colors.text.primary as string}
+					compact
+					iconOnly
+					{...(onToggleSave ? { onPress: onToggleSave } : {})}
+				/>
+			</View>
+		);
+	}
 
 	return (
 		<View

@@ -302,16 +302,16 @@ rather than being re-decided:
   every kind a tone and tinted its pill, its facts panel and its button to
   match; the result was three saturated blocks stacked down the middle of every
   card, and since most feed rows are needs, a column of orange rectangles. The
-  brand colour now appears exactly twice - a need's gauge and the one solid
-  button - and `error.main` once, as a 5pt dot beside "Urgent". Everything else
+  brand colour now appears exactly twice - a need's progress bar and the one
+  solid button - and `error.main` once, as a 5pt dot beside "Urgent". Everything else
   is type on the card surface. **Do not reintroduce a tinted block to carry a
   label.**
 - **Kinds are told apart by arrangement, not colour.** `cardLayout()` in
   `card-body` maps a row to one of four shapes. An **event** indents: its date
   sits in a 38pt left column with title and facts beside it, so it is recognisable
   from the card's silhouette. A **story** leads with its picture and a larger
-  title. A **need** ends with its gauge, so "how far along" and the action are
-  read together. An **update** is just words. Colour was the wrong carrier for
+  title. A **need** ends with its facts block (see below), with the action
+  directly beneath it. An **update** is just words. Colour was the wrong carrier for
   this: it costs the whole surface to say one word, it collapses in greyscale,
   and it does nothing in a feed where forty consecutive rows are the same kind.
 - **A kind the layout already announces gets no label.** `card-meta` renders
@@ -321,11 +321,31 @@ rather than being re-decided:
   direction** ("Needs help" / "Giving away", the same layout and opposite
   requests), **urgency**, and a **closed state**. That silence across most of
   the feed is what lets the rows that do carry a kicker register at a glance.
-- **A gauge is short and thick, not full-width and thin.** `GAUGE_WIDTH` 120,
-  `GAUGE_HEIGHT` 8, sitting at the end of the line it belongs to. A hairline
-  stretched across a desktop column reads as a divider rather than a
-  measurement; a progress bar is a thing you compare two lengths in, so it wants
-  to be small enough to take in at once.
+- **A need's facts are one grey block, and its bar spans that block.** This
+  was wrong: the need had a 120pt gauge pinned to the far end of a "20 of 52"
+  line, on the theory that a short bar is easier to take in. On a phone it
+  was; at desktop width the count sat at the left edge and its bar ~450pt away
+  at the right, so the two halves of one measurement were read separately.
+  `NeedFacts` is now a `background.subtle` inset (`borderRadius.md`, its own
+  padding) that reads as a sentence: **"{remaining} {unit} still needed"**
+  bold ("Target met - {quantity} {unit}" once complete), with
+  "{fulfilled} of {quantity}" muted on the same line; the 8pt bar directly
+  under it at full block width (inset twice, it no longer reads as a divider,
+  which was the only reason for the short gauge); then MapPin "Drop off in
+  {city}" and Clock "By Sat, 18 Oct" from `expiresAt`, which becomes "Closes
+  today" / "Closed" and takes `error.ink` inside the closing-soon window. It
+  leads with the remainder because that is what a volunteer can act on. A
+  neutral grey inset is not the tinted block the rule above forbids - that
+  rule is about colour carrying a label. The bar's track is `border.medium`,
+  since `background.subtle` vanishes on its own ground. **Events keep the
+  short 120pt gauge** at the end of their spots line.
+- **The header says "Posted", and Follow is a pill.** The subline is
+  "City, State · Posted 3 days ago". A bare "3 days ago" on a need read as
+  time left; urgency is now the deadline in the facts block, so the age says
+  plainly that it is only the post's age. Follow (volunteers, not following,
+  handler supplied - rules unchanged) was a bare word, which did not read as a
+  control at the end of the row; it is now a compact `background.subtle` pill
+  with primary ink - still neutral, never a brand fill.
 - **The event date block has no border and no padding.** Boxed, it was a 50pt
   tile beside a 22pt title - the tallest thing in the row, and it gave the card
   the look of a dashboard widget. Two lines of type indent just as clearly.
@@ -344,7 +364,8 @@ rather than being re-decided:
   worth showing; how many others did is not. The comment count survives, above
   zero only, because it promises something to read rather than scoring the post.
 - **A card's height is bounded by construction, not by a `maxHeight`.** Prose
-  clamps to 3 lines (5 for a story) with "Read more", and media is capped by
+  clamps to 3 lines (5 for a story, **2 for a need** - its facts block now
+  carries the substance, so the prose is context) with "Read more", and media is capped by
   `MEDIA_MAX_HEIGHT` - 280 desktop / 380 mobile, and never more than 40% of the
   window. Clipping a measured card with a fade needs a layout pass and a
   gradient and still cuts a sentence mid-word; capping the two things that can
@@ -380,10 +401,21 @@ rather than being re-decided:
   never invalidate either: impressions fire from the list's viewability
   callback. `FeedCard` is `memo`ised, so the three feed screens pass
   `useCallback` handlers rather than inline arrows.
-- **The action bar is grouped.** Like, comment and share sit together on the
-  left (things done to the conversation); save sits alone on the right (a thing
-  done for yourself). Spread edge to edge with `space-between` they became a
-  sparse row of unrelated glyphs on a wide desktop card.
+- **Beside a CTA, the actions are icons on the CTA's row.** This was wrong: a
+  need or event drew its button on one line, then a hairline, then a labelled
+  Like / Comment / Share / Save row - two lines and a rule for one button and
+  four glyphs. Whenever `primaryCta` returns something, `index.tsx` puts the
+  button (sized to its label) on the left and `CardActions iconOnly` on the
+  right: four 40x40 targets, `accessibilityLabel` on each,
+  `accessibilityState.selected` on like and save, no rule above. The comment
+  count, above zero only, sits beside its icon and widens that target rather
+  than being a corner badge "12" would overrun. Likes still never show a count.
+- **Without a CTA, the labelled action bar stays, grouped.** Stories, updates
+  and closed needs have nothing to share a line with. Like, comment and share
+  sit together on the left (things done to the conversation); save sits alone
+  on the right (a thing done for yourself). Spread edge to edge with
+  `space-between` they became a sparse row of unrelated glyphs on a wide
+  desktop card.
 - **Hover is read from the style callback, never held in state.** Cast the
   argument to `PressState` from `lib/focus.ts` - RNW passes `hovered` and
   `focused` alongside `pressed` even though RN's own type declares only the

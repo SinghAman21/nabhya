@@ -28,7 +28,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Pressable } from "@/components/ui/pressable";
-import { Caption, Label } from "@/components/ui/typography";
+import { Caption, Label, Micro } from "@/components/ui/typography";
+import { mediaColors } from "@/constants/design-system";
 import { useTheme } from "@/hooks/use-theme";
 import type { FeedMedia } from "@/lib/types";
 
@@ -312,7 +313,7 @@ function VideoControl({
 				width: 36,
 				height: 36,
 				borderRadius: 18,
-				backgroundColor: pressed ? "rgba(0,0,0,0.75)" : "rgba(0,0,0,0.55)",
+				backgroundColor: pressed ? mediaColors.scrimPressed : mediaColors.scrim,
 				alignItems: "center",
 				justifyContent: "center",
 				...style,
@@ -423,7 +424,7 @@ function CarouselVideo({
 				aspectRatio: ratio,
 				borderRadius: borderRadius.lg,
 				overflow: "hidden",
-				backgroundColor: "#111111",
+				backgroundColor: mediaColors.stage,
 			}}
 		>
 			<VideoView
@@ -450,19 +451,19 @@ function CarouselVideo({
 				}}
 			>
 				{loading ? (
-					<ActivityIndicator color="#FFFFFF" />
+					<ActivityIndicator color={mediaColors.ink} />
 				) : ended ? (
 					<View
 						style={{
 							width: 56,
 							height: 56,
 							borderRadius: 28,
-							backgroundColor: "rgba(0,0,0,0.55)",
+							backgroundColor: mediaColors.scrim,
 							alignItems: "center",
 							justifyContent: "center",
 						}}
 					>
-						<RotateCcw size={24} color="#FFFFFF" strokeWidth={2} />
+						<RotateCcw size={24} color={mediaColors.ink} strokeWidth={2} />
 					</View>
 				) : !isPlaying ? (
 					<View
@@ -470,12 +471,12 @@ function CarouselVideo({
 							width: 56,
 							height: 56,
 							borderRadius: 28,
-							backgroundColor: "rgba(0,0,0,0.55)",
+							backgroundColor: mediaColors.scrim,
 							alignItems: "center",
 							justifyContent: "center",
 						}}
 					>
-						<Play size={24} color="#FFFFFF" fill="#FFFFFF" />
+						<Play size={24} color={mediaColors.ink} fill={mediaColors.ink} />
 					</View>
 				) : null}
 			</Pressable>
@@ -486,7 +487,7 @@ function CarouselVideo({
 				onPress={onOpen}
 				style={{ top: spacing[2], right: spacing[2] }}
 			>
-				<Maximize2 size={16} color="#FFFFFF" strokeWidth={2} />
+				<Maximize2 size={16} color={mediaColors.ink} strokeWidth={2} />
 			</VideoControl>
 
 			{/*
@@ -503,9 +504,9 @@ function CarouselVideo({
 				style={{ bottom: spacing[2], left: spacing[2] }}
 			>
 				{muted ? (
-					<VolumeX size={16} color="#FFFFFF" strokeWidth={2} />
+					<VolumeX size={16} color={mediaColors.ink} strokeWidth={2} />
 				) : (
-					<Volume2 size={16} color="#FFFFFF" strokeWidth={2} />
+					<Volume2 size={16} color={mediaColors.ink} strokeWidth={2} />
 				)}
 			</VideoControl>
 
@@ -519,12 +520,12 @@ function CarouselVideo({
 						paddingHorizontal: spacing[2],
 						paddingVertical: 2,
 						borderRadius: 999,
-						backgroundColor: "rgba(0,0,0,0.55)",
+						backgroundColor: mediaColors.scrim,
 					}}
 				>
-					<Caption weight="semibold" style={{ color: "#FFFFFF", fontSize: 11 }}>
+					<Micro weight="semibold" color={mediaColors.ink}>
 						{formatClock(isPlaying || currentTime > 0 ? remaining : duration)}
-					</Caption>
+					</Micro>
 				</View>
 			)}
 
@@ -536,14 +537,14 @@ function CarouselVideo({
 					right: 0,
 					bottom: 0,
 					height: 2,
-					backgroundColor: "rgba(255,255,255,0.25)",
+					backgroundColor: mediaColors.track,
 				}}
 			>
 				<View
 					style={{
 						width: `${progress * 100}%`,
 						height: "100%",
-						backgroundColor: "#FFFFFF",
+						backgroundColor: mediaColors.ink,
 					}}
 				/>
 			</View>
@@ -679,7 +680,7 @@ export function FeedMediaViewer({
 			<Animated.View
 				style={{
 					flex: 1,
-					backgroundColor: "#000000",
+					backgroundColor: mediaColors.viewer,
 					opacity: backdropOpacity,
 				}}
 				{...pan.panHandlers}
@@ -709,19 +710,23 @@ export function FeedMediaViewer({
 								justifyContent: "center",
 							}}
 						>
-							<X size={24} color="#FFFFFF" strokeWidth={2} />
+							<X size={24} color={mediaColors.ink} strokeWidth={2} />
 						</Pressable>
 						<Label
 							weight="semibold"
 							numberOfLines={1}
-							style={{ flex: 1, color: "#FFFFFF" }}
+							style={{ flex: 1, color: mediaColors.ink }}
 						>
 							{actions.headline}
 						</Label>
 						{media.length > 1 && (
 							<Caption
 								weight="medium"
-								style={{ color: "#A3A3A3", minWidth: 40, textAlign: "right" }}
+								style={{
+									color: mediaColors.inkMuted,
+									minWidth: 40,
+									textAlign: "right",
+								}}
 							>
 								{index + 1} / {media.length}
 							</Caption>
@@ -788,9 +793,9 @@ export function FeedMediaViewer({
 						>
 							<Heart
 								size={24}
-								color={actions.liked ? "#F87171" : "#FFFFFF"}
+								color={actions.liked ? mediaColors.liked : mediaColors.ink}
 								strokeWidth={1.8}
-								fill={actions.liked ? "#F87171" : "transparent"}
+								fill={actions.liked ? mediaColors.liked : "transparent"}
 							/>
 						</ViewerAction>
 						<ViewerAction
@@ -798,7 +803,11 @@ export function FeedMediaViewer({
 							count={actions.commentCount}
 							onPress={actions.onComment}
 						>
-							<MessageCircle size={24} color="#FFFFFF" strokeWidth={1.8} />
+							<MessageCircle
+								size={24}
+								color={mediaColors.ink}
+								strokeWidth={1.8}
+							/>
 						</ViewerAction>
 						<ViewerAction
 							label={actions.saved ? "Unsave" : "Save"}
@@ -807,16 +816,16 @@ export function FeedMediaViewer({
 						>
 							<Bookmark
 								size={24}
-								color="#FFFFFF"
+								color={mediaColors.ink}
 								strokeWidth={1.8}
-								fill={actions.saved ? "#FFFFFF" : "transparent"}
+								fill={actions.saved ? mediaColors.ink : "transparent"}
 							/>
 						</ViewerAction>
 						<ViewerAction
 							label={`Share ${actions.headline}`}
 							onPress={actions.onShare}
 						>
-							<Share2 size={24} color="#FFFFFF" strokeWidth={1.8} />
+							<Share2 size={24} color={mediaColors.ink} strokeWidth={1.8} />
 						</ViewerAction>
 					</View>
 				</Animated.View>
@@ -860,7 +869,7 @@ function ViewerAction({
 		>
 			{children}
 			{count !== undefined && count > 0 && (
-				<Label weight="medium" style={{ color: "#FFFFFF" }}>
+				<Label weight="medium" style={{ color: mediaColors.ink }}>
 					{count > 999 ? `${(count / 1000).toFixed(1)}k` : count}
 				</Label>
 			)}

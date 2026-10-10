@@ -26,7 +26,11 @@ export function NeedPreviewDrawer({
 }: {
 	item: FeedNeedItem | null;
 	onClose: () => void;
-	onToggleFollow: (organizationId: string, following: boolean) => void;
+	/**
+	 * Omit to hide Follow - following is a volunteer act on the server, so an
+	 * NGO account browsing its own feed has no use for it (every press 403s).
+	 */
+	onToggleFollow?: (organizationId: string, following: boolean) => void;
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
 	const router = useRouter();
@@ -97,7 +101,7 @@ export function NeedPreviewDrawer({
 									{formatRelative(item.postedAt)}
 								</Caption>
 							</View>
-							{!item.isFollowing && (
+							{!item.isFollowing && onToggleFollow && (
 								<Pressable
 									onPress={() => onToggleFollow(org.id, false)}
 									accessibilityRole="button"

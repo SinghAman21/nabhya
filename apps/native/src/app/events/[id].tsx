@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
+	Building2,
 	CalendarDays,
 	Clock,
 	type LucideIcon,
@@ -28,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { confirm, toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption, H2, Label } from "@/components/ui/typography";
+import { VerificationNote } from "@/components/verification-note";
 import {
 	useApplyToEvent,
 	usePublicEvent,
@@ -40,6 +42,17 @@ import { apiErrorMessage } from "@/lib/api";
 import { formatDateRange, formatDateTime } from "@/lib/format";
 import { verticalScrollbar } from "@/lib/scroll";
 import { useAuthStore } from "@/store/auth-store";
+
+/**
+ * The reading column, shared by the back row, the body and the pinned footer
+ * so all three line up - the back button used to sit at the window's left
+ * edge, 230pt away from the column it belonged to.
+ */
+const DESKTOP_COLUMN = {
+	maxWidth: 720,
+	width: "100%",
+	alignSelf: "center",
+} as const;
 
 /**
  * One event, laid out in the order a volunteer decides: who and what, then the
@@ -97,6 +110,14 @@ export default function EventDetail() {
 				onSuccess: () => {
 					setMessage("");
 					setApplyOpen(false);
+					// The sheet closing is the only other sign anything happened.
+					toast.success(
+						`Application sent to ${event?.organization.organizationName ?? "the organiser"}. You'll hear back in Activity.`,
+						{
+							label: "View",
+							onPress: () => router.push("/(volunteer)/activity"),
+						},
+					);
 				},
 				onError: (error) => toast.error(apiErrorMessage(error)),
 			},
@@ -140,15 +161,26 @@ export default function EventDetail() {
 									? "Application sent"
 									: "Not accepted this time"}
 						</Label>
-						<Caption color="tertiary" numberOfLines={1}>
+						{/* What happens next, in order - "turn up" alone left an accepted
+						    volunteer asking how they would hear the details. Two lines:
+						    one truncated mid-sentence on a phone. */}
+						<Caption color="tertiary" numberOfLines={2}>
 							{activeApplication.status === "ACCEPTED"
-								? "Turn up and get marked present."
+								? "The organiser has your phone number and will message the details. Once they mark you present, your certificate appears in Profile."
 								: activeApplication.status === "PENDING"
-									? "The organiser will review it."
-									: "You can look for another event."}
+									? "The organiser reviews it next. You'll get an update in Activity."
+									: "Thanks for offering. Other events are looking for people."}
 						</Caption>
 					</View>
-					{activeApplication.status !== "REJECTED" && (
+					{activeApplication.status === "REJECTED" ? (
+						<Button
+							variant="outline"
+							size="sm"
+							onPress={() => router.push("/events")}
+						>
+							Find events
+						</Button>
+					) : (
 						<Button
 							variant="outline"
 							size="sm"
@@ -197,13 +229,22 @@ export default function EventDetail() {
 				style={{
 					flexDirection: "row",
 					alignItems: "center",
+					justifyContent: "center",
 					minHeight: 40,
-					paddingHorizontal: gutter,
+					paddingHorizontal: isDesktop ? 0 : gutter,
 					paddingTop: insets.top + spacing[2],
 					paddingBottom: spacing[2],
 				}}
 			>
-				<BackButton fallbackHref="/events" />
+				<View
+					style={
+						isDesktop
+							? { ...DESKTOP_COLUMN, paddingHorizontal: gutter }
+							: { flex: 1 }
+					}
+				>
+					<BackButton fallbackHref="/events" />
+				</View>
 			</View>
 
 			{query.isLoading ? (
@@ -224,9 +265,7 @@ export default function EventDetail() {
 							paddingHorizontal: gutter,
 							paddingTop: spacing[2],
 							paddingBottom: spacing[8],
-							...(isDesktop
-								? { maxWidth: 720, width: "100%", alignSelf: "center" }
-								: {}),
+							...(isDesktop ? DESKTOP_COLUMN : {}),
 						}}
 					>
 						<Caption color="secondary" style={{ marginBottom: spacing[1] }}>
@@ -270,6 +309,12 @@ export default function EventDetail() {
 									}
 									hint={`${event.acceptedCount} confirmed so far`}
 								/>
+								<ListRow
+									icon={Building2}
+									label={event.organization.organizationName}
+									hint="See the NGO"
+									onPress={() => router.push(`/ngos/${event.organization.id}`)}
+								/>
 								{event.applicationDeadline && (
 									<Fact
 										icon={Clock}
@@ -310,13 +355,7 @@ export default function EventDetail() {
 								backgroundColor: colors.background.card,
 							}}
 						>
-							<View
-								style={
-									isDesktop
-										? { maxWidth: 720, width: "100%", alignSelf: "center" }
-										: undefined
-								}
-							>
+							<View style={isDesktop ? DESKTOP_COLUMN : undefined}>
 								{footer}
 							</View>
 						</View>
@@ -340,6 +379,7 @@ export default function EventDetail() {
 				}
 			>
 				<View style={{ paddingTop: spacing[2], paddingBottom: spacing[2] }}>
+					<VerificationNote onNavigate={() => setApplyOpen(false)} />
 					<Label style={{ marginBottom: spacing[1.5] }}>
 						Message to the organiser
 						<Caption color="tertiary"> (optional)</Caption>

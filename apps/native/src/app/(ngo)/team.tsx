@@ -1,25 +1,37 @@
 import { inviteTeamMemberSchema } from "@nabhya/shared";
-import { KeyRound, MailPlus, UserPlus, Users } from "lucide-react-native";
+import {
+	ChevronDown,
+	ChevronUp,
+	Eye,
+	KeyRound,
+	MailPlus,
+	UserPlus,
+	Users,
+} from "lucide-react-native";
 import { useState } from "react";
 import { RefreshControl, ScrollView, View } from "react-native";
+import { DataTable, type TableColumn } from "@/components/admin/data-table";
+import { SwitchRow } from "@/components/composer/switch-row";
 import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
 import { InitialAvatar } from "@/components/initial-avatar";
 import {
 	EmptyState,
 	ErrorState,
 	FilterChips,
+	ListRow,
 	LoadingState,
 	Screen,
 	ScreenHeader,
+	SectionTitle,
 	Surface,
 } from "@/components/screen-shell";
 import { type PillTone, StatusPill } from "@/components/status-pill";
+import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { confirm, toast } from "@/components/ui/overlay";
-import { Sheet } from "@/components/ui/sheet";
-import { Switch } from "@/components/ui/switch";
-import { Body, Caption, H3, Label } from "@/components/ui/typography";
+import { Sheet, SheetOption } from "@/components/ui/sheet";
+import { Body, Caption, H3 } from "@/components/ui/typography";
 import {
 	useConfirmOwnershipTransfer,
 	useCreateTeamInvite,
@@ -34,6 +46,7 @@ import {
 } from "@/hooks/use-directory";
 import { useOrgAccess } from "@/hooks/use-org-access";
 import { useTheme } from "@/hooks/use-theme";
+import { useMedia } from "@/hooks/useMedia";
 
 import { apiErrorMessage } from "@/lib/api";
 import { copyText } from "@/lib/clipboard";
@@ -44,20 +57,58 @@ import type { OrgTeamMember, TeamInvite, TeamStatusFilter } from "@/lib/types";
 
 const ROLES = ["ADMIN", "MANAGER", "MEMBER", "VIEWER"] as const;
 
-const STATUS_OPTIONS: Array<{ value: TeamStatusFilter; label: string }> = [
+/**
+ * One filter, not a chip row plus an "Include people who left" switch. The
+ * switch never worked: the server's team query defaults `status` to ACTIVE, so
+ * `includeLeft` alone still returned only active rows. Asking for LEFT by name
+ * (with `includeLeft`, which lifts the server's own LEFT exclusion) is the one
+ * combination that does return them. REMOVED rows have no chip - nothing on
+ * this screen can act on one.
+ */
+type MemberFilter = TeamStatusFilter | "LEFT";
+
+const STATUS_OPTIONS: Array<{ value: MemberFilter; label: string }> = [
 	{ value: "ACTIVE", label: "Active" },
 	{ value: "SUSPENDED", label: "Suspended" },
+	{ value: "LEFT", label: "Left" },
 ];
+
+const EMPTY_COPY: Record<MemberFilter, { title: string; description: string }> =
+	{
+		ACTIVE: {
+			title: "Just you so far",
+			description:
+				"Invite colleagues, coordinators or accountants with the minimum access they need.",
+		},
+		SUSPENDED: {
+			title: "No suspended teammates",
+			description:
+				"Suspended teammates will appear here until they are reactivated.",
+		},
+		LEFT: {
+			title: "Nobody has left",
+			description: "Teammates who leave the team will be listed here.",
+		},
+	};
 
 /**
  * Organisation team management: members, pending invites, and ownership.
  * The team endpoint returns the whole team (no paging), so a ScrollView is
  * enough here - see the paged-list note in apps/native/AGENTS.md.
+ *
+ * Members and invites are cards on a phone and the console's `DataTable` on
+ * desktop, as the other NGO lists are. A team is a set of records compared
+ * down a column - who is an admin, whose invite is about to expire - and a
+ * full-width card per person spent 120pt of height on a name, an email and a
+ * pill. The table has no scroller of its own and this page's `ScrollView` is
+ * the only one, so its header sticks at the top of that.
  */
 export default function OrgTeam() {
 	const { colors, spacing } = useTheme();
-	const [status, setStatus] = useState<TeamStatusFilter>("ACTIVE");
-	const [includeLeft, setIncludeLeft] = useState(false);
+	const { isDesktop } = useMedia();
+	const [status, setStatus] = useState<MemberFilter>("ACTIVE");
+	const [showRoleGuide, setShowRoleGuide] = useState(false);
+	const [showConfirmTransfer, setShowConfirmTransfer] = useState(false);
 	const [inviting, setInviting] = useState(false);
 	const [managing, setManaging] = useState<OrgTeamMember | null>(null);
 	const [transferring, setTransferring] = useState(false);
@@ -72,7 +123,9 @@ export default function OrgTeam() {
 	// Only an active admin can receive ownership (`requestOwnershipTransfer`).
 	const canReceiveOwnership = access.role === "ADMIN";
 
-	const teamQuery = useOrgTeam({ status, includeLeft });
+	const teamQuery = useOrgTeam(
+		status === "LEFT" ? { status, includeLeft: true } : { status },
+	);
 	const invitesQuery = useTeamInvites(canInvite);
 	const items = teamQuery.data ?? [];
 	const invites = invitesQuery.data ?? [];
@@ -88,7 +141,10 @@ export default function OrgTeam() {
 	const memberCount =
 		status === "ACTIVE"
 			? `${items.length} active ${items.length === 1 ? "member" : "members"}`
-			: `${items.length} suspended`;
+			: status === "SUSPENDED"
+				? `${items.length} suspended`
+				: `${items.length} left`;
+	const empty = EMPTY_COPY[status];
 
 	return (
 		<Screen>
@@ -131,47 +187,44 @@ export default function OrgTeam() {
 				>
 					{/* The header's Invite is the one way in; a second button here
 					    was a third invite control on one screen. */}
-					<SectionHeading title="Members" />
-					{!canInvite && !access.isLoading ? (
-						<Caption color="tertiary">
-							Only owners and admins can invite. Ask an owner or admin.
-						</Caption>
-					) : null}
+					<View>
+						<SectionTitle>Members</SectionTitle>
+						{!canInvite && !access.isLoading ? (
+							<Caption color="tertiary">
+								Only owners and admins can invite. Ask an owner or admin.
+							</Caption>
+						) : null}
+					</View>
 					{/* Filters only once there is something to filter. */}
-					{items.length > 0 || status !== "ACTIVE" || includeLeft ? (
-						<>
-							<FilterChips
-								inline
-								options={STATUS_OPTIONS}
-								value={status}
-								onChange={setStatus}
-							/>
-							<SwitchRow
-								label="Include people who left"
-								checked={includeLeft}
-								onChange={setIncludeLeft}
-							/>
-						</>
+					{items.length > 0 || status !== "ACTIVE" ? (
+						<FilterChips
+							inline
+							options={STATUS_OPTIONS}
+							value={status}
+							onChange={setStatus}
+						/>
 					) : null}
 					{items.length === 0 ? (
 						<EmptyState
 							icon={Users}
-							title={
-								status === "SUSPENDED"
-									? "No suspended teammates"
-									: "Just you so far"
-							}
-							description={
-								status === "SUSPENDED"
-									? "Suspended teammates will appear here until they are reactivated."
-									: "Invite colleagues, coordinators or accountants with the minimum access they need."
-							}
+							title={empty.title}
+							description={empty.description}
 							action={
 								status === "ACTIVE" && canInvite ? (
 									<Button onPress={() => setInviting(true)}>
 										Invite someone
 									</Button>
 								) : undefined
+							}
+						/>
+					) : isDesktop ? (
+						<DataTable
+							columns={memberColumns(canManage, setManaging)}
+							rows={items}
+							rowKey={(member) => member.id}
+							{...(canManage ? { onRowPress: setManaging } : {})}
+							rowLabel={(member) =>
+								`Manage ${member.user.fullName ?? member.user.email}`
 							}
 						/>
 					) : (
@@ -189,68 +242,130 @@ export default function OrgTeam() {
 
 					{/* Listing invites is `team.invite` too; for anyone else the
 					    endpoint 403s, which used to render as an error block. */}
-					{canInvite ? <SectionHeading title="Pending invites" /> : null}
-					{!canInvite ? null : invitesQuery.isError ? (
-						<ErrorState
-							message={apiErrorMessage(invitesQuery.error)}
-							onRetry={() => void invitesQuery.refetch()}
+					{canInvite ? (
+						<View>
+							<SectionTitle>Pending invites</SectionTitle>
+							{invitesQuery.isError ? (
+								<ErrorState
+									message={apiErrorMessage(invitesQuery.error)}
+									onRetry={() => void invitesQuery.refetch()}
+								/>
+							) : invites.length === 0 ? (
+								<Surface>
+									<View style={{ gap: spacing[2] }}>
+										<MailPlus
+											size={22}
+											color={colors.text.tertiary as string}
+										/>
+										<Body weight="bold">No pending invites</Body>
+										<Caption color="tertiary">
+											Invites for new or existing users will appear here with a
+											link to copy, resend or revoke.
+										</Caption>
+									</View>
+								</Surface>
+							) : isDesktop ? (
+								<DataTable
+									columns={INVITE_COLUMNS}
+									rows={invites}
+									rowKey={(invite) => invite.id}
+								/>
+							) : (
+								<View style={{ gap: spacing[3] }}>
+									{invites.map((invite) => (
+										<InviteRow key={invite.id} invite={invite} />
+									))}
+								</View>
+							)}
+						</View>
+					) : null}
+
+					{/* Reference, not reading: it was an always-open card of five
+					    roles at the foot of the page, which made Team the heaviest
+					    screen in the app for the one time anyone needs it. The
+					    role picker in the invite and member sheets already explains
+					    the role being chosen, so the full table waits behind a row. */}
+					<Surface padded={false} style={{ overflow: "hidden" }}>
+						<ListRow
+							label="What can each role do?"
+							onPress={() => setShowRoleGuide((open) => !open)}
+							accessibilityLabel={
+								showRoleGuide
+									? "Hide what each role can do"
+									: "What can each role do?"
+							}
+							value={
+								showRoleGuide ? (
+									<ChevronUp size={18} color={colors.text.tertiary as string} />
+								) : (
+									<ChevronDown
+										size={18}
+										color={colors.text.tertiary as string}
+									/>
+								)
+							}
 						/>
-					) : invites.length === 0 ? (
-						<Surface>
-							<View style={{ gap: spacing[2] }}>
-								<MailPlus size={22} color={colors.text.tertiary as string} />
-								<Body weight="bold">No pending invites</Body>
-								<Caption color="tertiary">
-									Invites for new or existing users will appear here with a link
-									to copy, resend or revoke.
+						{showRoleGuide ? (
+							<View
+								style={{
+									gap: spacing[3],
+									paddingHorizontal: spacing[4],
+									paddingBottom: spacing[4],
+								}}
+							>
+								{(["OWNER", ...ROLES] as const).map((role) => (
+									<View
+										key={role}
+										style={{
+											flexDirection: "row",
+											alignItems: "flex-start",
+											gap: spacing[3],
+										}}
+									>
+										<View style={{ width: 84 }}>
+											<StatusPill
+												label={TEAM_ROLE_LABELS[role]}
+												tone={role === "OWNER" ? "info" : "neutral"}
+											/>
+										</View>
+										<Caption color="tertiary" style={{ flex: 1 }}>
+											{TEAM_ROLE_COPY[role]}
+										</Caption>
+									</View>
+								))}
+								<Caption color="quaternary">
+									A designation ("Field lead - Pune") is only the label shown
+									beside a name; the role is what grants access.
 								</Caption>
 							</View>
-						</Surface>
-					) : (
-						<View style={{ gap: spacing[3] }}>
-							{invites.map((invite) => (
-								<InviteRow key={invite.id} invite={invite} />
-							))}
-						</View>
-					)}
-
-					{/* Reference, not the first thing on the page: it used to open
-					    the screen and push the members below the fold on a phone. */}
-					<SectionHeading title="What each role can do" />
-					<Surface>
-						<View style={{ gap: spacing[3] }}>
-							{(["OWNER", ...ROLES] as const).map((role) => (
-								<View
-									key={role}
-									style={{
-										flexDirection: "row",
-										alignItems: "flex-start",
-										gap: spacing[3],
-									}}
-								>
-									<View style={{ width: 84 }}>
-										<StatusPill
-											label={TEAM_ROLE_LABELS[role]}
-											tone={role === "OWNER" ? "info" : "neutral"}
-										/>
-									</View>
-									<Caption color="tertiary" style={{ flex: 1 }}>
-										{TEAM_ROLE_COPY[role]}
-									</Caption>
-								</View>
-							))}
-							<Caption color="quaternary">
-								A designation ("Field lead - Pune") is only the label shown
-								beside a name; the role is what grants access.
-							</Caption>
-						</View>
+						) : null}
 					</Surface>
 
 					<OwnershipSection
 						isOwner={isOwner}
 						onTransfer={() => setTransferring(true)}
 					/>
-					{canReceiveOwnership ? <ConfirmTransferCard /> : null}
+					{/* Only an admin can receive ownership, and nothing client-side
+					    says a transfer is waiting for them - the token travels by
+					    hand. So the paste-a-token form stays one small link away
+					    rather than a full card every admin scrolls past forever. */}
+					{canReceiveOwnership ? (
+						showConfirmTransfer ? (
+							<ConfirmTransferCard
+								onCancel={() => setShowConfirmTransfer(false)}
+							/>
+						) : (
+							<View style={{ alignItems: "flex-start" }}>
+								<Button
+									size="sm"
+									variant="link"
+									onPress={() => setShowConfirmTransfer(true)}
+								>
+									Received an ownership transfer token?
+								</Button>
+							</View>
+						)
+					) : null}
 				</ScrollView>
 			)}
 
@@ -261,36 +376,6 @@ export default function OrgTeam() {
 				onClose={() => setTransferring(false)}
 			/>
 		</Screen>
-	);
-}
-
-/** Screen-local: an H3 with an optional action, unlike screen-shell's caption. */
-function SectionHeading({
-	title,
-	actionLabel,
-	onAction,
-}: {
-	title: string;
-	actionLabel?: string;
-	onAction?: () => void;
-}) {
-	const { spacing } = useTheme();
-	return (
-		<View
-			style={{
-				flexDirection: "row",
-				alignItems: "center",
-				justifyContent: "space-between",
-				gap: spacing[3],
-			}}
-		>
-			<H3>{title}</H3>
-			{actionLabel && onAction ? (
-				<Button size="sm" variant="outline" onPress={onAction}>
-					{actionLabel}
-				</Button>
-			) : null}
-		</View>
 	);
 }
 
@@ -307,6 +392,120 @@ function memberPill(member: OrgTeamMember): {
 	return { label: TEAM_ROLE_LABELS[member.role ?? "ADMIN"], tone: "neutral" };
 }
 
+function memberName(member: OrgTeamMember) {
+	return member.user.fullName ?? member.user.email;
+}
+
+/** Reactivating a suspended teammate - the card's button and the table's cell. */
+function useReactivate(member: OrgTeamMember) {
+	const update = useUpdateAdmin();
+	const name = memberName(member);
+	const reactivate = () => {
+		update.mutate(
+			{ id: member.id, input: { status: "ACTIVE" } },
+			{
+				onSuccess: () => toast.success(`${name} reactivated.`),
+				onError: (e) => toast.error(apiErrorMessage(e)),
+			},
+		);
+	};
+	return { reactivate, pending: update.isPending };
+}
+
+/**
+ * The members table. Identity flexes; role, designation and date are fixed
+ * columns. The row opens the member sheet for a role that can change people,
+ * and a suspended row carries Reactivate in place, as the card does.
+ */
+function memberColumns(
+	canManage: boolean,
+	onManage: (member: OrgTeamMember) => void,
+): Array<TableColumn<OrgTeamMember>> {
+	return [
+		{
+			key: "member",
+			header: "Member",
+			minWidth: 240,
+			render: (member) => (
+				<View style={{ minWidth: 0, alignSelf: "stretch" }}>
+					<Body weight="medium" numberOfLines={1}>
+						{memberName(member)}
+					</Body>
+					<Caption color="quaternary" numberOfLines={1}>
+						{member.user.email}
+					</Caption>
+				</View>
+			),
+		},
+		{
+			key: "role",
+			header: "Role",
+			width: 130,
+			render: (member) => {
+				const pill = memberPill(member);
+				return <StatusPill label={pill.label} tone={pill.tone} />;
+			},
+		},
+		{
+			key: "designation",
+			header: "Designation",
+			width: 200,
+			wideOnly: true,
+			render: (member) => (
+				<Caption
+					color={member.designation ? "tertiary" : "quaternary"}
+					numberOfLines={1}
+				>
+					{member.designation ?? "-"}
+					{member.isPublic ? " · Public" : ""}
+				</Caption>
+			),
+		},
+		{
+			key: "since",
+			header: "Since",
+			width: 130,
+			render: (member) => (
+				<Caption color="tertiary" numberOfLines={1}>
+					{(member.status === "LEFT" || member.status === "REMOVED") &&
+					member.leftAt
+						? `Left ${formatDate(member.leftAt)}`
+						: formatDate(member.joinedAt)}
+				</Caption>
+			),
+		},
+		{
+			key: "actions",
+			header: "",
+			width: 120,
+			align: "end",
+			render: (member) =>
+				!canManage ? null : (member.status ?? "ACTIVE") === "SUSPENDED" ? (
+					<ReactivateCell member={member} />
+				) : member.isOwner || member.role === "OWNER" ? null : (
+					<TextAction
+						label="Manage"
+						onPress={() => onManage(member)}
+						accessibilityLabel={`Manage ${memberName(member)}`}
+					/>
+				),
+		},
+	];
+}
+
+function ReactivateCell({ member }: { member: OrgTeamMember }) {
+	const { reactivate, pending } = useReactivate(member);
+	return (
+		<TextAction
+			label={pending ? "Reactivating…" : "Reactivate"}
+			tone="brand"
+			disabled={pending}
+			onPress={reactivate}
+			accessibilityLabel={`Reactivate ${memberName(member)}`}
+		/>
+	);
+}
+
 function MemberRow({
 	member,
 	canManage,
@@ -318,21 +517,11 @@ function MemberRow({
 	onPress?: () => void;
 }) {
 	const { spacing } = useTheme();
-	const update = useUpdateAdmin();
+	const { reactivate, pending } = useReactivate(member);
 	const pill = memberPill(member);
-	const name = member.user.fullName ?? member.user.email;
+	const name = memberName(member);
 	const suspended = (member.status ?? "ACTIVE") === "SUSPENDED";
 	const left = member.status === "LEFT" || member.status === "REMOVED";
-
-	const reactivate = () => {
-		update.mutate(
-			{ id: member.id, input: { status: "ACTIVE" } },
-			{
-				onSuccess: () => toast.success(`${name} reactivated.`),
-				onError: (e) => toast.error(apiErrorMessage(e)),
-			},
-		);
-	};
 
 	return (
 		<Surface
@@ -343,7 +532,7 @@ function MemberRow({
 						<Button
 							size="sm"
 							variant="outline"
-							loading={update.isPending}
+							loading={pending}
 							accessibilityLabel={`Reactivate ${name}`}
 							onPress={reactivate}
 						>
@@ -406,8 +595,8 @@ function isRateLimited(error: unknown): boolean {
 	);
 }
 
-function InviteRow({ invite }: { invite: TeamInvite }) {
-	const { colors, spacing } = useTheme();
+/** Copy, resend and revoke for one invite - the card's buttons and the table's cell. */
+function useInviteActions(invite: TeamInvite) {
 	const resend = useResendTeamInvite();
 	const revoke = useRevokeTeamInvite();
 	const [sharedUrl, setSharedUrl] = useState<string | undefined>(
@@ -443,6 +632,108 @@ function InviteRow({ invite }: { invite: TeamInvite }) {
 			onError: (e) => toast.error(apiErrorMessage(e)),
 		});
 	};
+
+	return {
+		link,
+		onResend,
+		onRevoke,
+		resending: resend.isPending,
+		revoking: revoke.isPending,
+	};
+}
+
+/**
+ * The invites table. Expiry is its own column because it is the one fact that
+ * forces a decision - resend or let it lapse.
+ */
+const INVITE_COLUMNS: Array<TableColumn<TeamInvite>> = [
+	{
+		key: "email",
+		header: "Invited",
+		minWidth: 240,
+		render: (invite) => (
+			<Body weight="medium" numberOfLines={1}>
+				{invite.email}
+			</Body>
+		),
+	},
+	{
+		key: "role",
+		header: "Role",
+		width: 130,
+		render: (invite) => (
+			<Caption color="tertiary">{TEAM_ROLE_LABELS[invite.role]}</Caption>
+		),
+	},
+	{
+		key: "expires",
+		header: "Expires",
+		width: 130,
+		render: (invite) => (
+			<Caption color="tertiary">{formatDate(invite.expiresAt)}</Caption>
+		),
+	},
+	{
+		key: "sent",
+		header: "Resent",
+		width: 150,
+		wideOnly: true,
+		render: (invite) =>
+			(invite.resentCount ?? 0) > 0 ? (
+				<Caption color="tertiary" numberOfLines={1}>
+					{invite.resentCount}x
+					{invite.lastSentAt ? ` · ${formatDate(invite.lastSentAt)}` : ""}
+				</Caption>
+			) : (
+				<Caption color="quaternary">-</Caption>
+			),
+	},
+	{
+		key: "actions",
+		header: "",
+		width: 250,
+		align: "end",
+		render: (invite) => <InviteCell invite={invite} />,
+	},
+];
+
+function InviteCell({ invite }: { invite: TeamInvite }) {
+	const { spacing } = useTheme();
+	const { link, onResend, onRevoke, resending, revoking } =
+		useInviteActions(invite);
+	return (
+		<View style={{ flexDirection: "row", gap: spacing[3] }}>
+			<TextAction
+				label="Copy link"
+				disabled={!link}
+				onPress={() => copyLink(link, "Link appears after resend.")}
+				accessibilityLabel={
+					link
+						? `Copy invite link for ${invite.email}`
+						: `Invite link for ${invite.email} appears after a resend`
+				}
+			/>
+			<TextAction
+				label={resending ? "Resending…" : "Resend"}
+				disabled={resending}
+				onPress={onResend}
+				accessibilityLabel={`Resend the invite to ${invite.email}`}
+			/>
+			<TextAction
+				label="Revoke"
+				tone="danger"
+				disabled={revoking}
+				onPress={onRevoke}
+				accessibilityLabel={`Revoke the invite to ${invite.email}`}
+			/>
+		</View>
+	);
+}
+
+function InviteRow({ invite }: { invite: TeamInvite }) {
+	const { colors, spacing } = useTheme();
+	const { link, onResend, onRevoke, resending, revoking } =
+		useInviteActions(invite);
 
 	return (
 		<Surface>
@@ -497,7 +788,7 @@ function InviteRow({ invite }: { invite: TeamInvite }) {
 					<Button
 						size="sm"
 						variant="outline"
-						loading={resend.isPending}
+						loading={resending}
 						onPress={onResend}
 					>
 						Resend
@@ -505,7 +796,7 @@ function InviteRow({ invite }: { invite: TeamInvite }) {
 					<Button
 						size="sm"
 						variant="ghost"
-						loading={revoke.isPending}
+						loading={revoking}
 						onPress={onRevoke}
 					>
 						Revoke
@@ -685,9 +976,10 @@ function MemberSheetInner({
 					/>
 				</Field>
 				<SwitchRow
-					label="Show on your public profile"
+					icon={Eye}
+					title="Show on your public profile"
 					hint="With their designation, in the team section volunteers see."
-					checked={isPublic}
+					value={isPublic}
 					onChange={setPublic}
 				/>
 			</View>
@@ -951,6 +1243,7 @@ function TransferSheet({
 	// The transfer target must be an active admin, independent of the
 	// members filter on the screen behind this sheet.
 	const teamQuery = useOrgTeam();
+	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [created, setCreated] = useState<{
 		name: string;
 		token: string;
@@ -962,20 +1255,35 @@ function TransferSheet({
 			(member.role ?? "ADMIN") === "ADMIN" &&
 			(member.status ?? "ACTIVE") === "ACTIVE",
 	);
+	const selected = admins.find((member) => member.id === selectedId) ?? null;
+	const selectedName = selected
+		? (selected.user.fullName ?? selected.user.email)
+		: null;
 
 	const close = () => {
+		setSelectedId(null);
 		setCreated(null);
 		setError(null);
 		onClose();
 	};
 
-	const select = (member: OrgTeamMember) => {
+	// Picking a name only selects it. Each row used to be a card whose tap
+	// fired the request outright, so a mis-tap while scrolling the list
+	// started handing the organisation to the wrong person. The request now
+	// waits for the footer button and a confirmation that names them.
+	const send = async () => {
+		if (!selected || !selectedName) return;
+		const ok = await confirm({
+			title: `Transfer ownership to ${selectedName}?`,
+			message: `${selectedName} gets a token to accept. You stay the owner until they confirm it; after that, they are the owner and you are an admin.`,
+			confirmLabel: "Send request",
+		});
+		if (!ok) return;
 		setError(null);
-		const name = member.user.fullName ?? member.user.email;
-		request.mutate(member.id, {
+		request.mutate(selected.id, {
 			onSuccess: (data) => {
-				setCreated({ name, token: data.token });
-				toast.success(`Transfer request created for ${name}.`);
+				setCreated({ name: selectedName, token: data.token });
+				toast.success(`Transfer request created for ${selectedName}.`);
 			},
 			onError: (e) => setError(apiErrorMessage(e)),
 		});
@@ -1008,11 +1316,23 @@ function TransferSheet({
 							Done
 						</Button>
 					</View>
+				) : admins.length > 0 ? (
+					<View style={{ gap: spacing[2] }}>
+						<FieldError message={error} />
+						<Button
+							disabled={!selected}
+							loading={request.isPending}
+							onPress={send}
+						>
+							{selectedName
+								? `Send transfer request to ${selectedName}`
+								: "Pick an admin"}
+						</Button>
+					</View>
 				) : undefined
 			}
 		>
-			<View style={{ paddingTop: spacing[2], gap: spacing[3] }}>
-				<FieldError message={error} />
+			<View style={{ paddingTop: spacing[2], gap: spacing[1] }}>
 				{created ? (
 					<View style={{ gap: spacing[2] }}>
 						<Body weight="bold" numberOfLines={1}>
@@ -1022,8 +1342,8 @@ function TransferSheet({
 							{created.token}
 						</Caption>
 						<Caption color="tertiary">
-							Share this with {created.name}; they confirm from Team → Confirm
-							transfer.
+							Share this with {created.name}; they confirm from Team → Received
+							an ownership transfer token.
 						</Caption>
 					</View>
 				) : teamQuery.isLoading ? (
@@ -1039,25 +1359,24 @@ function TransferSheet({
 					</Caption>
 				) : (
 					admins.map((member) => (
-						<Surface key={member.id} onPress={() => select(member)}>
-							<Body weight="bold">
-								{member.user.fullName ?? member.user.email}
-							</Body>
-							<Caption color="tertiary">
-								{member.designation ?? "Admin"}
-							</Caption>
-						</Surface>
+						<SheetOption
+							key={member.id}
+							label={member.user.fullName ?? member.user.email}
+							hint={member.designation ?? "Admin"}
+							selected={member.id === selectedId}
+							onPress={() => {
+								setError(null);
+								setSelectedId(member.id);
+							}}
+						/>
 					))
 				)}
-				{!created && request.isPending ? (
-					<Caption color="tertiary">Creating transfer request…</Caption>
-				) : null}
 			</View>
 		</Sheet>
 	);
 }
 
-function ConfirmTransferCard() {
+function ConfirmTransferCard({ onCancel }: { onCancel: () => void }) {
 	const { spacing } = useTheme();
 	const inputStyle = useFieldInputStyle();
 	const [token, setToken] = useState("");
@@ -1096,48 +1415,17 @@ function ConfirmTransferCard() {
 						style={inputStyle}
 					/>
 				</Field>
-				<View style={{ alignItems: "flex-start" }}>
+				<View
+					style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[2] }}
+				>
 					<Button loading={confirmTransfer.isPending} onPress={submit}>
 						Confirm transfer
+					</Button>
+					<Button variant="ghost" onPress={onCancel}>
+						Cancel
 					</Button>
 				</View>
 			</View>
 		</Surface>
-	);
-}
-
-/** A labelled switch - a setting, not a button that changes its own label. */
-function SwitchRow({
-	label,
-	hint,
-	checked,
-	onChange,
-}: {
-	label: string;
-	hint?: string;
-	checked: boolean;
-	onChange: (next: boolean) => void;
-}) {
-	const { spacing } = useTheme();
-	return (
-		<View
-			style={{
-				flexDirection: "row",
-				alignItems: "center",
-				justifyContent: "space-between",
-				gap: spacing[3],
-				minHeight: 44,
-			}}
-		>
-			<View style={{ flex: 1, minWidth: 0 }}>
-				<Label>{label}</Label>
-				{hint ? <Caption color="tertiary">{hint}</Caption> : null}
-			</View>
-			<Switch
-				checked={checked}
-				onCheckedChange={onChange}
-				accessibilityLabel={label}
-			/>
-		</View>
 	);
 }

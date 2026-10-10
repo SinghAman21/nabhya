@@ -1,9 +1,11 @@
-import type {
-	UploadOrgDocumentInput,
-	UploadUserDocumentInput,
+import {
+	isSelfieDocument,
+	type UploadOrgDocumentInput,
+	type UploadUserDocumentInput,
 } from "@nabhya/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Linking } from "react-native";
+import { useMe } from "@/hooks/use-profile";
 import { organizationsApi, queryKeys, uploadsApi, usersApi } from "@/lib/api";
 
 export function useMyOrgDocuments(enabled = true) {
@@ -20,6 +22,47 @@ export function useMyUserDocuments(enabled = true) {
 		queryFn: usersApi.documents,
 		enabled,
 	});
+}
+
+/**
+ * Where the volunteer's identity check stands, in the four states a screen
+ * has to word differently: `none` (start), `review` (wait), `rejected`
+ * (retake - with the reviewer's remarks), `verified`.
+ *
+ * The account flag alone cannot tell "not started" from "submitted and
+ * waiting" - both read as unverified - so the apply sheet asked people who
+ * had already sent their ID to "verify now", and Verify identity offered them
+ * the capture form again. `loading` is true until both sources answer.
+ */
+export function useIdentityStatus(enabled = true) {
+	const me = useMe(enabled);
+	const documents = useMyUserDocuments(enabled);
+
+	const docs = documents.data ?? [];
+	const govId = docs.find((doc) => !isSelfieDocument(doc.documentType));
+	const selfie = docs.find((doc) => isSelfieDocument(doc.documentType));
+	const rejected =
+		govId?.verificationStatus === "REJECTED" ||
+		selfie?.verificationStatus === "REJECTED";
+
+	const state: "none" | "review" | "rejected" | "verified" =
+		me.data?.verificationStatus === "VERIFIED"
+			? "verified"
+			: rejected
+				? "rejected"
+				: govId || selfie
+					? "review"
+					: "none";
+
+	return {
+		state,
+		remarks: govId?.remarks || selfie?.remarks || null,
+		loading: me.isLoading || documents.isLoading,
+		refetch: () => {
+			me.refetch();
+			documents.refetch();
+		},
+	};
 }
 
 export function useUploadOrgDocument() {

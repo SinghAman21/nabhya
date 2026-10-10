@@ -33,6 +33,16 @@ import { apiErrorMessage } from "@/lib/api";
  * - **Mobile** - always the cards, one across, whatever `view` says. A 360dp
  *   window cannot hold six columns, and a table squeezed into it is six
  *   two-line wraps per row.
+ *
+ * ## Changing a filter keeps the rows up
+ *
+ * The admin list hooks pass `keepPrevious`, so a sort or filter change leaves
+ * the last result on screen (`query.isPlaceholderData`) while the next one
+ * loads. Here those rows are dimmed and inert rather than replaced by
+ * `LoadingState`: a spinner in place of the table on every header press
+ * collapsed the page's height, threw the reader back to the top, and made a
+ * 200ms round trip look like a reload. `LoadingState` is now only for the very
+ * first load, when there is nothing to keep.
  */
 export function ConsoleList<T, K extends string>({
 	query,
@@ -52,6 +62,8 @@ export function ConsoleList<T, K extends string>({
 	renderCard,
 	empty,
 	loadingLabel,
+	rowLabel,
+	activeKey,
 }: {
 	query: PagedQuery;
 	items: T[];
@@ -74,9 +86,14 @@ export function ConsoleList<T, K extends string>({
 	renderCard: (row: T) => React.ReactElement;
 	empty: React.ReactElement;
 	loadingLabel?: string;
+	/** Passed to `DataTable` - the spoken name of an openable row. */
+	rowLabel?: (row: T) => string;
+	/** Passed to `DataTable` - the keyboard cursor's row. */
+	activeKey?: string;
 }) {
 	const { spacing } = useTheme();
 	const { isDesktop, width } = useMedia();
+	const stale = query.isPlaceholderData;
 
 	if (query.isLoading) {
 		return <LoadingState {...(loadingLabel ? { label: loadingLabel } : {})} />;
@@ -94,12 +111,20 @@ export function ConsoleList<T, K extends string>({
 		);
 	}
 
-	if (items.length === 0) return empty;
+	if (items.length === 0) {
+		return <View style={stale ? { opacity: 0.5 } : null}>{empty}</View>;
+	}
 
 	const asTable = isDesktop && view === "table";
 
 	return (
-		<View>
+		<View
+			// Dimmed and inert while the previous filter's rows stand in: they are
+			// not what was asked for, so they must not be pressed or ticked.
+			pointerEvents={stale ? "none" : "auto"}
+			accessibilityState={{ busy: stale }}
+			style={stale ? { opacity: 0.5 } : null}
+		>
 			<ResultCount
 				total={total}
 				loaded={items.length}
@@ -117,6 +142,8 @@ export function ConsoleList<T, K extends string>({
 					{...(onSortChange ? { onSortChange } : {})}
 					{...(selection ? { selection } : {})}
 					{...(onSelectionChange ? { onSelectionChange } : {})}
+					{...(rowLabel ? { rowLabel } : {})}
+					{...(activeKey ? { activeKey } : {})}
 					// Below ~1240 the last columns are dropped rather than squeezed;
 					// past that the sideways scroll takes over.
 					wide={width >= 1240}

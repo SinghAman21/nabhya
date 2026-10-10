@@ -1,7 +1,7 @@
 import { FlashList } from "@shopify/flash-list";
 import { useRouter } from "expo-router";
 import { BookmarkCheck } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, RefreshControl, View } from "react-native";
 import { withAppShell } from "@/components/app-shell";
 import { FeedCard, toPublicNeed } from "@/components/feed/feed-card";
@@ -14,18 +14,20 @@ import {
 	ScreenHeader,
 } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/overlay";
 import { Caption } from "@/components/ui/typography";
 import { useToggleFollow } from "@/hooks/use-engagement";
 import { useFeedReaction, useSavedFeed } from "@/hooks/use-feed";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
+import { READING_COLUMN } from "@/lib/reading-column";
 import { verticalScrollbar } from "@/lib/scroll";
-import type { FeedNeedItem } from "@/lib/types";
+import type { FeedItem, FeedNeedItem } from "@/lib/types";
 
 /**
  * Feed items the volunteer has saved via the reaction-bar bookmark - needs,
  * events, updates and announcements, in one list, most-recently-posted
- * first. Distinct from `/bookmarks` ("Saved NGOs"), which is the org-level
+ * first. Distinct from `/bookmarks` ("Shortlisted NGOs"), which is the org-level
  * bookmark on an NGO's own page; see the note on `useSavedFeed`.
  */
 function SavedFeed() {
@@ -42,6 +44,55 @@ function SavedFeed() {
 	const toggleFollow = useToggleFollow();
 	const like = useFeedReaction("like");
 	const save = useFeedReaction("save");
+
+	/*
+	 * Stable handlers for the memoised `FeedCard` - inline arrows in
+	 * `renderItem` are a new function per render and re-render every card (and
+	 * its video player) on each like. Each closes only over a mutation's
+	 * `mutate`, which react-query keeps stable. Same as the two feed screens.
+	 */
+	const itemsRef = useRef(items);
+	useEffect(() => {
+		itemsRef.current = items;
+	}, [items]);
+	const handleToggleFollow = useCallback(
+		(organizationId: string, following: boolean) =>
+			toggleFollow.mutate(
+				{ organizationId, following },
+				{
+					// Follow vanishes from the card on press; this is the only sign
+					// it worked, and the way back short of the NGO page.
+					onSuccess: () => {
+						if (following) return;
+						const name = itemsRef.current.find(
+							(row) => row.organization?.id === organizationId,
+						)?.organization?.organizationName;
+						toast.success(name ? `Following ${name}` : "Following", {
+							label: "Undo",
+							onPress: () =>
+								toggleFollow.mutate({ organizationId, following: true }),
+						});
+					},
+					onError: (error) => toast.error(apiErrorMessage(error)),
+				},
+			),
+		[toggleFollow.mutate],
+	);
+	const handleToggleLike = useCallback(
+		(row: FeedItem, liked: boolean) => like.mutate({ item: row, on: !liked }),
+		[like.mutate],
+	);
+	const handleToggleSave = useCallback(
+		(row: FeedItem, saved: boolean) => save.mutate({ item: row, on: !saved }),
+		[save.mutate],
+	);
+
+	// A deep link or a reload has no history, and `router.back()` then does
+	// nothing - the one button on an empty screen would be dead.
+	const backToFeed = () => {
+		if (router.canGoBack()) router.back();
+		else router.replace("/(volunteer)");
+	};
 
 	const loadMore = () => {
 		if (feed.hasNextPage && !feed.isFetchingNextPage) feed.fetchNextPage();
@@ -60,7 +111,7 @@ function SavedFeed() {
 			title="No saved posts yet"
 			description="Tap the bookmark on any need, event or update and it will be kept here."
 			action={
-				<Button size="sm" variant="outline" onPress={() => router.back()}>
+				<Button size="sm" variant="outline" onPress={backToFeed}>
 					Back to feed
 				</Button>
 			}
@@ -76,7 +127,9 @@ function SavedFeed() {
 	);
 
 	return (
-		<Screen style={{ paddingHorizontal: 0 }}>
+		// The feed's own column width: at the top bar's 1180 a card's media
+		// and prose ran a full laptop wide, unlike every other feed in the app.
+		<Screen style={{ ...READING_COLUMN, paddingHorizontal: 0 }}>
 			<View style={{ paddingHorizontal: spacing[4] }}>
 				<ScreenHeader
 					back
@@ -91,15 +144,9 @@ function SavedFeed() {
 					<FeedCard
 						item={item}
 						onRespond={setResponding}
-						onToggleFollow={(organizationId, following) =>
-							toggleFollow.mutate({ organizationId, following })
-						}
-						onToggleLike={(row, liked) =>
-							like.mutate({ item: row, on: !liked })
-						}
-						onToggleSave={(row, saved) =>
-							save.mutate({ item: row, on: !saved })
-						}
+						onToggleFollow={handleToggleFollow}
+						onToggleLike={handleToggleLike}
+						onToggleSave={handleToggleSave}
 					/>
 				)}
 				ListFooterComponent={footer}

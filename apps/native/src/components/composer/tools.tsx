@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react-native";
 import { View } from "react-native";
 import { Pressable } from "@/components/ui/pressable";
 import { Tooltip } from "@/components/ui/tooltip";
-import { Caption } from "@/components/ui/typography";
+import { Micro } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { focusable } from "@/lib/focus";
 
@@ -179,12 +179,15 @@ export function Tool({
 							backgroundColor: colors.primary.main,
 						}}
 					>
-						<Caption
+						{/* Fixed 14pt dot, so the numeral is pinned at 1x rather
+						    than scaled out of it. */}
+						<Micro
 							weight="bold"
-							style={{ color: colors.primary.contrast as string, fontSize: 9 }}
+							color={colors.primary.contrast as string}
+							maxFontSizeMultiplier={1}
 						>
 							{badge}
-						</Caption>
+						</Micro>
 					</View>
 				)}
 			</Pressable>

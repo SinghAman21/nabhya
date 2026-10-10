@@ -12,6 +12,7 @@ import {
 	Surface,
 } from "@/components/screen-shell";
 import { StepIndicator } from "@/components/step-indicator";
+import { toast } from "@/components/ui/overlay";
 import { Body, Caption, Label } from "@/components/ui/typography";
 import { useMyOrgDocuments, useUploadOrgDocument } from "@/hooks/use-documents";
 import { useOrgAccess } from "@/hooks/use-org-access";
@@ -93,8 +94,24 @@ export default function NgoVerification() {
 	const isVerified = status === "VERIFIED";
 	const currentStep = orgVerificationStep(status, requiredUploaded);
 
-	const handleUploaded = (documentType: OrgDocumentType, key: string) =>
-		upload.mutate({ documentType, documentKey: key });
+	// The tile changes state in place, but on a phone the slot can be below
+	// the banner that changes with it - so the outcome is said out loud too,
+	// including that a re-upload has reopened review.
+	const handleUploaded = (documentType: OrgDocumentType, key: string) => {
+		const label = ORG_DOCUMENT_LABELS[documentType] ?? "Document";
+		const replacing = byType.get(documentType)?.verificationStatus;
+		upload.mutate(
+			{ documentType, documentKey: key },
+			{
+				onSuccess: () =>
+					toast.success(
+						replacing === "REJECTED"
+							? `${label} re-sent. It's back in the review queue.`
+							: `${label} uploaded for review.`,
+					),
+			},
+		);
+	};
 
 	const isSaving = (type: OrgDocumentType) =>
 		upload.isPending && upload.variables?.documentType === type;
@@ -113,7 +130,16 @@ export default function NgoVerification() {
 			// it is only still the answer while the org itself is REJECTED.
 			description={
 				(status === "REJECTED" ? org.data?.rejectionReason : null) ??
-				"A reviewer left notes on the documents below. Upload a corrected copy of each to reopen review."
+				(rejected.length > 0
+					? `Sent back: ${rejected
+							.map(
+								(doc) =>
+									ORG_DOCUMENT_LABELS[doc.documentType] ?? doc.documentType,
+							)
+							.join(
+								", ",
+							)}. Each has the reviewer's note below - upload a corrected copy to reopen review.`
+					: "Upload corrected copies of the documents below to reopen review.")
 			}
 		/>
 	) : allRequired ? (

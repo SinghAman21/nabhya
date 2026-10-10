@@ -10,7 +10,7 @@ import {
 	Search,
 	X,
 } from "lucide-react-native";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { View, type ViewToken } from "react-native";
 import { withAppShell } from "@/components/app-shell";
 import { BackButton } from "@/components/back-button";
@@ -27,6 +27,7 @@ import {
 	SectionTitle,
 } from "@/components/screen-shell";
 import { SearchField } from "@/components/search-field";
+import { toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
 import { Caption } from "@/components/ui/typography";
 import { useToggleFollow } from "@/hooks/use-engagement";
@@ -163,13 +164,17 @@ function SearchScreen() {
 								value={
 									<Pressable
 										onPress={() => recent.remove(term)}
-										hitSlop={10}
 										accessibilityRole="button"
 										accessibilityLabel={`Remove ${term} from recent searches`}
 										{...focusable}
+										// A 44pt target, pulled into the row's own padding by
+										// the negative margin so the row does not grow to fit
+										// it. At 32 it relied on hitSlop, which the focus ring
+										// and the pressed state never showed.
 										style={{
-											width: 32,
-											height: 32,
+											width: 44,
+											height: 44,
+											marginVertical: -spacing[1.5],
 											alignItems: "center",
 											justifyContent: "center",
 											borderRadius: 999,
@@ -313,9 +318,32 @@ function SearchScreen() {
 	 * and every video player in it. Each closes only over a mutation's `mutate`,
 	 * which react-query keeps stable, so these dependencies never change.
 	 */
+	// Follow vanishes from the card on press, so the toast is the only sign it
+	// worked and the only way back short of the NGO page. The name comes from a
+	// ref so this handler stays stable for the memoised card.
+	const feedItemsRef = useRef<FeedItem[]>([]);
+	useEffect(() => {
+		feedItemsRef.current = feedItems;
+	});
 	const handleToggleFollow = useCallback(
 		(organizationId: string, following: boolean) =>
-			toggleFollow.mutate({ organizationId, following }),
+			toggleFollow.mutate(
+				{ organizationId, following },
+				{
+					onSuccess: () => {
+						if (following) return;
+						const name = feedItemsRef.current.find(
+							(row) => row.organization?.id === organizationId,
+						)?.organization?.organizationName;
+						toast.success(name ? `Following ${name}` : "Following", {
+							label: "Undo",
+							onPress: () =>
+								toggleFollow.mutate({ organizationId, following: true }),
+						});
+					},
+					onError: (error) => toast.error(apiErrorMessage(error)),
+				},
+			),
 		[toggleFollow.mutate],
 	);
 	const handleToggleLike = useCallback(
@@ -342,9 +370,11 @@ function SearchScreen() {
 					borderBottomColor: colors.border.hairline,
 				}}
 			>
-				{/* `"none"` is not a colour - RN ignored it and the button kept its
-				    default fill. `transparent` is what was meant. */}
-				<BackButton style={{ backgroundColor: "transparent", width: 24 }} />
+				{/* The full 40pt control, as on every pushed page. It was narrowed to
+				    24 to buy the search field width, which left a target smaller
+				    than the glyph's own row. Centred because BackButton top-aligns
+				    itself for `ScreenHeader`, and the field beside it is 44. */}
+				<BackButton style={{ alignSelf: "center" }} />
 				<View style={{ flex: 1 }}>
 					<SearchField
 						value={query}

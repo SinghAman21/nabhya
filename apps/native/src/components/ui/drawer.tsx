@@ -12,6 +12,7 @@ import { Pressable } from "@/components/ui/pressable";
 import { Sheet, SheetHeader } from "@/components/ui/sheet";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
+import { motionDuration, useReducedMotion } from "@/lib/motion";
 import { verticalScrollbar } from "@/lib/scroll";
 
 /**
@@ -94,6 +95,8 @@ function DesktopDrawer({
 	const { colors, spacing, elevation, isDark } = useTheme();
 	const { width, height } = useWindowDimensions();
 	const [scrolled, setScrolled] = useState(false);
+	// The slide is decoration; with reduced motion the panel simply appears.
+	const reduce = useReducedMotion();
 
 	const panelWidth = Math.min(
 		xl ? XL_PANEL_WIDTH : wide ? WIDE_PANEL_WIDTH : PANEL_WIDTH,
@@ -104,25 +107,27 @@ function DesktopDrawer({
 	const slide = useRef(new Animated.Value(panelWidth)).current;
 	const [mounted, setMounted] = useState(visible);
 	const mountedRef = useRef(visible);
+	const closingRef = useRef(false);
 
 	// Mounted until the slide-out finishes; `onClose` fires only for a
 	// user-initiated dismiss, never when the parent flips `visible` itself.
 	useEffect(() => {
 		if (visible) {
 			mountedRef.current = true;
+			closingRef.current = false;
 			setMounted(true);
 			setScrolled(false);
 			slide.setValue(panelWidth);
 			Animated.timing(slide, {
 				toValue: 0,
-				duration: 280,
+				duration: motionDuration(280, reduce),
 				easing: Easing.bezier(0.22, 1, 0.36, 1),
 				useNativeDriver: true,
 			}).start();
 		} else if (mountedRef.current) {
 			Animated.timing(slide, {
 				toValue: panelWidth,
-				duration: 200,
+				duration: motionDuration(200, reduce),
 				easing: Easing.in(Easing.cubic),
 				useNativeDriver: true,
 			}).start(() => {
@@ -130,42 +135,34 @@ function DesktopDrawer({
 				setMounted(false);
 			});
 		}
-	}, [visible, panelWidth, slide]);
+	}, [visible, panelWidth, slide, reduce]);
 
+	// `closing` guards the second request: a scrim press during the slide-out,
+	// or the Modal's own Escape arriving while one is already running, used to
+	// start a second animation whose callback called `onClose` again.
 	const requestClose = useCallback(() => {
-		if (!mountedRef.current) return;
+		if (!mountedRef.current || closingRef.current) return;
+		closingRef.current = true;
 		Animated.timing(slide, {
 			toValue: panelWidth,
-			duration: 200,
+			duration: motionDuration(200, reduce),
 			easing: Easing.in(Easing.cubic),
 			useNativeDriver: true,
 		}).start(() => {
+			closingRef.current = false;
 			mountedRef.current = false;
 			setMounted(false);
 			onClose();
 		});
-	}, [onClose, panelWidth, slide]);
+	}, [onClose, panelWidth, slide, reduce]);
 
-	// A desktop dialog closes on Escape.
-	useEffect(() => {
-		if (!mounted) return;
-		const target = globalThis as unknown as {
-			addEventListener?: (
-				type: string,
-				listener: (event: { key?: string }) => void,
-			) => void;
-			removeEventListener?: (
-				type: string,
-				listener: (event: { key?: string }) => void,
-			) => void;
-		};
-		if (typeof target.addEventListener !== "function") return;
-		const onKey = (event: { key?: string }) => {
-			if (event?.key === "Escape") requestClose();
-		};
-		target.addEventListener("keydown", onKey);
-		return () => target.removeEventListener?.("keydown", onKey);
-	}, [mounted, requestClose]);
+	/*
+	 * Escape is the Modal's: react-native-web's `Modal` calls `onRequestClose`
+	 * on Escape keyup, and traps focus inside itself. This used to add its own
+	 * window keydown listener as well, which closed the drawer twice per press -
+	 * and closed it underneath an open confirm dialog, whose Escape was meant
+	 * to cancel only the question (see `ConfirmDialog` in `overlay.tsx`).
+	 */
 
 	if (!mounted) return null;
 
@@ -182,6 +179,8 @@ function DesktopDrawer({
 					onPress={requestClose}
 					accessibilityRole="button"
 					accessibilityLabel="Dismiss"
+					// Not a tab stop - see the same scrim in `sheet.tsx`.
+					focusable={false}
 					style={{
 						position: "absolute",
 						top: 0,
@@ -193,6 +192,7 @@ function DesktopDrawer({
 				/>
 				<Animated.View
 					accessibilityLabel={title}
+					accessibilityViewIsModal
 					style={{
 						position: "absolute",
 						top: 0,

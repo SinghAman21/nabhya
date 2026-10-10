@@ -1,7 +1,6 @@
-import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { memo, useState } from "react";
-import { Share, useWindowDimensions, View } from "react-native";
+import { useWindowDimensions, View } from "react-native";
 import { FeedCommentsSheet } from "@/components/feed/feed-comments-sheet";
 import {
 	FeedMediaViewer,
@@ -10,6 +9,7 @@ import {
 import { useRecordFeedInteraction } from "@/hooks/use-feed";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
+import { publicUrl, shareLink } from "@/lib/share-link";
 import type {
 	FeedItem,
 	FeedMedia,
@@ -38,7 +38,7 @@ export { CardKicker } from "./card-meta";
  *
  * It is also near-monochrome. Type hierarchy and arrangement do the work - see
  * `card-body.tsx` for how the four kinds differ - and the brand colour appears
- * exactly twice: a need's gauge and the one solid button.
+ * exactly twice: a need's progress bar and the one solid button.
  */
 
 /**
@@ -74,7 +74,8 @@ export function toPublicNeed(item: FeedNeedItem): PublicNeed {
 
 export interface FeedCardActions {
 	onRespond: (item: FeedNeedItem) => void;
-	onToggleFollow: (organizationId: string, following: boolean) => void;
+	/** Omit to hide Follow (an NGO account cannot follow - the server 403s). */
+	onToggleFollow?: (organizationId: string, following: boolean) => void;
 	onToggleLike?: (item: FeedItem, liked: boolean) => void;
 	onToggleSave?: (item: FeedItem, saved: boolean) => void;
 	/**
@@ -137,20 +138,30 @@ function FeedCardImpl({
 					: org
 						? `/ngos/${org.id}`
 						: "/";
-		try {
-			await Share.share({
-				message: `${headline}${org ? ` - ${org.organizationName}` : ""} on Nabhya\n${Linking.createURL(path)}`,
-			});
-			if (email) recordShare.mutate({ item });
-		} catch {
-			/* user dismissed, or web without the Share API */
-		}
+		// `shareLink` copies the link where there is no share sheet - desktop
+		// Chrome and Firefox lack `navigator.share`, so `Share.share` did nothing.
+		await shareLink({
+			message: `${headline}${org ? ` - ${org.organizationName}` : ""} on Nabhya`,
+			url: publicUrl(path),
+		});
+		if (email) recordShare.mutate({ item });
 	};
 
 	const cta = primaryCta(item, {
 		onRespond,
 		openEvent: () => router.push(`/events/${item.id}`),
 	});
+
+	const actionProps = {
+		item,
+		liked,
+		saved,
+		headline,
+		...(onToggleLike ? { onToggleLike: () => onToggleLike(item, liked) } : {}),
+		...(onToggleSave ? { onToggleSave: () => onToggleSave(item, saved) } : {}),
+		onComment: () => setCommentsOpen(true),
+		onShare: share,
+	};
 
 	const mediaActions: MediaViewerActions = {
 		headline,
@@ -188,7 +199,7 @@ function FeedCardImpl({
 				<CardHeader
 					item={item}
 					{...(org ? { onOpen: () => router.push(`/ngos/${org.id}`) } : {})}
-					{...(org && !item.isFollowing
+					{...(org && !item.isFollowing && onToggleFollow
 						? { onToggleFollow: () => onToggleFollow(org.id, false) }
 						: {})}
 					{...(onDelete ? { onDelete: () => onDelete(item) } : {})}
@@ -206,24 +217,30 @@ function FeedCardImpl({
 					onOpenViewer={(media, index) => setViewer({ media, index })}
 				/>
 
-				{cta && <CtaButton cta={cta} />}
-
-				<CardActions
-					item={item}
-					liked={liked}
-					saved={saved}
-					compact={!isDesktop}
-					showLabels={isDesktop}
-					headline={headline}
-					{...(onToggleLike
-						? { onToggleLike: () => onToggleLike(item, liked) }
-						: {})}
-					{...(onToggleSave
-						? { onToggleSave: () => onToggleSave(item, saved) }
-						: {})}
-					onComment={() => setCommentsOpen(true)}
-					onShare={share}
-				/>
+				{cta ? (
+					// The CTA and the reactions share one row: the button sized to
+					// its label on the left, four icons on the right. This replaced a
+					// CTA line followed by a ruled, labelled action row - two lines
+					// and a hairline to hold one button and four glyphs.
+					<View
+						style={{
+							flexDirection: "row",
+							alignItems: "center",
+							justifyContent: "space-between",
+							flexWrap: "wrap",
+							gap: spacing[2],
+						}}
+					>
+						<CtaButton cta={cta} />
+						<CardActions {...actionProps} compact showLabels={false} iconOnly />
+					</View>
+				) : (
+					<CardActions
+						{...actionProps}
+						compact={!isDesktop}
+						showLabels={isDesktop}
+					/>
+				)}
 			</View>
 
 			{viewer && (

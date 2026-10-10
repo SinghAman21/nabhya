@@ -1,8 +1,18 @@
-import type { UpdateOrganizationInput } from "@nabhya/shared";
+import {
+	type FieldErrors,
+	type UpdateOrganizationInput,
+	updateOrganizationSchema,
+	validateStep,
+} from "@nabhya/shared";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ScrollView, View, type ViewStyle } from "react-native";
+import {
+	type LayoutChangeEvent,
+	ScrollView,
+	View,
+	type ViewStyle,
+} from "react-native";
 import { MultiChoiceChips } from "@/components/choice-chips";
 import { Field, useFieldInputStyle } from "@/components/form-field";
 import { LocationFields } from "@/components/onboarding/location-fields";
@@ -73,7 +83,25 @@ import { verticalScrollbar } from "@/lib/scroll";
  * statement could be set once and never removed. Optional text now sends the
  * empty string; only the fields whose schema has a minimum length (name, phone,
  * email, city, state) fall back to `undefined`, because `""` would fail their
- * validation rather than clear them.
+ * validation rather than clear them. `pincode` is in that second group too:
+ * its schema is `min(4)`, not `optionalText`, so sending `""` to clear it was a
+ * 400 on every save after the field had been emptied.
+ *
+ * ## Validation
+ *
+ * The form checks itself against `updateOrganizationSchema` before it sends
+ * anything, and puts each problem under its field. It used to send and wait:
+ * the server's 400 came back as one sentence in a banner at the *top* of a
+ * six-section form whose Save button is at the bottom, so the press looked
+ * dead. Now a failed Save scrolls to the first section with a problem, the
+ * banner counts them, and once Save has been pressed every field re-checks as
+ * it is typed in, so the count falls as they are fixed.
+ *
+ * Required fields are checked here rather than by the schema, because the
+ * payload leaves a blank one `undefined` ("leave it alone") and the schema
+ * has nothing to say about a key that is not there. Blank is not a choice
+ * the record allows - the name, phone, email and city are what a volunteer
+ * uses to reach you - so it is an error on the field, not a silent no-op.
  */
 
 interface Form {
@@ -123,6 +151,59 @@ const EMPTY: Form = {
 
 const MAX_CAUSES = 5;
 
+type Section = "about" | "contact" | "location" | "organisation";
+
+/** Which card a field lives in, for scrolling to the first problem. */
+const SECTION_OF: Record<string, Section> = {
+	organizationName: "about",
+	registrationNumber: "about",
+	description: "about",
+	mission: "about",
+	vision: "about",
+	phone: "contact",
+	email: "contact",
+	website: "contact",
+	address: "location",
+	city: "location",
+	state: "location",
+	pincode: "location",
+	teamSize: "organisation",
+	foundingYear: "organisation",
+};
+const SECTION_ORDER: Section[] = [
+	"about",
+	"contact",
+	"location",
+	"organisation",
+];
+
+/**
+ * The schema's bounds in words. Zod's defaults ("Too small: expected string
+ * to have >=4 characters") are written for a developer reading a 400.
+ */
+const FIELD_COPY: Record<string, string> = {
+	organizationName: "Use at least 2 characters.",
+	registrationNumber: "Keep it under 60 characters.",
+	description: "Keep it under 1,000 characters.",
+	mission: "Keep it under 1,000 characters.",
+	vision: "Keep it under 1,000 characters.",
+	website: "Enter a full address, starting with https://",
+	address: "Keep it under 500 characters.",
+	city: "Pick a city from the list.",
+	state: "Pick a state from the list.",
+	pincode: "Enter a 6-digit pincode.",
+	teamSize: "Enter a number of 1 or more.",
+	foundingYear: `Enter a year between 1900 and ${new Date().getFullYear()}.`,
+};
+
+const REQUIRED: Array<[keyof Form, string]> = [
+	["organizationName", "Your organisation needs a name."],
+	["phone", "Add a phone number volunteers can reach you on."],
+	["email", "Add a contact email."],
+	["city", "Pick the city you work in."],
+	["state", "Pick your state."],
+];
+
 /**
  * A form column, not a page column. Wider than this and a single-line input
  * paired with nothing has more white space in it than text.
@@ -157,6 +238,12 @@ export default function EditOrganization() {
 	// Local previews for a file picked in this session - see the header note.
 	const [coverPreview, setCoverPreview] = useState<string | null>(null);
 	const [logoPreview, setLogoPreview] = useState<string | null>(null);
+	const [attempted, setAttempted] = useState(false);
+	const scroller = useRef<ScrollView>(null);
+	const sectionY = useRef<Partial<Record<Section, number>>>({});
+	const track = (section: Section) => (event: LayoutChangeEvent) => {
+		sectionY.current[section] = event.nativeEvent.layout.y;
+	};
 
 	/** Two fields on one row on desktop, one per row on a phone. */
 	const half = isDesktop ? { flex: 1 } : undefined;
@@ -259,37 +346,71 @@ export default function EditOrganization() {
 		}
 	};
 
+	const buildPayload = (): UpdateOrganizationInput => ({
+		// Minimum-length fields: blank means "leave it alone", because the
+		// schema would reject "" rather than treat it as a clear.
+		organizationName: form.organizationName.trim() || undefined,
+		phone: form.phone.trim() || undefined,
+		email: form.email.trim() || undefined,
+		city: form.city.trim() || undefined,
+		state: form.state.trim() || undefined,
+		// `optionalText` fields: "" is how you clear one.
+		registrationNumber: form.registrationNumber.trim(),
+		description: form.description.trim(),
+		mission: form.mission.trim(),
+		vision: form.vision.trim(),
+		address: form.address.trim(),
+		pincode: form.pincode.trim() || undefined,
+		logo: form.logo.trim(),
+		coverImage: form.coverImage.trim(),
+		// Its schema is `url() | ""`, so the empty string is already allowed.
+		website: form.website.trim(),
+		// null clears; the schema takes it for these two.
+		teamSize: form.teamSize ? Number(form.teamSize) : null,
+		foundingYear: form.foundingYear ? Number(form.foundingYear) : null,
+		...(form.latitude !== undefined && form.longitude !== undefined
+			? { latitude: form.latitude, longitude: form.longitude }
+			: {}),
+		categoryIds: form.categoryIds,
+	});
+
+	const validate = (): FieldErrors => {
+		const next: FieldErrors = {};
+		for (const [key, message] of REQUIRED) {
+			const value = form[key];
+			if (typeof value === "string" && !value.trim()) next[key] = message;
+		}
+		const result = validateStep(updateOrganizationSchema, buildPayload());
+		if (!result.ok) {
+			for (const [key, message] of Object.entries(result.errors)) {
+				if (!next[key]) next[key] = FIELD_COPY[key] ?? message;
+			}
+		}
+		return next;
+	};
+
+	// Live once Save has been pressed, silent before - an error under a field
+	// the person has not reached yet is a scolding, not help.
+	const fieldErrors: FieldErrors = attempted ? validate() : {};
+	const errorCount = Object.keys(fieldErrors).length;
+
 	const save = () => {
-		const payload: UpdateOrganizationInput = {
-			// Minimum-length fields: blank means "leave it alone", because the
-			// schema would reject "" rather than treat it as a clear.
-			organizationName: form.organizationName.trim() || undefined,
-			phone: form.phone.trim() || undefined,
-			email: form.email.trim() || undefined,
-			city: form.city.trim() || undefined,
-			state: form.state.trim() || undefined,
-			// `optionalText` fields: "" is how you clear one.
-			registrationNumber: form.registrationNumber.trim(),
-			description: form.description.trim(),
-			mission: form.mission.trim(),
-			vision: form.vision.trim(),
-			address: form.address.trim(),
-			pincode: form.pincode.trim(),
-			logo: form.logo.trim(),
-			coverImage: form.coverImage.trim(),
-			// Its schema is `url() | ""`, so the empty string is already allowed.
-			website: form.website.trim(),
-			// null clears; the schema takes it for these two.
-			teamSize: form.teamSize ? Number(form.teamSize) : null,
-			foundingYear: form.foundingYear ? Number(form.foundingYear) : null,
-			...(form.latitude !== undefined && form.longitude !== undefined
-				? { latitude: form.latitude, longitude: form.longitude }
-				: {}),
-			categoryIds: form.categoryIds,
-		};
+		setAttempted(true);
+		const problems = validate();
+		const first = SECTION_ORDER.find((section) =>
+			Object.keys(problems).some((key) => SECTION_OF[key] === section),
+		);
+		if (first) {
+			scroller.current?.scrollTo({
+				y: Math.max(0, (sectionY.current[first] ?? 0) - 12),
+				animated: true,
+			});
+			return;
+		}
+		if (Object.keys(problems).length > 0) return;
 
 		setError(null);
-		update.mutate(payload, {
+		update.mutate(buildPayload(), {
 			onSuccess: () => {
 				toast.success("Profile saved.");
 				if (router.canGoBack()) router.back();
@@ -334,12 +455,21 @@ export default function EditOrganization() {
 				/>
 			) : (
 				<ScrollView
+					ref={scroller}
 					{...verticalScrollbar}
 					contentContainerStyle={{ paddingBottom: spacing[12] }}
 					keyboardShouldPersistTaps="handled"
 					automaticallyAdjustKeyboardInsets
 				>
 					<View style={[FORM, { gap: spacing[6] }]}>
+						{errorCount > 0 ? (
+							<Banner
+								tone="error"
+								title={`${errorCount} field${errorCount === 1 ? " needs" : "s need"} fixing before you can save`}
+								description="Each one is marked below."
+							/>
+						) : null}
+
 						{error || uploadError ? (
 							<Banner
 								tone="error"
@@ -387,11 +517,15 @@ export default function EditOrganization() {
 						</View>
 
 						{/* About ---------------------------------------------------- */}
-						<View>
+						<View onLayout={track("about")}>
 							<SectionTitle>About</SectionTitle>
 							<Surface>
 								<View style={row}>
-									<Field label="Organisation name" style={half}>
+									<Field
+										label="Organisation name"
+										error={fieldErrors.organizationName}
+										style={half}
+									>
 										<Input
 											value={form.organizationName}
 											onChangeText={(v) => set("organizationName", v)}
@@ -401,6 +535,7 @@ export default function EditOrganization() {
 									</Field>
 									<Field
 										label="Registration number"
+										error={fieldErrors.registrationNumber}
 										hint="A reviewer checks it against your upload."
 										style={half}
 									>
@@ -415,6 +550,7 @@ export default function EditOrganization() {
 								</View>
 								<Field
 									label="Short description"
+									error={fieldErrors.description}
 									hint="One or two lines. This is the first thing a volunteer reads."
 								>
 									<Input
@@ -426,7 +562,12 @@ export default function EditOrganization() {
 									/>
 								</Field>
 								<View style={row}>
-									<Field label="Mission" optional style={half}>
+									<Field
+										label="Mission"
+										error={fieldErrors.mission}
+										optional
+										style={half}
+									>
 										<Input
 											value={form.mission}
 											onChangeText={(v) => set("mission", v)}
@@ -435,7 +576,12 @@ export default function EditOrganization() {
 											style={textAreaStyle}
 										/>
 									</Field>
-									<Field label="Vision" optional style={half}>
+									<Field
+										label="Vision"
+										error={fieldErrors.vision}
+										optional
+										style={half}
+									>
 										<Input
 											value={form.vision}
 											onChangeText={(v) => set("vision", v)}
@@ -476,11 +622,11 @@ export default function EditOrganization() {
 						</View>
 
 						{/* Contact -------------------------------------------------- */}
-						<View>
+						<View onLayout={track("contact")}>
 							<SectionTitle>Contact</SectionTitle>
 							<Surface>
 								<View style={row}>
-									<Field label="Phone" style={half}>
+									<Field label="Phone" error={fieldErrors.phone} style={half}>
 										<Input
 											value={form.phone}
 											onChangeText={(v) => set("phone", v)}
@@ -488,7 +634,7 @@ export default function EditOrganization() {
 											style={[inputStyle, { maxWidth: 280 }]}
 										/>
 									</Field>
-									<Field label="Email" style={half}>
+									<Field label="Email" error={fieldErrors.email} style={half}>
 										<Input
 											value={form.email}
 											onChangeText={(v) => set("email", v)}
@@ -499,7 +645,12 @@ export default function EditOrganization() {
 										/>
 									</Field>
 								</View>
-								<Field label="Website" optional style={{ marginBottom: 0 }}>
+								<Field
+									label="Website"
+									error={fieldErrors.website}
+									optional
+									style={{ marginBottom: 0 }}
+								>
 									<Input
 										value={form.website}
 										onChangeText={(v) => set("website", v)}
@@ -514,10 +665,10 @@ export default function EditOrganization() {
 						</View>
 
 						{/* Location ------------------------------------------------- */}
-						<View>
+						<View onLayout={track("location")}>
 							<SectionTitle>Location</SectionTitle>
 							<Surface>
-								<Field label="Address">
+								<Field label="Address" error={fieldErrors.address}>
 									<Input
 										value={form.address}
 										onChangeText={(v) => set("address", v)}
@@ -541,9 +692,17 @@ export default function EditOrganization() {
 											: {}),
 									}}
 									onChange={(fields) => setForm((f) => ({ ...f, ...fields }))}
+									{...(fieldErrors.city ? { cityError: fieldErrors.city } : {})}
+									{...(fieldErrors.state
+										? { stateError: fieldErrors.state }
+										: {})}
 									detectLede="Puts you in “NGOs near me” for volunteers around you"
 								/>
-								<Field label="Pincode" style={{ marginBottom: 0 }}>
+								<Field
+									label="Pincode"
+									error={fieldErrors.pincode}
+									style={{ marginBottom: 0 }}
+								>
 									<Input
 										value={form.pincode}
 										onChangeText={(v) => set("pincode", v.replace(/\D/g, ""))}
@@ -556,12 +715,13 @@ export default function EditOrganization() {
 						</View>
 
 						{/* Organisation --------------------------------------------- */}
-						<View>
+						<View onLayout={track("organisation")}>
 							<SectionTitle>Organisation</SectionTitle>
 							<Surface>
 								<View style={{ flexDirection: "row", gap: spacing[4] }}>
 									<Field
 										label="Team size"
+										error={fieldErrors.teamSize}
 										optional
 										style={{ flex: 1, marginBottom: 0 }}
 									>
@@ -577,6 +737,7 @@ export default function EditOrganization() {
 									</Field>
 									<Field
 										label="Founded"
+										error={fieldErrors.foundingYear}
 										optional
 										style={{ flex: 1, marginBottom: 0 }}
 									>
@@ -595,7 +756,11 @@ export default function EditOrganization() {
 							</Surface>
 						</View>
 
-						<Button onPress={save} loading={update.isPending} disabled={busy}>
+						<Button
+							onPress={save}
+							loading={update.isPending}
+							disabled={busy || !!editBlocked}
+						>
 							Save changes
 						</Button>
 					</View>

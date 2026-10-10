@@ -64,6 +64,34 @@ const popperRule = `
 `;
 
 /**
+ * Reduced motion, for everything react-native-web animates in CSS.
+ *
+ * The JS animations read `useReducedMotion()` (`lib/motion.ts`), but RNW draws
+ * a `Modal`'s slide and fade - every sheet on a phone-width window - as CSS
+ * keyframes, which nothing in JS can reach. This flattens them when the OS
+ * asks. Two exemptions, both deliberate:
+ *
+ * - **Spinners.** An `ActivityIndicator` is a `role="progressbar"` whose child
+ *   spins in CSS; frozen, it reads as a hung page. A progress indicator is
+ *   the motion the setting allows.
+ * - **Form fields.** The autofill rule in `global.css` rides a 5000s
+ *   transition to outrun Chrome's repaint; collapsing it to nothing brings the
+ *   yellow fill back.
+ */
+const reducedMotionRule = `
+@media (prefers-reduced-motion: reduce) {
+  *:not([role="progressbar"] *):not(input):not(textarea):not(select),
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+`;
+
+/**
  * The app's scrollbar: thin, trackless, theme-aware.
  *
  * Two things to know before editing:
@@ -163,7 +191,7 @@ export function applyWebStyles(isDark: boolean) {
 		node.id = STYLE_ID;
 		document.head.appendChild(node);
 	}
-	const next = `${popperRule}${scrollbarRules(isDark)}`;
+	const next = `${popperRule}${reducedMotionRule}${scrollbarRules(isDark)}`;
 	// Assigning identical text would still trigger a style recalculation.
 	if (node.textContent !== next) node.textContent = next;
 }

@@ -365,6 +365,11 @@ function WebSheet({
 					onPress={onClose}
 					accessibilityRole="button"
 					accessibilityLabel="Dismiss"
+					// Out of the tab order: on the web it was the first stop in the
+					// dialog, an invisible full-screen "button" with no ring. Escape
+					// and the header's Close cover the keyboard; a screen reader
+					// still finds it.
+					focusable={false}
 					style={{
 						position: "absolute",
 						top: 0,
@@ -481,6 +486,7 @@ export function SheetHeader({
 					accessibilityRole="button"
 					accessibilityLabel="Close"
 					hitSlop={8}
+					{...focusable}
 					style={({ pressed }) => ({
 						width: 32,
 						height: 32,

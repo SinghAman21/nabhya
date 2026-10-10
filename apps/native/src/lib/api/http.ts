@@ -42,6 +42,20 @@ function clean(params?: Record<string, unknown>) {
 	);
 }
 
+/**
+ * The HTTP status of a failed request, or null when there was no response at
+ * all (offline, timed out, DNS) - the case a screen must not mistake for
+ * "signed out".
+ */
+export function apiErrorStatus(error: unknown): number | null {
+	if (typeof error === "object" && error !== null && "response" in error) {
+		const status = (error as { response?: { status?: unknown } }).response
+			?.status;
+		if (typeof status === "number") return status;
+	}
+	return null;
+}
+
 /** Pulls a readable message out of an axios error for toast/alert display. */
 export function apiErrorMessage(
 	error: unknown,

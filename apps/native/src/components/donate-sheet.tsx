@@ -1,19 +1,27 @@
-import { DONATION_PRESETS_MINOR, formatMinor } from "@nabhya/shared";
+import {
+	DONATION_PRESETS_MINOR,
+	formatMinor,
+	MIN_DONATION_MINOR,
+} from "@nabhya/shared";
 import { useQueryClient } from "@tanstack/react-query";
-import { Check } from "lucide-react-native";
+import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Platform, View } from "react-native";
+import { Platform } from "react-native";
+import { Tick } from "@/components/admin/data-table";
+import { ChoiceChips } from "@/components/choice-chips";
+import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
 import { Sheet } from "@/components/ui/sheet";
-import { Body, Caption, Label } from "@/components/ui/typography";
+import { Caption, Label } from "@/components/ui/typography";
 import { useCreateDonation } from "@/hooks/use-engagement";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { queryScopes } from "@/lib/api/query-keys";
+import { focusable } from "@/lib/focus";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
@@ -21,6 +29,15 @@ import { useAuthStore } from "@/store/auth-store";
  *
  * The amount is captured in rupees but sent as paise - integers only, so no
  * float rounding ever reaches the ledger.
+ *
+ * Open to signed-out visitors: the checkout endpoint is optional-auth and a
+ * guest gives a receipt email instead of an account. The NGO page used to send
+ * them to sign in first, which left this sheet's guest fields unreachable.
+ *
+ * Built from the form primitives (`ChoiceChips`, `Field`, `FieldError`, the
+ * shared tick) rather than its own hand-drawn checkbox and 12pt radii - the
+ * old checkbox drew `primary.main` as a border, which is a fill colour that
+ * fails contrast as a line.
  */
 interface RazorpayCheckout {
 	open: (options: Record<string, unknown>) => Promise<unknown>;
@@ -135,12 +152,17 @@ export function DonateSheet({
 	onClose: () => void;
 }) {
 	const { colors, spacing } = useTheme();
+	const inputStyle = useFieldInputStyle();
 	const email = useAuthStore((s) => s.email);
 	const { data: me } = useMe(!!email);
 	const queryClient = useQueryClient();
+	const router = useRouter();
 
-	const [amountMinor, setAmountMinor] = useState<number>(
-		DONATION_PRESETS_MINOR[1] ?? 100_000,
+	// A preset is chosen by its value; a typed amount replaces it. Clearing the
+	// typed amount leaves nothing chosen, rather than silently keeping the last
+	// number on the button.
+	const [preset, setPreset] = useState<string | null>(
+		String(DONATION_PRESETS_MINOR[1] ?? 100_000),
 	);
 	const [custom, setCustom] = useState("");
 	const [message, setMessage] = useState("");
@@ -151,15 +173,17 @@ export function DonateSheet({
 
 	const donate = useCreateDonation();
 
-	const inputStyle = {
-		borderWidth: 0,
-		borderRadius: 12,
-		backgroundColor: colors.background.tertiary,
-		paddingVertical: spacing[3.5],
-	} as const;
+	const amountMinor = custom
+		? Number(custom) * 100
+		: preset
+			? Number(preset)
+			: 0;
+	const tooSmall = amountMinor > 0 && amountMinor < MIN_DONATION_MINOR;
+	const canSubmit = amountMinor >= MIN_DONATION_MINOR;
 
 	const submit = () => {
 		setError(null);
+		if (!canSubmit) return;
 
 		if (!me && !guestEmail.trim()) {
 			setError("Enter an email so we can send your receipt.");
@@ -193,7 +217,7 @@ export function DonateSheet({
 					if (!checkout) {
 						toast.error(
 							Platform.OS === "web"
-								? "Razorpay's checkout script didn't load. Check your connection and try again."
+								? "Razorpay's checkout script didn't load. Check your connection and tap Donate to try again."
 								: "Donations open Razorpay's secure checkout, which is not available in this preview - use the dev client build instead.",
 						);
 						return;
@@ -220,9 +244,21 @@ export function DonateSheet({
 						// signed webhook moves a donation to COMPLETED, so the
 						// client's own success callback can only promise that it
 						// is being confirmed.
-						toast.success(
-							"Thank you - we're confirming your donation now. It will show in My Donations shortly.",
-						);
+						if (me?.roles.includes("volunteer")) {
+							toast.success(
+								"Thank you - we're confirming your donation now. It shows under Your giving, with a receipt, once it lands.",
+								{
+									label: "View",
+									onPress: () => router.push("/(volunteer)/donations"),
+								},
+							);
+						} else {
+							toast.success(
+								me
+									? "Thank you - we're confirming your donation now."
+									: `Thank you - we're confirming your donation now. The receipt goes to ${guestEmail.trim()}.`,
+							);
+						}
 					} catch (err: unknown) {
 						// User-cancelled checkouts land here too (react-native-razorpay
 						// rejects on dismiss, not just on failure) - there is no distinct
@@ -231,9 +267,14 @@ export function DonateSheet({
 							typeof err === "object" && err !== null && "description" in err
 								? String((err as { description?: unknown }).description)
 								: null;
+						// Razorpay's descriptions end without a stop ("Payment
+						// cancelled"), which ran straight into the next sentence.
+						const reason = (description || "Payment not completed").replace(
+							/[.\s]*$/,
+							".",
+						);
 						toast.error(
-							description ||
-								"Payment not completed. You can try again from My Donations.",
+							`${reason} Nothing was charged - tap Donate to try again.`,
 						);
 					}
 				},
@@ -250,8 +291,14 @@ export function DonateSheet({
 			subtitle={organizationName}
 			footer={
 				<>
-					<Button onPress={submit} loading={donate.isPending}>
-						Donate {formatMinor(amountMinor)}
+					<Button
+						onPress={submit}
+						loading={donate.isPending}
+						disabled={!canSubmit}
+					>
+						{canSubmit
+							? `Donate ${formatMinor(amountMinor)}`
+							: `Choose an amount (min ${formatMinor(MIN_DONATION_MINOR)})`}
 					</Button>
 					<Caption
 						color="quaternary"
@@ -263,142 +310,96 @@ export function DonateSheet({
 			}
 		>
 			<Label style={{ marginBottom: spacing[2] }}>Amount</Label>
-			<View
-				style={{
-					flexDirection: "row",
-					flexWrap: "wrap",
-					gap: spacing[2],
+			<ChoiceChips
+				label="Amount"
+				options={DONATION_PRESETS_MINOR.map((value) => ({
+					value: String(value),
+					label: formatMinor(value),
+				}))}
+				value={custom ? null : preset}
+				onChange={(value) => {
+					setCustom("");
+					setPreset(value);
 				}}
-			>
-				{DONATION_PRESETS_MINOR.map((preset) => {
-					const active = !custom && amountMinor === preset;
-					return (
-						<Pressable
-							key={preset}
-							onPress={() => {
-								setCustom("");
-								setAmountMinor(preset);
-							}}
-							accessibilityRole="radio"
-							accessibilityState={{ checked: active }}
-							style={{
-								paddingHorizontal: spacing[4],
-								paddingVertical: spacing[2.5],
-								borderRadius: 12,
-								backgroundColor: active
-									? colors.primary.main
-									: colors.background.tertiary,
-							}}
-						>
-							<Body
-								weight={active ? "bold" : "normal"}
-								color={
-									active ? (colors.primary.contrast as string) : "secondary"
-								}
-							>
-								{formatMinor(preset)}
-							</Body>
-						</Pressable>
-					);
-				})}
-			</View>
-
-			<Label style={{ marginTop: spacing[4], marginBottom: spacing[1.5] }}>
-				Or enter an amount (₹)
-			</Label>
-			<Input
-				placeholder="e.g. 750"
-				value={custom}
-				onChangeText={(v) => {
-					const digits = v.replace(/\D/g, "");
-					setCustom(digits);
-					if (digits) setAmountMinor(Number(digits) * 100);
-				}}
-				keyboardType="number-pad"
-				style={[inputStyle, { maxWidth: 180 }]}
 			/>
+
+			<Field
+				label="Or enter an amount (₹)"
+				hint={`Minimum ${formatMinor(MIN_DONATION_MINOR)}`}
+				{...(tooSmall
+					? { error: `The minimum is ${formatMinor(MIN_DONATION_MINOR)}.` }
+					: {})}
+				style={{ marginTop: spacing[4] }}
+			>
+				<Input
+					placeholder="e.g. 750"
+					value={custom}
+					onChangeText={(v) => {
+						const digits = v.replace(/\D/g, "").replace(/^0+/, "");
+						setCustom(digits);
+						if (!digits) setPreset(null);
+					}}
+					keyboardType="number-pad"
+					accessibilityLabel="Amount in rupees"
+					style={[inputStyle, { maxWidth: 180 }]}
+				/>
+			</Field>
 
 			{!me && (
 				<>
-					<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-						Your name <Caption color="tertiary">(optional)</Caption>
-					</Label>
-					<Input
-						placeholder="Aditi Sharma"
-						value={guestName}
-						onChangeText={setGuestName}
-						style={inputStyle}
-					/>
-
-					<Label style={{ marginTop: spacing[4], marginBottom: spacing[1.5] }}>
-						Email for receipt
-					</Label>
-					<Input
-						placeholder="you@example.com"
-						value={guestEmail}
-						onChangeText={setGuestEmail}
-						keyboardType="email-address"
-						autoCapitalize="none"
-						style={inputStyle}
-					/>
+					<Field label="Your name" optional>
+						<Input
+							placeholder="Aditi Sharma"
+							value={guestName}
+							onChangeText={setGuestName}
+							autoComplete="name"
+							style={inputStyle}
+						/>
+					</Field>
+					<Field label="Email for receipt">
+						<Input
+							placeholder="you@example.com"
+							value={guestEmail}
+							onChangeText={setGuestEmail}
+							keyboardType="email-address"
+							autoCapitalize="none"
+							autoComplete="email"
+							style={inputStyle}
+						/>
+					</Field>
 				</>
 			)}
 
-			<Label style={{ marginTop: spacing[5], marginBottom: spacing[1.5] }}>
-				Message <Caption color="tertiary">(optional)</Caption>
-			</Label>
-			<Input
-				placeholder="Anything you'd like the NGO to know"
-				value={message}
-				onChangeText={setMessage}
-				multiline
-				style={{ ...inputStyle, minHeight: 88, textAlignVertical: "top" }}
-			/>
+			<Field label="Message" optional>
+				<Input
+					placeholder="Anything you'd like the NGO to know"
+					value={message}
+					onChangeText={setMessage}
+					multiline
+					style={{ ...inputStyle, minHeight: 88, textAlignVertical: "top" }}
+				/>
+			</Field>
 
 			<Pressable
 				onPress={() => setAnonymous((v) => !v)}
 				accessibilityRole="checkbox"
 				accessibilityState={{ checked: isAnonymous }}
+				accessibilityLabel="Donate anonymously"
+				{...focusable}
 				style={{
 					flexDirection: "row",
 					alignItems: "center",
 					gap: spacing[3],
-					marginTop: spacing[4],
+					minHeight: 44,
 				}}
 			>
-				<View
-					style={{
-						width: 22,
-						height: 22,
-						borderRadius: 6,
-						borderWidth: 2,
-						borderColor: isAnonymous ? colors.primary.main : colors.border.dark,
-						backgroundColor: isAnonymous ? colors.primary.main : "transparent",
-						alignItems: "center",
-						justifyContent: "center",
-					}}
-				>
-					{isAnonymous && (
-						<Check
-							size={14}
-							color={colors.primary.contrast as string}
-							strokeWidth={3}
-						/>
-					)}
-				</View>
+				<Tick checked={isAnonymous} label="Donate anonymously" />
 				<Caption color="secondary" style={{ flex: 1 }}>
 					Donate anonymously - your name is hidden from the NGO
 				</Caption>
 			</Pressable>
 
-			{error && (
-				<Caption
-					color={colors.error.main as string}
-					style={{ marginTop: spacing[3] }}
-				>
-					{error}
-				</Caption>
-			)}
+			<FieldError message={error} />
 		</Sheet>
 	);
 }

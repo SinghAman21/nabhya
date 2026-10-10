@@ -45,6 +45,7 @@ import {
 import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { confirm } from "@/components/ui/overlay";
 import { Caption } from "@/components/ui/typography";
 import { useSignOut } from "@/hooks/use-auth";
 import { useUpdateMyOrganization } from "@/hooks/use-organization";
@@ -54,7 +55,11 @@ import { useImageUpload } from "@/hooks/use-upload";
 import { apiErrorMessage } from "@/lib/api";
 import { verticalScrollbar } from "@/lib/scroll";
 import { useAuthStore } from "@/store/auth-store";
-import { type OrgDraft, useOnboardingStore } from "@/store/onboarding-store";
+import {
+	draftHasContent,
+	type OrgDraft,
+	useOnboardingStore,
+} from "@/store/onboarding-store";
 
 const STEPS = ["Organisation", "Location", "Causes", "Team", "Review"] as const;
 
@@ -193,6 +198,16 @@ export default function OrgOnboarding() {
 		step4TeamSchema,
 	];
 
+	// Set when a step is opened from the review screen's Edit, so Continue
+	// validates that one step and returns to review instead of walking
+	// through every step after it.
+	const [returnToReview, setReturnToReview] = useState(false);
+	const reviewStep = STEPS.length - 1;
+	const editFromReview = (target: number) => {
+		setReturnToReview(true);
+		setStep(target);
+	};
+
 	const advance = () => {
 		setSubmitError(null);
 		const schema = stepSchema[step];
@@ -204,10 +219,16 @@ export default function OrgOnboarding() {
 			}
 		}
 		setErrors({});
+		if (returnToReview) {
+			setReturnToReview(false);
+			setStep(reviewStep);
+			return;
+		}
 		setStep(Math.min(step + 1, STEPS.length - 1));
 	};
 
 	const back = () => {
+		setReturnToReview(false);
 		setErrors({});
 		setSubmitError(null);
 		setStep(Math.max(step - 1, 0));
@@ -221,6 +242,7 @@ export default function OrgOnboarding() {
 		if (!result.ok) {
 			// Review has no fields, so an error here belongs to an earlier step.
 			setErrors(result.errors);
+			setReturnToReview(true);
 			setStep(stepOwning(Object.keys(result.errors)[0]));
 			return;
 		}
@@ -384,6 +406,23 @@ export default function OrgOnboarding() {
 		);
 	}
 
+	// Signing out clears the draft (`useSignOut`), so a filled-in form asks
+	// first - otherwise one stray tap throws away the whole registration.
+	const signOutFromWizard = async () => {
+		if (draftHasContent(draft)) {
+			const ok = await confirm({
+				title: "Sign out and discard your draft?",
+				message:
+					"Everything you've entered for your NGO is cleared from this device.",
+				confirmLabel: "Sign out",
+				cancelLabel: "Keep my draft",
+				destructive: true,
+			});
+			if (!ok) return;
+		}
+		signOut.mutate();
+	};
+
 	const copy = COPY[step] ?? COPY[0];
 	const isReview = step === STEPS.length - 1;
 
@@ -394,56 +433,63 @@ export default function OrgOnboarding() {
 			title={copy.title}
 			lede={copy.lede}
 			error={submitError}
-			{...(step > 0 ? { onBack: back } : {})}
+			// Withheld mid-submit: stepping back while "Create organisation" is
+			// in flight would leave the review behind a request still landing.
+			{...(step > 0 && !complete.isPending ? { onBack: back } : {})}
 			exit={
 				step === 0 ? (
 					<TextAction
 						label={
 							signOut.isPending ? "Signing out…" : "Not your NGO? Sign out"
 						}
-						onPress={() => signOut.mutate()}
+						onPress={signOutFromWizard}
 						disabled={signOut.isPending}
 					/>
 				) : null
 			}
+			// Not on the review: by then it has been read four times, and under
+			// the list on a phone it is one more block between the reader and
+			// the button. Same rule in the volunteer wizard.
 			aside={
-				<WizardAside
-					title="What happens with this"
-					points={[
-						{
-							icon: FileCheck2,
-							title: "A person reads it",
-							body: "Your name and registration number are checked against the certificate you upload next. Get them exactly as printed.",
-						},
-						{
-							icon: ShieldCheck,
-							title: "Private until verified",
-							body: "Nothing you create is public before a reviewer approves you, and your address and documents are never public at all.",
-						},
-						{
-							icon: MapPin,
-							title: "How volunteers find you",
-							body: "City, causes and coordinates are what put your needs in someone's feed. Skipping them is why an NGO sees no volunteers.",
-						},
-						{
-							icon: Users,
-							title: "You can invite your team after",
-							body: "The account you're using becomes the owner. Add coordinators from Team once setup is done.",
-						},
-					]}
-				/>
+				isReview ? undefined : (
+					<WizardAside
+						title="What happens with this"
+						points={[
+							{
+								icon: FileCheck2,
+								title: "A person reads it",
+								body: "Your name and registration number are checked against the certificate you upload next. Get them exactly as printed.",
+							},
+							{
+								icon: ShieldCheck,
+								title: "Private until verified",
+								body: "Nothing you create is public before a reviewer approves you, and your address and documents are never public at all.",
+							},
+							{
+								icon: MapPin,
+								title: "How volunteers find you",
+								body: "City, causes and coordinates are what put your needs in someone's feed. Skipping them is why an NGO sees no volunteers.",
+							},
+							{
+								icon: Users,
+								title: "You can invite your team after",
+								body: "The account you're using becomes the owner. Add coordinators from Team once setup is done.",
+							},
+						]}
+					/>
+				)
 			}
 			footer={
 				<WizardFooter
-					{...(step > 0 ? { onBack: back } : {})}
-					primaryLabel={isReview ? "Create organisation" : "Continue"}
+					primaryLabel={
+						isReview
+							? "Create organisation"
+							: returnToReview
+								? "Back to review"
+								: "Continue"
+					}
 					onPrimary={isReview ? submit : advance}
 					loading={complete.isPending}
-					{...(step === 2 && draft.categoryIds.length === 0
-						? {
-								note: "No causes means no interest matching - you can still continue.",
-							}
-						: {})}
 				/>
 			}
 		>
@@ -473,7 +519,7 @@ export default function OrgOnboarding() {
 			{isReview && (
 				<ReviewStep
 					draft={draft}
-					onEdit={setStep}
+					onEdit={editFromReview}
 					causeNames={(categories.data ?? [])
 						.filter((category) => draft.categoryIds.includes(category.id))
 						.map((category) => category.name)
@@ -727,7 +773,7 @@ function CausesStep({
 					/>
 					<Caption color="quaternary" style={{ marginTop: spacing[2] }}>
 						{draft.categoryIds.length === 0
-							? `Pick up to ${MAX_CAUSES}. Volunteers who follow a cause see NGOs that work on it.`
+							? `Pick up to ${MAX_CAUSES}, or skip for now. Volunteers who follow a cause see NGOs that work on it - none means no interest matching.`
 							: draft.categoryIds.length >= MAX_CAUSES
 								? `${MAX_CAUSES} of ${MAX_CAUSES} chosen - deselect one to swap.`
 								: `${draft.categoryIds.length} of ${MAX_CAUSES} chosen`}
@@ -774,7 +820,6 @@ function TeamStep({
 	merge: (fields: Partial<OrgDraft>) => void;
 	errors: FieldErrors;
 }) {
-	const { spacing } = useTheme();
 	const inputStyle = useFieldInputStyle();
 
 	return (
@@ -808,13 +853,8 @@ function TeamStep({
 				/>
 			</FieldPair>
 
-			<View style={{ flexDirection: "row", gap: spacing[3] }}>
-				<Field
-					label="Team size"
-					optional
-					error={errors.teamSize}
-					style={{ flex: 1 }}
-				>
+			<FieldPair tight>
+				<Field label="Team size" optional error={errors.teamSize}>
 					<Input
 						placeholder="e.g. 25"
 						value={draft.teamSize}
@@ -826,12 +866,7 @@ function TeamStep({
 						style={inputStyle}
 					/>
 				</Field>
-				<Field
-					label="Founded in"
-					optional
-					error={errors.foundingYear}
-					style={{ flex: 1 }}
-				>
+				<Field label="Founded in" optional error={errors.foundingYear}>
 					<Input
 						placeholder="e.g. 2015"
 						value={draft.foundingYear}
@@ -844,7 +879,7 @@ function TeamStep({
 						style={inputStyle}
 					/>
 				</Field>
-			</View>
+			</FieldPair>
 
 			<Field
 				label="Website"
@@ -870,6 +905,14 @@ function TeamStep({
 /* -------------------------------------------------------------------------- */
 /* Step 5 - review                                                            */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Why a logo or banner can read "not added" when one was picked: the previews
+ * are local `file://` URIs the draft deliberately does not persist (see
+ * `onboarding-store.ts`), so closing the app drops them. The review cannot tell
+ * "never chosen" from "lost", so it says both rather than looking like a bug.
+ */
+const IMAGE_NOT_ADDED = "Not added - images need picking again after a restart";
 
 function ReviewStep({
 	draft,
@@ -911,7 +954,7 @@ function ReviewStep({
 					},
 					{ label: "Pincode", value: draft.pincode, onEdit: () => onEdit(1) },
 					{
-						label: "Coordinates",
+						label: "Location pin",
 						value:
 							draft.latitude !== undefined && draft.longitude !== undefined
 								? "Saved - you'll appear in “near me”"
@@ -938,12 +981,12 @@ function ReviewStep({
 				rows={[
 					{
 						label: "Logo",
-						value: draft.logoPreview ? "Chosen" : "Not added",
+						value: draft.logoPreview ? "Chosen" : IMAGE_NOT_ADDED,
 						onEdit: () => onEdit(3),
 					},
 					{
 						label: "Banner",
-						value: draft.coverPreview ? "Chosen" : "Not added",
+						value: draft.coverPreview ? "Chosen" : IMAGE_NOT_ADDED,
 						onEdit: () => onEdit(3),
 					},
 					{

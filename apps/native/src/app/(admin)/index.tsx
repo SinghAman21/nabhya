@@ -119,7 +119,14 @@ export default function AdminOverviewScreen() {
 						? overview.organizations.pending +
 							overview.organizations.underReview
 						: 0,
-					go: () => router.push("/(admin)/organizations"),
+					// Filtered to exactly what this tile counts. It opened the bare
+					// list, which defaulted to Pending alone - so the tile and the
+					// list it led to disagreed whenever an NGO was under review.
+					go: () =>
+						router.push({
+							pathname: "/(admin)/organizations",
+							params: { verification: "AWAITING" },
+						}),
 				},
 				{
 					label: "NGO documents",
@@ -187,6 +194,7 @@ export default function AdminOverviewScreen() {
 								values: points.map((point) => point.volunteers),
 							},
 						]}
+						emptyNote={`No signups in the last ${window} days`}
 						totals={{
 							organizations: trends.data?.totals.organizations ?? 0,
 							volunteers: trends.data?.totals.volunteers ?? 0,
@@ -202,7 +210,12 @@ export default function AdminOverviewScreen() {
 				{trends.isLoading ? (
 					<LoadingState />
 				) : trends.isError ? (
-					<Caption color="tertiary">Couldn't load activity.</Caption>
+					// The same request as the chart above, so the same retry: a
+					// sentence with no way out left the reviewer reloading the page.
+					<ErrorState
+						message={apiErrorMessage(trends.error)}
+						onRetry={() => trends.refetch()}
+					/>
 				) : (
 					<TrendChart
 						labels={labels}
@@ -218,6 +231,7 @@ export default function AdminOverviewScreen() {
 								values: points.map((point) => point.applications),
 							},
 						]}
+						emptyNote={`No events or applications in the last ${window} days`}
 						totals={{
 							events: trends.data?.totals.events ?? 0,
 							applications: trends.data?.totals.applications ?? 0,
@@ -236,7 +250,8 @@ export default function AdminOverviewScreen() {
 			<PipelineBar
 				stages={[
 					{ label: "Pending", value: overview.organizations.pending },
-					{ label: "In review", value: overview.organizations.underReview },
+					// "Under review", as the pills and the NGO filter say it.
+					{ label: "Under review", value: overview.organizations.underReview },
 					{ label: "Verified", value: overview.organizations.verified },
 					{
 						label: "Rejected",

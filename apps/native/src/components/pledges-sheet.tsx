@@ -16,16 +16,17 @@ import {
 } from "@/components/screen-shell";
 import {
 	humanizeStatus,
+	pledgeStatusLabel,
 	pledgeTone,
 	StatusPill,
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { toast } from "@/components/ui/overlay";
+import { confirm, toast } from "@/components/ui/overlay";
 import { Sheet, SheetFlatList } from "@/components/ui/sheet";
 import { Body, BodySmall, Caption } from "@/components/ui/typography";
-import { useMyTeamRole } from "@/hooks/use-my-team-role";
 import { useReviewPledge } from "@/hooks/use-needs";
+import { useOrgAccess } from "@/hooks/use-org-access";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage, orgNeedsApi, queryKeys } from "@/lib/api";
 import { formatProgress, formatRelative } from "@/lib/format";
@@ -46,6 +47,10 @@ const FILTERS: Array<{ value: StatusFilter; label: string }> = [
  *
  * Accepting advances the need's `fulfilledQuantity` by the pledged amount and
  * auto-closes it once the target is met; completing marks the handover done.
+ *
+ * The note to the volunteer lives on the row it is for. It used to be one
+ * field above the list, "sent with your next decision" - a mode error: a
+ * pickup address typed for one person went to whoever was tapped next.
  */
 export function PledgesSheet({
 	need,
@@ -55,9 +60,7 @@ export function PledgesSheet({
 	onClose: () => void;
 }) {
 	const { spacing } = useTheme();
-	const inputStyle = useFieldInputStyle();
 	const [filter, setFilter] = useState<StatusFilter>("PENDING");
-	const [note, setNote] = useState("");
 
 	// Paged and filtered by the server - filtering page 1 here hid every
 	// pending pledge past the twentieth.
@@ -70,30 +73,42 @@ export function PledgesSheet({
 	});
 	const review = useReviewPledge(need?.id ?? "");
 
-	// Accepting, declining or completing is `people.review`. Allowed while the
-	// role is still resolving; the server still 403s anything denied.
-	const teamRole = useMyTeamRole();
-	const canReview = teamRole.isLoading ? true : teamRole.can("people.review");
+	// Accepting, declining or completing is `people.review` - plus suspension,
+	// which the role check alone missed.
+	const reviewBlocked = useOrgAccess().blocked("people.review");
 
 	const close = () => {
-		setNote("");
 		setFilter("PENDING");
 		onClose();
 	};
 
-	const decide = (pledge: NeedPledge, status: Decision) => {
+	const decide = async (pledge: NeedPledge, status: Decision, note: string) => {
+		const who = pledge.user.fullName ?? "the volunteer";
+		if (status === "REJECTED") {
+			const ok = await confirm({
+				title: `Decline ${who}'s offer?`,
+				message: note
+					? "They'll be told it isn't needed this time, with your note."
+					: "They'll be told it isn't needed this time.",
+				confirmLabel: "Decline",
+				cancelLabel: "Keep pending",
+			});
+			if (!ok) return;
+		}
 		review.mutate(
 			{
 				pledgeId: pledge.id,
 				input: { status, reviewNote: note.trim() || undefined },
 			},
 			{
-				onSuccess: () => {
-					setNote("");
+				onSuccess: () =>
 					toast.success(
-						status === "ACCEPTED" ? "Pledge accepted." : "Pledge declined.",
-					);
-				},
+						status === "ACCEPTED"
+							? `Offer from ${who} accepted. They have been notified.`
+							: status === "COMPLETED"
+								? `Marked received from ${who}.`
+								: `Offer from ${who} declined.`,
+					),
 				onError: (error) => toast.error(apiErrorMessage(error)),
 			},
 		);
@@ -112,20 +127,6 @@ export function PledgesSheet({
 				</Caption>
 			)}
 			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
-			{(filter === "PENDING" || filter === "ACCEPTED") && (
-				<Field
-					label="Note to the volunteer"
-					optional
-					hint="Sent with your next decision - pickup address, timing, a thank-you."
-				>
-					<Input
-						placeholder="e.g. Drop off at our Andheri office, Mon–Fri 10–5"
-						value={note}
-						onChangeText={setNote}
-						style={inputStyle}
-					/>
-				</Field>
-			)}
 		</View>
 	);
 
@@ -181,14 +182,13 @@ export function PledgesSheet({
 						<PledgeRow
 							pledge={item}
 							unit={need?.unit ?? null}
-							canReview={canReview}
-							busy={review.isPending}
+							reviewBlocked={reviewBlocked}
 							deciding={
 								review.isPending && review.variables?.pledgeId === item.id
 									? review.variables.input.status
 									: null
 							}
-							onDecide={(status) => decide(item, status)}
+							onDecide={(status, note) => decide(item, status, note)}
 						/>
 					)}
 				/>
@@ -200,20 +200,25 @@ export function PledgesSheet({
 function PledgeRow({
 	pledge,
 	unit,
-	canReview,
-	busy,
+	reviewBlocked,
 	deciding,
 	onDecide,
 }: {
 	pledge: NeedPledge;
 	unit: string | null;
-	/** `people.review` - false only once the role has resolved as denied. */
-	canReview: boolean;
-	busy: boolean;
+	/** Why `people.review` is denied, or null when it is allowed. */
+	reviewBlocked: string | null;
+	/** Which decision is in flight for *this* row, if any. */
 	deciding: Decision | null;
-	onDecide: (status: Decision) => void;
+	onDecide: (status: Decision, note: string) => void;
 }) {
 	const { colors, spacing } = useTheme();
+	const inputStyle = useFieldInputStyle();
+	const [note, setNote] = useState("");
+	const [noteOpen, setNoteOpen] = useState(false);
+	const busy = deciding !== null;
+	const canReview = !reviewBlocked;
+	const open = pledge.status === "PENDING" || pledge.status === "ACCEPTED";
 	const name = pledge.user.fullName ?? "Unnamed volunteer";
 	const verified = pledge.user.verificationStatus === "VERIFIED";
 	// City only: contact details wait for acceptance (`ContactActions`).
@@ -239,11 +244,7 @@ function PledgeRow({
 					</Caption>
 				</View>
 				<StatusPill
-					label={
-						pledge.status === "COMPLETED"
-							? "Received"
-							: humanizeStatus(pledge.status)
-					}
+					label={pledgeStatusLabel(pledge.status)}
 					tone={pledgeTone(pledge.status)}
 				/>
 			</View>
@@ -283,12 +284,35 @@ function PledgeRow({
 				/>
 			)}
 
-			{!canReview &&
-			pledge.status !== "REJECTED" &&
-			pledge.status !== "COMPLETED" ? (
+			{open && reviewBlocked ? (
 				<Caption color="tertiary" style={{ marginTop: spacing[4] }}>
-					Your role doesn't allow reviews. Ask an owner or admin.
+					{reviewBlocked}
 				</Caption>
+			) : open && noteOpen ? (
+				<Field
+					label={`Note to ${name}`}
+					optional
+					hint="Sent with your decision - pickup address, timing, a thank-you."
+					style={{ marginTop: spacing[4], marginBottom: 0 }}
+				>
+					<Input
+						placeholder="e.g. Drop off at our Andheri office, Mon–Fri 10–5"
+						value={note}
+						onChangeText={setNote}
+						style={inputStyle}
+						autoFocus
+					/>
+				</Field>
+			) : open ? (
+				<Button
+					variant="link"
+					size="sm"
+					onPress={() => setNoteOpen(true)}
+					style={{ alignSelf: "flex-start", marginTop: spacing[2] }}
+					accessibilityLabel={`Add a note for ${name}`}
+				>
+					Add a note
+				</Button>
 			) : null}
 			{pledge.status === "PENDING" && (
 				<View
@@ -302,7 +326,7 @@ function PledgeRow({
 						style={{ flex: 1 }}
 						disabled={busy || !canReview}
 						loading={deciding === "ACCEPTED"}
-						onPress={() => onDecide("ACCEPTED")}
+						onPress={() => onDecide("ACCEPTED", note)}
 						accessibilityLabel={`Accept offer from ${name}`}
 					>
 						Accept
@@ -312,7 +336,7 @@ function PledgeRow({
 						style={{ flex: 1 }}
 						disabled={busy || !canReview}
 						loading={deciding === "REJECTED"}
-						onPress={() => onDecide("REJECTED")}
+						onPress={() => onDecide("REJECTED", note)}
 						accessibilityLabel={`Decline offer from ${name}`}
 					>
 						Decline
@@ -324,7 +348,7 @@ function PledgeRow({
 					<Button
 						disabled={busy || !canReview}
 						loading={deciding === "COMPLETED"}
-						onPress={() => onDecide("COMPLETED")}
+						onPress={() => onDecide("COMPLETED", note)}
 						accessibilityLabel={`Mark ${name}'s items as received`}
 					>
 						Mark received

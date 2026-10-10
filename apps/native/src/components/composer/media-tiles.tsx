@@ -2,7 +2,8 @@ import { Image } from "expo-image";
 import { AlertTriangle, Check, ImagePlus, Play, X } from "lucide-react-native";
 import { View } from "react-native";
 import { Pressable } from "@/components/ui/pressable";
-import { Caption } from "@/components/ui/typography";
+import { Caption, Micro } from "@/components/ui/typography";
+import { mediaColors, withOpacity } from "@/constants/design-system";
 import { useTheme } from "@/hooks/use-theme";
 import { type ComposerMedia, formatDuration } from "@/lib/feed-media";
 import { focusable } from "@/lib/focus";
@@ -18,6 +19,15 @@ import { focusable } from "@/lib/focus";
 
 /** The tile's edge, and the width the strip lays out on. */
 export const TILE = 88;
+
+/*
+ * Everything drawn over the thumbnail comes from `mediaColors`, not the theme:
+ * the ground here is the picture, so a chip that flipped to white in light
+ * mode would vanish on a bright photo. The chips use the shared scrim; the
+ * upload veil is lighter on purpose - it dims the picture without hiding it
+ * while the bar below reports progress - and there is no token at that weight.
+ */
+const UPLOAD_VEIL = withOpacity(mediaColors.stage, 0.42);
 
 /* -------------------------------------------------------------------------- */
 /* Tiles                                                                      */
@@ -114,12 +124,14 @@ export function MediaTile({
 					borderRadius: 999,
 					alignItems: "center",
 					justifyContent: "center",
-					backgroundColor: "rgba(17,17,17,0.66)",
+					backgroundColor: mediaColors.scrim,
 				}}
 			>
-				<Caption weight="bold" style={{ color: "#FFFFFF", fontSize: 10 }}>
+				{/* Pinned at 1x: the chip is a fixed 18pt circle, and a scaled
+				    numeral would burst it long before it became easier to read. */}
+				<Micro weight="bold" color={mediaColors.ink} maxFontSizeMultiplier={1}>
 					{ordinal}
-				</Caption>
+				</Micro>
 			</View>
 
 			{!locked && (
@@ -127,7 +139,9 @@ export function MediaTile({
 					onPress={onRemove}
 					accessibilityRole="button"
 					accessibilityLabel={`Remove ${file.kind === "VIDEO" ? "video" : "photo"} ${ordinal}`}
-					hitSlop={6}
+					// 22pt drawn, 44pt touched: the badge stays small over the
+					// photo, the finger target does not.
+					hitSlop={11}
 					style={{
 						position: "absolute",
 						top: 4,
@@ -137,10 +151,10 @@ export function MediaTile({
 						borderRadius: 11,
 						alignItems: "center",
 						justifyContent: "center",
-						backgroundColor: "rgba(17,17,17,0.66)",
+						backgroundColor: mediaColors.scrim,
 					}}
 				>
-					<X size={12} color="#FFFFFF" strokeWidth={2.6} />
+					<X size={12} color={mediaColors.ink} strokeWidth={2.6} />
 				</Pressable>
 			)}
 
@@ -154,7 +168,7 @@ export function MediaTile({
 							right: 0,
 							bottom: 0,
 							left: 0,
-							backgroundColor: "rgba(17,17,17,0.42)",
+							backgroundColor: UPLOAD_VEIL,
 						}}
 					/>
 					<View
@@ -165,7 +179,7 @@ export function MediaTile({
 							bottom: 0,
 							left: 0,
 							height: 4,
-							backgroundColor: "rgba(255,255,255,0.28)",
+							backgroundColor: mediaColors.track,
 						}}
 					>
 						<View
@@ -194,7 +208,11 @@ export function MediaTile({
 						backgroundColor: colors.success.main,
 					}}
 				>
-					<Check size={12} color="#FFFFFF" strokeWidth={3} />
+					<Check
+						size={12}
+						color={colors.success.contrast as string}
+						strokeWidth={3}
+					/>
 				</View>
 			)}
 
@@ -213,7 +231,9 @@ export function MediaTile({
 						backgroundColor: colors.error.main,
 					}}
 				>
-					<AlertTriangle size={11} color="#FFFFFF" strokeWidth={2.6} />
+					{/* `error` has no `contrast` token; this badge sits on the
+					    picture, so it takes the media ink like the chips above. */}
+					<AlertTriangle size={11} color={mediaColors.ink} strokeWidth={2.6} />
 				</View>
 			)}
 		</View>

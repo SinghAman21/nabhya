@@ -1,14 +1,15 @@
+import { useState } from "react";
 import { useWindowDimensions, View } from "react-native";
-import { Field } from "@/components/form-field";
 import type { Fact } from "@/components/screen-shell";
 import { FactList, SectionTitle, Surface } from "@/components/screen-shell";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Body, Caption } from "@/components/ui/typography";
+import { Body, Caption, Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 
 /**
  * Pieces shared by the NGO and user dossier sheets: the section wrapper, the
- * fact table, and the reason field that gates every destructive decision.
+ * fact table, and the reason step that gates every destructive decision.
  */
 
 /**
@@ -98,45 +99,98 @@ export function FactGroup({ facts }: { facts: Fact[] }) {
 }
 
 /**
- * The reason box above the decision buttons. Errors render under the field,
- * never in an alert - the reviewer is already looking here.
+ * The "why?" step of a decision that needs a reason - reject, suspend - drawn
+ * in the drawer's pinned footer, in place of the buttons, once one is pressed.
+ *
+ * The reason used to be a field at the very end of the dossier body, below the
+ * timeline, posts and documents, while the buttons were pinned in the footer.
+ * Pressing Reject with it empty set an error on a field nobody could see, so
+ * the press looked dead and got pressed again. Asking at the moment of the
+ * press, where the press happened, removes the gap: the field cannot be
+ * off-screen, and the consequence sits beside the box. It is not a sheet of
+ * its own because the dossier is already a `Drawer` - a modal inside a modal
+ * is the trap `app-shell`'s note on nesting describes.
+ *
+ * The text survives a failed request (only success unmounts the step), so a
+ * 500 never costs the reviewer what they wrote.
  */
-export function ReasonField({
-	value,
-	onChangeText,
+export function ReasonStep({
+	title,
+	consequence,
 	placeholder,
-	requiredFor,
-	error,
+	confirmLabel,
+	pending,
+	onCancel,
+	onConfirm,
 }: {
-	value: string;
-	onChangeText: (text: string) => void;
+	/** "Why reject Asha Foundation?" */
+	title: string;
+	/** What happens on confirm, and who reads the reason. */
+	consequence: string;
 	placeholder: string;
-	/** "reject or suspend" - completes "Required to …". */
-	requiredFor: string;
-	error: string | null;
+	confirmLabel: string;
+	pending: boolean;
+	onCancel: () => void;
+	onConfirm: (reason: string) => void;
 }) {
-	const { colors } = useTheme();
+	const { colors, spacing } = useTheme();
+	const [text, setText] = useState("");
+	const [error, setError] = useState<string | null>(null);
+
+	const submit = () => {
+		const reason = text.trim();
+		if (!reason) {
+			setError("Add a reason - it is sent with the decision.");
+			return;
+		}
+		setError(null);
+		onConfirm(reason);
+	};
 
 	return (
-		<Field
-			label="Reason"
-			hint={`Required to ${requiredFor}`}
-			{...(error ? { error } : {})}
-		>
+		<View style={{ gap: spacing[2] }}>
+			<Label weight="semibold">{title}</Label>
+			<Caption color="tertiary">{consequence}</Caption>
 			<Input
 				placeholder={placeholder}
-				value={value}
-				onChangeText={onChangeText}
+				value={text}
+				onChangeText={(value) => {
+					setText(value);
+					if (error && value.trim()) setError(null);
+				}}
 				multiline
+				autoFocus
 				maxLength={500}
 				accessibilityLabel="Reason"
 				{...(error ? { accessibilityHint: error } : {})}
 				style={{
-					minHeight: 88,
+					minHeight: 72,
 					textAlignVertical: "top",
 					...(error ? { borderColor: colors.error.border } : {}),
 				}}
 			/>
-		</Field>
+			{error ? (
+				<Caption
+					color={colors.error.ink as string}
+					accessibilityLiveRegion="polite"
+				>
+					{error}
+				</Caption>
+			) : null}
+			<View
+				style={{
+					flexDirection: "row",
+					justifyContent: "flex-end",
+					gap: spacing[2],
+				}}
+			>
+				<Button variant="outline" onPress={onCancel} disabled={pending}>
+					Cancel
+				</Button>
+				<Button variant="destructive" onPress={submit} loading={pending}>
+					{confirmLabel}
+				</Button>
+			</View>
+		</View>
 	);
 }

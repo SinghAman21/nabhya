@@ -21,6 +21,7 @@ import {
 } from "@/components/screen-shell";
 import {
 	humanizeStatus,
+	pledgeStatusLabel,
 	pledgeTone,
 	StatusPill,
 } from "@/components/status-pill";
@@ -35,6 +36,13 @@ import { apiErrorMessage } from "@/lib/api";
 import { formatDateTime, formatProgress } from "@/lib/format";
 import { verticalScrollbar } from "@/lib/scroll";
 import { useAuthStore } from "@/store/auth-store";
+
+/** Back row, body and footer share one column - see `events/[id].tsx`. */
+const DESKTOP_COLUMN = {
+	maxWidth: 720,
+	width: "100%",
+	alignSelf: "center",
+} as const;
 
 /**
  * One need or offer - the page a shared link and a "pledge accepted"
@@ -112,7 +120,10 @@ export default function NeedDetail() {
 		if (pledge) {
 			const copy =
 				pledge.status === "ACCEPTED"
-					? ["They said yes", "The NGO will contact you to arrange it."]
+					? [
+							"They said yes",
+							"The NGO has your phone number and will message you to arrange the handover.",
+						]
 					: pledge.status === "COMPLETED"
 						? ["Received - thank you", "The NGO marked your help as delivered."]
 						: pledge.status === "REJECTED"
@@ -130,11 +141,13 @@ export default function NeedDetail() {
 						<Label weight="semibold" numberOfLines={1}>
 							{copy[0]}
 						</Label>
-						<Caption color="tertiary" numberOfLines={1}>
+						<Caption color="tertiary" numberOfLines={2}>
 							{copy[1]}
 						</Caption>
 					</View>
-					{(pledge.status === "PENDING" || pledge.status === "ACCEPTED") && (
+					{/* Only a pending offer can be withdrawn (the server refuses the
+					    rest); once accepted, changing it is a conversation with the NGO. */}
+					{pledge.status === "PENDING" && (
 						<Button
 							variant="outline"
 							size="sm"
@@ -158,7 +171,7 @@ export default function NeedDetail() {
 		} else {
 			footer = (
 				<Button onPress={startPledge}>
-					{!email ? "Sign in to help" : isWant ? "I can help" : "I'd like this"}
+					{!email ? "Sign in to help" : isWant ? "I can help" : "Claim this"}
 				</Button>
 			);
 		}
@@ -170,13 +183,22 @@ export default function NeedDetail() {
 				style={{
 					flexDirection: "row",
 					alignItems: "center",
+					justifyContent: "center",
 					minHeight: 40,
-					paddingHorizontal: gutter,
+					paddingHorizontal: isDesktop ? 0 : gutter,
 					paddingTop: insets.top + spacing[2],
 					paddingBottom: spacing[2],
 				}}
 			>
-				<BackButton fallbackHref="/" />
+				<View
+					style={
+						isDesktop
+							? { ...DESKTOP_COLUMN, paddingHorizontal: gutter }
+							: { flex: 1 }
+					}
+				>
+					<BackButton fallbackHref="/" />
+				</View>
 			</View>
 
 			{query.isLoading ? (
@@ -197,9 +219,7 @@ export default function NeedDetail() {
 							paddingHorizontal: gutter,
 							paddingTop: spacing[2],
 							paddingBottom: spacing[8],
-							...(isDesktop
-								? { maxWidth: 720, width: "100%", alignSelf: "center" }
-								: {}),
+							...(isDesktop ? DESKTOP_COLUMN : {}),
 						}}
 					>
 						<Caption color="secondary" style={{ marginBottom: spacing[1] }}>
@@ -224,11 +244,7 @@ export default function NeedDetail() {
 								)}
 								{pledge && (
 									<StatusPill
-										label={`Your offer: ${
-											pledge.status === "COMPLETED"
-												? "Received"
-												: humanizeStatus(pledge.status)
-										}`}
+										label={`Your offer: ${pledgeStatusLabel(pledge.status)}`}
 										tone={pledgeTone(pledge.status)}
 									/>
 								)}
@@ -307,13 +323,7 @@ export default function NeedDetail() {
 								backgroundColor: colors.background.card,
 							}}
 						>
-							<View
-								style={
-									isDesktop
-										? { maxWidth: 720, width: "100%", alignSelf: "center" }
-										: undefined
-								}
-							>
+							<View style={isDesktop ? DESKTOP_COLUMN : undefined}>
 								{footer}
 							</View>
 						</View>

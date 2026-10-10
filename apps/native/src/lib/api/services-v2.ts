@@ -1,5 +1,7 @@
 import type {
 	BroadcastInput,
+	BulkAttendanceInput,
+	BulkResult,
 	CertificateVerification,
 	CreateDonationInput,
 	DonationCheckout,
@@ -9,6 +11,7 @@ import type {
 	MarkAttendanceInput,
 	MarkReadInput,
 	NotificationQuery,
+	OrgDonationQuery,
 	OrgReviewQuery,
 	Paginated,
 	PaginationQuery,
@@ -110,6 +113,8 @@ export const certificatesApi = {
 		http.post<MyCertificate>(CERTIFICATES.issue(eventId, applicationId), input),
 	revoke: (id: string, input: RevokeCertificateInput) =>
 		http.patch<{ id: string }>(CERTIFICATES.revoke(id), input),
+	bulkAttendance: (eventId: string, input: BulkAttendanceInput) =>
+		http.post<BulkResult>(CERTIFICATES.bulkAttendance(eventId), input),
 };
 
 export const donationsApi = {
@@ -118,7 +123,7 @@ export const donationsApi = {
 	listMine: (query: Partial<DonationQuery>) =>
 		http.getPage<MyDonation>(DONATIONS.MINE, query),
 	receipt: (id: string) => http.get<DonationReceipt>(DONATIONS.receipt(id)),
-	listForOrg: (query: Partial<DonationQuery>) =>
+	listForOrg: (query: Partial<OrgDonationQuery>) =>
 		http.get<Paginated<OrgDonation> & { stats: DonationStats }>(
 			DONATIONS.ORG,
 			query,

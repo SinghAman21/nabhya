@@ -1,12 +1,9 @@
 import { useRouter } from "expo-router";
 import { CalendarCheck } from "lucide-react-native";
-import { useState } from "react";
 import { View } from "react-native";
-import { EventFeed } from "@/components/event-feed";
 import { PAGE_SIZE, PagedList, usePagedQuery } from "@/components/paged-list";
 import {
 	EmptyState,
-	FilterChips,
 	Screen,
 	ScreenHeader,
 	Surface,
@@ -21,40 +18,22 @@ import { Caption, H5 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { eventsApi, queryKeys } from "@/lib/api";
 import { formatDateRange } from "@/lib/format";
+import { READING_COLUMN } from "@/lib/reading-column";
 import type { ApplicationListItem } from "@/lib/types";
 
-type Tab = "browse" | "applications";
-
-const TABS: Array<{ value: Tab; label: string }> = [
-	{ value: "browse", label: "Browse" },
-	{ value: "applications", label: "My applications" },
-];
-
 /**
- * Events for a volunteer: the public list to browse, and the ones they have
- * applied to. Not on the tab bar - reached from Activity and Profile - so the
- * header carries a back button.
+ * Every event the volunteer has applied to, paged - the full list behind
+ * Activity's first page. Not on the tab bar: reached from Profile and from
+ * Activity's Events filter, so the header carries a back button.
+ *
+ * This was `(volunteer)/events.tsx`, which resolved to `/events` - the same
+ * URL as the public `events/index.tsx` - so every "/events" push was
+ * ambiguous and nothing linked here at all. Browsing events is the public
+ * page's job; this screen is only the volunteer's own applications.
  */
-export default function VolunteerEvents() {
-	const [tab, setTab] = useState<Tab>("browse");
-
-	return (
-		<Screen>
-			<ScreenHeader back title="Events" />
-
-			<FilterChips options={TABS} value={tab} onChange={setTab} />
-
-			{tab === "browse" ? (
-				<EventFeed />
-			) : (
-				<MyApplications onBrowse={() => setTab("browse")} />
-			)}
-		</Screen>
-	);
-}
-
-function MyApplications({ onBrowse }: { onBrowse: () => void }) {
+export default function MyApplications() {
 	const router = useRouter();
+	const onBrowse = () => router.push("/events");
 
 	const { query, items, loadMore } = usePagedQuery({
 		queryKey: queryKeys.myApplications({ limit: PAGE_SIZE }),
@@ -62,31 +41,42 @@ function MyApplications({ onBrowse }: { onBrowse: () => void }) {
 	});
 
 	return (
-		<PagedList
-			query={query}
-			items={items}
-			loadMore={loadMore}
-			loadingLabel="Loading your applications"
-			keyExtractor={(item) => item.id}
-			empty={
-				<EmptyState
-					icon={CalendarCheck}
-					title="No applications yet"
-					description="Apply to an event and you can follow its status here - pending, accepted, or not this time."
-					action={
-						<Button size="sm" variant="outline" onPress={onBrowse}>
-							Browse events
-						</Button>
-					}
-				/>
-			}
-			renderItem={(item) => (
-				<ApplicationCard
-					application={item}
-					onPress={() => router.push(`/events/${item.event.id}`)}
-				/>
-			)}
-		/>
+		<Screen style={READING_COLUMN}>
+			<ScreenHeader
+				back
+				title="Applications"
+				action={
+					<Button size="sm" variant="outline" onPress={onBrowse}>
+						Find events
+					</Button>
+				}
+			/>
+			<PagedList
+				query={query}
+				items={items}
+				loadMore={loadMore}
+				loadingLabel="Loading your applications"
+				keyExtractor={(item) => item.id}
+				empty={
+					<EmptyState
+						icon={CalendarCheck}
+						title="No applications yet"
+						description="Apply to an event and you can follow its status here - pending, accepted, or not this time."
+						action={
+							<Button size="sm" variant="outline" onPress={onBrowse}>
+								Browse events
+							</Button>
+						}
+					/>
+				}
+				renderItem={(item) => (
+					<ApplicationCard
+						application={item}
+						onPress={() => router.push(`/events/${item.event.id}`)}
+					/>
+				)}
+			/>
+		</Screen>
 	);
 }
 
@@ -106,7 +96,7 @@ function ApplicationCard({
 			? { text: "Waiting for the NGO to review", ink: colors.warning.ink }
 			: application.status === "ACCEPTED"
 				? {
-						text: "You're in - turn up and get marked present",
+						text: "You're in - the organiser will message you the details",
 						ink: colors.success.ink,
 					}
 				: null;

@@ -5,14 +5,22 @@ import {
 	ScrollView,
 	useWindowDimensions,
 	View,
+	type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Body, Caption, H1, Label } from "@/components/ui/typography";
+import { Body, Caption, Wordmark } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { verticalScrollbar } from "@/lib/scroll";
 
 const BREAKPOINT = 768;
-const BRAND_BG = "#0A0A0A";
+
+/**
+ * The row's height on the web, so the form column's `ScrollView` has a real
+ * height to scroll within rather than growing to its content. Same idiom as
+ * `WizardShell` and `(ngo)/_layout.tsx`.
+ */
+const WEB_VIEWPORT: ViewStyle =
+	Platform.OS === "web" ? ({ height: "100dvh" } as unknown as ViewStyle) : {};
 
 interface AuthSplitLayoutProps {
 	children: ReactNode;
@@ -52,20 +60,18 @@ export function AuthSplitLayout({
 
 	if (isWide) {
 		return (
-			<View style={{ flex: 1, flexDirection: "row" }}>
+			<View style={{ flex: 1, flexDirection: "row", ...WEB_VIEWPORT }}>
 				<View
 					style={{
 						flex: 1,
-						backgroundColor: BRAND_BG,
+						backgroundColor: colors.brand.surface,
 						justifyContent: "center",
 						padding: spacing[16],
 					}}
 				>
-					<H1 color="#FFFFFF" style={{ letterSpacing: 3 }}>
-						NABHYA
-					</H1>
+					<Wordmark color={colors.brand.ink}>NABHYA</Wordmark>
 					<Body
-						color="#A3A3A3"
+						color={colors.brand.muted}
 						style={{ maxWidth: 360, marginTop: spacing[4] }}
 					>
 						Verified NGOs and the volunteers who show up for them. Find what's
@@ -75,30 +81,40 @@ export function AuthSplitLayout({
 					<View
 						style={{
 							height: 1,
-							backgroundColor: "#222222",
+							backgroundColor: colors.brand.rule,
 							marginTop: spacing[10],
 						}}
 					/>
 
-					<Caption color="#8F8F8F" style={{ marginTop: spacing[4] }}>
+					<Caption color={colors.brand.faint} style={{ marginTop: spacing[4] }}>
 						For volunteers and NGOs across India
 					</Caption>
 				</View>
 
-				<View
-					style={{
-						flex: 1,
-						backgroundColor: colors.background.warm,
+				{/*
+				 * A scroller, not a centred box. The form column was a plain
+				 * `View` - the desktop branch with no scroll container that
+				 * AGENTS.md warns about - so sign-up with its error block and the
+				 * Google button, in a 700pt laptop window or at 125% zoom, ran
+				 * off the bottom with no way to reach Create account. `flexGrow`
+				 * keeps it centred whenever it does fit.
+				 */}
+				<ScrollView
+					style={{ flex: 1, backgroundColor: colors.background.warm }}
+					contentContainerStyle={{
+						flexGrow: 1,
 						justifyContent: "center",
 						alignItems: "center",
 						padding: spacing[12],
 					}}
+					keyboardShouldPersistTaps="handled"
+					{...verticalScrollbar}
 				>
 					<View style={{ width: "100%", maxWidth: 400 }}>
 						{children}
 						{alternate}
 					</View>
-				</View>
+				</ScrollView>
 			</View>
 		);
 	}
@@ -107,7 +123,7 @@ export function AuthSplitLayout({
 		<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
 			<View
 				style={{
-					backgroundColor: BRAND_BG,
+					backgroundColor: colors.brand.surface,
 					paddingHorizontal: spacing[5],
 					paddingTop: insets.top + spacing[3],
 					paddingBottom: spacing[4],
@@ -127,9 +143,9 @@ export function AuthSplitLayout({
 							backgroundColor: colors.primary.main,
 						}}
 					/>
-					<Label weight="bold" color="#FFFFFF" style={{ letterSpacing: 2 }}>
+					<Wordmark size="sm" color={colors.brand.ink}>
 						NABHYA
-					</Label>
+					</Wordmark>
 				</View>
 			</View>
 

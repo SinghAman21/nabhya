@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { withAppShell } from "@/components/app-shell";
 import {
 	Banner,
+	LoadingState,
 	Screen,
 	ScreenHeader,
 	SectionTitle,
@@ -20,11 +21,25 @@ import {
 	SelfieCapture,
 	type SelfieCaptureValue,
 } from "@/components/verification/selfie-capture";
-import { useUploadUserDocument } from "@/hooks/use-documents";
+import {
+	useIdentityStatus,
+	useUploadUserDocument,
+} from "@/hooks/use-documents";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { apiErrorMessage } from "@/lib/api";
 import { verticalScrollbar } from "@/lib/scroll";
+
+/**
+ * Two capture cards sit side by side on desktop, so this page gets more than
+ * the 720 reading column - but not the top bar's 1180, where each camera card
+ * stretched to 560 and the pinned Submit became a bar the width of the window.
+ */
+const READING_WIDE = {
+	width: "100%",
+	maxWidth: 960,
+	alignSelf: "center",
+} as const;
 
 /**
  * Volunteer identity verification: capture a government ID and a liveness
@@ -53,6 +68,10 @@ function VerifyIdentity() {
 	const insets = useSafeAreaInsets();
 	const router = useRouter();
 	const upload = useUploadUserDocument();
+	const identity = useIdentityStatus();
+	// A pending submission hides the capture form until asked for: offering it
+	// unprompted read as "your upload was lost, do it again".
+	const [replacing, setReplacing] = useState(false);
 
 	const [idValue, setIdValue] = useState<IdCaptureValue | null>(null);
 	const [selfieValue, setSelfieValue] = useState<SelfieCaptureValue | null>(
@@ -85,6 +104,7 @@ function VerifyIdentity() {
 				},
 			});
 			setSubmitted(true);
+			identity.refetch();
 		} catch (e) {
 			setError(
 				apiErrorMessage(
@@ -97,13 +117,74 @@ function VerifyIdentity() {
 		}
 	};
 
+	const leave = () => {
+		if (router.canGoBack()) router.back();
+		else router.replace("/(volunteer)/profile");
+	};
+
+	const footerBar = {
+		paddingTop: spacing[3],
+		paddingBottom: insets.bottom + spacing[3],
+		borderTopWidth: 1,
+		borderTopColor: colors.border.hairline,
+		gap: spacing[2],
+	} as const;
+
+	const header = (
+		<ScreenHeader
+			back
+			title="Get verified"
+			subtitle="A government ID and a quick selfie"
+		/>
+	);
+
+	if (identity.loading && !submitted) {
+		return (
+			<Screen style={READING_WIDE}>
+				{header}
+				<LoadingState />
+			</Screen>
+		);
+	}
+
+	// Nothing to capture: say where things stand and offer the way out. The
+	// row in Profile opens this screen whatever the state, so a verified
+	// volunteer used to land on "Why verify?" and two empty camera cards.
+	if (
+		!submitted &&
+		(identity.state === "verified" ||
+			(identity.state === "review" && !replacing))
+	) {
+		const verified = identity.state === "verified";
+		return (
+			<Screen style={READING_WIDE}>
+				{header}
+				<View style={{ flex: 1 }}>
+					<Banner
+						tone={verified ? "success" : "info"}
+						title={verified ? "You're verified" : "Submitted - under review"}
+						description={
+							verified
+								? "NGOs see the verified badge on your applications and offers. There's nothing else to do here."
+								: "A reviewer is checking your ID and selfie, usually within a day or two. You'll get a notification in Activity with the result."
+						}
+					/>
+				</View>
+				<View style={footerBar}>
+					<Button onPress={leave}>Done</Button>
+					{verified ? null : (
+						<Button variant="ghost" onPress={() => setReplacing(true)}>
+							Replace my photos
+						</Button>
+					)}
+				</View>
+			</Screen>
+		);
+	}
+
 	return (
-		<Screen>
-			<ScreenHeader
-				back
-				title="Get verified"
-				subtitle="A government ID and a quick selfie"
-			/>
+		<Screen style={READING_WIDE}>
+			{header}
 
 			<ScrollView
 				{...verticalScrollbar}
@@ -116,6 +197,16 @@ function VerifyIdentity() {
 							tone="success"
 							title="Submitted for review"
 							description="Your ID and selfie are in. A reviewer usually gets to them within a day or two, and the result shows on your profile."
+						/>
+					) : identity.state === "rejected" ? (
+						<Banner
+							tone="error"
+							title="Your last submission needs another look"
+							description={
+								identity.remarks
+									? `Reviewer's note: ${identity.remarks} Retake whichever photo it mentions and submit again.`
+									: "Retake your ID and selfie - make sure the text is sharp and your face is well lit - and submit again."
+							}
 						/>
 					) : (
 						<Banner
@@ -167,15 +258,7 @@ function VerifyIdentity() {
 				</View>
 			</ScrollView>
 
-			<View
-				style={{
-					paddingTop: spacing[3],
-					paddingBottom: insets.bottom + spacing[3],
-					borderTopWidth: 1,
-					borderTopColor: colors.border.hairline,
-					gap: spacing[2],
-				}}
-			>
+			<View style={footerBar}>
 				{/* The failure sits directly above the control that caused it, so it
 				    is still on screen while the photo is retaken. */}
 				{error ? (
@@ -189,7 +272,7 @@ function VerifyIdentity() {
 				) : null}
 
 				{submitted ? (
-					<Button onPress={() => router.back()}>Done</Button>
+					<Button onPress={leave}>Done</Button>
 				) : (
 					<Button onPress={submit} disabled={!canSubmit} loading={submitting}>
 						Submit for review

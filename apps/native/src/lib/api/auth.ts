@@ -66,15 +66,96 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 	});
 }
 
+/**
+ * Sign-up either signs the person straight in or, when the Supabase project
+ * requires email confirmation, creates the account with no session at all.
+ * The second case is not a failure - the account exists and a retry would say
+ * "already registered" - so it is a result the screen renders, not a throw.
+ */
+export type SignUpResult =
+	| ({ status: "signed-in" } & AuthResponse)
+	| { status: "confirm-email"; email: string };
+
+/** Where Supabase's emailed links (confirm, reset) send the person back to. */
+function authRedirect(path: string): string {
+	return Platform.OS === "web"
+		? `${window.location.origin}/${path}`
+		: Linking.createURL(path);
+}
+
 export class AuthService {
-	async signup(input: SignUpInput): Promise<AuthResponse> {
+	async signup(input: SignUpInput): Promise<SignUpResult> {
 		const result = await supabase.auth.signUp({
 			email: input.email,
 			password: input.password,
-			options: { data: { name: input.name } },
+			options: {
+				data: { name: input.name },
+				emailRedirectTo: authRedirect("login"),
+			},
 		});
 		this.throwIfSupabaseError(result.error);
-		return this.getAuthenticatedUser(result.data.session?.access_token);
+		if (!result.data.session) {
+			return { status: "confirm-email", email: input.email };
+		}
+		const signedIn = await this.getAuthenticatedUser(
+			result.data.session.access_token,
+		);
+		return { status: "signed-in", ...signedIn };
+	}
+
+	/** Sends the sign-up confirmation email again. */
+	async resendConfirmation(email: string): Promise<void> {
+		const { error } = await supabase.auth.resend({
+			type: "signup",
+			email,
+			options: { emailRedirectTo: authRedirect("login") },
+		});
+		this.throwIfSupabaseError(error);
+	}
+
+	/**
+	 * Emails a password-reset link. Supabase answers the same way whether or
+	 * not the address has an account (anything else is an enumeration oracle),
+	 * so the screen must not claim the account exists either.
+	 */
+	async requestPasswordReset(email: string): Promise<void> {
+		const { error } = await supabase.auth.resetPasswordForEmail(email, {
+			redirectTo: authRedirect("reset-password"),
+		});
+		this.throwIfSupabaseError(error);
+	}
+
+	/**
+	 * Picks up the recovery session the reset link carries. Web: Supabase has
+	 * already parsed it out of the address bar (`detectSessionInUrl`), so the
+	 * session simply exists. Native: the deep link brings the tokens in its
+	 * fragment, the same shape as the Google redirect, and they are set here.
+	 * Returns whether a session is now available to change the password on.
+	 */
+	async startPasswordRecovery(url: string | null): Promise<boolean> {
+		if (Platform.OS !== "web" && url) {
+			const params = this.parseRedirectParams(url);
+			if (params.error) {
+				throw new Error(params.error_description ?? params.error);
+			}
+			if (params.access_token && params.refresh_token) {
+				const session = await supabase.auth.setSession({
+					access_token: params.access_token,
+					refresh_token: params.refresh_token,
+				});
+				this.throwIfSupabaseError(session.error);
+			}
+		}
+		const { data } = await supabase.auth.getSession();
+		return !!data.session;
+	}
+
+	/** Sets a new password on the recovery session, then signs in with it. */
+	async updatePassword(password: string): Promise<AuthResponse> {
+		const { error } = await supabase.auth.updateUser({ password });
+		this.throwIfSupabaseError(error);
+		const { data } = await supabase.auth.getSession();
+		return this.getAuthenticatedUser(data.session?.access_token);
 	}
 
 	async login(input: LoginInput): Promise<AuthResponse> {

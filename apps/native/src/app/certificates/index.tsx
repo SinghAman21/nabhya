@@ -11,18 +11,25 @@ import {
 import { StatusPill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/overlay";
-import { Pressable } from "@/components/ui/pressable";
 import { Caption, H5 } from "@/components/ui/typography";
 import { useCertificatePdf } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage, certificatesApi, queryKeys } from "@/lib/api";
-import { focusable } from "@/lib/focus";
 import { formatDate } from "@/lib/format";
+import { READING_COLUMN } from "@/lib/reading-column";
+import { publicUrl, shareLink } from "@/lib/share-link";
 import type { MyCertificate } from "@/lib/types";
 
 /**
  * Every certificate the volunteer has earned. Each card carries the event, the
- * NGO, the public code (which is what an employer checks), and a PDF download.
+ * NGO, the public code (which is what an employer checks), and two ways to hand
+ * it on: **Share link** (the public verification page, which anyone can open
+ * without an account) and the PDF.
+ *
+ * The card opens that verification page too. It used to be reachable only by
+ * tapping "Code ABC123" in grey caption type, which read as a label rather than
+ * a control - so nobody found the one thing that makes a certificate worth
+ * having: proof someone else can check.
  */
 export default function Certificates() {
 	const { colors, spacing } = useTheme();
@@ -33,6 +40,12 @@ export default function Certificates() {
 		queryKey: queryKeys.certificates({ limit: PAGE_SIZE }),
 		fetchPage: (page) => certificatesApi.listMine({ page, limit: PAGE_SIZE }),
 	});
+
+	const share = (certificate: MyCertificate) =>
+		shareLink({
+			message: `My volunteering certificate for ${certificate.event.title} with ${certificate.organization.organizationName} - verify it on Nabhya (code ${certificate.code}).`,
+			url: publicUrl(`/certificates/${certificate.code}`),
+		});
 
 	const download = (certificate: MyCertificate) => {
 		pdf.mutate(certificate.id, {
@@ -46,11 +59,11 @@ export default function Certificates() {
 	};
 
 	return (
-		<Screen>
+		<Screen style={READING_COLUMN}>
 			<ScreenHeader
 				back
 				title="Certificates"
-				subtitle="Each one can be checked by anyone using its code."
+				subtitle="Share the link - anyone can check it, no account needed."
 			/>
 
 			<PagedList
@@ -76,8 +89,57 @@ export default function Certificates() {
 				}
 				renderItem={(item) => {
 					const busy = pdf.isPending && pdf.variables === item.id;
+					// The actions ride in `footer`, outside the card's press target:
+					// a button inside a button is invalid on the web.
+					const actions = (
+						<View
+							style={{
+								flexDirection: "row",
+								alignItems: "center",
+								justifyContent: "space-between",
+								gap: spacing[3],
+								marginTop: spacing[3],
+								paddingTop: spacing[3],
+								borderTopWidth: 1,
+								borderTopColor: colors.border.hairline,
+							}}
+						>
+							<Caption
+								color="quaternary"
+								selectable
+								numberOfLines={1}
+								style={{ flex: 1, minWidth: 0 }}
+							>
+								Code {item.code}
+							</Caption>
+							{!item.revokedAt && (
+								<View style={{ flexDirection: "row", gap: spacing[2] }}>
+									<Button
+										size="sm"
+										variant="outline"
+										onPress={() => share(item)}
+										accessibilityLabel={`Share the verification link for ${item.event.title}`}
+									>
+										Share link
+									</Button>
+									<Button
+										size="sm"
+										variant="outline"
+										onPress={() => download(item)}
+										loading={busy}
+										accessibilityLabel={`Download PDF for ${item.event.title}`}
+									>
+										PDF
+									</Button>
+								</View>
+							)}
+						</View>
+					);
 					return (
-						<Surface>
+						<Surface
+							onPress={() => router.push(`/certificates/${item.code}`)}
+							footer={actions}
+						>
 							<View
 								style={{
 									flexDirection: "row",
@@ -107,40 +169,6 @@ export default function Certificates() {
 									{item.note}
 								</Caption>
 							)}
-
-							<View
-								style={{
-									flexDirection: "row",
-									alignItems: "center",
-									justifyContent: "space-between",
-									gap: spacing[3],
-									marginTop: spacing[3],
-									paddingTop: spacing[3],
-									borderTopWidth: 1,
-									borderTopColor: colors.border.hairline,
-								}}
-							>
-								<Pressable
-									onPress={() => router.push(`/certificates/${item.code}`)}
-									hitSlop={8}
-									accessibilityRole="button"
-									accessibilityLabel={`Verify certificate ${item.code}`}
-									{...focusable}
-								>
-									<Caption color="quaternary">Code {item.code}</Caption>
-								</Pressable>
-								{!item.revokedAt && (
-									<Button
-										size="sm"
-										variant="outline"
-										onPress={() => download(item)}
-										loading={busy}
-										accessibilityLabel={`Download PDF for ${item.event.title}`}
-									>
-										Download PDF
-									</Button>
-								)}
-							</View>
 						</Surface>
 					);
 				}}

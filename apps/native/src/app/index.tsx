@@ -1,8 +1,10 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, View } from "react-native";
+import { ErrorState } from "@/components/screen-shell";
 import { useOnboardingStatus } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
+import { apiErrorStatus } from "@/lib/api";
 import { authService } from "@/lib/api/auth";
 import { takePendingInvite } from "@/lib/pending-invite";
 import { useAuthStore } from "@/store/auth-store";
@@ -60,9 +62,17 @@ export default function Index() {
 
 	const {
 		data: status,
-		isLoading,
 		isError,
+		error,
+		refetch,
+		isRefetching,
 	} = useOnboardingStatus(!!email && webSessionChecked);
+	// Only a rejected session means "sign in again". Offline, a timeout or a
+	// 500 used to land a signed-in person on the login form with no word of
+	// why - they would sign in again and hit the same wall.
+	const errorStatus = isError ? apiErrorStatus(error) : null;
+	const signedOutByServer = errorStatus === 401 || errorStatus === 403;
+	const unreachable = isError && !signedOutByServer;
 
 	// Supabase access tokens are short-lived (an hour) while the refresh token
 	// in storage is long-lived - mint a fresh one on boot so a reload never
@@ -92,12 +102,14 @@ export default function Index() {
 			return;
 		}
 
-		// A failed status call means the token is gone or the account is
-		// suspended; the axios interceptor has already signed the user out.
-		if (isError) {
+		// A 401/403 means the token is gone or the account is suspended; the
+		// axios interceptor has already signed the user out. Anything else is
+		// shown below with a retry, not mistaken for a sign-out.
+		if (signedOutByServer) {
 			router.replace("/(auth)/login");
 			return;
 		}
+		if (isError) return;
 
 		if (!status) return;
 
@@ -123,6 +135,7 @@ export default function Index() {
 		email,
 		status,
 		isError,
+		signedOutByServer,
 		router,
 		webSessionChecked,
 		pendingInvite,
@@ -138,8 +151,19 @@ export default function Index() {
 				justifyContent: "center",
 			}}
 		>
-			{isLoading && (
-				<ActivityIndicator size="small" color={colors.primary.main as string} />
+			{unreachable ? (
+				<ErrorState
+					message="Couldn't reach Nabhya. Check your connection, then try again."
+					onRetry={() => refetch()}
+				/>
+			) : (
+				// Until a route is chosen - including the session and invite checks
+				// before the status call starts - so the screen is never blank.
+				<ActivityIndicator
+					size="small"
+					color={colors.primary.ink as string}
+					accessibilityLabel={isRefetching ? "Retrying" : "Loading"}
+				/>
 			)}
 		</View>
 	);

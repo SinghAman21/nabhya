@@ -15,6 +15,7 @@ import type {
 	NearbyOrganization,
 	OrgTeamMember,
 	PublicOrganization,
+	PublicOrganizationDetail,
 	PublicTeamMember,
 	TeamInvite,
 	TeamListQuery,
@@ -27,7 +28,7 @@ export const orgDirectoryApi = {
 		query: Partial<PaginationQuery & { search?: string; city?: string }>,
 	) => http.getPage<PublicOrganization>(ORGANIZATIONS.LIST, query),
 	detail: (id: string) =>
-		http.get<PublicOrganization>(ORGANIZATIONS.detail(id)),
+		http.get<PublicOrganizationDetail>(ORGANIZATIONS.detail(id)),
 	nearby: (query: NearbyQuery) =>
 		http.getPage<NearbyOrganization>(PUBLISHING.NEARBY, query),
 };

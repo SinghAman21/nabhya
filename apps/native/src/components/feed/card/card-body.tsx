@@ -22,8 +22,8 @@ import { CardKicker } from "./card-meta";
  * - **An event indents.** Its date sits in a 38pt left column with everything
  *   else beside it. No other kind has a left column.
  * - **A story leads with its picture** and sets its title a step larger.
- * - **A need ends with its gauge**, so "how far along" and the action are read
- *   together.
+ * - **A need ends with its facts block** - remainder, bar, drop-off place and
+ *   deadline in one grey inset - with the action directly beneath it.
  * - **An update is just words** - which is what makes the other three legible
  *   as *not* that.
  *
@@ -46,7 +46,7 @@ function cardLayout(item: FeedItem): CardLayout {
 }
 
 /** Collapsed line budget per layout. This is what bounds the card's height. */
-const CLAMP_LINES = { story: 5, other: 3 } as const;
+const CLAMP_LINES = { story: 5, need: 2, other: 3 } as const;
 /**
  * Roughly how many characters fit in a clamped line at this ramp step. Used
  * only to decide whether to *offer* "Read more" - over-offering it on a body
@@ -158,7 +158,14 @@ export function CardBody({
 	const { title, text, media } = resolveBody(item);
 	const layout = cardLayout(item);
 
-	const clamp = layout === "story" ? CLAMP_LINES.story : CLAMP_LINES.other;
+	// A need's two lines: its facts block below already says how many, where
+	// and by when, so the prose is context, not the substance.
+	const clamp =
+		layout === "story"
+			? CLAMP_LINES.story
+			: layout === "need"
+				? CLAMP_LINES.need
+				: CLAMP_LINES.other;
 	const expandable = text.length > clamp * CHARS_PER_LINE;
 
 	const kicker = <CardKicker item={item} />;

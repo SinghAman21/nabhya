@@ -33,6 +33,14 @@ function usePagedAdminList<Q extends object, T>(
 	queryKey: readonly unknown[],
 	fetcher: (query: Partial<Q>) => Promise<Paginated<T>>,
 	query: Partial<Q>,
+	/**
+	 * True for the console's directories, whose filters and sort re-key the
+	 * query: the old rows stay up, dimmed by `ConsoleList`, until the new ones
+	 * land, instead of the table collapsing to a spinner on every header press.
+	 * False for the per-record timelines, where the previous key is a different
+	 * NGO's history and must never be shown under this one's name.
+	 */
+	keepPrevious = false,
 ) {
 	const {
 		query: result,
@@ -43,6 +51,7 @@ function usePagedAdminList<Q extends object, T>(
 		queryKey,
 		fetchPage: (page) =>
 			fetcher({ ...query, page, limit: PAGE_SIZE } as Partial<Q>),
+		keepPrevious,
 	});
 
 	return {
@@ -58,11 +67,17 @@ export function useAdminOrganizationsPaged(query: Partial<AdminOrgQuery> = {}) {
 		queryKeys.adminOrganizations(query),
 		adminApi.organizations,
 		query,
+		true,
 	);
 }
 
 export function useAdminUsersPaged(query: Partial<AdminUserQuery> = {}) {
-	return usePagedAdminList(queryKeys.adminUsers(query), adminApi.users, query);
+	return usePagedAdminList(
+		queryKeys.adminUsers(query),
+		adminApi.users,
+		query,
+		true,
+	);
 }
 
 export function useOrgDocumentQueuePaged(
@@ -72,6 +87,7 @@ export function useOrgDocumentQueuePaged(
 		queryKeys.adminOrgDocuments(query),
 		adminApi.orgDocuments,
 		query,
+		true,
 	);
 }
 
@@ -82,6 +98,7 @@ export function useUserDocumentQueuePaged(
 		queryKeys.adminUserDocuments(query),
 		adminApi.userDocuments,
 		query,
+		true,
 	);
 }
 
@@ -123,5 +140,6 @@ export function useAuditLogsPaged(query: Partial<AuditLogQuery> = {}) {
 		queryKeys.adminAuditLogs(query),
 		adminApi.auditLogs,
 		query,
+		true,
 	);
 }

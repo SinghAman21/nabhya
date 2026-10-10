@@ -1,4 +1,4 @@
-import type { AdminOrgSort, SortDir } from "@nabhya/shared";
+import type { AdminOrgSort, AdminOrgVerificationFilter } from "@nabhya/shared";
 import { Building2 } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
@@ -16,10 +16,15 @@ import {
 	StatusPill,
 	verificationTone,
 } from "@/components/status-pill";
+import { Button } from "@/components/ui/button";
 import { Body, Caption } from "@/components/ui/typography";
 import { useAdminOrganizationsPaged } from "@/hooks/use-admin-lists";
+import {
+	useParamSearch,
+	useParamSort,
+	useParamState,
+} from "@/hooks/use-admin-params";
 import { useTheme } from "@/hooks/use-theme";
-import { useDebounced } from "@/hooks/useDebounced";
 import { formatDate } from "@/lib/format";
 import type { AdminOrgListItem } from "@/lib/types";
 
@@ -31,21 +36,32 @@ import type { AdminOrgListItem } from "@/lib/types";
  * row of six chips had to lie about that by making "Suspended" a seventh
  * verification value. Two `SelectMenu`s say both at once and take one line
  * between them.
+ *
+ * **The default is "Awaiting" - pending and under review together**, which is
+ * exactly what the dashboard's "NGOs awaiting verification" tile counts. The
+ * screen used to default to Pending alone and read no params, so the tile said
+ * 7 and the list it opened showed 4. The tile now links here with
+ * `?verification=AWAITING`, and every filter, the sort and the search live in
+ * the URL, so a reload or a shared link lands on the same list.
  */
-type Verification =
-	| "ANY"
-	| "PENDING"
-	| "UNDER_REVIEW"
-	| "VERIFIED"
-	| "REJECTED";
+type Verification = "ANY" | AdminOrgVerificationFilter;
 type Standing = "ANY" | "ACTIVE" | "SUSPENDED";
 
+/**
+ * Labels match the pills (`humanizeStatus`): "Under review", not "In review",
+ * so the select and the column it filters use one word for one state.
+ */
 const VERIFICATION = [
+	{
+		value: "AWAITING" as const,
+		label: "Awaiting",
+		hint: "Pending and under review",
+	},
 	{ value: "ANY" as const, label: "Any" },
 	{ value: "PENDING" as const, label: "Pending", hint: "Never looked at" },
 	{
 		value: "UNDER_REVIEW" as const,
-		label: "In review",
+		label: "Under review",
 		hint: "Picked up, not decided",
 	},
 	{ value: "VERIFIED" as const, label: "Verified" },
@@ -58,17 +74,41 @@ const STANDING = [
 	{ value: "SUSPENDED" as const, label: "Suspended" },
 ];
 
+const VERIFICATION_VALUES = VERIFICATION.map((option) => option.value);
+const STANDING_VALUES = STANDING.map((option) => option.value);
+const SORT_KEYS: AdminOrgSort[] = [
+	"createdAt",
+	"name",
+	"city",
+	"verificationStatus",
+	"pendingDocuments",
+	"events",
+];
+
 export default function AdminOrganizations() {
 	const { colors, spacing } = useTheme();
-	const [verification, setVerification] = useState<Verification>("PENDING");
-	const [standing, setStanding] = useState<Standing>("ANY");
-	const [search, setSearch] = useState("");
-	const [sort, setSort] = useState<{ sort: AdminOrgSort; dir: SortDir }>({
-		// Oldest waiting first: the default filter is "Pending", and the NGO that
-		// has been waiting longest is the one to look at, not the newest sign-up.
-		sort: "createdAt",
-		dir: "asc",
-	});
+	const [verification, setVerification] = useParamState<Verification>(
+		"verification",
+		"AWAITING",
+		VERIFICATION_VALUES,
+	);
+	const [standing, setStanding] = useParamState<Standing>(
+		"standing",
+		"ANY",
+		STANDING_VALUES,
+	);
+	const {
+		text: search,
+		setText: setSearch,
+		debounced: debouncedSearch,
+	} = useParamSearch();
+	const [sort, setSort] = useParamSort<AdminOrgSort>(
+		// Oldest waiting first: the default filter is "Awaiting", and the NGO
+		// that has been waiting longest is the one to look at, not the newest
+		// sign-up.
+		{ sort: "createdAt", dir: "asc" },
+		SORT_KEYS,
+	);
 	const [selected, setSelected] = useState<string | null>(null);
 	/**
 	 * The owner account opened from a dossier. Held here rather than inside
@@ -79,7 +119,6 @@ export default function AdminOrganizations() {
 	const [owner, setOwner] = useState<string | null>(null);
 	const [view, setView] = useTableView("organizations");
 
-	const debouncedSearch = useDebounced(search.trim());
 	const list = useAdminOrganizationsPaged({
 		...(debouncedSearch ? { search: debouncedSearch } : {}),
 		...(verification === "ANY" ? {} : { verificationStatus: verification }),
@@ -87,6 +126,26 @@ export default function AdminOrganizations() {
 		sort: sort.sort,
 		dir: sort.dir,
 	});
+
+	const filtered =
+		!!debouncedSearch || verification !== "ANY" || standing !== "ANY";
+	const clearFilters = () => {
+		setSearch("");
+		setVerification("ANY");
+		setStanding("ANY");
+	};
+
+	/**
+	 * The row after the open one, for the dossier's "Approve & next" and
+	 * "Next". Read from the rows as loaded: a decision refetches the list and
+	 * the decided NGO may leave the filter, but "next" means the one that was
+	 * below it. Absent on the last loaded row; the page after is fetched as
+	 * the reviewer nears it.
+	 */
+	const openIndex = selected
+		? list.items.findIndex((org) => org.id === selected)
+		: -1;
+	const next = openIndex >= 0 ? list.items[openIndex + 1] : undefined;
 
 	const columns: Array<TableColumn<AdminOrgListItem>> = [
 		{
@@ -239,6 +298,7 @@ export default function AdminOrganizations() {
 				columns={columns}
 				rowKey={(org) => org.id}
 				onRowPress={(org) => setSelected(org.id)}
+				rowLabel={(org) => `Open ${org.organizationName}`}
 				sort={sort}
 				onSortChange={setSort}
 				loadingLabel="Loading organizations"
@@ -251,17 +311,30 @@ export default function AdminOrganizations() {
 						title={
 							debouncedSearch
 								? "No matching organizations"
-								: verification === "PENDING"
+								: verification === "AWAITING" && standing === "ANY"
 									? "Nothing waiting"
-									: "Nothing here"
+									: filtered
+										? "Nothing matches"
+										: "No organizations yet"
 						}
 						description={
 							debouncedSearch
 								? "Try a shorter name, or the registration number."
-								: verification === "PENDING"
+								: verification === "AWAITING" && standing === "ANY"
 									? "No organizations are waiting for verification."
-									: "No organizations match these filters."
+									: filtered
+										? "No organizations match these filters."
+										: "Organizations appear here once they register."
 						}
+						{...(filtered
+							? {
+									action: (
+										<Button size="sm" variant="outline" onPress={clearFilters}>
+											Clear filters
+										</Button>
+									),
+								}
+							: {})}
 					/>
 				}
 			/>
@@ -269,6 +342,14 @@ export default function AdminOrganizations() {
 			<OrgDetailSheet
 				organizationId={selected}
 				onClose={() => setSelected(null)}
+				{...(next
+					? {
+							onNext: () => {
+								if (openIndex >= list.items.length - 3) list.loadMore();
+								setSelected(next.id);
+							},
+						}
+					: {})}
 				onOpenOwner={(userId) => {
 					setSelected(null);
 					setOwner(userId);

@@ -1,13 +1,16 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SignUpInput, signUpSchema } from "@nabhya/shared";
 import { useRouter } from "expo-router";
+import { MailCheck } from "lucide-react-native";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { View } from "react-native";
 import { AuthError, authErrorCopy } from "@/components/auth-error";
 import { AuthSplitLayout } from "@/components/auth-split-layout";
 import { GoogleSignInButton } from "@/components/google-signin-button";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form";
+import { toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H2 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
@@ -25,6 +28,10 @@ export default function SignUp() {
 		message: string;
 		hint?: "sign-up" | "sign-in";
 	} | null>(null);
+	// Set when the project requires email confirmation: the account exists but
+	// has no session yet, so the form gives way to "check your inbox".
+	const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+	const [resending, setResending] = useState(false);
 	const form = useForm<SignUpInput>({
 		// biome-ignore lint/suspicious/noExplicitAny: @hookform/resolvers v5 Zod v4 incompatibility
 		resolver: zodResolver(signUpSchema as any),
@@ -40,9 +47,11 @@ export default function SignUp() {
 				password: data.password,
 				name: data.name,
 			});
-			if (result?.user) {
-				setUser(result.user);
+			if (result.status === "confirm-email") {
+				setPendingEmail(result.email);
+				return;
 			}
+			setUser(result.user);
 			router.replace("/");
 		} catch (error) {
 			// Inline, above the button - see the same note in `login.tsx`.
@@ -56,6 +65,61 @@ export default function SignUp() {
 			setLoading(false);
 		}
 	});
+
+	const resend = async () => {
+		if (!pendingEmail) return;
+		setResending(true);
+		try {
+			await authService.resendConfirmation(pendingEmail);
+			toast.success(`Sent again to ${pendingEmail}.`);
+		} catch (error) {
+			toast.error(
+				apiErrorMessage(error, "Couldn't resend the email. Try again shortly."),
+			);
+		} finally {
+			setResending(false);
+		}
+	};
+
+	if (pendingEmail) {
+		return (
+			<AuthSplitLayout alternateLink={null}>
+				<View style={{ marginBottom: spacing[4] }}>
+					<MailCheck
+						size={28}
+						strokeWidth={1.8}
+						color={colors.primary.ink as string}
+					/>
+				</View>
+				<H2 accessibilityRole="header" style={{ marginBottom: spacing[1] }}>
+					Check your inbox
+				</H2>
+				<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
+					We sent a link to {pendingEmail}. Open it to confirm your email, then
+					sign in. Check spam if it isn't there in a minute.
+				</Body>
+				<Button size="lg" onPress={() => router.replace("/(auth)/login")}>
+					Go to sign in
+				</Button>
+				<Button
+					variant="outline"
+					size="lg"
+					loading={resending}
+					onPress={resend}
+					style={{ marginTop: spacing[3] }}
+				>
+					Send the email again
+				</Button>
+				<Button
+					variant="link"
+					onPress={() => setPendingEmail(null)}
+					style={{ marginTop: spacing[2], alignSelf: "center" }}
+				>
+					Use a different email
+				</Button>
+			</AuthSplitLayout>
+		);
+	}
 
 	return (
 		<AuthSplitLayout
@@ -113,7 +177,8 @@ export default function SignUp() {
 				control={form.control}
 				name="password"
 				label="Password"
-				placeholder="At least 8 characters"
+				placeholder="Choose a password"
+				hint="At least 8 characters"
 				revealable
 				autoComplete="new-password"
 				textContentType="newPassword"

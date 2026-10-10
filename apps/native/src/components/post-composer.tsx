@@ -46,12 +46,14 @@ import { Banner, SectionTitle } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
 import { Caption, Label } from "@/components/ui/typography";
 import { useCreateAnnouncement } from "@/hooks/use-directory";
 import { useCreateEvent, useOrgEvents } from "@/hooks/use-events";
 import { useCreateFeedPost } from "@/hooks/use-feed";
 import { useCreateNeed, useOrgNeeds } from "@/hooks/use-needs";
+import { useOrgAccess } from "@/hooks/use-org-access";
 import { useMyOrganization } from "@/hooks/use-organization";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
@@ -233,7 +235,7 @@ export function PostComposer({
 	openPickerOnMount?: boolean;
 	openDraftsOnMount?: boolean;
 }) {
-	const { colors, spacing, borderRadius } = useTheme();
+	const { colors, spacing, borderRadius, typography } = useTheme();
 	const router = useRouter();
 	const publish = useCreateFeedPost();
 	const createNeed = useCreateNeed();
@@ -243,6 +245,11 @@ export function PostComposer({
 	const org = useMyOrganization();
 	const orgName = org.data?.organizationName ?? "Your NGO";
 	const isVerified = org.data?.verificationStatus === "VERIFIED";
+	// Suspension and team role, the two checks besides verification that the
+	// server makes on every publish. The callers disable their entry points,
+	// but a draft restored or a tile pressed mid-refetch could still open the
+	// drawer, and a full form ending in a 403 is the worst way to learn it.
+	const roleBlocked = useOrgAccess().blocked("content.publish");
 
 	const [type, setType] = useState<ComposerType>(toComposerType(initialTag));
 	const [headline, setHeadline] = useState("");
@@ -471,7 +478,14 @@ export function PostComposer({
 
 	/* ---- Publish ---- */
 
-	const finish = async () => {
+	/**
+	 * Clears the composer and closes it, then says what was published and
+	 * where it went. It used to only close: the drawer vanished and nothing on
+	 * the screen behind it said the post existed - the exact "screen just
+	 * blinks" case in `apps/native/AGENTS.md`. `view` opens the list the new
+	 * row lives in, for the types that have one.
+	 */
+	const finish = async (message: string, view?: string) => {
 		await persist(drafts.filter((row) => row.id !== draftId.current));
 		draftId.current = newDraftId();
 		setHeadline("");
@@ -486,6 +500,12 @@ export function PostComposer({
 		setEvent(emptyEvent());
 		setAnnouncement(EMPTY_ANNOUNCEMENT);
 		onClose();
+		toast.success(
+			message,
+			view
+				? { label: "View", onPress: () => router.push(view as never) }
+				: undefined,
+		);
 	};
 
 	const applyIssues = (issues: { path: PropertyKey[]; message: string }[]) => {
@@ -553,7 +573,13 @@ export function PostComposer({
 				return;
 			}
 			createNeed.mutate(parsed.data as CreateNeedInput, {
-				onSuccess: () => void finish(),
+				onSuccess: () =>
+					void finish(
+						need.needType === "OFFER"
+							? "Offer published - it's on the feed."
+							: "Need published - it's on the feed.",
+						"/(ngo)/needs",
+					),
 				onError,
 			});
 			return;
@@ -587,7 +613,11 @@ export function PostComposer({
 				return;
 			}
 			createEvent.mutate(parsed.data as CreateEventInput, {
-				onSuccess: () => void finish(),
+				onSuccess: () =>
+					void finish(
+						"Event published - volunteers can apply now.",
+						"/(ngo)/events",
+					),
 				onError,
 			});
 			return;
@@ -607,7 +637,8 @@ export function PostComposer({
 				return;
 			}
 			createAnnouncement.mutate(parsed.data as UpsertAnnouncementInput, {
-				onSuccess: () => void finish(),
+				onSuccess: () =>
+					void finish("Announcement published.", "/(ngo)/announcements"),
 				onError,
 			});
 			return;
@@ -629,7 +660,7 @@ export function PostComposer({
 				onMediaChange: patchMedia,
 				uploaded,
 			},
-			{ onSuccess: () => void finish(), onError },
+			{ onSuccess: () => void finish("Update posted to the feed."), onError },
 		);
 	};
 
@@ -660,10 +691,33 @@ export function PostComposer({
 						description="Posting opens once a reviewer has approved your registration certificate and PAN card."
 					/>
 					<Caption color="tertiary">
-						You can draft needs and events before then - only publishing waits
-						on the review.
+						You can still draft events from the Events screen - only publishing
+						them waits on the review. Needs and updates go public the moment
+						they are posted, so they wait too.
 					</Caption>
 				</View>
+			</Drawer>
+		);
+	}
+
+	if (roleBlocked) {
+		return (
+			<Drawer
+				visible={visible}
+				onClose={onClose}
+				title="New post"
+				subtitle={orgName}
+				footer={
+					<Button variant="outline" onPress={onClose}>
+						Close
+					</Button>
+				}
+			>
+				<Banner
+					tone="info"
+					title="Publishing isn't open to you"
+					description={roleBlocked}
+				/>
 			</Drawer>
 		);
 	}
@@ -756,9 +810,11 @@ export function PostComposer({
 					accessibilityLabel={copy.headlineLabel}
 					style={{
 						...canvasBox,
-						fontSize: 17,
+						// A TextInput cannot take a ramp component, so the headline
+						// reads the H5 step's size from the tokens instead.
+						fontSize: typography.fontSize.xl,
 						lineHeight: 24,
-						fontFamily: "MonaSans-Medium",
+						fontFamily: typography.fontFamily.sansMedium,
 						paddingVertical: spacing[3],
 					}}
 				/>
