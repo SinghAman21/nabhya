@@ -1,0 +1,19 @@
+{
+	"buildCommand": "expo export --platform web",
+	"outputDirectory": "dist",
+	"cleanUrls": true,
+	"rewrites": [
+		{ "source": "/ngos/:id", "destination": "/ngos/[id].html" },
+		{ "source": "/events/:id", "destination": "/events/[id].html" },
+		{ "source": "/needs/:id", "destination": "/needs/[id].html" },
+		{
+			"source": "/certificates/:code",
+			"destination": "/certificates/[code].html"
+		},
+		{
+			"source": "/team/invites/:token",
+			"destination": "/team/invites/[token].html"
+		},
+		{ "source": "/(.*)", "destination": "/index.html" }
+	]
+}
