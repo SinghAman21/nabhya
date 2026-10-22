@@ -1,7 +1,7 @@
 # apps/web - not scaffolded yet
 
 There is **no web app**. This directory holds only this guide; do not import from it,
-add it to CI, or "fix" its absence from the workspace. `notes.md` at the repo root
+add it to CI, or "fix" its absence from the workspace. `docs/architecture/notes.md`
 plans it as a Next.js app, and the superadmin console currently living in the Expo
 `(admin)` group most likely belongs here once it exists.
 

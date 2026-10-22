@@ -1,0 +1,1231 @@
+% !TeX program = pdflatex
+% OVERLEAF WORKING COPY - formatting/layout only.
+% Images are sized placeholder boxes (no files needed) and the custom
+% Geist Mono font is swapped for the default so this compiles with plain
+% pdfLaTeX, no project uploads or compiler settings required.
+% Do formatting/spacing edits here, then bring the .tex back for the
+% real images and font to be restored.
+% Self-contained Nabhya black book source (final).
+% The institute class is embedded below; no separate .cls file is required.
+\begin{filecontents*}[overwrite]{final_raitdisser.cls}
+% final_raitdisser.cls
+% B.Tech project report class, Vidyalankar Institute of Technology.
+% Based on the IITB APS class by Amey Karkare (Perl Artistic License).
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesClass{final_raitdisser}[2026/01/01 B.Tech Project Report VIT]
+
+\DeclareOption*{\PassOptionsToClass{\CurrentOption}{report}}
+\ProcessOptions
+\PassOptionsToClass{12pt,a4paper}{report}
+\LoadClass{report}
+
+% ---------------- Supervisor / co-supervisor ----------------
+\def\@advisorname{None}
+\newcommand{\setguide}[1]{\def\@advisorname{#1}}
+\global\let\@coadvisorname\@empty
+\newcommand{\setcoguide}[1]{\def\@coadvisorname{#1}}
+\let\coguide\setcoguide
+
+% ---------------- Title page ----------------
+\newcommand\@thesistitlesmlskip{0.15in}
+\newcommand\@thesistitlemedskip{0.35in}
+\newcommand\@thesistitlebigskip{0.75in}
+
+\newcommand{\department}[1]{\gdef\@department{#1}}
+\newcommand{\reporttype}[1]{\gdef\@doctype{#1}}
+
+\gdef\@doctype{Submitted in fulfilment of the requirements \\ \vspace{0.15in} For the degree of\\ \vspace{0.2in}\large \bf B.Tech. \vspace{0.2in}\\
+Department of Information Technology}
+\gdef\@department{(Unknown Department)}
+
+\renewcommand{\maketitle}{\begin{titlepage}
+    \def\thanks##1{\typeout{Warning: `thanks' deleted from title page.}}
+    \let\footnotesize\small \let\footnoterule\relax \setcounter{page}{1}
+    \vspace*{0.1in}
+    \begin{center}
+      \mbox{}\\
+      {\bf\expandafter\uppercase\expandafter{\LARGE\@title}} \\[\@thesistitlebigskip]
+      {\large  \@doctype} \\[\@thesistitlesmlskip]
+      {\large by} \\[\@thesistitlesmlskip]
+      {\large \bf \@author} \\ [\@thesistitlesmlskip]
+      \vspace{0.4in}{\large Supervisor }  \\[\@thesistitlesmlskip]
+      {\large \bf \@advisorname} \\[\@thesistitlesmlskip]
+      \ifx\@coadvisorname\@empty
+        \mbox{}\\[\@thesistitlemedskip]
+      \else
+        {\large and } \\[\@thesistitlesmlskip]
+        {\large \bf \@coadvisorname} \\\vspace{0.1in}
+      \fi
+      \IfFileExists{VIT.png}{\origincludegraphics[width=10cm]{VIT.png}}{%
+        \IfFileExists{../images/VIT.png}{\origincludegraphics[width=10cm]{../images/VIT.png}}{%
+          \fbox{\parbox[c][1.0cm][c]{8cm}{\centering Insert VIT logo here}}}}\\[\@thesistitlesmlskip]
+      {\large \MakeUppercase{\@department}} \\
+      {\large Vidyalankar Institute of Technology,\\Wadala, Mumbai - 400037.\\(Under the ambit of University of Mumbai)}\\
+    \end{center}
+  \end{titlepage}
+  \setcounter{footnote}{0}
+  \setcounter{page}{1}
+}
+
+% ---------------- Abstract ----------------
+\def\abstract{
+  \chapter*{Abstract}
+  \addcontentsline{toc}{chapter}{Abstract}
+  \relax\markboth{ABSTRACT}{ABSTRACT}}
+\def\endabstract{\par\newpage}
+
+% ---------------- List of figures / tables (with ToC entries) ----------------
+\renewcommand\listoffigures{%
+    \if@twocolumn
+      \@restonecoltrue\onecolumn
+    \else
+      \@restonecolfalse
+    \fi
+    \chapter*{\listfigurename}%
+    \addcontentsline{toc}{chapter}{\listfigurename}%
+      \@mkboth{\MakeUppercase\listfigurename}%
+              {\MakeUppercase\listfigurename}%
+    \@starttoc{lof}%
+    \if@restonecol\twocolumn\fi
+    }
+\renewcommand\listoftables{%
+    \if@twocolumn
+      \@restonecoltrue\onecolumn
+    \else
+      \@restonecolfalse
+    \fi
+    \chapter*{\listtablename}%
+    \addcontentsline{toc}{chapter}{\listtablename}%
+      \@mkboth{%
+          \MakeUppercase\listtablename}%
+         {\MakeUppercase\listtablename}%
+    \@starttoc{lot}%
+    \if@restonecol\twocolumn\fi
+    }
+
+% ---------------- Spacing switches ----------------
+\newcommand{\oneskip}{1.0}
+\newcommand{\twoskip}{1.5}
+\newcommand{\singlespace}
+  {\renewcommand{\baselinestretch}{\oneskip}\Large\normalsize}
+\newcommand{\doublespace}
+  {\renewcommand{\baselinestretch}{\twoskip}\Large\normalsize}
+
+% ---------------- Page geometry ----------------
+\setlength{\textheight}{245mm}
+\setlength{\textwidth}{160mm}
+\setlength{\headheight}{3mm}
+\setlength{\headsep}{12mm}
+\setlength{\topmargin}{15mm}
+\if@twoside
+  \setlength{\oddsidemargin}{30mm}
+  \setlength{\evensidemargin}{20mm}
+\else
+  \setlength{\oddsidemargin}{30mm}
+  \setlength{\evensidemargin}{30mm}
+\fi
+\setlength{\hoffset}{-1in}
+\setlength{\voffset}{-1in}
+\setlength{\parindent}{5ex}
+\singlespace
+\end{filecontents*}
+
+
+%=====================================================================
+% Main file - B.Tech Project Report / Black Book
+% Vidyalankar Institute of Technology, Department of Information Technology
+% Nabhya: A Verified NGO-Volunteer Connect Platform for India
+% All report content is contained in this file. Only figures/screenshots
+% are included as external image files.
+%=====================================================================
+
+\documentclass{final_raitdisser}
+
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{epstopdf}
+\usepackage{fancyhdr}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{float}
+\usepackage{xcolor}
+\let\clssinglespace\singlespace \let\clsdoublespace\doublespace
+\let\singlespace\undefined \let\doublespace\undefined
+\usepackage{setspace}
+\let\singlespace\clssinglespace \let\doublespace\clsdoublespace
+\usepackage{amsmath,amssymb}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage[hyperfootnotes=false,plainpages=false]{hyperref}
+% Generates the deployment QR code directly in the PDF (vector, no image
+% file needed), so readers can scan the printed report.
+\usepackage{qrcode}
+\graphicspath{{../images/}{./}}
+
+% Every included image gets a thin frame, automatically. The frame hugs the
+% image exactly (zero \fboxsep) so it adds no visible margin beyond the
+% rule width, and \hfuzz absorbs that sub-point rounding without warnings.
+\setlength{\fboxsep}{0pt}
+\setlength{\fboxrule}{0.4pt}
+\hfuzz=1pt
+\let\origincludegraphics\includegraphics
+\renewcommand{\includegraphics}[2][]{\fbox{\origincludegraphics[#1]{#2}}}
+
+% Sized placeholder box standing in for a real image - same footprint as
+% the final figure so layout/spacing work here transfers directly.
+% Usage: \imgph{width}{height}{label}
+\newcommand{\imgph}[3]{%
+  \fbox{\parbox[c][#2][c]{#1}{\centering\ttfamily\footnotesize #3}}%
+}
+
+\hypersetup{
+  colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue,
+  filecolor=blue,
+  pdftitle={Nabhya: A Verified NGO-Volunteer Connect Platform for India},
+  pdfauthor={Tanay Shinde, Aman Singh, Tanishq Chavan}
+}
+\setcounter{secnumdepth}{4}
+
+% ---------------- Heading spacing: tighter, paper-template style ----------------
+\usepackage{titlesec}
+\titleformat{\chapter}[hang]{\normalfont\huge\bfseries\hyphenpenalty=10000\exhyphenpenalty=10000}{\thechapter}{0.6em}{}
+\titleformat{\section}{\normalfont\Large\bfseries}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\chapter}{0pt}{0pt}{18pt}
+\titlespacing*{\section}{0pt}{2ex plus .5ex minus .2ex}{1ex plus .2ex}
+\titlespacing*{\subsection}{0pt}{1.6ex plus .4ex minus .2ex}{0.8ex plus .2ex}
+
+% ---------------- ToC / LoF / LoT: tighter indentation ----------------
+% Plain kernel-level redefinitions (not tocloft) to stay compatible with
+% hyperref's PDF tagging sockets in current LaTeX releases.
+\makeatletter
+\renewcommand*\l@section{\@dottedtocline{1}{1.1em}{2.3em}}
+\renewcommand*\l@subsection{\@dottedtocline{2}{2.6em}{3em}}
+\renewcommand*\l@figure{\@dottedtocline{1}{0em}{2.3em}}
+\renewcommand*\l@table{\@dottedtocline{1}{0em}{2.3em}}
+\makeatother
+
+% ---------------- Lists: less indent, tighter spacing ----------------
+\usepackage{enumitem}
+\setlist[itemize]{leftmargin=1.3em, itemsep=0.3em, topsep=0.35em}
+
+% ---------------- Tables: roomier cells, consistently ----------------
+\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{7pt}
+\setcounter{tocdepth}{3}
+
+% ---------------- Shared macros ----------------
+\newcommand{\projtitle}{Nabhya: A Verified NGO-Volunteer Connect Platform for India}
+
+% Sequence-diagram figure with a safe fallback if the image is missing.
+% Arguments: file stem, diagram name, caption, label
+\newcommand{\seqfigure}[5]{%
+  \begin{figure}[H]\centering
+  \imgph{\textwidth}{#5}{#1.png}
+  \caption{#3}\label{#4}
+  \end{figure}}
+
+\begin{document}
+\setlength{\headheight}{14pt}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhf[FCE,FCO]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+
+% ======================== FRONT MATTER ========================
+\cleardoublepage
+\pagenumbering{roman}
+
+\title{\LARGE Nabhya: A Verified NGO-Volunteer\\Connect Platform for India}
+\author{Tanay Shinde (23101B0034)\\[0.05in]
+        Aman Singh (23101B0063)\\[0.05in]
+        Tanishq Chavan (23101C0008)}
+\department{Department of Information Technology}
+\setguide{Prof. Deepali Shrikhande}
+\date{}
+\maketitle
+
+% ------------------------ CERTIFICATE ------------------------
+\cleardoublepage
+\thispagestyle{empty}
+\begin{center}
+\IfFileExists{VIT.png}{\origincludegraphics[width=10cm]{VIT.png}\\[0.3in]}{%
+  \IfFileExists{../images/VIT.png}{\origincludegraphics[width=10cm]{../images/VIT.png}\\[0.3in]}{}}
+{\Huge\textbf{Certificate}}
+\end{center}
+\vspace{0.05in}
+\begin{center}
+\large This is to certify that the project titled\\[0.15in]
+\textbf{``\projtitle''}\\[0.1in]
+is a bona fide work carried out by\\[0.15in]
+\textbf{Tanay Shinde (23101B0034)\\[0.12in]
+Aman Singh (23101B0063)\\[0.12in]
+Tanishq Chavan (23101C0008)}\\[0.1in]
+under the guidance of Prof. Deepali Shrikhande, in partial fulfilment of the requirements for the degree of\\[0.12in]
+\textbf{Bachelor of Technology}\\[0.08in]
+\textbf{(Department of Information Technology)}\\
+at \textbf{Vidyalankar Institute of Technology, Wadala, Mumbai.}
+\end{center}
+\vspace{0.8in}
+\begin{center}
+\begin{tabularx}{0.88\textwidth}{@{}>{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X@{}}
+\rule{3.2cm}{0.4pt} & \rule{3.2cm}{0.4pt} & \rule{3.2cm}{0.4pt} \\[0.12in]
+Project Guide & Head of Department & Principal
+\end{tabularx}
+\end{center}
+
+% ------------------------ DISSERTATION APPROVAL ------------------------
+\cleardoublepage
+\thispagestyle{empty}
+\begin{center}{\Huge\textbf{Dissertation Approval for B.Tech.}}\end{center}
+\vspace{0.4in}
+\begin{spacing}{1.5}
+This is to certify that the dissertation titled ``\textbf{\projtitle}'' is submitted for evaluation as part of the B.Tech. programme in Information Technology at Vidyalankar Institute of Technology, Wadala, Mumbai. It covers the design, implementation, architecture, database model, API, security controls and testing approach of the Nabhya platform.
+\end{spacing}
+\vspace{0.55in}
+\begin{flushright}
+\begin{tabular}{l}
+\textbf{Examiners:}\\[0.35in]
+1: \rule{5cm}{0.4pt}\\[0.35in]
+2: \rule{5cm}{0.4pt}
+\end{tabular}
+\end{flushright}
+\vspace{0.4in}
+\noindent Date: \rule{5cm}{0.4pt}\\[0.3in]
+Place: Mumbai
+
+% ------------------------ DECLARATION ------------------------
+\cleardoublepage
+\thispagestyle{empty}
+\begin{center}{\Huge\textbf{Declaration}}\end{center}
+\vspace{0.4in}
+\begin{spacing}{1.5}
+We declare that this project report, ``\projtitle'', describes work carried out as part of the B.Tech. programme in Information Technology. We have acknowledged the sources and external material we used wherever they apply. The technical descriptions in this report are based on our project documentation and the state of our repository. All test results, screenshots and measurements in the report are genuine and come from the system we built.
+\end{spacing}
+\vspace{0.6in}
+\begin{center}
+\begin{tabularx}{0.95\textwidth}{@{}>{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X@{}}
+\rule{3.4cm}{0.4pt} & \rule{3.4cm}{0.4pt} & \rule{3.4cm}{0.4pt} \\[0.1in]
+Tanay Shinde & Aman Singh & Tanishq Chavan \\
+23101B0034 & 23101B0063 & 23101C0008 \\
+\end{tabularx}
+\end{center}
+\vspace{0.5in}
+\noindent Date: \rule{4cm}{0.4pt} \hfill Place: Mumbai
+
+% ------------------------ ACKNOWLEDGEMENT ------------------------
+\cleardoublepage
+\thispagestyle{empty}
+\begin{center}{\Huge\textbf{Acknowledgement}}\end{center}
+\vspace{0.4in}
+\begin{spacing}{1.5}
+We would like to thank our project guide, Prof. Deepali Shrikhande, for her guidance and feedback while we built Nabhya. We are also grateful to the Department of Information Technology and Vidyalankar Institute of Technology for the environment and resources that made this project possible. The open-source communities behind the tools we used, and their documentation, helped us more than once. Finally, thank you to our friends and families for their constant encouragement and support.
+\end{spacing}
+\vspace{0.6in}
+\noindent Date: \rule{5cm}{0.4pt}
+
+\onehalfspacing
+
+% ------------------------ ABSTRACT ------------------------
+\begin{abstract}
+Nabhya is a mobile-first platform that has been created to connect verified non-governmental organisations (NGOs) in India with volunteers and donors. It focuses on two battles in digital philanthropy: it can be difficult to determine whether to trust an organisation, and it is uncertain what kind of help an organisation might need at the moment. An NGO uploads its legal documents to Nabhya, and a superadmin examines them before anything the organisation posts is made available to the public. After verification, the NGO may post volunteering events and item-level needs, either as a WANT or as an OFFER of surplus resources, and it can post updates to a community feed. Volunteers can discover organisations and opportunities, apply to events, pledge items, bookmark and review organisations, monitor their impact, and receive a certificate of participation that can be verified online with a verification code. Monetary donations have been implemented, but they are on hold pending a go-live decision.
+
+The system uses an Expo/React Native app, a REST API built with NestJS, PostgreSQL on Supabase (via Drizzle ORM), Supabase Auth (for sign-up and login) and Supabase Storage (for files). Zod schemas are shared between the app and the server, which means that both validate data in the same way. Security and data integrity were given special consideration. Its features include role-based access control, public lists restricted to verified organisations, transactional counter updates, signed upload URLs, webhook-based payment settlement and integration tests that run against the committed migrations. Only implementation and integration testing are evaluated. We have not conducted a user study or measured production-scale performance, so we cannot make any claims regarding either.
+\vspace{0.15in}
+
+\noindent\textbf{Keywords:} NGO platform, volunteer management, digital philanthropy, item donations, verification, React Native, NestJS, PostgreSQL, role-based access control
+\end{abstract}
+
+% ------------------------ CONTENTS ------------------------
+\tableofcontents
+\listoffigures
+\listoftables
+
+% ------------------------ ABBREVIATIONS ------------------------
+\cleardoublepage
+\phantomsection\addcontentsline{toc}{chapter}{Abbreviations}
+\thispagestyle{empty}
+\begin{center}{\Huge\textbf{Abbreviations}}\end{center}
+\vspace{0.3in}
+\begin{longtable}{p{0.2\textwidth}cp{0.65\textwidth}}
+\textbf{API} & - & Application Programming Interface\\
+\textbf{CORS} & - & Cross-Origin Resource Sharing\\
+\textbf{ERD} & - & Entity-Relationship Diagram\\
+\textbf{JWKS} & - & JSON Web Key Set\\
+\textbf{JWT} & - & JSON Web Token\\
+\textbf{NGO} & - & Non-Governmental Organisation\\
+\textbf{ORM} & - & Object-Relational Mapping\\
+\textbf{PDF} & - & Portable Document Format\\
+\textbf{RBAC} & - & Role-Based Access Control\\
+\textbf{REST} & - & Representational State Transfer\\
+\textbf{SQL} & - & Structured Query Language\\
+\textbf{UI/UX} & - & User Interface / User Experience\\
+\textbf{UUID} & - & Universally Unique Identifier\\
+\textbf{WANT/OFFER} & - & Need request / surplus resource listing\\
+\end{longtable}
+
+\cleardoublepage
+\pagenumbering{arabic}
+
+% ======================== CHAPTER 1 ========================
+\chapter{Introduction}
+\label{ch:introduction}
+
+\section{Background and Motivation}
+Civil society organisations need the volunteer work of people as well as material and financial contributions. A potential good Samaritan is likely to ask two questions before stepping in: can I have confidence in this organisation, and what can I do for it at this moment? A simple listing on a website only tells part of the story when it comes to the first question. The second one doesn't usually come up on event platforms, since they can't identify a particular material need or a surplus that someone else could use.
+
+We want to answer both with Nabhya, a mobile-first system that integrates organisation verification, volunteering opportunities and giving of individual items in a single location. Public discovery co-exists with logged-in workflows, and the superadmin role manages verification, moderation and auditing.
+
+\section{Problem Statement}
+We wanted to create a secure, mobile-friendly platform on which verified NGOs can post volunteering opportunities as well as material needs, while citizens can search for organisations, offer their time or items, and receive a certificate of participation that others can verify. The platform also needs administrative tools for verification, moderation and auditing.
+
+\section{Objectives}
+The objectives of Nabhya are:
+\begin{itemize}
+  \item Provide document-based onboarding and verification for NGOs, and identity-document handling for volunteers (Sections~\ref{sec:impl-auth} and~\ref{sec:impl-verification}).
+  \item Support the full event lifecycle: drafting, publishing, applications, review, attendance and completion (Section~\ref{sec:impl-events}).
+  \item Represent item-based support through WANT and OFFER listings, with quantities and fulfilment tracking (Section~\ref{sec:impl-needs}).
+  \item Show only verified and active organisations in public discovery.
+  \item Offer bookmarks, follows, reviews, organisation replies, announcements, financial reports, a community feed and notifications (Sections~\ref{sec:impl-engagement}, \ref{sec:impl-feed} and~\ref{sec:impl-notifications}).
+  \item Issue attendance-based certificates that can be downloaded as PDFs and verified publicly by code (Section~\ref{sec:impl-certificates}).
+  \item Support monetary donations settled through a payment-provider webhook, which is currently on hold for go-live (Section~\ref{sec:impl-donations}).
+  \item Protect data integrity through access control, audit logs, rate limiting, database constraints and automated integration tests (Chapter~\ref{ch:testing}).
+\end{itemize}
+
+\section{Scope of Work}
+Nabhya consists of an Expo~\cite{expo}/React Native~\cite{reactnative} mobile app, a NestJS REST API, a PostgreSQL database, hosted authentication, object storage, workflows for each role, public feeds and administrative tools. The mobile app has separate route groups for volunteers, organisations and superadmins. A dedicated web application for the admin console, email and push notifications, and full pagination on the client are left for future work (Sections~\ref{sec:limitations} and~\ref{sec:future}).
+
+\section{Development Methodology}
+The project was set up as a TypeScript monorepo, using pnpm workspaces and Turborepo (Table~\ref{tab:monorepo}). The database access layer, the environment validation and the request and response contracts are packaged together as shared packages. We began by building features around a full API and client workflow, and then applied schema migrations and automated integration tests to make sure all components stay in sync. This is an inventory report on the current state of the repository. It does not include a user-adoption study or a scale-up evaluation.
+
+\section{Feasibility Study}
+\label{sec:feasibility}
+\begin{description}[leftmargin=0pt, itemindent=0pt, labelsep=0.4em, font=\bfseries]
+  \item[Technical feasibility.] Every piece of the stack we chose is proven at the scale a pilot NGO platform needs: Expo and React Native for a single cross-platform client, NestJS for a typed, modular API, and managed Postgres/Auth/Storage through Supabase so the team was not operating its own database or identity server. Building 75{,}000+ lines of working TypeScript across the mobile app, the API and the shared packages (Section~\ref{sec:effort-estimation}) over the project timeline is itself evidence that the approach was technically workable for a three-person team.
+  \item[Operational feasibility.] Nabhya automates a workflow NGOs and volunteers already run by hand - verifying an organisation's paperwork, posting a volunteering opportunity, tracking who showed up, noting what a shelter needs this week. Nothing in the product asks a volunteer or an NGO coordinator to learn a new mental model; the roles, the verification step and the WANT/OFFER language map onto what they already do on paper, over WhatsApp or through a generic form. That lowers the adoption barrier relative to asking an NGO to change its process to fit the software.
+  \item[Economic feasibility.] The stack runs almost entirely on usage-based managed services (Supabase, Vercel, Render) whose free or low tiers comfortably cover a pilot's traffic, so there is no fixed infrastructure cost to carry before the platform has real organisations on it. The only recurring paid dependency with transaction-based pricing is Razorpay, and that cost only appears once a donation actually clears - it scales with usage rather than being a fixed overhead.
+\end{description}
+
+\section{Effort Estimation}
+\label{sec:effort-estimation}
+We sized the project after the fact with the COCOMO Basic model~\cite{boehm1981} so the report carries a standard estimate alongside what we actually measured, rather than one or the other. The codebase stands at 75{,}087 lines of TypeScript, or 75.1 KLOC, measured directly from the repository: 55{,}474 in \texttt{apps/native} (the mobile client), 15{,}030 in \texttt{apps/server} (the API), 2{,}368 in \texttt{packages/db} (schema and migrations) and 2{,}215 in \texttt{packages/shared} (the Zod contracts).
+
+For an organic project, COCOMO Basic gives effort $E = 2.4 \times (\text{KLOC})^{1.05}$ person-months and schedule $D = 2.5 \times E^{0.38}$ months. At 75.1 KLOC this works out to $E \approx 223$ person-months and $D \approx 19.5$ months, implying a team of roughly 11-12 people working full-time. The actual project was three students working part-time around coursework over the five months in Figure~\ref{fig:timeline}, which is a small fraction of the COCOMO figure. We read that gap as the model, not the team: COCOMO Basic was calibrated on 1970s-80s organic software projects written largely by hand, and it has no term for a scaffolded monorepo, a schema-driven ORM, shared Zod contracts generating both client and server validation, or AI-assisted code generation, all of which cut the person-hours a line of delivered code actually costs today. We report the COCOMO number because estimating effort is expected of this report, not because we think it reflects how long the project would take a typical team to build with the same tools.
+
+\section{Project Planning and Scheduling}
+\label{sec:planning}
+The project ran from 9 June 2026 to the submission date, tracked as 102 commits across six overlapping phases rather than a strict waterfall (Figure~\ref{fig:timeline}). Planning and schema design came first; the authentication, database and API skeleton followed; then the three of us split across feature modules (events and needs, then certificates and donations) through July and August. September carried the heaviest load - the ranked community feed, the composer and the superadmin console all landed in a five-week window - before the project moved into integration testing and hardening, and finally this report.
+
+\begin{figure}[H]
+    \centering
+    \imgph{\textwidth}{5.96cm}{project-timeline.png}
+    \caption{Development timeline from repository commit history.}
+    \label{fig:timeline}
+\end{figure}
+
+\section{Organisation of the Report}
+Chapter~\ref{ch:literature} reviews the technical background. Requirements, architecture and data design are presented in Chapter~\ref{ch:design}. The implementation modules and user workflows are covered in Chapter~\ref{ch:implementation}. The tests done on the system, and how we did them, are described in Chapter~\ref{ch:testing}. Deployment, limitations and future work are explored in Chapter~\ref{ch:deployment}. Chapter~\ref{ch:conclusion} concludes the report, references follow, and the appendix lists every API endpoint.
+
+% ======================== CHAPTER 2 ========================
+\chapter{Literature Survey}
+\label{ch:literature}
+
+\section{Existing Digital Volunteering and Donation Platforms}
+People are already using online platforms to locate social organisations and volunteering opportunities. We see two gaps in the project documentation: first, trust in the organisation, and second, giving that people can act on at the level of individual items. Nabhya answers the first with a review-based verification workflow. For the second, it treats material needs as records in their own right, rather than as secondary to participation or money transfers. A summary of the comparison is given in Table~\ref{tab:comparison}.
+
+\section{Document-Based Verification and Moderation}
+A verification workflow offers independent, document-based verification before an organisation's registration goes public. In Nabhya, organisations hand in their legal documents and a superadmin looks into them. Public queries only return organisations whose verification status is \texttt{VERIFIED} and whose operational status is \texttt{ACTIVE}. This rule is enforced in the server-side query and does not depend on the client app's UI (see Section~\ref{sec:impl-verification}).
+
+\section{Event Lifecycle and Concurrency}
+Managing an event isn't just about keeping track; it is about the entire event lifecycle. Applications may be accepted or rejected, attendance must be recorded, and the number of accepted volunteers must not exceed the event's capacity. Counters are modified within database transactions that use row-level locks, and a unique constraint ensures that a volunteer cannot register twice for the same event. These safeguards are very important when several different requests try to modify the same event at the same time (see Section~\ref{sec:impl-events}).
+
+\section{Item-Level Need Matching}
+The WANT/OFFER model is applicable in both directions of exchange, which yields item-level need matching. A WANT is a request and therefore a need of the organisation, while an OFFER is a surplus that someone else might want. Pledges include the amount pledged, the review process and the completion of the pledge. A denormalised fulfilled-quantity field allows for quick listings, while every change is treated as a transaction, which keeps the number current (see Section~\ref{sec:impl-needs}).
+
+\section{API, Data and Validation Technologies}
+A resource is made available to the outside world through a REST API over HTTP. With NestJS~\cite{nestjs} we get modular controllers, dependency injection, guards and validation pipes. Relational constraints and transactions are provided by PostgreSQL~\cite{postgresql}, and typed queries are generated from the schema by Drizzle ORM~\cite{drizzle}. The same Zod~\cite{zod} schemas are used for the client forms and the server validation, which helps prevent the two from disagreeing about what is valid data. The complete technology stack is given in Table~\ref{tab:stack}.
+
+\section{Authentication, Storage and Payments}
+Supabase Auth~\cite{supabase} generates identity tokens~\cite{jwt}, which the API then checks against a remote JWKS endpoint~\cite{jwk}. Uploaded files are stored in Supabase Storage~\cite{supabase}. Pre-signed URLs are short-lived URLs that the client can use to send and receive files without the file contents ever passing through the API. We do not accept a success message from the client as proof of a donation. Settlement only occurs through signature-verified provider webhooks (Razorpay~\cite{razorpay}).
+
+\section{Testing Approach and Research Gap}
+Our tests are performed with Vitest~\cite{vitest} and PGlite~\cite{pglite}, an in-process, PostgreSQL-compatible database constructed from the committed migrations. This allows the tests to exercise unique constraints, aggregates and row locking against real SQL. What this project offers, and what was missing, is a single platform that supports organisation discovery, volunteering and item-level exchange and also enables publicly verifiable participation credentials, all through a mobile-first point of entry.
+
+\section{Comparative Summary}
+\begin{table}[H]\centering
+\caption{Comparison of common capabilities and the Nabhya design.}
+\label{tab:comparison}
+\begin{tabularx}{\textwidth}{|p{0.22\textwidth}|p{0.31\textwidth}|X|}
+\hline
+\textbf{Capability} & \textbf{Typical separated tools} & \textbf{Nabhya design}\\ \hline
+Organisation trust & May depend on external checks & Document review and verified-only public visibility\\ \hline
+Volunteering & Opportunity/event listings & Applications, review, attendance and certificates\\ \hline
+Material support & Often separate from event flows & WANT/OFFER needs and quantity pledges\\ \hline
+Recognition & May require manual proof & PDF certificate with public verification code\\ \hline
+Governance & Varies by service & Superadmin moderation and append-only audit trail\\ \hline
+\end{tabularx}
+\end{table}
+
+% ======================== CHAPTER 3 ========================
+\chapter{System Analysis and Design}
+\label{ch:design}
+
+\section{System Actors}
+Nabhya has four kinds of users. Table~\ref{tab:actors} lists them and what each one does on the platform.
+
+\begin{table}[H]\centering
+\caption{Actors and responsibilities.}
+\label{tab:actors}
+\begin{tabularx}{\textwidth}{|p{0.22\textwidth}|X|}
+\hline
+\textbf{Actor} & \textbf{Responsibilities}\\ \hline
+Volunteer & Complete onboarding, browse organisations/events/needs and the community feed, apply to events, pledge items, bookmark and review NGOs, view impact and certificates, and participate in donations.\\ \hline
+Organisation & Submit legal documents, manage profile and team, publish events and needs, review applications and pledges, mark attendance, issue certificates, publish announcements/reports and reply to reviews.\\ \hline
+Superadmin & Review, approve, reject or suspend organisations and users; verify documents; inspect platform metrics; search audit logs; and broadcast notifications.\\ \hline
+Anonymous visitor & Browse public events, needs, NGO directory, reviews, announcements and reports; verify certificates by code; and access guest-donation entry points.\\ \hline
+\end{tabularx}
+\end{table}
+
+\section{Functional Requirements}
+Table~\ref{tab:fr} lists the functional requirements we worked from.
+
+\begin{longtable}{|p{0.12\textwidth}|p{0.26\textwidth}|p{0.53\textwidth}|}
+\caption{Functional requirements.}\label{tab:fr}\\\hline
+\textbf{ID} & \textbf{Requirement} & \textbf{Description}\\\hline
+\endfirsthead
+\hline
+\textbf{ID} & \textbf{Requirement} & \textbf{Description}\\\hline
+\endhead
+FR-01 & Account and role onboarding & Users authenticate through hosted identity; role selection and role-specific onboarding determine the subsequent app route.\\\hline
+FR-02 & NGO verification & Organisations submit legal documents for superadmin review; unverified organisations must not appear in public listings.\\\hline
+FR-03 & Event management & Organisations create and publish events; volunteers apply; organisations review applications and record attendance.\\\hline
+FR-04 & Capacity integrity & Acceptance updates the accepted count transactionally and must respect event capacity.\\\hline
+FR-05 & Needs and pledges & Organisations publish WANT/OFFER needs; users pledge quantities and organisations review pledges.\\\hline
+FR-06 & Engagement & Users bookmark, follow and review organisations; organisations can reply to reviews and publish updates.\\\hline
+FR-07 & Certificates & Attendance gates certificate issuance; certificates are downloadable and publicly verifiable by code.\\\hline
+FR-08 & Uploads & Upload tickets and short-lived signed URLs support direct object-storage transfers.\\\hline
+FR-09 & Notifications and audit & The platform stores in-app notifications and administrative audit events.\\\hline
+FR-10 & Community feed & Feed posts with media, interactions and comments present verified organisation updates and community posts.\\\hline
+FR-11 & Donations & Donation records and webhook settlement are implemented; monetary donations are currently on hold for go-live.\\\hline
+\end{longtable}
+
+\section{Non-Functional Requirements}
+Table~\ref{tab:nfr} shows the quality attributes we cared about and how the design responds to each.
+
+\begin{table}[H]\centering
+\caption{Non-functional requirements and design responses.}
+\label{tab:nfr}
+\begin{tabularx}{\textwidth}{|p{0.23\textwidth}|X|}
+\hline
+\textbf{Quality attribute} & \textbf{Requirement / design response}\\\hline
+Security & Global deny-by-default JWT guard, role checks, verified-only public data, validated inputs and rate limits.\\\hline
+Integrity & Database unique constraints and transactions for event capacity, pledge fulfilment and payment idempotency.\\\hline
+Maintainability & TypeScript monorepo, modular NestJS services, shared Zod contracts and Drizzle migrations.\\\hline
+Usability & Mobile-first navigation with role-specific route groups and reusable form/state patterns.\\\hline
+\end{tabularx}
+\end{table}
+
+\section{Technology Stack}
+Table~\ref{tab:stack} summarises the technologies used in each layer of Nabhya.
+
+\begin{table}[H]\centering
+\caption{Technology stack used by Nabhya.}
+\label{tab:stack}
+\begin{tabularx}{\textwidth}{|p{0.22\textwidth}|p{0.38\textwidth}|X|}
+\hline
+\textbf{Layer} & \textbf{Technology} & \textbf{Purpose}\\\hline
+Mobile application & Expo SDK 56, React Native 0.85, Expo Router & Cross-platform mobile client and file-based navigation\\\hline
+Client state/data & Zustand, TanStack Query, Axios & Session state, server cache and API requests\\\hline
+Forms and styling & React Hook Form, Zod, NativeWind/Tailwind, design tokens & Validated forms and consistent UI\\\hline
+Backend & NestJS 11, Node.js 22+, TypeScript & REST endpoints, guards, services and validation\\\hline
+Authentication & Supabase Auth, jose, remote JWKS & Hosted identity and JWT verification\\\hline
+Database & Supabase PostgreSQL, Drizzle ORM & Relational persistence, typed queries and migrations\\\hline
+Object storage & Supabase Storage, signed URLs & Direct signed uploads and downloads\\\hline
+Payments & Razorpay webhooks & Provider-settled monetary donations (go-live on hold)\\\hline
+Testing & Vitest 4, PGlite & Unit and migration-backed integration tests\\\hline
+Tooling & pnpm workspaces, Turborepo, Biome & Monorepo task orchestration and code quality\\\hline
+\end{tabularx}
+\end{table}
+
+\clearpage
+\section{High-Level System Architecture}
+The mobile app talks to the NestJS REST API over HTTPS. The API validates each request with Supabase Auth's JWKS endpoint, checks the role of the user, validates the request, and then passes it on to a feature service. Drizzle ORM links the services to Supabase PostgreSQL. Signed URLs let files go directly between the app and Supabase Storage, and the API only issues and validates the upload permissions. A payment-provider webhook is the only path that can settle a monetary donation. The overall architecture is shown in Figure~\ref{fig:architecture}.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \imgph{\textwidth}{4.02cm}{architecture-client-api.png}
+        \caption{Client, API and authentication.}
+    \end{subfigure}
+    \par\vspace{0.2in}
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \imgph{\textwidth}{11.27cm}{architecture-data-payments.png}
+        \caption{Data layer and payment integration (fed by the API's Drizzle ORM and Feature Services).}
+    \end{subfigure}
+    \caption{High-level system architecture of Nabhya.}
+    \label{fig:architecture}
+\end{figure}
+
+\section{Database Design}
+The database has 29 PostgreSQL tables, grouped by area: identity and access, organisations, categories, events, needs, certificates, donations, engagement, publishing, feed and audit. All tables use UUID primary keys. Foreign keys, status enums, unique indexes and transaction boundaries are used to enforce the core rules. The entity groups are summarised in Table~\ref{tab:entities} and the full model is provided in Section~\ref{sec:erd}.
+
+\begin{table}[H]\centering
+\caption{Core database entity groups.}
+\label{tab:entities}
+\begin{tabularx}{\textwidth}{|p{0.28\textwidth}|X|}
+\hline
+\textbf{Entity group} & \textbf{Representative tables / purpose}\\\hline
+Identity and access & \texttt{users}, \texttt{roles}, \texttt{user\_roles}, \texttt{user\_documents}: user profile, role grants and volunteer identity documents\\\hline
+Organisations & \texttt{organizations}, \texttt{organization\_admins}, \texttt{team\_invites}, \texttt{organization\_ownership\_transfers}, \texttt{organization\_documents}: ownership, team membership, invites, transfers and private legal documents\\\hline
+Discovery and events & \texttt{categories}, \texttt{organization\_categories}, \texttt{user\_categories}, \texttt{events}, \texttt{event\_applications}\\\hline
+Needs & \texttt{needs}, \texttt{need\_pledges}: WANT/OFFER posts, quantity and pledge lifecycle\\\hline
+Feed & \texttt{posts}, \texttt{posts\_media}, \texttt{post\_interactions}, \texttt{post\_comments}: unified feed posts, media, likes/saves/shares/impressions and comments\\\hline
+Recognition and donations & \texttt{certificates}, \texttt{donations}: attendance-linked certificates and monetary contribution records\\\hline
+Engagement and publishing & \texttt{bookmarks}, \texttt{follows}, \texttt{reviews}, \texttt{notifications}, \texttt{announcements}, \texttt{financial\_reports}\\\hline
+Governance & \texttt{audit\_logs}: append-only records of sensitive actions\\\hline
+\end{tabularx}
+\end{table}
+
+% ------------------------ DATABASE ER DIAGRAMS ------------------------
+\section{Entity-Relationship Diagrams}
+\label{sec:erd}
+
+These 29 tables cover identity and access, organisations, events, volunteering, needs and pledges, certificates, donations, engagement, publishing, the feed and audit records. A single diagram of all of them would be unreadable, so we divided the model into three ERDs.
+
+\clearpage
+\subsection{ERD 1: Identity and Organisation Management}
+
+Figure~\ref{fig:erd-identity} shows the entities behind user accounts, roles, organisation profiles, team membership, invitations, ownership transfers and document verification.
+
+\begin{figure}[H]
+    \centering
+    \imgph{\textwidth}{8.22cm}{erd-identity.png}
+    \caption{ERD for identity and organisation management.}
+    \label{fig:erd-identity}
+\end{figure}
+
+\clearpage
+\subsection{ERD 2: Categories, Events and Volunteering}
+
+Figure~\ref{fig:erd-events} shows how categories, user interests, organisation categories, volunteering events, event applications and participation certificates relate to each other.
+
+\begin{figure}[H]
+    \centering
+    \imgph{\textwidth}{16.44cm}{erd-events.png}
+    \caption{ERD for categories, events and volunteering.}
+    \label{fig:erd-events}
+\end{figure}
+
+\clearpage
+\subsection{ERD 3: Needs, Donations and Engagement}
+
+Figure~\ref{fig:erd-engagement} covers WANT/OFFER listings, item pledges, monetary donations, bookmarks, follows, reviews, notifications, announcements, financial reports, feed posts, media, interactions, comments and audit logs.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \imgph{\textwidth}{7.40cm}{erd-engagement-a.png}
+        \caption{Needs, pledges, donations, bookmarks, follows and reviews.}
+    \end{subfigure}
+    \par\vspace{0.2in}
+    \begin{subfigure}[t]{\textwidth}
+        \centering
+        \imgph{\textwidth}{6.67cm}{erd-engagement-b.png}
+        \caption{Feed posts, media, interactions, comments, announcements, financial reports, notifications and audit logs.}
+    \end{subfigure}
+    \caption{ERD for needs, donations and engagement.}
+    \label{fig:erd-engagement}
+\end{figure}
+
+\clearpage
+
+\section{Important Database Decisions}
+The \texttt{events.accepted\_count} and \texttt{needs.fulfilled\_quantity} fields are denormalised counters. They are stored so that the database does not have to run an aggregate query every time the public accesses the data, and their updates use transactions and row locks. Unique constraints are used to enforce the rules that matter most: only one application per volunteer per event, one certificate per event application, one follow and one review per user and organisation pair, and one bookmark per user and organisation pair. Donation amounts are not kept as floating-point values but as whole numbers in paise. For files, we store object-storage keys rather than long-lived public URLs.
+
+\section{Use-Case Summary}
+Volunteers can onboard, discover organisations, apply to events, pledge items, write reviews, bookmark organisations, see their impact and receive their certificates. Organisations get to manage their profile, documents, events, needs, applications and pledges, record who attended and publish public updates. Superadmins verify organisations and users, monitor and moderate content, and audit logs. Eligible public content may be freely viewed, and certificates may be verified without a user account. These use cases are presented in Figure~\ref{fig:use-case} for each of the actors listed in Table~\ref{tab:actors}.
+
+\begin{figure}[H]
+    \centering
+    \imgph{\textwidth}{8.81cm}{use-case-diagram.png}
+    \caption{Use-case diagram of the Nabhya platform.}
+    \label{fig:use-case}
+\end{figure}
+
+\section{System Requirements}
+\label{sec:system-requirements}
+Table~\ref{tab:sysreq} lists what building, running and testing Nabhya requires. None of it is specialised: the heaviest items are an Android emulator or a physical test device and, for native builds outside Expo Go, a once-off Expo Application Services (EAS) build.
+
+\begin{table}[H]\centering
+\caption{Development and runtime requirements.}
+\label{tab:sysreq}
+\begin{tabularx}{\textwidth}{|p{0.22\textwidth}|X|}
+\hline
+\textbf{Category} & \textbf{Requirement}\\\hline
+Hardware (development) & Any machine capable of running Node.js and Android Studio/Xcode; 8\,GB RAM minimum, 16\,GB recommended for the emulator and bundler running together\\\hline
+Hardware (testing) & An Android or iOS device, or an emulator/simulator, for the Expo client\\\hline
+Hardware (deployment) & None dedicated - the API, database, auth and storage all run on managed hosting (Render, Supabase)\\\hline
+Runtime & Node.js 22+, pnpm 10.10\\\hline
+Mobile tooling & Expo SDK 56, Expo Router, EAS CLI for native builds\\\hline
+Backend tooling & NestJS 11, Drizzle ORM, TypeScript 5\\\hline
+Database & PostgreSQL 15+ (managed via Supabase)\\\hline
+External services & Supabase (Auth, Storage, Postgres), Razorpay (payments, on hold for go-live)\\\hline
+Testing & Vitest 4, PGlite (in-process PostgreSQL for integration tests)\\\hline
+Version control & Git, with GitHub Actions available for CI\\\hline
+\end{tabularx}
+\end{table}
+
+\clearpage
+\section{Entity Lifecycle State Models}
+\label{sec:state-models}
+The ER diagrams in Section~\ref{sec:erd} show what each record looks like; they do not show how a record moves between states over its life. Figures~\ref{fig:states-a} and~\ref{fig:states-b} give that view for the four status fields the rest of this report leans on most: organisation verification, events, needs and donations. Every transition shown is enforced server-side - the superadmin and organisation endpoints are the only things that can move a record off its current state, never the client directly.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \imgph{\textwidth}{12.25cm}{state-organisation.png}
+        \caption{Organisation verification status.}
+    \end{subfigure}\hfill
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \imgph{\textwidth}{12.57cm}{state-event.png}
+        \caption{Event status.}
+    \end{subfigure}
+    \caption{State models for organisation verification and event status.}
+    \label{fig:states-a}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \imgph{\textwidth}{9.34cm}{state-need.png}
+        \caption{Need status.}
+    \end{subfigure}\hfill
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \imgph{\textwidth}{12.57cm}{state-donation.png}
+        \caption{Donation status.}
+    \end{subfigure}
+    \caption{State models for need and donation status.}
+    \label{fig:states-b}
+\end{figure}
+
+\clearpage
+
+% ======================== CHAPTER 4 ========================
+\chapter{Implementation}
+\label{ch:implementation}
+
+\section{Monorepo Structure}
+The foundation of the technology is a single TypeScript monorepo using pnpm workspaces and Turborepo. Both the mobile app and the API are in \texttt{apps/}: the mobile application is stored in \texttt{apps/native} and the API sits in \texttt{apps/server}. The packages include the database schema, client and environment validation, shared request and response contracts, and common tooling configuration. The interactive setup utilities for the database are in the \texttt{scripts} directory. Definitions are shared in one place, and both client and server tasks are run with the same tooling (Table~\ref{tab:monorepo}).
+
+\begin{table}[H]\centering
+\caption{Monorepo structure.}
+\label{tab:monorepo}
+\begin{tabularx}{\textwidth}{|p{0.3\textwidth}|X|}
+\hline
+\textbf{Path} & \textbf{Responsibility}\\\hline
+\texttt{apps/native} & Expo / React Native mobile app and role-based route groups\\\hline
+\texttt{apps/server} & NestJS REST API, controllers, feature modules, guards and services\\\hline
+\texttt{packages/db} & Drizzle schema, PostgreSQL client, migrations and seed data\\\hline
+\texttt{packages/env} & Runtime environment validation\\\hline
+\texttt{packages/shared} & Shared Zod request and response schemas\\\hline
+\texttt{packages/config} & Shared Biome and TypeScript configuration\\\hline
+\texttt{scripts} & Interactive database setup utilities\\\hline
+\end{tabularx}
+\end{table}
+
+\section{Module Boundaries and Dependencies}
+\label{sec:modules}
+\begin{figure}[H]
+    \centering
+    \imgph{\textwidth}{3.05cm}{module-dependencies.png}
+    \caption{Feature modules grouped by domain, with their dependency on shared core infrastructure.}
+    \label{fig:modules}
+\end{figure}
+The API's 18 controllers expose 119 REST endpoints, verified directly from NestJS's own route metadata by \texttt{endpoints.spec.ts} (Section~\ref{sec:testing-objectives}).
+
+Each registered against a single feature module. Figure~\ref{fig:modules} groups those modules by the domain they serve, rather than listing all 18 flat: every domain module depends on the same core infrastructure (the JWT/role guards, the Drizzle database module and the shared Zod validation pipe), and the dotted arrows show the one-way domain dependencies that matter for understanding the system - identity underlies organisations, organisations publish into volunteering and the community layer, volunteering feeds the community layer, and governance moderates both identity and organisations without being depended on in return.
+
+
+
+\section{Authentication and Role-Aware Navigation}
+\label{sec:impl-auth}
+Supabase Auth provides the sign-in functionality. The app receives a JWT and passes it to the API as a bearer token. A global JWT guard checks the token against the remote JWKS and, as soon as the token is verified, updates the matching user record in our database in real time. On the client, a route resolver verifies that the user is authenticated, has selected a role and has completed the onboarding for that role. The volunteer, organisation and superadmin screens are in separate route groups. These client-side guards make the app easier to use, but they are not a security boundary, because the actual access decision is the responsibility of the API. This flow is shown in Figure~\ref{fig:sequence-auth}.
+
+\seqfigure{sequence-auth}{authentication}{Sequence diagram for user authentication and JWT validation.}{fig:sequence-auth}{11.75cm}
+
+\section{NGO Onboarding and Verification}
+\label{sec:impl-verification}
+When onboarding, an organisation enters its details and legal documents on the platform. An object key is kept on every document record. These documents are then taken for review by a superadmin, who may approve, reject or even suspend the organisation. Public event, need and directory queries filter on \texttt{VERIFIED} status in addition to \texttt{ACTIVE} status. This occurs at the server level, so an ineligible organisation won't show up simply by changing the client. The workflow is shown in Figure~\ref{fig:sequence-ngo-verification}.
+
+\seqfigure{sequence-ngo-verification}{NGO verification}{Sequence diagram for NGO registration and verification.}{fig:sequence-ngo-verification}{14.60cm}
+
+\section{Event Management and Applications}
+\label{sec:impl-events}
+Organisations plan events with a particular venue, time, application closing date and a fixed number of volunteers for the event. An event moves through the stages draft, published, cancelled and completed. Volunteers make applications and may withdraw, and organisations go through the applications and record attendance. A unique constraint on the event and volunteer pair prevents a volunteer from applying twice for a particular event. Once an application is accepted, the API increments the event's accepted counter within a transaction that acquires the event row lock, thus ensuring that the capacity is not exceeded even when requests are concurrent (Figure~\ref{fig:sequence-event-application}).
+
+\seqfigure{sequence-event-application}{event application}{Sequence diagram for event application and capacity management.}{fig:sequence-event-application}{11.13cm}
+
+\section{Needs and Item Pledges}
+\label{sec:impl-needs}
+The needs module supports two types of listing. A WANT is an organisation's request for a quantity of some resource. An OFFER states the items an organisation has in surplus that others can take. A user makes a pledge against a listing, which the organisation can accept, reject or complete. Each need keeps its urgency, expiry, status and fulfilled quantity, and row-locking transactions ensure that the fulfilment counter is not altered by another transaction at the same time. Figure~\ref{fig:needs-management} shows the organisation-side needs dashboard.
+
+\section{Engagement and Public Information}
+\label{sec:impl-engagement}
+The engagement layer covers bookmarks, follows, reviews, organisation replies and in-app notifications. Organisations can also add and publish public announcements and financial reports. Duplicate bookmarks, follows and reviews are not allowed, because of unique constraints. When an announcement is published, it notifies the users who have bookmarked the organisation. Financial reports are kept separate from the private verification documents and are public by design.
+
+\section{Community Feed}
+\label{sec:impl-feed}
+The feed is built on a unified posts table, with media attachments, interactions (likes, saves, shares and impressions) and comments, as listed in Table~\ref{tab:entities}. The volunteer home screen (Figure~\ref{fig:volunteer-home}) and the organisation feed (Figure~\ref{fig:organisation-feed}) show verified organisation updates and community posts.
+
+\section{Upload and Object Storage Workflow}
+\label{sec:impl-uploads}
+Files travel directly between the mobile app and Supabase Storage using short-lived pre-signed URLs. The API creates an upload ticket, and before it accepts an object key for storage in the database it checks ownership and object metadata. Downloads use short-lived signed URLs that are issued only after an authorisation check. The API therefore controls permissions and metadata without ever carrying the file itself (Figure~\ref{fig:sequence-media-upload}).
+
+\seqfigure{sequence-media-upload}{document and media upload}{Sequence diagram for document and media upload.}{fig:sequence-media-upload}{10.06cm}
+
+\section{Certificates and Participation Verification}
+\label{sec:impl-certificates}
+A certificate is linked to a volunteer's event application and to the organisation, and it can only be issued after attendance has been recorded. Every certificate record contains a unique public code, the PDF object key, the issuer and any revocation information. The volunteer downloads the PDF using an authorised signed URL from Supabase Storage (Section~\ref{sec:impl-uploads}). A public verification endpoint makes it possible to check a certificate code without having an account. A revoked certificate will still resolve, but it will be marked void. Issuance and verification are depicted in Figure~\ref{fig:sequence-certificate}.
+
+\seqfigure{sequence-certificate}{certificate}{Sequence diagram for certificate issuance and public verification.}{fig:sequence-certificate}{11.47cm}
+
+\section{Monetary Donations}
+\label{sec:impl-donations}
+The data model supports donations from registered users as well as from guest donors. The server determines the amount and stores it as an integer number of paise. The client cannot mark a donation as successful by itself: a donation starts in the \texttt{PENDING} state and is completed only when a signature-verified webhook from the payment provider (Razorpay~\cite{razorpay}) is received. A unique provider payment identifier protects against replayed webhooks and double settlement. This feature is fully implemented but on hold until a go-live decision is made (Figure~\ref{fig:sequence-donation}).
+
+\seqfigure{sequence-donation}{Razorpay donation}{Sequence diagram for donation processing and Razorpay webhook verification. The feature is implemented but go-live is currently on hold.}{fig:sequence-donation}{15.27cm}
+
+\section{Notifications, Audit and Administration}
+\label{sec:impl-notifications}
+The notification system stores in-app messages for application and pledge outcomes, verification events, certificates, donations, reviews and broadcasts. A broadcast creates one notification row per user, so each person keeps their own read state. Administrative actions and other sensitive operations go into an append-only audit log that records the actor, the action, the entity, the old and new values and the IP address. Superadmins can moderate content, work through verification queues, see a platform overview and search the audit log.
+
+\section{Client Application Design}
+\label{sec:impl-client}
+The Expo Router app has route groups for authentication, role selection, onboarding, volunteer features, and organisation management and administration, along with public routes for events, NGOs and certificates. Axios provides the typed HTTP client that attaches the bearer token, and server state and cache invalidation are managed by TanStack Query. Zustand holds on to the session state and saves it on the device using \texttt{expo-secure-store}. Forms use React Hook Form with the shared Zod schemas, and Supabase Auth takes care of sign-in, sign-up and token refresh, as shown by the authentication screen in Figure~\ref{fig:navigation}.
+
+\begin{figure}[H]
+    \centering
+    \imgph{\textwidth}{10cm}{auth-signin-screen.png}
+    \caption{Authentication screen on the web client, used to sign in with email/password or Google.}
+    \label{fig:navigation}
+\end{figure}
+
+\section{User Interface Evidence}
+\label{sec:impl-ui}
+This section shows screenshots taken from the running application. Each caption names the role and the action on screen. Figure~\ref{fig:ui-volunteer} covers the volunteer screens, and Figures~\ref{fig:organisation-feed}, \ref{fig:needs-management} and~\ref{fig:org-verification} cover the organisation screens.
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[t]{0.31\textwidth}
+  \centering
+  \imgph{\textwidth}{10.73cm}{search-discovery.jpeg}
+  \caption{Search and discovery.}
+  \label{fig:search-discovery}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\textwidth}
+  \centering
+  \imgph{\textwidth}{10.73cm}{volunteer-home.jpeg}
+  \caption{Volunteer home feed.}
+  \label{fig:volunteer-home}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.31\textwidth}
+  \centering
+  \imgph{\textwidth}{10.73cm}{event-details.jpeg}
+  \caption{Event details.}
+  \label{fig:event-details}
+\end{subfigure}
+\caption{Volunteer-facing mobile screens: (a) search and discovery of NGOs, events, causes and needs; (b) home feed displaying verified organisation updates and community posts; (c) event timing, location, available places and application status.}
+\label{fig:ui-volunteer}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\imgph{\textwidth}{9.0cm}{feed-desktop.jpeg}
+\caption{Organisation feed interface displaying public updates and community activities.}
+\label{fig:organisation-feed}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\imgph{\textwidth}{9.0cm}{needs-management.jpeg}
+\caption{Organisation needs dashboard showing listing type, status, progress and urgency.}
+\label{fig:needs-management}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\imgph{\textwidth}{9.0cm}{org-verification.jpeg}
+\caption{Organisation profile and verification interface displaying document-review status.}
+\label{fig:org-verification}
+\end{figure}
+
+\noindent These screenshots illustrate the interface only. They do not demonstrate the backend workflows; the integration tests in Chapter~\ref{ch:testing} cover those. Beyond the authentication screen in Figure~\ref{fig:navigation}, we have not included screenshots of the onboarding screens, the superadmin audit console, certificates or donation checkout.
+
+% ======================== CHAPTER 5 ========================
+\chapter{Testing and Evaluation}
+\label{ch:testing}
+
+\section{Testing Objectives}
+\label{sec:testing-objectives}
+We want to ensure that the API adheres to the access rules, keeps data consistent, makes only correct state changes and exposes only public data. We wrote a number of unit tests for selected guards and infrastructure, and integration tests based on PGlite. The test database is built from the committed migrations, so any differences between the migrations and the schema show up when the tests are executed.
+
+\section{Test Environment and Strategy}
+We use Vitest as our test runner. PGlite provides an in-process PostgreSQL engine, so the tests can exercise SQL constraints, transactions and aggregates without requiring a separate database service. A shared harness builds the database and wires in the services, factories generate the test rows, and the environment setup provides throwaway configuration. A dependency-injection verification script also checks that all controllers and services can be resolved before the application runs. The Vitest specs are shown in Figure~\ref{fig:testing}.
+
+\begin{figure}[H]
+    \centering
+    \imgph{\textwidth}{2.82cm}{testing-architecture.png}
+    \caption{Vitest test specifications and execution output.}
+    \label{fig:testing}
+\end{figure}
+
+\section{Integration Test Coverage}
+Every suite in Table~\ref{tab:tests} runs as an integration test rather than a unit test with mocks: each one boots the feature services against a PGlite database that is rebuilt from the committed migrations, seeds it with factory rows and then drives the same service methods the controllers call. Because the database is real PostgreSQL SQL, the tests exercise the unique constraints, transactional counters and row locks described in Chapter~\ref{ch:implementation} directly, so a suite fails if any of those have drifted from what the design promises. The suites are grouped by feature domain, and together they cover FR-01 to FR-11; Section~\ref{sec:traceability} maps each requirement to the suite that verifies it.
+
+Table~\ref{tab:tests} lists the integration test suites and what each one covers.
+
+\begin{longtable}{|p{0.29\textwidth}|p{0.63\textwidth}|}
+\caption{Integration test coverage.}\label{tab:tests}\\\hline
+\textbf{Test suite} & \textbf{Coverage}\\\hline
+\endfirsthead
+\hline
+\textbf{Test suite} & \textbf{Coverage}\\\hline
+\endhead
+\texttt{events.spec.ts} & Public feed filtering, duplicate application conflict, application review and capacity accounting, publish gating, deletion and correlated counts.\\\hline
+\texttt{needs.spec.ts} & Pledging, fulfilment accounting under row lock, deletion and correlated counts.\\\hline
+\texttt{certificates.spec.ts} & Attendance, attendance reversal, issuance gating, public verification and downloads.\\\hline
+\texttt{admin.spec.ts} & Organisation/user moderation, overview counters, verification queues and listings.\\\hline
+\texttt{organizations.spec.ts} & Public directory filtering and proximity search.\\\hline
+\texttt{onboarding.spec.ts} & Status resolution and volunteer/organisation onboarding workflows.\\\hline
+\texttt{uploads.spec.ts} & Upload ticket issuance, download authorisation and upload confirmation.\\\hline
+\texttt{notifications.spec.ts} & Inbox operations, mark-read, broadcast fan-out and notifications.\\\hline
+\texttt{donations.spec.ts} & Checkout and webhook settlement behaviour.\\\hline
+Publishing, engagement, impact and users & Announcements, reports, team management, bookmarks, reviews, impact aggregates, profile, role and interest operations.\\\hline
+\end{longtable}
+
+\section{Requirements Traceability Matrix}
+\label{sec:traceability}
+Table~\ref{tab:traceability} closes the loop from the functional requirements in Table~\ref{tab:fr} to where each one is built and which integration suite exercises it, so a requirement is never just a line in Chapter~\ref{ch:design} with nothing to point back to it.
+
+\begin{longtable}{|p{0.07\textwidth}|p{0.27\textwidth}|p{0.16\textwidth}|p{0.33\textwidth}|}
+\caption{Requirements traceability matrix.}\label{tab:traceability}\\\hline
+\textbf{ID} & \textbf{Requirement} & \textbf{Implemented in} & \textbf{Verified by}\\\hline
+\endfirsthead
+\hline
+\textbf{ID} & \textbf{Requirement} & \textbf{Implemented in} & \textbf{Verified by}\\\hline
+\endhead
+FR-01 & Account and role onboarding & Section~\ref{sec:impl-auth} & \texttt{onboarding.spec.ts}\\\hline
+FR-02 & NGO verification & Section~\ref{sec:impl-verification} & \texttt{admin.spec.ts}\\\hline
+FR-03 & Event management & Section~\ref{sec:impl-events} & \texttt{events.spec.ts}\\\hline
+FR-04 & Capacity integrity & Section~\ref{sec:impl-events} & \texttt{events.spec.ts}\\\hline
+FR-05 & Needs and pledges & Section~\ref{sec:impl-needs} & \texttt{needs.spec.ts}\\\hline
+FR-06 & Engagement & Section~\ref{sec:impl-engagement} & Publishing/engagement suite\\\hline
+FR-07 & Certificates & Section~\ref{sec:impl-certificates} & \texttt{certificates.spec.ts}\\\hline
+FR-08 & Uploads & Section~\ref{sec:impl-uploads} & \texttt{uploads.spec.ts}\\\hline
+FR-09 & Notifications and audit & Section~\ref{sec:impl-notifications} & \texttt{notifications.spec.ts}\\\hline
+FR-10 & Community feed & Section~\ref{sec:impl-feed} & \texttt{events.spec.ts} (feed filtering)\\\hline
+FR-11 & Donations & Section~\ref{sec:impl-donations} & \texttt{donations.spec.ts}\\\hline
+\end{longtable}
+
+\section{Evaluation Limitations}
+Our evaluation focuses mainly on the implementation and the integration tests. It has no evidence of real NGOs or volunteers using the platform, no field evaluation, no user study and no independent measurement of production-scale performance. Statements of that sort should come only after such a study has been carried out (see Section~\ref{sec:future}).
+
+% ======================== CHAPTER 6 ========================
+\chapter[Deployment, Limitations and Future Scope]{Deployment, Limitations\\and Future Scope}
+\label{ch:deployment}
+
+\section{Deployment Architecture}
+The API is a Node.js/NestJS service configured through validated environment variables. Supabase PostgreSQL is the primary datastore, Supabase Auth handles authentication and provides the remote JWKS, and uploaded documents and generated certificates are stored in Supabase Storage. The API includes a liveness route and a readiness route that verifies the database connection, and Swagger documentation is available at \texttt{/api/docs}. During deployment, the readiness probe should point to the database-aware health endpoint. The topology is shown in Figure~\ref{fig:deployment}.
+
+\begin{figure}[H]
+    \centering
+    \imgph{\textwidth}{5.67cm}{deployment-topology.png}
+    \caption{Deployment and external-service topology.}
+    \label{fig:deployment}
+\end{figure}
+
+% ------------------------ DEPLOYMENT LINK ------------------------
+\section{Deployed Application and Access Link}
+\label{sec:deployment-link}
+
+Nabhya is deployed as a live web application and can be reached at the URL below. Opening it in any browser lands on the sign-in screen, after which the features available to the visitor depend on their authentication status and assigned role. The same address is encoded in the QR code next to it, so a reader can scan the page straight from the printed report instead of typing the URL by hand.
+
+\begin{center}
+\begin{minipage}[c]{0.58\textwidth}
+\textbf{Application URL:}\\[0.08in]
+\url{https://appnabhya.vercel.app}
+\end{minipage}\hfill
+\begin{minipage}[c]{0.34\textwidth}
+\centering
+\qrcode[height=3.2cm]{https://appnabhya.vercel.app}\\[0.06in]
+{\footnotesize Scan to open Nabhya}
+\end{minipage}
+\end{center}
+
+
+\section{Environment and Operational Considerations}
+The server needs the database URLs, the CORS origin, the runtime environment, the Supabase Auth and JWKS URLs and the Supabase Storage credentials in order to work. The mobile app needs the API base URL and the public Supabase Auth URL. These are specific to each target environment and must not be put in source control. The purpose of environment validation is to fail early, at startup, when anything is missing. The in-memory storage stub must not be used in a production environment, since verification documents and certificates need to be stored reliably.
+
+The operations checklist also covers setting up graceful shutdown hooks, setting trust-proxy when the service is behind a proxy, and scheduling the endpoint that closes finished events. The health checks and the scheduled close-finished endpoint are both included in the API (Figure~\ref{fig:deployment}).
+
+\section{Known Limitations}
+\label{sec:limitations}
+Table~\ref{tab:limitations} lists the known limitations of the current implementation.
+
+\begin{table}[H]\centering
+\caption{Known limitations and their effects.}
+\label{tab:limitations}
+\begin{tabularx}{\textwidth}{|p{0.29\textwidth}|X|}
+\hline
+\textbf{Limitation} & \textbf{Effect}\\\hline
+No dedicated web application & The superadmin console currently ships inside the Expo app; public SEO-friendly pages and a web admin console are future work.\\\hline
+In-app notifications only & Email and push delivery are not yet available.\\\hline
+Client pagination incomplete & List APIs return paginated envelopes, but screens currently render page one.\\\hline
+Development schema push & Non-production boots use Drizzle schema push; production data should use migration-based deployment.\\\hline
+Monetary donations on hold & The donation workflow is implemented but awaits a go-live decision (Section~\ref{sec:impl-donations}).\\\hline
+Client route guards are advisory & The client may briefly display a stale route group; server-side guards remain authoritative (Section~\ref{sec:impl-auth}).\\\hline
+Light-mode styling constraint & The Tailwind theme is light-mode oriented; a dark-aware token system is used by most screens.\\\hline
+\end{tabularx}
+\end{table}
+
+\section{Risk Analysis and Mitigation}
+\label{sec:risks}
+Table~\ref{tab:risks} names the risks that could actually derail a pilot launch, separately from the known limitations above, which are gaps rather than active threats.
+
+\begin{table}[H]\centering
+\caption{Project and operational risks, and how each is mitigated.}
+\label{tab:risks}
+\begin{tabularx}{\textwidth}{|p{0.22\textwidth}|p{0.3\textwidth}|X|}
+\hline
+\textbf{Risk} & \textbf{Impact if realised} & \textbf{Mitigation}\\\hline
+A fraudulent organisation gets verified & Public trust in every verified NGO on the platform is undermined & Document review is manual and attributable to a specific superadmin; every decision is written to the append-only audit log (Section~\ref{sec:impl-notifications})\\\hline
+Concurrent requests overrun event capacity or need fulfilment & Over-committed volunteers at an event, or a need double-pledged past its quantity & Counter mutations run inside a transaction with \texttt{SELECT ... FOR UPDATE} on the parent row (Section~\ref{sec:impl-events})\\\hline
+A donation webhook is replayed or forged & Double-settlement or a donation marked complete without payment & Settlement only happens on a signature-verified webhook, keyed on a unique provider payment id (Section~\ref{sec:impl-donations})\\\hline
+Supabase Storage misconfigured in production & Uploads silently discarded by the in-memory stub, data loss on restart & The stub is refused outright in a production boot (known trap, Section~\ref{sec:limitations})\\\hline
+Schema drift between migrations and the running database & Integration tests pass locally but production queries fail & The test database is built from the committed migrations themselves, so drift fails CI before it reaches production\\\hline
+Key project knowledge concentrated in three students & Continuity risk if the project is handed off or extended by others & This report, the per-module \texttt{AGENTS.md} guides and the inline code comments exist specifically to transfer that context\\\hline
+\end{tabularx}
+\end{table}
+
+\section{Future Enhancements}
+\label{sec:future}
+These are the enhancements we want the project to have next:
+\begin{itemize}
+  \item A dedicated web application (Next.js) for superadmin operations, with SEO-friendly public pages for NGOs, events and certificates.
+  \item Email and push notifications, with delivery preferences and digest options.
+  \item Infinite scroll or full pagination controls across feeds.
+  \item Consistent migration-based database setup before any production data is added.
+  \item A move to PostGIS for geospatial queries if the current latitude/longitude and Haversine proximity search no longer meets the needs.
+  \item Organisation analytics such as application funnels and donation trends.
+  \item Support for regional languages, starting with Hindi, so that the platform can deliver its functionality in a locally spoken language wherever possible.
+  \item Field testing of the platform with NGOs and volunteers, to measure its usability and performance and report on them.
+\end{itemize}
+
+\section{Operational Readiness Checklist}
+Before deployment to production, the following checks should be performed:
+\begin{itemize}
+  \item All environment variables needed by both the client and the server have been set and checked.
+  \item The dependency-injection verification succeeds.
+  \item The production build succeeds.
+  \item Supabase Storage, including signed upload and download, is set up correctly.
+  \item The Supabase Auth configuration (issuer and JWKS) is correct and valid.
+  \item The allowed CORS origins are correct.
+  \item The committed migrations are applied and the automated tests pass on a clean schema.
+  \item The readiness probe and the scheduled event-closing job are configured.
+  \item Payment go-live remains disabled while provider configuration, webhook verification and business approval are pending.
+  \item Deployment logs are captured.
+  \item Rollback and recovery steps are documented.
+\end{itemize}
+
+% ======================== CHAPTER 7 ========================
+\chapter{Conclusion}
+\label{ch:conclusion}
+
+In conclusion, Nabhya combines NGO verification, volunteer opportunities, item-level giving, engagement and verifiable participation certificates in one mobile-first solution. On one side, an Expo app makes regular calls to a REST API created with NestJS, which uses Supabase Auth for authentication; on the other side, Supabase Storage and shared Zod contracts sit alongside a Supabase PostgreSQL database that is accessed through Drizzle ORM. The privileges of volunteers, organisations and superadmins differ, and anonymous visitors can view only some public information and verify certificates.
+
+Most of the engineering decisions come down to trust and doing the right thing. Organisation documents are reviewed before an organisation becomes public, and public listings only display verified and active organisations. Event capacity and need fulfilment counters are updated inside transactions, and important relationships are preserved through database uniqueness constraints. Payments settle only through signature-verified webhooks, and files move only through short-lived signed URLs. The integration tests (Chapter~\ref{ch:testing}) exercise a PostgreSQL-compatible database that we construct from the committed migrations.
+
+The project is also clearly bounded (Section~\ref{sec:limitations}). The web console and email and push notifications are yet to be built, full client pagination is still pending, and monetary donations are on hold until go-live. Real-world adoption and performance have not been demonstrated yet, and this should be done with field studies and validated measurements (Section~\ref{sec:future}). In this limited sense, Nabhya gives us a sufficient base for more reliable and effective giving.
+
+% ======================== REFERENCES ========================
+\clearpage\phantomsection\addcontentsline{toc}{chapter}{References}
+\begin{thebibliography}{99}
+\bibitem{expo} Expo, ``Expo Documentation.'' \url{https://docs.expo.dev/}
+\bibitem{reactnative} React Native, ``React Native Documentation.'' \url{https://reactnative.dev/docs/getting-started}
+\bibitem{nestjs} NestJS, ``NestJS Documentation.'' \url{https://docs.nestjs.com/}
+\bibitem{postgresql} PostgreSQL Global Development Group, ``PostgreSQL Documentation.'' \url{https://www.postgresql.org/docs/}
+\bibitem{drizzle} Drizzle Team, ``Drizzle ORM Documentation.'' \url{https://orm.drizzle.team/docs/overview}
+\bibitem{supabase} Supabase, ``Supabase Documentation.'' \url{https://supabase.com/docs}
+\bibitem{zod} Zod, ``Zod Documentation.'' \url{https://zod.dev/}
+\bibitem{vitest} Vitest, ``Vitest Documentation.'' \url{https://vitest.dev/guide/}
+\bibitem{pglite} PGlite, ``PGlite Documentation.'' \url{https://pglite.dev/}
+\bibitem{razorpay} Razorpay, ``Razorpay Documentation.'' \url{https://razorpay.com/docs/}
+\bibitem{jwt} M. Jones, J. Bradley and N. Sakimura, ``JSON Web Token (JWT),'' RFC 7519, IETF, May 2015. \url{https://www.rfc-editor.org/rfc/rfc7519}
+\bibitem{jwk} M. Jones, ``JSON Web Key (JWK),'' RFC 7517, IETF, May 2015. \url{https://www.rfc-editor.org/rfc/rfc7517}
+\bibitem{boehm1981} B. W. Boehm, \emph{Software Engineering Economics}. Prentice-Hall, 1981.
+\end{thebibliography}
+
+% ======================== APPENDICES ========================
+\appendix
+\renewcommand{\thechapter}{\Alph{chapter}}
+
+\chapter{Complete API Endpoint Reference}
+\label{app:endpoints}
+This appendix lists every one of the 119 REST endpoints the API exposes, grouped by controller, read directly from NestJS's own route metadata rather than written out by hand (the same source \texttt{endpoints.spec.ts} uses to keep this count honest, Section~\ref{sec:testing-objectives}). All paths are relative to the \texttt{/api} prefix. Paths under \texttt{org/*} resolve the caller's organisation from their token rather than accepting one from the client.
+
+\begin{longtable}{|p{0.13\textwidth}|p{0.57\textwidth}|p{0.18\textwidth}|}
+\caption{Complete endpoint reference by controller.}\label{tab:endpoints}\\\hline
+\textbf{Method} & \textbf{Path} & \textbf{Controller}\\\hline
+\endfirsthead
+\hline
+\textbf{Method} & \textbf{Path} & \textbf{Controller}\\\hline
+\endhead
+
+GET & \texttt{/} and \texttt{/health} & App (liveness/readiness)\\\hline
+GET & \texttt{/onboarding/status} & Onboarding\\\hline
+POST & \texttt{/onboarding/organization} & Onboarding\\\hline
+POST & \texttt{/onboarding/volunteer} & Onboarding\\\hline
+GET & \texttt{/users/me} & Users\\\hline
+PATCH & \texttt{/users/me} & Users\\\hline
+POST & \texttt{/users/me/role} & Users\\\hline
+GET & \texttt{/users/me/documents} & Users\\\hline
+POST & \texttt{/users/me/documents} & Users\\\hline
+GET & \texttt{/organizations} & Organizations\\\hline
+GET & \texttt{/organizations/nearby} & Organizations\\\hline
+GET & \texttt{/organizations/me} & Organizations\\\hline
+PATCH & \texttt{/organizations/me} & Organizations\\\hline
+GET & \texttt{/organizations/me/overview} & Organizations\\\hline
+GET & \texttt{/organizations/me/documents} & Organizations\\\hline
+POST & \texttt{/organizations/me/documents} & Organizations\\\hline
+GET & \texttt{/organizations/:id} & Organizations\\\hline
+GET & \texttt{/categories} & Categories\\\hline
+GET & \texttt{/search} & Search\\\hline
+POST & \texttt{/uploads/intent} & Uploads\\\hline
+POST & \texttt{/uploads/download-url} & Uploads\\\hline
+GET & \texttt{/events} & Events\\\hline
+GET & \texttt{/events/me/applications} & Events\\\hline
+GET & \texttt{/events/:id} & Events\\\hline
+POST & \texttt{/events/:id/applications} & Events\\\hline
+DELETE & \texttt{/events/:id/applications/me} & Events\\\hline
+GET & \texttt{/org/events} & Org Events\\\hline
+POST & \texttt{/org/events} & Org Events\\\hline
+GET & \texttt{/org/events/:id} & Org Events\\\hline
+PATCH & \texttt{/org/events/:id} & Org Events\\\hline
+DELETE & \texttt{/org/events/:id} & Org Events\\\hline
+GET & \texttt{/org/events/:id/applications} & Org Events\\\hline
+POST & \texttt{/org/events/:id/applications/bulk-review} & Org Events\\\hline
+PATCH & \texttt{/org/events/:id/applications\allowbreak/:applicationId} & Org Events\\\hline
+GET & \texttt{/needs} & Needs\\\hline
+GET & \texttt{/needs/me/pledges} & Needs\\\hline
+GET & \texttt{/needs/:id} & Needs\\\hline
+POST & \texttt{/needs/:id/pledges} & Needs\\\hline
+DELETE & \texttt{/needs/:id/pledges/me} & Needs\\\hline
+GET & \texttt{/org/needs} & Org Needs\\\hline
+POST & \texttt{/org/needs} & Org Needs\\\hline
+PATCH & \texttt{/org/needs/:id} & Org Needs\\\hline
+DELETE & \texttt{/org/needs/:id} & Org Needs\\\hline
+GET & \texttt{/org/needs/:id/pledges} & Org Needs\\\hline
+PATCH & \texttt{/org/needs/:id/pledges/:pledgeId} & Org Needs\\\hline
+POST & \texttt{/org/events/:eventId\allowbreak/applications\allowbreak/bulk-attendance} & Certificates\\\hline
+PATCH & \texttt{/org/events/:eventId\allowbreak/applications\allowbreak/:applicationId\allowbreak/attendance} & Certificates\\\hline
+POST & \texttt{/org/events/:eventId\allowbreak/applications\allowbreak/:applicationId\allowbreak/certificate} & Certificates\\\hline
+PATCH & \texttt{/org/certificates/:id/revoke} & Certificates\\\hline
+GET & \texttt{/me/certificates} & Certificates\\\hline
+GET & \texttt{/me/certificates/:id/pdf} & Certificates\\\hline
+GET & \texttt{/certificates/:code/verify} & Certificates\\\hline
+POST & \texttt{/donations/checkout} & Donations\\\hline
+POST & \texttt{/donations/webhook} & Donations (provider-only)\\\hline
+GET & \texttt{/me/donations} & Donations\\\hline
+GET & \texttt{/me/donations/:id/receipt} & Donations\\\hline
+GET & \texttt{/org/donations} & Donations\\\hline
+POST & \texttt{/organizations/:id/bookmark} & Engagement\\\hline
+POST & \texttt{/organizations/:id/follow} & Engagement\\\hline
+DELETE & \texttt{/organizations/:id/follow} & Engagement\\\hline
+GET & \texttt{/me/following} & Engagement\\\hline
+GET & \texttt{/me/bookmarks} & Engagement\\\hline
+GET & \texttt{/organizations/:id/reviews} & Engagement\\\hline
+POST & \texttt{/organizations/:id/reviews} & Engagement\\\hline
+DELETE & \texttt{/organizations/:id/reviews/me} & Engagement\\\hline
+GET & \texttt{/org/reviews} & Engagement\\\hline
+PATCH & \texttt{/org/reviews/:reviewId/reply} & Engagement\\\hline
+GET & \texttt{/feed} & Feed\\\hline
+GET & \texttt{/feed/for-you} & Feed\\\hline
+GET & \texttt{/feed/trending} & Feed\\\hline
+GET & \texttt{/feed/following} & Feed\\\hline
+GET & \texttt{/feed/saved} & Feed\\\hline
+POST & \texttt{/feed/upload-intents} & Feed\\\hline
+POST & \texttt{/feed} & Feed\\\hline
+POST & \texttt{/feed/:type/:id/like} & Feed\\\hline
+DELETE & \texttt{/feed/:type/:id/like} & Feed\\\hline
+POST & \texttt{/feed/:type/:id/save} & Feed\\\hline
+DELETE & \texttt{/feed/:type/:id/save} & Feed\\\hline
+POST & \texttt{/feed/:type/:id/share} & Feed\\\hline
+POST & \texttt{/feed/:type/:id/impression} & Feed\\\hline
+GET & \texttt{/feed/:type/:id/comments} & Feed\\\hline
+POST & \texttt{/feed/:type/:id/comments} & Feed\\\hline
+DELETE & \texttt{/feed/comments/:commentId} & Feed\\\hline
+DELETE & \texttt{/feed/:id} & Feed\\\hline
+GET & \texttt{/organizations/:id/announcements} & Publishing\\\hline
+GET & \texttt{/org/announcements} & Publishing\\\hline
+POST & \texttt{/org/announcements} & Publishing\\\hline
+PATCH & \texttt{/org/announcements/:id} & Publishing\\\hline
+DELETE & \texttt{/org/announcements/:id} & Publishing\\\hline
+GET & \texttt{/organizations/:id/reports} & Publishing\\\hline
+POST & \texttt{/org/reports} & Publishing\\\hline
+DELETE & \texttt{/org/reports/:id} & Publishing\\\hline
+GET & \texttt{/org/team} & Publishing\\\hline
+POST & \texttt{/org/team} & Publishing\\\hline
+POST & \texttt{/org/team/invites} & Publishing\\\hline
+GET & \texttt{/org/team/invites} & Publishing\\\hline
+DELETE & \texttt{/org/team/invites/:id} & Publishing\\\hline
+POST & \texttt{/org/team/invites/:id/resend} & Publishing\\\hline
+POST & \texttt{/team/invites/by-id/:id/accept} & Publishing\\\hline
+POST & \texttt{/team/invites/by-id/:id/decline} & Publishing\\\hline
+POST & \texttt{/team/invites/:token/accept} & Publishing\\\hline
+POST & \texttt{/team/invites/:token/decline} & Publishing\\\hline
+POST & \texttt{/org/team/leave} & Publishing\\\hline
+POST & \texttt{/org/team/transfer} & Publishing\\\hline
+POST & \texttt{/org/team/transfer/confirm} & Publishing\\\hline
+GET & \texttt{/organizations/:id/team} & Publishing\\\hline
+PATCH & \texttt{/org/team/:id} & Publishing\\\hline
+DELETE & \texttt{/org/team/:id} & Publishing\\\hline
+GET & \texttt{/me/impact} & Publishing\\\hline
+POST & \texttt{/admin/events/close-finished} & Publishing (cron target)\\\hline
+GET & \texttt{/organizations/:id/impact} & Publishing\\\hline
+GET & \texttt{/notifications} & Notifications\\\hline
+GET & \texttt{/notifications/unread-count} & Notifications\\\hline
+POST & \texttt{/notifications/read} & Notifications\\\hline
+POST & \texttt{/notifications/broadcast} & Notifications\\\hline
+GET & \texttt{/admin/overview} & Admin\\\hline
+GET & \texttt{/admin/overview/trends} & Admin\\\hline
+GET & \texttt{/admin/analytics} & Admin\\\hline
+GET & \texttt{/admin/organizations} & Admin\\\hline
+GET & \texttt{/admin/organizations/:id} & Admin\\\hline
+GET & \texttt{/admin/organizations/:id/activity} & Admin\\\hline
+GET & \texttt{/admin/organizations/:id/posts} & Admin\\\hline
+PATCH & \texttt{/admin/organizations/:id/verification} & Admin\\\hline
+PATCH & \texttt{/admin/organizations/:id/status} & Admin\\\hline
+GET & \texttt{/admin/users} & Admin\\\hline
+GET & \texttt{/admin/users/:id} & Admin\\\hline
+GET & \texttt{/admin/users/:id/activity} & Admin\\\hline
+PATCH & \texttt{/admin/users/:id/status} & Admin\\\hline
+GET & \texttt{/admin/documents/organizations} & Admin\\\hline
+POST & \texttt{/admin/documents/organizations/bulk} & Admin\\\hline
+PATCH & \texttt{/admin/documents/organizations/:id} & Admin\\\hline
+GET & \texttt{/admin/documents/users} & Admin\\\hline
+POST & \texttt{/admin/documents/users/bulk} & Admin\\\hline
+PATCH & \texttt{/admin/documents/users/:id} & Admin\\\hline
+DELETE & \texttt{/admin/posts/:id} & Admin\\\hline
+GET & \texttt{/admin/audit-logs} & Admin\\\hline
+\end{longtable}
+
+\end{document}

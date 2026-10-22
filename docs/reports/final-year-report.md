@@ -1159,7 +1159,7 @@ flowchart LR
 
 **Known limitations of the current build**
 
-1. **No web app.** The superadmin console currently ships inside the Expo app; the plan (`notes.md`) is a Next.js `apps/web` where an admin console more naturally belongs.
+1. **No web app.** The superadmin console currently ships inside the Expo app; the plan (`docs/architecture/notes.md`) is a Next.js `apps/web` where an admin console more naturally belongs.
 2. **Notifications are in-app only** - no email or push delivery yet; a provider integration (e.g. Expo Push + a transactional email service) is the natural next step.
 3. **Pagination controls are unfinished on the client** - every list endpoint returns a `Paginated<T>` envelope, but screens currently render only page 1.
 4. **Dev-boot schema push.** Non-production boots still run `drizzle-kit push`; the boot path should switch to applying the generated migrations before real data lands.
@@ -1188,4 +1188,4 @@ The platform is feature-complete for its three roles on mobile, with a clear, do
 
 ---
 
-*Appendix - where to look in the repository: schema `packages/db/src/schema/`, shared contracts `packages/shared/src/`, API modules `apps/server/src/modules/`, cross-cutting server infrastructure `apps/server/src/common/`, client screens `apps/native/src/app/`, integration tests `apps/server/test/`, per-role feature checklists `org.md` / `volunteer.md` / `superadmin.md` at the repo root.*
+*Appendix - where to look in the repository: schema `packages/db/src/schema/`, shared contracts `packages/shared/src/`, API modules `apps/server/src/modules/`, cross-cutting server infrastructure `apps/server/src/common/`, client screens `apps/native/src/app/`, integration tests `apps/server/test/`, per-role feature checklists under `docs/product/flows/` and `docs/product/features-per-role.md`.*

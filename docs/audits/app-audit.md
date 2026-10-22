@@ -39,7 +39,7 @@ Severity: **Broken** = user hits an error or dead end. **Security** = permission
 | # | Issue | Where |
 |---|---|---|
 | B8 | The "Nearby" NGOs tab never works for volunteers. `hasFix = !!me?.organization` is always false for a volunteer, and the request hardcodes Mumbai (`19.076, 72.8777`). `MyProfile` has no lat/lng. | `apps/native/src/app/ngos/index.tsx:66-78`; `lib/types/domain.ts` |
-| B9 | No forgot / reset password (no screen, link or `resetPasswordForEmail` call), though `PerRoleFeatures.txt` marks it done. | `apps/native/src/app/(auth)/*` |
+| B9 | No forgot / reset password (no screen, link or `resetPasswordForEmail` call), though `docs/product/features-per-role.md` marks it done. | `apps/native/src/app/(auth)/*` |
 | B10 | If Supabase email confirmation is on, sign-up gets no session and throws "Supabase Auth did not return an access token". `authErrorCopy` doesn't map it. The account is created, but the user sees a raw error and no "check your email" step. | `apps/native/src/app/(auth)/signup.tsx:38-46`; `lib/api/auth.ts:191` |
 | B11 | Volunteers are never told when their ID or selfie is reviewed. `reviewUserDocument` sends no notification (org documents do, line 1014). `verify-identity.tsx:201` promises one, and `notification-destination.ts` has no `USER_DOCUMENT` case. | `apps/server/src/modules/admin/admin.service.ts:1082` |
 | B12 | The failed-donation path dead-ends. The donate sheet says "try again from My Donations", but only completed donations get an action there. | `apps/native/src/components/donate-sheet.tsx:238`; `(volunteer)/donations.tsx:267-277` |
@@ -80,7 +80,7 @@ Severity: **Broken** = user hits an error or dead end. **Security** = permission
   - The invite URL is built from `CORS_ORIGIN`, a web origin with no app deep link (`publishing.service.ts` ~1303).
 - The certificate revoke reason is hardcoded to "Revoked by the organization" (`applicants-sheet.tsx:402`).
 - A member whose own membership is suspended sees "Your team role doesn't allow this" instead of a suspended message (`use-org-access.ts:44-55`).
-- No donation report export (`PerRoleFeatures.txt:211`, `org.md` P→Q).
+- No donation report export (`docs/product/features-per-role.md` - "Download Reports"; `docs/product/flows/organisation.md` P→Q).
 - `DONATION_RECEIVED` goes only to the owner, not the whole team (`donations.service.ts:178`).
 
 ### Admin

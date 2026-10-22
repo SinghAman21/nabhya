@@ -165,5 +165,7 @@ local development before exercising these routes.
 - `pnpm db:generate` - generate a Drizzle migration after a schema change
 - `pnpm db:studio` - Drizzle Studio, a GUI over your Supabase database
 
-See `AGENTS.md` for the full architecture guide, per-role feature docs, and the
-list of known traps before making non-trivial changes.
+See `AGENTS.md` for the full architecture guide and the list of known traps
+before making non-trivial changes. Everything else written about the project -
+per-role flows and features, the architecture notes, the audits, the deployment
+guide, the final-year report and the thesis - is indexed in `docs/README.md`.

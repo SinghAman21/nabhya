@@ -36,8 +36,9 @@ Three roles, defined in `packages/db/src/seed.ts`:
 | `organisation` | Register NGO, upload legal docs, create events + needs, accept/reject applicants, issue certificates, post announcements and financial reports |
 | `superadmin` | Approve/reject/suspend orgs and users, verify both document types, manage categories, audit logs, donations, broadcast notifications, analytics |
 
-Per-role flows and feature checklists live in `org.md`, `volunteer.md`,
-`superadmin.md`, and `PerRoleFeatures.txt` at the repo root.
+Per-role flows and feature checklists live under `docs/product/` -
+`flows/organisation.md`, `flows/volunteer.md`, `flows/superadmin.md` and
+`features-per-role.md`.
 
 ## Stack
 
@@ -71,8 +72,9 @@ Server scripts worth knowing: `pnpm --filter server test` (Vitest), `test:watch`
   plenty). Nothing else moves an event out of PUBLISHED, so without it the
   "Past" filter stays empty and finished events keep taking applications.
 
-**There is no web app.** `notes.md` plans `apps/web` as Next.js - not scaffolded yet.
-The superadmin console likely belongs there, not in Expo. See `apps/web/AGENTS.md`.
+**There is no web app.** `docs/architecture/notes.md` plans `apps/web` as Next.js
+- not scaffolded yet. The superadmin console likely belongs there, not in Expo.
+See `apps/web/AGENTS.md`.
 
 ### Client (`apps/native`)
 
@@ -535,12 +537,20 @@ non-existent endpoints, `JwtGuard`'s hardcoded `volunteer` assignment, and the
 
 ## Docs, and how much to trust them
 
+Everything is indexed in `docs/README.md`. The two files that stay at the repo
+root are `README.md` (setup) and this one.
+
 | File | Trust |
 |---|---|
-| `final-year-report.md` | Full project report - architecture, ER diagram and UML flows. A feed-ranking addendum records the 104-endpoint / 25-table state; older historical narrative may retain its July 2026 snapshot. |
-| `notes.md` | Architecture doc - Zod as single source of truth, target layout, hardening checklist, roadmap. Partly stale (claims `packages/db` is empty). |
-| `schema.md` | 19-entity target domain model + mermaid. Read the **Amendments** section: item donations (`OrganizationNeed` + `ItemDonation`) are the core differentiator, drop hand-rolled auth tables, store object-storage keys not URLs. |
-| `misc.md` | Table-by-table longform, v1 - pre-amendment. |
-| `org.md`, `volunteer.md`, `superadmin.md`, `PerRoleFeatures.txt` | Per-role flows/checklists. Current. |
+| `docs/reports/final-year-report.md` | Full project report - architecture, ER diagram and UML flows. A feed-ranking addendum records the 104-endpoint / 25-table state; older historical narrative may retain its July 2026 snapshot. |
+| `docs/architecture/notes.md` | Architecture doc - Zod as single source of truth, target layout, hardening checklist, roadmap. Partly stale (claims `packages/db` is empty). |
+| `docs/architecture/schema.md` | 19-entity target domain model + mermaid. Read the **Amendments** section: item donations (`OrganizationNeed` + `ItemDonation`) are the core differentiator, drop hand-rolled auth tables, store object-storage keys not URLs. |
+| `docs/architecture/data-model.md` | Table-by-table longform, v1 - pre-amendment. |
+| `docs/architecture/bts.jsonc` | **Stale scaffold metadata.** Says `nestjs` but also `auth: none`, `dbSetup: supabase`. Ignore. |
+| `docs/product/flows/*.md`, `docs/product/features-per-role.md` | Per-role flows/checklists. Current. |
+| `docs/product/ui-redesign.md` | The UI redesign plan, by screen shape rather than by role. Current. |
+| `docs/audits/app-audit.md` | Functional audit - broken / security / incomplete / polish, with file+line evidence. |
+| `docs/audits/ui-audit.md` | UI/UX audit - P0/P1/P2 with evidence, diagnosis and fix. |
+| `docs/ops/deployment.md` | Render (API) + Vercel (web) deploy guide, with the port and `trust proxy` gotchas. |
+| `docs/thesis/` | The B.Tech report: `main.tex` is the source, `final.pdf` the deliverable, `variants/` the earlier drafts. |
 | `README.md` | Accurate setup/run instructions (install, Supabase env, db push/seed, dev commands). |
-| `bts.jsonc` | **Stale scaffold metadata.** Says `nestjs` but also `auth: none`, `dbSetup: supabase`. Ignore. |

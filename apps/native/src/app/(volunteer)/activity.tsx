@@ -51,7 +51,7 @@ import { verticalScrollbar } from "@/lib/scroll";
  *
  * Known limit: five endpoints, five first pages, merged and sorted here. That is
  * correct for the volumes one volunteer generates and wrong in general - a true
- * merged cursor is server work, tracked as step 1 in `ui-redesign.md`. Until
+ * merged cursor is server work, tracked as step 1 in `docs/product/ui-redesign.md`. Until
  * then the Events and Giving filters link to the full paged lists.
  *
  * One source failing does not blank the timeline: what loaded is shown, with a

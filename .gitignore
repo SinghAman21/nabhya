@@ -68,3 +68,17 @@ temp
 # Expo CLI cache (root, when started from the workspace)
 .expo/
 x-algorithm/
+
+# LaTeX build artifacts (thesis). Source, figures and the built PDF are tracked;
+# everything a compile leaves behind is not.
+docs/thesis/build/
+*.aux
+*.lof
+*.lot
+*.out
+*.toc
+*.synctex.gz
+*.synctex(busy)
+*.fls
+*.fdb_latexmk
+*.xdv

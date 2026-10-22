@@ -62,7 +62,7 @@ Auth is handled by **Better Auth** (wired with Neon Auth), not hand-rolled JWT:
 - App-specific user fields (`role: 'ngo' | 'volunteer' | 'admin'`, `phone`, `profile_photo`, `verification_status`) live as Better Auth additional fields or a 1:1 `user_profile` table.
 - NestJS guard validates the Better Auth session; `@Public()` opts routes out, `@CurrentUser()` resolves the session user.
 - Rate limiting (`@nestjs/throttler`) still applies on auth routes.
-- See `schema.md` → Amendments for the full DB reconciliation.
+- See `docs/architecture/schema.md` → Amendments for the full DB reconciliation.
 
 ## Onboarding state lives server-side
 
