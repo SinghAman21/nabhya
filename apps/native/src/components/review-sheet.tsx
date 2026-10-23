@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Body, Caption, Label } from "@/components/ui/typography";
 import { useUpsertReview } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
+import type { ReviewItem } from "@/lib/types";
 
 /**
  * Write or edit a review.
@@ -19,20 +20,30 @@ import { apiErrorMessage } from "@/lib/api";
 export function ReviewSheet({
 	organizationId,
 	organizationName,
+	existingReview,
 	visible,
 	onClose,
 }: {
 	organizationId: string;
 	organizationName: string;
+	existingReview?: Pick<ReviewItem, "id" | "rating" | "body"> | null;
 	visible: boolean;
 	onClose: () => void;
 }) {
 	const { colors, spacing } = useTheme();
-	const [rating, setRating] = useState(5);
-	const [body, setBody] = useState("");
+	const [rating, setRating] = useState(existingReview?.rating ?? 5);
+	const [body, setBody] = useState(existingReview?.body ?? "");
 	const [error, setError] = useState<string | null>(null);
 
 	const upsert = useUpsertReview(organizationId);
+	const editing = !!existingReview;
+
+	useEffect(() => {
+		if (!visible) return;
+		setRating(existingReview?.rating ?? 5);
+		setBody(existingReview?.body ?? "");
+		setError(null);
+	}, [visible, existingReview?.rating, existingReview?.body]);
 
 	const submit = () => {
 		setError(null);
@@ -40,9 +51,12 @@ export function ReviewSheet({
 			{ rating, body: body.trim() || undefined },
 			{
 				onSuccess: () => {
-					setBody("");
 					onClose();
-					toast.success("Your review has been posted.");
+					toast.success(
+						editing
+							? "Your review has been updated."
+							: "Your review has been posted.",
+					);
 				},
 				onError: (e) => setError(apiErrorMessage(e)),
 			},
@@ -53,11 +67,11 @@ export function ReviewSheet({
 		<Sheet
 			visible={visible}
 			onClose={onClose}
-			title="Write a review"
+			title={editing ? "Edit your review" : "Write a review"}
 			subtitle={organizationName}
 			footer={
 				<Button onPress={submit} loading={upsert.isPending}>
-					Post review
+					{editing ? "Save changes" : "Post review"}
 				</Button>
 			}
 		>

@@ -1,4 +1,6 @@
+import { organizationAdmins, organizations } from "@nabhya/db/schema";
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
 	NGO_VERIFICATION_BUCKET,
@@ -88,9 +90,27 @@ describe("UploadsService", () => {
 				purpose: "ORG_DOCUMENT",
 				ownerId: org.id,
 			});
+
+			const manager = await createUser(db, { role: "organisation" });
+			await db.insert(organizationAdmins).values({
+				organizationId: org.id,
+				userId: manager.id,
+				role: "MANAGER",
+				status: "ACTIVE",
+			});
+			const teammateTicket = await service.createIntent(
+				authUserFor(manager, ["organisation"]),
+				{
+					purpose: "ORG_DOCUMENT",
+					fileName: "registration.pdf",
+					contentType: "application/pdf",
+					size: 1000,
+				},
+			);
+			expect(parseStorageKey(teammateTicket.key)?.ownerId).toBe(org.id);
 		});
 
-		it("refuses org-scoped uploads from someone with no organization", async () => {
+		it("refuses org-scoped uploads without an organization or purpose permission", async () => {
 			const volunteer = await createUser(db, { role: "volunteer" });
 			const auth = authUserFor(volunteer, ["volunteer"]);
 
@@ -102,11 +122,29 @@ describe("UploadsService", () => {
 					size: 1000,
 				}),
 			).rejects.toBeInstanceOf(ForbiddenException);
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const viewer = await createUser(db, { role: "organisation" });
+			await db.insert(organizationAdmins).values({
+				organizationId: org.id,
+				userId: viewer.id,
+				role: "VIEWER",
+				status: "ACTIVE",
+			});
+
+			await expect(
+				service.createIntent(authUserFor(viewer, ["organisation"]), {
+					purpose: "ORG_DOCUMENT",
+					fileName: "pan.pdf",
+					contentType: "application/pdf",
+					size: 1000,
+				}),
+			).rejects.toBeInstanceOf(ForbiddenException);
 		});
 	});
 
 	describe("download authorization", () => {
-		it("lets a user read their own document", async () => {
+		it("lets users read their private documents and attached public NGO branding", async () => {
 			const user = await createUser(db, { role: "volunteer" });
 			const auth = authUserFor(user, ["volunteer"]);
 
@@ -119,6 +157,31 @@ describe("UploadsService", () => {
 
 			const result = await service.createDownloadUrl(auth, ticket.key);
 			expect(result.url).toContain("stub-download");
+
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const logo = await service.createIntent(
+				authUserFor(owner, ["organisation"]),
+				{
+					purpose: "ORG_LOGO",
+					fileName: "logo.png",
+					contentType: "image/png",
+					size: 100,
+				},
+			);
+			await db
+				.update(organizations)
+				.set({ logo: logo.key })
+				.where(eq(organizations.id, org.id));
+
+			const anonymous = await service.createDownloadUrl(undefined, logo.key);
+			expect(anonymous.url).toContain("stub-download");
+			const stranger = await createUser(db, { role: "volunteer" });
+			const publicRead = await service.createDownloadUrl(
+				authUserFor(stranger, ["volunteer"]),
+				logo.key,
+			);
+			expect(publicRead.url).toContain("stub-download");
 		});
 
 		it("refuses another user's identity document", async () => {
@@ -140,6 +203,9 @@ describe("UploadsService", () => {
 					authUserFor(attacker, ["volunteer"]),
 					ticket.key,
 				),
+			).rejects.toBeInstanceOf(ForbiddenException);
+			await expect(
+				service.createDownloadUrl(undefined, ticket.key),
 			).rejects.toBeInstanceOf(ForbiddenException);
 		});
 
@@ -213,12 +279,39 @@ describe("UploadsService", () => {
 	});
 
 	describe("confirming uploads", () => {
-		it("rejects a key that was never uploaded", async () => {
+		it("rejects missing uploads and keys owned by another user or purpose", async () => {
 			await expect(
 				service.assertUploaded(
-					`${NGO_VERIFICATION_BUCKET}/user-documents/someone-070926/nobody/never-uploaded.pdf`,
+					`${NGO_VERIFICATION_BUCKET}/user-documents/nobody/never-uploaded.pdf`,
+					{ purpose: "USER_DOCUMENT", ownerId: "nobody" },
 				),
 			).rejects.toBeInstanceOf(BadRequestException);
+			const owner = await createUser(db, { role: "volunteer" });
+			const attacker = await createUser(db, { role: "volunteer" });
+			const otherOrgOwner = await createUser(db, { role: "organisation" });
+			const otherOrg = await createOrganization(db, otherOrgOwner.id);
+			const ticket = await service.createIntent(
+				authUserFor(owner, ["volunteer"]),
+				{
+					purpose: "USER_DOCUMENT",
+					fileName: "id.pdf",
+					contentType: "application/pdf",
+					size: 100,
+				},
+			);
+
+			await expect(
+				service.assertUploaded(ticket.key, {
+					purpose: "USER_DOCUMENT",
+					ownerId: attacker.id,
+				}),
+			).rejects.toBeInstanceOf(ForbiddenException);
+			await expect(
+				service.assertUploaded(ticket.key, {
+					purpose: "ORG_DOCUMENT",
+					ownerId: otherOrg.id,
+				}),
+			).rejects.toBeInstanceOf(ForbiddenException);
 		});
 
 		it("rejects and cleans up an oversized object", async () => {
@@ -241,9 +334,12 @@ describe("UploadsService", () => {
 				contentType: "application/pdf",
 			});
 
-			await expect(service.assertUploaded(ticket.key)).rejects.toBeInstanceOf(
-				BadRequestException,
-			);
+			await expect(
+				service.assertUploaded(ticket.key, {
+					purpose: "USER_DOCUMENT",
+					ownerId: user.id,
+				}),
+			).rejects.toBeInstanceOf(BadRequestException);
 
 			// And it must not be left behind occupying the bucket.
 			expect(await storage.head(ticket.key)).toBeNull();

@@ -23,6 +23,11 @@ const PURPOSE_TARGETS: Record<StoragePurpose, PurposeTarget> = {
 	ORG_COVER: { bucket: FEED_MEDIA_BUCKET, prefix: "org-covers" },
 	AVATAR: { bucket: FEED_MEDIA_BUCKET, prefix: "avatars" },
 	EVENT_COVER: { bucket: FEED_MEDIA_BUCKET, prefix: "event-covers" },
+	NEED_COVER: { bucket: FEED_MEDIA_BUCKET, prefix: "need-covers" },
+	ANNOUNCEMENT_COVER: {
+		bucket: FEED_MEDIA_BUCKET,
+		prefix: "announcement-covers",
+	},
 	FINANCIAL_REPORT: {
 		bucket: FEED_MEDIA_BUCKET,
 		prefix: "financial-reports",

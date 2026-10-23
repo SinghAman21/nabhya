@@ -91,6 +91,8 @@ export const ADMIN = {
 
 export const CATEGORIES = {
 	LIST: `${API_PREFIX}/categories`,
+	ADMIN: `${API_PREFIX}/categories/admin`,
+	adminCategory: (id: string) => `${API_PREFIX}/categories/admin/${id}`,
 } as const;
 
 export const SEARCH = {

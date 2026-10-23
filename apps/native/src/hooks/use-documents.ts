@@ -25,9 +25,9 @@ export function useMyUserDocuments(enabled = true) {
 }
 
 /**
- * Where the volunteer's identity check stands, in the four states a screen
- * has to word differently: `none` (start), `review` (wait), `rejected`
- * (retake - with the reviewer's remarks), `verified`.
+ * Where the volunteer's identity check stands: `none` (start), `partial`
+ * (one of the required documents was received), `review` (both are waiting),
+ * `rejected` (retake - with the reviewer's remarks), or `verified`.
  *
  * The account flag alone cannot tell "not started" from "submitted and
  * waiting" - both read as unverified - so the apply sheet asked people who
@@ -45,17 +45,23 @@ export function useIdentityStatus(enabled = true) {
 		govId?.verificationStatus === "REJECTED" ||
 		selfie?.verificationStatus === "REJECTED";
 
-	const state: "none" | "review" | "rejected" | "verified" =
+	const hasGovId = !!govId;
+	const hasSelfie = !!selfie;
+	const state: "none" | "partial" | "review" | "rejected" | "verified" =
 		me.data?.verificationStatus === "VERIFIED"
 			? "verified"
 			: rejected
 				? "rejected"
-				: govId || selfie
+				: hasGovId && hasSelfie
 					? "review"
-					: "none";
+					: hasGovId || hasSelfie
+						? "partial"
+						: "none";
 
 	return {
 		state,
+		hasGovId,
+		hasSelfie,
 		remarks: govId?.remarks || selfie?.remarks || null,
 		loading: me.isLoading || documents.isLoading,
 		refetch: () => {

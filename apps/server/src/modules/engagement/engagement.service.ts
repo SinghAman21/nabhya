@@ -289,6 +289,18 @@ export class EngagementService {
 		return this.queryReviews(organizationId, query);
 	}
 
+	async getMyReview(userId: string, organizationId: string) {
+		await this.organizationsService.assertPubliclyVisible(organizationId);
+		const review = await this.db.query.reviews.findFirst({
+			where: and(
+				eq(reviews.organizationId, organizationId),
+				eq(reviews.userId, userId),
+			),
+			columns: { id: true, rating: true, body: true },
+		});
+		return review ?? null;
+	}
+
 	private async queryReviews(
 		organizationId: string,
 		query: PaginationQuery,

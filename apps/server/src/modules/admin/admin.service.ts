@@ -43,6 +43,7 @@ import {
 	type SetOrgStatusInput,
 	type SetUserStatusInput,
 	type SortDir,
+	USER_DOCUMENT_LABELS,
 } from "@nabhya/shared";
 import {
 	BadRequestException,
@@ -1136,6 +1137,21 @@ export class AdminService {
 			entityId: documentId,
 			oldValue: { verificationStatus: document.verificationStatus },
 			newValue: input,
+		});
+
+		const label =
+			USER_DOCUMENT_LABELS[document.documentType] ?? "Identity document";
+		const verified = input.verificationStatus === "VERIFIED";
+		void this.notifications.notify({
+			userId: document.userId,
+			type: verified ? "DOCUMENT_VERIFIED" : "DOCUMENT_REJECTED",
+			title: verified ? `${label} approved` : `${label} needs another look`,
+			body: verified
+				? "Your identity verification is updated. Check Verification for your overall status."
+				: (input.remarks ??
+					"Upload a clearer or corrected copy from Verification."),
+			entityName: "USER_DOCUMENT",
+			entityId: documentId,
 		});
 
 		return updated;

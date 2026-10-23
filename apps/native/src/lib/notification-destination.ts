@@ -38,6 +38,8 @@ export function notificationDestination(
 			return ngo ? "/(ngo)/donations" : "/(volunteer)/donations";
 		case "ORGANIZATION_DOCUMENT":
 			return "/(ngo)/verification";
+		case "USER_DOCUMENT":
+			return "/verify-identity";
 		case "ORGANIZATION":
 			if (item.type === "TEAM_REMOVED") return null;
 			if (item.type === "ORG_VERIFIED" || item.type === "ORG_REJECTED") {

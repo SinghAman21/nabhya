@@ -68,9 +68,19 @@ export class PublishingService {
 				userId,
 				"content.publish",
 			);
+		} else {
+			await this.requireCanDraft(userId);
 		}
 		const organization =
-			await this.organizationsService.requireVerifiedOrganization(userId);
+			input.status === "PUBLISHED"
+				? await this.organizationsService.requireVerifiedOrganization(userId)
+				: await this.organizationsService.requireOwnedOrganization(userId);
+		if (input.coverImageKey) {
+			await this.uploads.assertUploaded(input.coverImageKey, {
+				purpose: "ANNOUNCEMENT_COVER",
+				ownerId: organization.id,
+			});
+		}
 
 		const announcement = takeFirstOrThrow(
 			await this.db
@@ -117,11 +127,24 @@ export class PublishingService {
 			userId,
 			announcementId,
 		);
-		if (input.status === "PUBLISHED") {
+		if (input.status === "PUBLISHED" || existing.status === "PUBLISHED") {
 			await this.organizationsService.requireOrgPermission(
 				userId,
 				"content.publish",
 			);
+			if (input.status === "PUBLISHED") {
+				await this.organizationsService.requireVerifiedOrganization(userId);
+			}
+		} else {
+			await this.requireCanDraft(userId);
+		}
+		if (input.coverImageKey) {
+			const organization =
+				await this.organizationsService.requireOwnedOrganization(userId);
+			await this.uploads.assertUploaded(input.coverImageKey, {
+				purpose: "ANNOUNCEMENT_COVER",
+				ownerId: organization.id,
+			});
 		}
 
 		const [updated] = await this.db
@@ -220,11 +243,14 @@ export class PublishingService {
 			userId,
 			"reports.manage",
 		);
-		const organization =
-			await this.organizationsService.requireVerifiedOrganization(userId);
 
 		// The client uploaded straight to storage; confirm it actually landed.
-		await this.uploads.assertUploaded(input.documentKey);
+		const organization =
+			await this.organizationsService.requireVerifiedOrganization(userId);
+		await this.uploads.assertUploaded(input.documentKey, {
+			purpose: "FINANCIAL_REPORT",
+			ownerId: organization.id,
+		});
 
 		const report = takeFirstOrThrow(
 			await this.db
@@ -988,6 +1014,17 @@ export class PublishingService {
 		return announcement;
 	}
 
+	/** Draft content is available to active team members except read-only viewers. */
+	private async requireCanDraft(userId: string) {
+		const membership =
+			await this.organizationsService.getActiveMembership(userId);
+		if (membership?.role === "VIEWER") {
+			throw new ForbiddenException(
+				"Viewers can't create or edit drafts - ask an admin.",
+			);
+		}
+	}
+
 	private async requireOwnedMember(userId: string, memberId: string) {
 		const organization =
 			await this.organizationsService.requireOwnedOrganization(userId);
@@ -1160,7 +1197,7 @@ export class PublishingService {
 		}
 	}
 
-	private async assertCanChangeRole(
+	private assertCanChangeRole(
 		actorRole: TeamRole,
 		currentRole: TeamRole,
 		nextRole: Exclude<TeamRole, "OWNER">,

@@ -2,11 +2,13 @@ import type {
 	AdminAnalyticsQuery,
 	AuditLogQuery,
 	BulkReviewDocumentsInput,
+	CreateCategoryInput,
 	ReviewDocumentInput,
 	ReviewOrganizationInput,
 	SetOrgStatusInput,
 	SetUserStatusInput,
 	TrendWindow,
+	UpdateCategoryInput,
 } from "@nabhya/shared";
 import {
 	keepPreviousData,
@@ -14,7 +16,7 @@ import {
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
-import { adminApi, queryKeys, queryScopes } from "@/lib/api";
+import { adminApi, categoriesApi, queryKeys, queryScopes } from "@/lib/api";
 
 /**
  * The Overview's time series.
@@ -179,6 +181,47 @@ export function useSetUserStatus() {
 			adminApi.setUserStatus(id, input),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.admin });
+		},
+	});
+}
+
+export function useAdminCategories() {
+	return useQuery({
+		queryKey: queryKeys.adminCategories,
+		queryFn: categoriesApi.adminList,
+	});
+}
+
+export function useCreateAdminCategory() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: (input: CreateCategoryInput) => categoriesApi.create(input),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryKeys.adminCategories });
+			queryClient.invalidateQueries({ queryKey: queryKeys.categories });
+		},
+	});
+}
+
+export function useUpdateAdminCategory() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({ id, input }: { id: string; input: UpdateCategoryInput }) =>
+			categoriesApi.update(id, input),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryKeys.adminCategories });
+			queryClient.invalidateQueries({ queryKey: queryKeys.categories });
+		},
+	});
+}
+
+export function useArchiveAdminCategory() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: categoriesApi.archive,
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: queryKeys.adminCategories });
+			queryClient.invalidateQueries({ queryKey: queryKeys.categories });
 		},
 	});
 }

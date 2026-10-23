@@ -1,4 +1,5 @@
 import type {
+	AdminCategory,
 	ApplicationStatus,
 	DonationStatus,
 	EventStatus,
@@ -20,13 +21,10 @@ export type OrgStatus = "ACTIVE" | "SUSPENDED";
 export type UserStatus = "ACTIVE" | "SUSPENDED" | "DELETED";
 export type DocVerificationStatus = "PENDING" | "VERIFIED" | "REJECTED";
 
-export interface Category {
-	id: string;
-	name: string;
-	slug: string;
-	description: string | null;
-	icon: string | null;
-}
+export type Category = Pick<
+	AdminCategory,
+	"id" | "name" | "slug" | "description" | "icon"
+>;
 
 export interface OrganizationSummary {
 	id: string;

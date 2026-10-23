@@ -36,6 +36,7 @@ import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
 import { orderBySort } from "../../common/utils/order";
 import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsService } from "../organizations/organizations.service";
+import { UploadsService } from "../uploads/uploads.service";
 
 const publicNeedColumns = {
 	id: needs.id,
@@ -70,6 +71,7 @@ export class NeedsService {
 		private readonly organizationsService: OrganizationsService,
 		@Inject(NotificationsService)
 		private readonly notifications: NotificationsService,
+		@Inject(UploadsService) private readonly uploads: UploadsService,
 	) {}
 
 	// ─── Public feed ─────────────────────────────────────────────────────────
@@ -248,6 +250,12 @@ export class NeedsService {
 		);
 		const organization =
 			await this.organizationsService.requireVerifiedOrganization(userId);
+		if (input.coverImage) {
+			await this.uploads.assertUploaded(input.coverImage, {
+				purpose: "NEED_COVER",
+				ownerId: organization.id,
+			});
+		}
 
 		const inserted = await this.db
 			.insert(needs)
@@ -286,6 +294,14 @@ export class NeedsService {
 			"content.publish",
 		);
 		const need = await this.requireOwnedNeed(userId, needId);
+		if (input.coverImage) {
+			const organization =
+				await this.organizationsService.requireOwnedOrganization(userId);
+			await this.uploads.assertUploaded(input.coverImage, {
+				purpose: "NEED_COVER",
+				ownerId: organization.id,
+			});
+		}
 
 		if (
 			input.quantity !== undefined &&

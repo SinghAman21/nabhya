@@ -3,6 +3,7 @@ import type {
 	AdminActivityQuery,
 	AdminAnalytics,
 	AdminAnalyticsQuery,
+	AdminCategory,
 	AdminOrgPost,
 	AdminOrgPostsQuery,
 	AdminOrgQuery,
@@ -19,6 +20,7 @@ import type {
 	BulkReviewResult,
 	CompleteOrgOnboardingPayload,
 	CompleteVolunteerOnboardingPayload,
+	CreateCategoryInput,
 	CreateEventInput,
 	CreateFeedCommentInput,
 	CreateFeedMediaIntentsInput,
@@ -48,6 +50,7 @@ import type {
 	SetOrgStatusInput,
 	SetUserStatusInput,
 	TrendingFeedQuery,
+	UpdateCategoryInput,
 	UpdateEventInput,
 	UpdateNeedInput,
 	UpdateOrganizationInput,
@@ -128,6 +131,13 @@ export const onboardingApi = {
 
 export const categoriesApi = {
 	list: () => http.get<Category[]>(CATEGORIES.LIST),
+	adminList: () => http.get<AdminCategory[]>(CATEGORIES.ADMIN),
+	create: (input: CreateCategoryInput) =>
+		http.post<AdminCategory>(CATEGORIES.ADMIN, input),
+	update: (id: string, input: UpdateCategoryInput) =>
+		http.patch<AdminCategory>(CATEGORIES.adminCategory(id), input),
+	archive: (id: string) =>
+		http.delete<AdminCategory>(CATEGORIES.adminCategory(id)),
 };
 
 export const searchApi = {

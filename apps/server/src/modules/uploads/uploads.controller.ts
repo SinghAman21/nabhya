@@ -8,7 +8,7 @@ import {
 	ApiTags,
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
-import { CurrentUser } from "../../common/decorators";
+import { CurrentUser, OptionalAuth } from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthUser } from "../../common/types";
 import { UploadsService } from "./uploads.service";
@@ -45,13 +45,15 @@ export class UploadsController {
 	}
 
 	@Post("download-url")
+	@OptionalAuth()
 	@ApiOperation({ summary: "Get a short-lived signed URL to read a file" })
 	@ApiResponse({
 		status: 403,
-		description: "The caller does not own this file and is not a superadmin.",
+		description:
+			"The caller cannot read this private file. Public NGO profile and report files can be read without signing in.",
 	})
 	createDownloadUrl(
-		@CurrentUser() user: AuthUser,
+		@CurrentUser() user: AuthUser | undefined,
 		@Body(new ZodValidationPipe(downloadUrlSchema)) body: DownloadUrlInput,
 	) {
 		return this.uploadsService.createDownloadUrl(user, body.key);

@@ -61,12 +61,14 @@ describe("team permission matrix", () => {
 				audit,
 				organizations,
 				notifications,
+				null as never,
 			),
 			events: new EventsService(
 				database as never,
 				audit,
 				organizations,
 				notifications,
+				null as never,
 			),
 			certificates: new CertificatesService(
 				database as never,

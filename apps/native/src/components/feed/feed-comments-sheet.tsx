@@ -1,6 +1,7 @@
 import { MessageCircle } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
+import { LoadMoreFooter } from "@/components/load-more-footer";
 import {
 	EmptyState,
 	ErrorState,
@@ -31,7 +32,8 @@ export function FeedCommentsSheet({
 	const email = useAuthStore((state) => state.email);
 	const userId = useAuthStore((state) => state.user?.id);
 	const [body, setBody] = useState("");
-	const comments = useFeedComments(item, { page: 1, limit: 50 });
+	const comments = useFeedComments(item, { limit: 50 });
+	const rows = comments.data?.pages.flatMap((page) => page.items) ?? [];
 	const createComment = useCreateFeedComment();
 	const deleteComment = useDeleteFeedComment();
 
@@ -92,14 +94,14 @@ export function FeedCommentsSheet({
 			 */}
 			{comments.isLoading ? (
 				<LoadingState label="Loading comments" />
-			) : comments.isError ? (
+			) : comments.isError && rows.length === 0 ? (
 				<ErrorState
 					message={apiErrorMessage(comments.error)}
 					onRetry={() => comments.refetch()}
 				/>
-			) : comments.data?.items.length ? (
+			) : rows.length ? (
 				<SheetFlatList
-					data={comments.data.items}
+					data={rows}
 					keyExtractor={(comment) => comment.id}
 					renderItem={({ item: comment }) => (
 						<CommentRow
@@ -108,6 +110,22 @@ export function FeedCommentsSheet({
 							onDelete={() => deleteComment.mutate(comment.id)}
 						/>
 					)}
+					ListFooterComponent={
+						comments.isFetchNextPageError ? (
+							<ErrorState
+								message={apiErrorMessage(comments.error)}
+								onRetry={() => void comments.fetchNextPage()}
+							/>
+						) : (
+							<LoadMoreFooter
+								hasMore={!!comments.hasNextPage}
+								loading={comments.isFetchingNextPage}
+								onLoadMore={() => void comments.fetchNextPage()}
+								count={rows.length}
+								noun="comments"
+							/>
+						)
+					}
 				/>
 			) : (
 				<EmptyState

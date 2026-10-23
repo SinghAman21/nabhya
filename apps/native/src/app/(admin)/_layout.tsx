@@ -132,6 +132,7 @@ export default function AdminLayout() {
 						),
 					}}
 				/>
+				<Tabs.Screen name="categories" options={{ href: null }} />
 			</Tabs>
 		</View>
 	);

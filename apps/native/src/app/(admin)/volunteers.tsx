@@ -28,7 +28,7 @@ import { formatDate } from "@/lib/format";
 import type { AdminUserListItem } from "@/lib/types";
 
 type IdFilter = "ANY" | "PENDING" | "VERIFIED" | "REJECTED";
-type Standing = "ANY" | "ACTIVE" | "SUSPENDED";
+type Standing = "ANY" | "ACTIVE" | "SUSPENDED" | "DELETED";
 
 const IDENTITY = [
 	{ value: "ANY" as const, label: "Any" },
@@ -45,6 +45,7 @@ const STANDING = [
 	{ value: "ANY" as const, label: "Any" },
 	{ value: "ACTIVE" as const, label: "Active" },
 	{ value: "SUSPENDED" as const, label: "Suspended" },
+	{ value: "DELETED" as const, label: "Deleted" },
 ];
 
 const IDENTITY_VALUES = IDENTITY.map((option) => option.value);

@@ -81,28 +81,41 @@ function VerifyIdentity() {
 	const [submitted, setSubmitted] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const done = [idValue, selfieValue].filter(Boolean).length;
-	const canSubmit = done === 2 && !submitting && !submitted;
+	const replaceAll = identity.state === "rejected" || replacing;
+	const needsId = replaceAll || !identity.hasGovId;
+	const needsSelfie = replaceAll || !identity.hasSelfie;
+	const required = Number(needsId) + Number(needsSelfie);
+	const done =
+		Number(needsId && !!idValue) + Number(needsSelfie && !!selfieValue);
+	const canSubmit =
+		required > 0 && done === required && !submitting && !submitted;
 
 	const submit = async () => {
-		if (!idValue || !selfieValue) return;
+		if ((needsId && !idValue) || (needsSelfie && !selfieValue)) return;
+		// Keep both replacement captures visible if the first upload changes the
+		// server state before the second upload fails.
+		if (identity.state === "rejected") setReplacing(true);
 		setSubmitting(true);
 		setError(null);
 		try {
-			await upload.mutateAsync({
-				documentType: idValue.documentType,
-				documentKey: idValue.key,
-			});
-			await upload.mutateAsync({
-				documentType: "SELFIE",
-				documentKey: selfieValue.primaryKey,
-				metadata: {
-					liveness: {
-						challenge: selfieValue.challenge,
-						secondaryFrameKey: selfieValue.secondaryFrameKey,
+			if (needsId && idValue) {
+				await upload.mutateAsync({
+					documentType: idValue.documentType,
+					documentKey: idValue.key,
+				});
+			}
+			if (needsSelfie && selfieValue) {
+				await upload.mutateAsync({
+					documentType: "SELFIE",
+					documentKey: selfieValue.primaryKey,
+					metadata: {
+						liveness: {
+							challenge: selfieValue.challenge,
+							secondaryFrameKey: selfieValue.secondaryFrameKey,
+						},
 					},
-				},
-			});
+				});
+			}
 			setSubmitted(true);
 			identity.refetch();
 		} catch (e) {
@@ -208,6 +221,16 @@ function VerifyIdentity() {
 									: "Retake your ID and selfie - make sure the text is sharp and your face is well lit - and submit again."
 							}
 						/>
+					) : identity.state === "partial" ? (
+						<Banner
+							tone="warning"
+							title="One document received"
+							description={
+								identity.hasGovId
+									? "We received your ID, but your selfie has not been submitted. Complete both steps below and submit again."
+									: "We received your selfie, but your ID has not been submitted. Complete both steps below and submit again."
+							}
+						/>
 					) : (
 						<Banner
 							tone="info"
@@ -230,15 +253,27 @@ function VerifyIdentity() {
 							width: isDesktop ? undefined : "100%",
 						}}
 					>
-						<SectionTitle>Step 1 · Your ID</SectionTitle>
-						<Surface
-							style={isDesktop ? undefined : { marginBottom: spacing[5] }}
-						>
-							<IdCapture
-								onChange={setIdValue}
-								disabled={submitting || submitted}
-							/>
-						</Surface>
+						{needsId ? (
+							<>
+								<SectionTitle>Step 1 · Your ID</SectionTitle>
+								<Surface
+									style={isDesktop ? undefined : { marginBottom: spacing[5] }}
+								>
+									<IdCapture
+										onChange={setIdValue}
+										disabled={submitting || submitted}
+									/>
+								</Surface>
+							</>
+						) : (
+							<Surface>
+								<Banner
+									tone="success"
+									title="Government ID already received"
+									description="Only your selfie remains to submit."
+								/>
+							</Surface>
+						)}
 					</View>
 
 					<View
@@ -247,13 +282,25 @@ function VerifyIdentity() {
 							width: isDesktop ? undefined : "100%",
 						}}
 					>
-						<SectionTitle>Step 2 · Selfie</SectionTitle>
-						<Surface>
-							<SelfieCapture
-								onChange={setSelfieValue}
-								disabled={submitting || submitted}
-							/>
-						</Surface>
+						{needsSelfie ? (
+							<>
+								<SectionTitle>Step 2 · Selfie</SectionTitle>
+								<Surface>
+									<SelfieCapture
+										onChange={setSelfieValue}
+										disabled={submitting || submitted}
+									/>
+								</Surface>
+							</>
+						) : (
+							<Surface>
+								<Banner
+									tone="success"
+									title="Selfie already received"
+									description="Only your government ID remains to submit."
+								/>
+							</Surface>
+						)}
 					</View>
 				</View>
 			</ScrollView>
@@ -275,16 +322,16 @@ function VerifyIdentity() {
 					<Button onPress={leave}>Done</Button>
 				) : (
 					<Button onPress={submit} disabled={!canSubmit} loading={submitting}>
-						Submit for review
+						{error ? "Retry submission" : "Submit for review"}
 					</Button>
 				)}
 
 				<Caption color="quaternary" style={{ textAlign: "center" }}>
 					{submitted
 						? "Nothing else to do here - we'll notify you when it's reviewed."
-						: done === 2
-							? "Both captured. Ready to submit."
-							: `${done} of 2 captured. Add ${idValue ? "your selfie" : selfieValue ? "your ID" : "both"} to continue.`}
+						: done === required
+							? "All required photos are ready."
+							: `${done} of ${required} required captures ready. Add ${needsId && !idValue ? "your ID" : needsSelfie && !selfieValue ? "your selfie" : "the required photo"} to continue.`}
 				</Caption>
 			</View>
 		</Screen>

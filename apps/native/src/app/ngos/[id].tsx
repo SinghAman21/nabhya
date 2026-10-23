@@ -56,6 +56,7 @@ import {
 import { useOpenDocument } from "@/hooks/use-documents";
 import {
 	useDeleteMyReview,
+	useMyReview,
 	useToggleBookmark,
 	useToggleFollow,
 } from "@/hooks/use-engagement";
@@ -71,6 +72,7 @@ import {
 import { focusable } from "@/lib/focus";
 import { formatDate, formatRelative } from "@/lib/format";
 import { verticalScrollbar } from "@/lib/scroll";
+import type { ReviewItem } from "@/lib/types";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
@@ -127,6 +129,10 @@ export default function NgoProfilePage() {
 	const router = useRouter();
 	const [tab, setTab] = useState<Tab>("about");
 	const [reviewOpen, setReviewOpen] = useState(false);
+	const [reviewBeingEdited, setReviewBeingEdited] = useState<Pick<
+		ReviewItem,
+		"id" | "rating" | "body"
+	> | null>(null);
 	const [donateOpen, setDonateOpen] = useState(false);
 
 	const email = useAuthStore((s) => s.email);
@@ -349,7 +355,12 @@ export default function NgoProfilePage() {
 			{tab === "reviews" && (
 				<ReviewsTab
 					organizationId={id}
-					onWrite={() => requireSignIn(() => setReviewOpen(true))}
+					onWrite={(review) =>
+						requireSignIn(() => {
+							setReviewBeingEdited(review ?? null);
+							setReviewOpen(true);
+						})
+					}
 				/>
 			)}
 			{tab === "transparency" && <TransparencyTab organizationId={id} />}
@@ -492,10 +503,15 @@ export default function NgoProfilePage() {
 			)}
 
 			<ReviewSheet
+				key={reviewBeingEdited?.id ?? "new-review"}
 				organizationId={id}
 				organizationName={data?.organizationName ?? ""}
+				existingReview={reviewBeingEdited}
 				visible={reviewOpen}
-				onClose={() => setReviewOpen(false)}
+				onClose={() => {
+					setReviewOpen(false);
+					setReviewBeingEdited(null);
+				}}
 			/>
 			<DonateSheet
 				organizationId={id}
@@ -767,12 +783,15 @@ function ReviewsTab({
 	onWrite,
 }: {
 	organizationId: string;
-	onWrite: () => void;
+	onWrite: (review?: Pick<ReviewItem, "id" | "rating" | "body">) => void;
 }) {
 	const { colors, spacing } = useTheme();
 	const email = useAuthStore((s) => s.email);
+	const role = useAuthStore((s) => s.role);
 	const me = useMe(!!email);
 	const remove = useDeleteMyReview(organizationId);
+	const canReview = role === "volunteer";
+	const myReviewQuery = useMyReview(organizationId, canReview);
 
 	const { query, items, first, loadMore } = usePagedQuery({
 		queryKey: queryKeys.reviews(organizationId, { limit: PAGE_SIZE }),
@@ -781,9 +800,9 @@ function ReviewsTab({
 	});
 	const summary = first?.summary;
 
-	// One review per person, so "mine" is whichever row carries my user id.
 	const myUserId = me.data?.id;
-	const hasMine = !!myUserId && items.some((r) => r.user.id === myUserId);
+	const myReview = canReview ? (myReviewQuery.data ?? undefined) : undefined;
+	const hasMine = !!myReview;
 
 	const confirmDelete = async () => {
 		const ok = await confirm({
@@ -840,11 +859,44 @@ function ReviewsTab({
 							{summary?.count ?? 0} review{summary?.count === 1 ? "" : "s"}
 						</Caption>
 					</View>
-					<Button size="sm" variant="outline" onPress={onWrite}>
-						{hasMine ? "Edit your review" : "Write a review"}
-					</Button>
+					{!email || canReview ? (
+						<Button
+							size="sm"
+							variant="outline"
+							onPress={() => onWrite(myReview)}
+							disabled={
+								canReview && (myReviewQuery.isLoading || myReviewQuery.isError)
+							}
+							loading={canReview && myReviewQuery.isLoading}
+						>
+							{hasMine ? "Edit your review" : "Write a review"}
+						</Button>
+					) : null}
 				</View>
 			</Surface>
+
+			{canReview && myReviewQuery.isError ? (
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						justifyContent: "space-between",
+						gap: spacing[3],
+						marginBottom: spacing[3],
+					}}
+				>
+					<Caption color="error">
+						Couldn't check whether you already reviewed this NGO.
+					</Caption>
+					<Button
+						size="sm"
+						variant="outline"
+						onPress={() => void myReviewQuery.refetch()}
+					>
+						Retry
+					</Button>
+				</View>
+			) : null}
 
 			{items.length === 0 ? (
 				<EmptyState
@@ -925,7 +977,11 @@ function ReviewsTab({
 												marginTop: spacing[3],
 											}}
 										>
-											<Button size="sm" variant="outline" onPress={onWrite}>
+											<Button
+												size="sm"
+												variant="outline"
+												onPress={() => onWrite(review)}
+											>
 												Edit
 											</Button>
 											<Button

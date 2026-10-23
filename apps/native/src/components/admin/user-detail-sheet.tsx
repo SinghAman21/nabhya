@@ -47,16 +47,17 @@ export function UserDetailSheet({
 }) {
 	const { spacing } = useTheme();
 	// The footer's "why?" step for a suspension - see `ReasonStep`.
-	const [asking, setAsking] = useState(false);
+	const [asking, setAsking] = useState<"suspend" | "delete" | null>(null);
 
 	const query = useAdminUser(userId ?? undefined);
 	const setStatus = useSetUserStatus();
 
 	const user = query.data;
 	const suspended = user?.status === "SUSPENDED";
+	const deleted = user?.status === "DELETED";
 
 	const close = () => {
-		setAsking(false);
+		setAsking(null);
 		onClose();
 	};
 
@@ -66,7 +67,7 @@ export function UserDetailSheet({
 			{ id: userId, input: { status: "SUSPENDED", reason } },
 			{
 				onSuccess: () => {
-					setAsking(false);
+					setAsking(null);
 					toast.success("Account suspended.");
 				},
 				onError: (error) => toast.error(apiErrorMessage(error)),
@@ -91,6 +92,37 @@ export function UserDetailSheet({
 		);
 	};
 
+	const restore = async () => {
+		if (!userId) return;
+		const ok = await confirm({
+			title: "Restore account?",
+			message: "They will regain access immediately.",
+			confirmLabel: "Restore",
+		});
+		if (!ok) return;
+		setStatus.mutate(
+			{ id: userId, input: { status: "ACTIVE" } },
+			{
+				onSuccess: () => toast.success("Account restored."),
+				onError: (error) => toast.error(apiErrorMessage(error)),
+			},
+		);
+	};
+
+	const deleteAccount = (reason: string) => {
+		if (!userId) return;
+		setStatus.mutate(
+			{ id: userId, input: { status: "DELETED", reason } },
+			{
+				onSuccess: () => {
+					setAsking(null);
+					toast.success("Account deleted. Its records were retained.");
+				},
+				onError: (error) => toast.error(apiErrorMessage(error)),
+			},
+		);
+	};
+
 	return (
 		<Drawer
 			visible={!!userId}
@@ -101,22 +133,53 @@ export function UserDetailSheet({
 			footer={
 				user && asking ? (
 					<ReasonStep
-						title={`Why suspend ${user.fullName ?? user.email}?`}
-						consequence="They are signed out and blocked from the app until reinstated. The reason is recorded in the audit log."
-						placeholder="e.g. Repeated no-shows reported by three NGOs"
-						confirmLabel="Suspend"
+						title={`Why ${asking} ${user.fullName ?? user.email}?`}
+						consequence={
+							asking === "delete"
+								? "They will be signed out and blocked from the app. Their records are retained, and the reason is recorded in the audit log."
+								: "They are signed out and blocked from the app until reinstated. The reason is recorded in the audit log."
+						}
+						placeholder={
+							asking === "delete"
+								? "Reason for deleting this account"
+								: "e.g. Repeated no-shows reported by three NGOs"
+						}
+						confirmLabel={asking === "delete" ? "Delete account" : "Suspend"}
 						pending={setStatus.isPending}
-						onCancel={() => setAsking(false)}
-						onConfirm={suspend}
+						onCancel={() => setAsking(null)}
+						onConfirm={asking === "delete" ? deleteAccount : suspend}
 					/>
 				) : user ? (
-					<Button
-						variant={suspended ? "outline" : "destructive"}
-						onPress={suspended ? reinstate : () => setAsking(true)}
-						loading={setStatus.isPending}
+					<View
+						style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[2] }}
 					>
-						{suspended ? "Reinstate account" : "Suspend account"}
-					</Button>
+						{deleted ? (
+							<Button
+								variant="outline"
+								onPress={restore}
+								loading={setStatus.isPending}
+							>
+								Restore account
+							</Button>
+						) : (
+							<>
+								<Button
+									variant={suspended ? "outline" : "destructive"}
+									onPress={suspended ? reinstate : () => setAsking("suspend")}
+									loading={setStatus.isPending}
+								>
+									{suspended ? "Reinstate account" : "Suspend account"}
+								</Button>
+								<Button
+									variant="destructive"
+									onPress={() => setAsking("delete")}
+									loading={setStatus.isPending}
+								>
+									Delete account
+								</Button>
+							</>
+						)}
+					</View>
 				) : undefined
 			}
 		>
@@ -145,6 +208,7 @@ export function UserDetailSheet({
 							tone={verificationTone(user.verificationStatus)}
 						/>
 						{suspended && <StatusPill label="Suspended" tone="error" />}
+						{deleted && <StatusPill label="Deleted" tone="error" />}
 					</View>
 
 					{user.suspendedReason && (

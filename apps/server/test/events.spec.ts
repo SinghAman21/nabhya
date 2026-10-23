@@ -48,6 +48,7 @@ describe("EventsService", () => {
 			audit,
 			organizationsService,
 			notifications,
+			null as never,
 		);
 	});
 
@@ -435,6 +436,7 @@ describe("EventsService - correlated counts", () => {
 			audit,
 			new OrganizationsService(db as never, audit, null as never),
 			new NotificationsService(db as never),
+			null as never,
 		);
 	});
 

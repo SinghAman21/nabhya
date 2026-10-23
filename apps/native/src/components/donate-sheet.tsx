@@ -186,7 +186,7 @@ export function DonateSheet({
 		if (!canSubmit) return;
 
 		if (!me && !guestEmail.trim()) {
-			setError("Enter an email so we can send your receipt.");
+			setError("Enter an email to attach to this guest donation.");
 			return;
 		}
 
@@ -256,7 +256,7 @@ export function DonateSheet({
 							toast.success(
 								me
 									? "Thank you - we're confirming your donation now."
-									: `Thank you - we're confirming your donation now. The receipt goes to ${guestEmail.trim()}.`,
+									: `Thank you - we're confirming your donation now. ${guestEmail.trim()} is attached to the donation record. Email receipts aren't available yet.`,
 							);
 						}
 					} catch (err: unknown) {
@@ -356,7 +356,7 @@ export function DonateSheet({
 							style={inputStyle}
 						/>
 					</Field>
-					<Field label="Email for receipt">
+					<Field label="Email for donation record">
 						<Input
 							placeholder="you@example.com"
 							value={guestEmail}

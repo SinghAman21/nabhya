@@ -18,7 +18,8 @@ export const TEAM_ROLE_LABELS: Record<TeamRole, string> = {
 
 export const TEAM_ROLE_COPY: Record<TeamRole, string> = {
 	OWNER: "Everything, including transferring ownership.",
-	ADMIN: "Everything except transferring ownership.",
+	ADMIN:
+		"Everything except inviting an Admin, changing someone into or out of Admin, removing an Admin, or transferring ownership.",
 	MANAGER: "Posts, needs, events, applicants, attendance and certificates.",
 	MEMBER: "Marks attendance at events.",
 	VIEWER: "Read-only, plus donations.",

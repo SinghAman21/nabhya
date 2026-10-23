@@ -39,7 +39,7 @@ vi.mock("@nabhya/db", async (importOriginal) => {
 	};
 });
 
-// 92 endpoints times several cases each would trip the 120/min bucket and turn
+// 142 endpoints times several cases each would trip the 120/min bucket and turn
 // this file into a 429 generator. The limits themselves are covered by the
 // throttler's own config, not here.
 vi.mock("../src/common/guards/throttler.config", () => ({
@@ -191,6 +191,7 @@ describe("HTTP surface", () => {
 				],
 				["../src/modules/events/events.controller", "EventsController"],
 				["../src/modules/events/org-events.controller", "OrgEventsController"],
+				["../src/modules/feed/feed.controller", "FeedController"],
 				["../src/modules/needs/needs.controller", "NeedsController"],
 				["../src/modules/needs/org-needs.controller", "OrgNeedsController"],
 				[
@@ -209,6 +210,7 @@ describe("HTTP surface", () => {
 					"../src/modules/publishing/publishing.controller",
 					"PublishingController",
 				],
+				["../src/modules/search/search.controller", "SearchController"],
 				["../src/modules/uploads/uploads.controller", "UploadsController"],
 				["../src/modules/users/users.controller", "UsersController"],
 			].map(async ([path, name]) => {
@@ -259,7 +261,7 @@ describe("HTTP surface", () => {
 	it("exposes the expected number of endpoints", () => {
 		// A bare count, so adding or deleting a route is a deliberate act that
 		// shows up in the diff rather than passing unnoticed.
-		expect(routes.length).toBe(119);
+		expect(routes.length).toBe(142);
 	});
 
 	it("mounts every route under the /api prefix", () => {
@@ -391,13 +393,20 @@ describe("HTTP surface", () => {
 		expect(optional.sort()).toEqual(
 			[
 				"GET /api/events/:id",
+				"GET /api/feed/:type/:id/comments",
+				"GET /api/feed/for-you",
+				"GET /api/feed/trending",
 				"GET /api/needs/:id",
+				"GET /api/search",
 				// Anyone can read an NGO's page; a signed-in caller also learns
 				// whether they follow and have saved it.
 				"GET /api/organizations/:id",
 				// Guest donations: a signed-in donor gets the receipt attached to
 				// their account, an anonymous one still gets to give.
 				"POST /api/donations/checkout",
+				// Anonymous access is limited to attached public assets; authenticated
+				// owners and superadmins can also preview files before publication.
+				"POST /api/uploads/download-url",
 			].sort(),
 		);
 	});

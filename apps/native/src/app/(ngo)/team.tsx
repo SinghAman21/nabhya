@@ -833,12 +833,16 @@ function MemberSheetInner({
 }) {
 	const { spacing } = useTheme();
 	const inputStyle = useFieldInputStyle();
-	const isOwner = member.isOwner || member.role === "OWNER";
+	const access = useOrgAccess();
+	const memberRole = member.role ?? (member.isOwner ? "OWNER" : "ADMIN");
+	const isOwner = member.isOwner || memberRole === "OWNER";
+	const canManageAdminRole = access.role === "OWNER";
+	const isAdminMember = memberRole === "ADMIN";
+	const canRemoveMember = canManageAdminRole || !isAdminMember;
 	const status = member.status ?? "ACTIVE";
 	const suspended = status === "SUSPENDED";
 	const left = status === "LEFT" || status === "REMOVED";
-	const initialRole =
-		member.role && member.role !== "OWNER" ? member.role : "ADMIN";
+	const initialRole = memberRole !== "OWNER" ? memberRole : "ADMIN";
 	const [designation, setDesignation] = useState(member.designation ?? "");
 	const [role, setRole] = useState<(typeof ROLES)[number]>(
 		initialRole as (typeof ROLES)[number],
@@ -939,7 +943,7 @@ function MemberSheetInner({
 							{suspended ? "Reactivate teammate" : "Suspend teammate"}
 						</Button>
 					) : null}
-					{!isOwner && !left ? (
+					{!isOwner && !left && canRemoveMember ? (
 						<Button
 							variant="destructive"
 							onPress={confirmRemove}
@@ -965,7 +969,12 @@ function MemberSheetInner({
 					</Caption>
 				) : null}
 				<Field label="Access role">
-					<RolePicker value={role} onChange={setRole} disabled={isOwner} />
+					<RolePicker
+						value={role}
+						onChange={setRole}
+						disabled={isOwner || (isAdminMember && !canManageAdminRole)}
+						allowAdmin={canManageAdminRole}
+					/>
 				</Field>
 				<Field label="Designation" optional>
 					<Input
@@ -996,6 +1005,8 @@ function InviteSheet({
 }) {
 	const { spacing } = useTheme();
 	const inputStyle = useFieldInputStyle();
+	const access = useOrgAccess();
+	const canInviteAdmin = access.role === "OWNER";
 	const [email, setEmail] = useState("");
 	const [designation, setDesignation] = useState("");
 	const [role, setRole] = useState<(typeof ROLES)[number]>("MANAGER");
@@ -1111,7 +1122,11 @@ function InviteSheet({
 						/>
 					</Field>
 					<Field label="Access role" error={errors.role}>
-						<RolePicker value={role} onChange={setRole} />
+						<RolePicker
+							value={role}
+							onChange={setRole}
+							allowAdmin={canInviteAdmin}
+						/>
 					</Field>
 					<Field label="Designation" optional error={errors.designation}>
 						<Input
@@ -1131,21 +1146,26 @@ function RolePicker({
 	value,
 	onChange,
 	disabled = false,
+	allowAdmin = true,
 }: {
 	value: (typeof ROLES)[number];
 	onChange: (role: (typeof ROLES)[number]) => void;
 	disabled?: boolean;
+	allowAdmin?: boolean;
 }) {
 	const { spacing } = useTheme();
+	const availableRoles = ROLES.filter(
+		(role) => role !== "ADMIN" || allowAdmin || role === value,
+	);
 	return (
 		<View style={{ gap: spacing[2] }}>
 			<View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[2] }}>
-				{ROLES.map((role) => (
+				{availableRoles.map((role) => (
 					<Button
 						key={role}
 						size="sm"
 						variant={value === role ? "default" : "outline"}
-						disabled={disabled}
+						disabled={disabled || (role === "ADMIN" && !allowAdmin)}
 						accessibilityRole="radio"
 						accessibilityState={{ selected: value === role }}
 						accessibilityLabel={`${TEAM_ROLE_LABELS[role]}. ${TEAM_ROLE_COPY[role]}`}

@@ -44,6 +44,7 @@ describe("CertificatesService", () => {
 			audit,
 			organizations,
 			notifications,
+			null as never,
 		);
 	});
 

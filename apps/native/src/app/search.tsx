@@ -40,6 +40,7 @@ import { focusable } from "@/lib/focus";
 import { useRecentSearches } from "@/lib/recent-searches";
 import { verticalScrollbar } from "@/lib/scroll";
 import type { FeedItem, FeedKind, FeedNeedItem } from "@/lib/types";
+import { useAuthStore } from "@/store/auth-store";
 
 /**
  * Search, as its own page.
@@ -85,6 +86,7 @@ const EXAMPLES = [
 function SearchScreen() {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
+	const email = useAuthStore((state) => state.email);
 	const [query, setQuery] = useState("");
 	const [scope, setScope] = useState<Scope>("all");
 	const [responding, setResponding] = useState<FeedNeedItem | null>(null);
@@ -110,6 +112,14 @@ function SearchScreen() {
 			}
 		},
 	).current;
+	const requireSignIn = useCallback(() => {
+		if (email) return true;
+		toast.info("Sign in to follow NGOs, like posts, or save posts.", {
+			label: "Sign in",
+			onPress: () => router.push("/(auth)/login"),
+		});
+		return false;
+	}, [email, router]);
 
 	const orgItems = active ? (result.data?.organizations.items ?? []) : [];
 	const feedItems = active ? (result.data?.feed.items ?? []) : [];
@@ -326,7 +336,8 @@ function SearchScreen() {
 		feedItemsRef.current = feedItems;
 	});
 	const handleToggleFollow = useCallback(
-		(organizationId: string, following: boolean) =>
+		(organizationId: string, following: boolean) => {
+			if (!requireSignIn()) return;
 			toggleFollow.mutate(
 				{ organizationId, following },
 				{
@@ -337,24 +348,29 @@ function SearchScreen() {
 						)?.organization?.organizationName;
 						toast.success(name ? `Following ${name}` : "Following", {
 							label: "Undo",
-							onPress: () =>
-								toggleFollow.mutate({ organizationId, following: true }),
+							onPress: () => {
+								if (!requireSignIn()) return;
+								toggleFollow.mutate({ organizationId, following: true });
+							},
 						});
 					},
 					onError: (error) => toast.error(apiErrorMessage(error)),
 				},
-			),
-		[toggleFollow.mutate],
+			);
+		},
+		[requireSignIn, toggleFollow.mutate],
 	);
 	const handleToggleLike = useCallback(
-		(row: FeedItem, isLiked: boolean) =>
-			like.mutate({ item: row, on: !isLiked }),
-		[like.mutate],
+		(row: FeedItem, isLiked: boolean) => {
+			if (requireSignIn()) like.mutate({ item: row, on: !isLiked });
+		},
+		[like.mutate, requireSignIn],
 	);
 	const handleToggleSave = useCallback(
-		(row: FeedItem, isSaved: boolean) =>
-			save.mutate({ item: row, on: !isSaved }),
-		[save.mutate],
+		(row: FeedItem, isSaved: boolean) => {
+			if (requireSignIn()) save.mutate({ item: row, on: !isSaved });
+		},
+		[requireSignIn, save.mutate],
 	);
 
 	return (

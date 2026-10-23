@@ -336,8 +336,8 @@ export class PublishingController {
 	 *
 	 * Nothing transitions an event out of PUBLISHED on its own, so without this
 	 * the "Past" filter stays empty and finished events keep accepting
-	 * applications. Exposed for a scheduler to call - see the deployment notes
-	 * in CLAUDE.md - and manually runnable from the admin console meanwhile.
+	 * applications. Exposed for the hourly scheduler described in the deployment
+	 * notes; it is not a user-facing admin action.
 	 */
 	@Post("admin/events/close-finished")
 	@Roles("superadmin")

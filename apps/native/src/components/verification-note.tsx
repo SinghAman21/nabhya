@@ -39,19 +39,26 @@ export function VerificationNote({ onNavigate }: { onNavigate: () => void }) {
 					description:
 						"You can apply meanwhile - NGOs see the verified badge once it's approved.",
 				}
-			: identity.state === "rejected"
+			: identity.state === "partial"
 				? {
 						tone: "warning" as const,
-						title: "Your ID needs another look",
+						title: "Your identity submission is incomplete",
 						description:
-							"NGOs accept verified volunteers first. Tap to retake your photos.",
+							"Finish the missing photo and submit both documents for review.",
 					}
-				: {
-						tone: "info" as const,
-						title: "NGOs accept verified volunteers first",
-						description:
-							"Verify your ID - an Aadhaar photo and a selfie. Tap to start.",
-					};
+				: identity.state === "rejected"
+					? {
+							tone: "warning" as const,
+							title: "Your ID needs another look",
+							description:
+								"NGOs accept verified volunteers first. Tap to retake your photos.",
+						}
+					: {
+							tone: "info" as const,
+							title: "NGOs accept verified volunteers first",
+							description:
+								"Verify your ID - an Aadhaar photo and a selfie. Tap to start.",
+						};
 
 	return (
 		<View style={{ marginBottom: spacing[4] }}>

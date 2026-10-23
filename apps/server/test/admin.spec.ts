@@ -77,6 +77,7 @@ describe("AdminService", () => {
 			audit,
 			new OrganizationsService(db as never, audit, null as never),
 			new NotificationsService(db as never),
+			null as never,
 		);
 	});
 
@@ -280,6 +281,14 @@ describe("AdminService", () => {
 			// Approving only the ID must not promote the account on its own.
 			await service.reviewUserDocument(admin.id, govId.id, {
 				verificationStatus: "VERIFIED",
+			});
+			await vi.waitFor(async () => {
+				const notice = await db.query.notifications.findFirst({
+					where: (table, { eq }) => eq(table.userId, volunteer.id),
+				});
+				expect(notice?.type).toBe("DOCUMENT_VERIFIED");
+				expect(notice?.entityName).toBe("USER_DOCUMENT");
+				expect(notice?.entityId).toBe(govId.id);
 			});
 
 			const user = await db.query.users.findFirst({
@@ -916,8 +925,12 @@ describe("AdminService", () => {
 		it("zero-fills every day in the window", async () => {
 			// A GROUP BY only returns days that had a row; a line drawn across the
 			// gaps would claim steady activity where there was none.
-			const owner = await createUser(db, { role: "organisation" });
-			await createOrganization(db, owner.id);
+			const now = new Date();
+			const owner = await createUser(db, {
+				role: "organisation",
+				createdAt: now,
+			});
+			await createOrganization(db, owner.id, { createdAt: now });
 
 			const trends = await service.getTrends(7);
 
@@ -932,9 +945,10 @@ describe("AdminService", () => {
 		});
 
 		it("counts volunteers by role, not every account", async () => {
-			await createUser(db, { role: "volunteer" });
-			await createUser(db, { role: "volunteer" });
-			await createUser(db, { role: "organisation" });
+			const now = new Date();
+			await createUser(db, { role: "volunteer", createdAt: now });
+			await createUser(db, { role: "volunteer", createdAt: now });
+			await createUser(db, { role: "organisation", createdAt: now });
 
 			const trends = await service.getTrends(7);
 

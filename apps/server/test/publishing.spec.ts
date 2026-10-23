@@ -227,19 +227,58 @@ describe("PublishingService", () => {
 			expect(drafts.meta.total).toBe(1);
 		});
 
-		it("does not notify anyone about a draft", async () => {
+		it("keeps drafts silent, restricts viewers, and protects published updates from demotion", async () => {
 			const { owner, org } = await verifiedOrg();
 			const follower = await createUser(db, { role: "volunteer" });
+			const member = await createUser(db, { role: "organisation" });
+			const viewer = await createUser(db, { role: "organisation" });
+			await db.insert(organizationAdmins).values([
+				{
+					organizationId: org.id,
+					userId: member.id,
+					role: "MEMBER",
+					status: "ACTIVE",
+				},
+				{
+					organizationId: org.id,
+					userId: viewer.id,
+					role: "VIEWER",
+					status: "ACTIVE",
+				},
+			]);
 			await db.execute(
 				`insert into bookmarks (user_id, organization_id) values ('${follower.id}', '${org.id}')`,
 			);
 
-			await service.createAnnouncement(owner.id, {
+			const draft = await service.createAnnouncement(member.id, {
 				...announcement,
 				status: "DRAFT",
 			});
+			expect(draft.status).toBe("DRAFT");
+			await expect(
+				service.createAnnouncement(viewer.id, {
+					...announcement,
+					status: "DRAFT",
+				}),
+			).rejects.toBeInstanceOf(ForbiddenException);
 
 			expect(await db.query.notifications.findMany()).toHaveLength(0);
+
+			const published = await service.createAnnouncement(
+				owner.id,
+				announcement,
+			);
+			await expect(
+				service.updateAnnouncement(viewer.id, published.id, {
+					...announcement,
+					status: "DRAFT",
+				}),
+			).rejects.toBeInstanceOf(ForbiddenException);
+
+			const stillPublished = await db.query.announcements.findFirst({
+				where: eq(announcements.id, published.id),
+			});
+			expect(stillPublished?.status).toBe("PUBLISHED");
 		});
 	});
 

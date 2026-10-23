@@ -44,6 +44,7 @@ import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
 import { orderBySort } from "../../common/utils/order";
 import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsService } from "../organizations/organizations.service";
+import { UploadsService } from "../uploads/uploads.service";
 
 /** Columns exposed on the public feed - never the internal review fields. */
 const publicEventColumns = {
@@ -82,6 +83,7 @@ export class EventsService {
 		private readonly organizationsService: OrganizationsService,
 		@Inject(NotificationsService)
 		private readonly notifications: NotificationsService,
+		@Inject(UploadsService) private readonly uploads: UploadsService,
 	) {}
 
 	// ─── Public feed ─────────────────────────────────────────────────────────
@@ -270,6 +272,12 @@ export class EventsService {
 			input.status === "PUBLISHED"
 				? await this.organizationsService.requireVerifiedOrganization(userId)
 				: await this.organizationsService.requireOwnedOrganization(userId);
+		if (input.coverImage) {
+			await this.uploads.assertUploaded(input.coverImage, {
+				purpose: "EVENT_COVER",
+				ownerId: organization.id,
+			});
+		}
 
 		const inserted = await this.db
 			.insert(events)
@@ -315,7 +323,16 @@ export class EventsService {
 	}
 
 	async update(userId: string, eventId: string, input: UpdateEventInput) {
-		const { event } = await this.requireOwnedEvent(userId, eventId);
+		const { event, organization } = await this.requireOwnedEvent(
+			userId,
+			eventId,
+		);
+		if (input.coverImage) {
+			await this.uploads.assertUploaded(input.coverImage, {
+				purpose: "EVENT_COVER",
+				ownerId: organization.id,
+			});
+		}
 
 		if (input.status === "PUBLISHED" && event.status !== "PUBLISHED") {
 			await this.organizationsService.requireOrgPermission(

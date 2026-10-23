@@ -34,6 +34,7 @@ export async function createUser(
 		role?: "volunteer" | "organisation" | "superadmin";
 		fullName?: string;
 		status?: "ACTIVE" | "SUSPENDED";
+		createdAt?: Date;
 	} = {},
 ) {
 	const [user] = await db
@@ -42,6 +43,7 @@ export async function createUser(
 			email: `user-${unique()}@example.com`,
 			fullName: options.fullName ?? "Test User",
 			status: options.status ?? "ACTIVE",
+			...(options.createdAt ? { createdAt: options.createdAt } : {}),
 		})
 		.returning();
 
@@ -108,6 +110,7 @@ export async function createOrganization(
 		verificationStatus?: "PENDING" | "UNDER_REVIEW" | "VERIFIED" | "REJECTED";
 		status?: "ACTIVE" | "SUSPENDED";
 		name?: string;
+		createdAt?: Date;
 	} = {},
 ) {
 	const [organization] = await db
@@ -119,6 +122,7 @@ export async function createOrganization(
 			state: "Maharashtra",
 			verificationStatus: options.verificationStatus ?? "VERIFIED",
 			status: options.status ?? "ACTIVE",
+			...(options.createdAt ? { createdAt: options.createdAt } : {}),
 		})
 		.returning();
 

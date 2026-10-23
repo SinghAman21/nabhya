@@ -108,6 +108,17 @@ export class EngagementController {
 		return this.engagementService.listReviews(id, query);
 	}
 
+	@Get("organizations/:id/reviews/me")
+	@Roles("volunteer")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({ summary: "The caller's review of an NGO, if one exists" })
+	getMyReview(
+		@CurrentUser() user: AuthUser,
+		@Param("id", ParseUUIDPipe) id: string,
+	) {
+		return this.engagementService.getMyReview(user.id, id);
+	}
+
 	@Throttle({ strict: { limit: 10, ttl: 60_000 } })
 	@Post("organizations/:id/reviews")
 	@Roles("volunteer")

@@ -207,13 +207,19 @@ export class UsersService {
 	async uploadDocument(userId: string, input: UploadUserDocumentInput) {
 		// The client uploaded straight to object storage, so confirm the object
 		// really exists and is within limits before trusting the key.
-		await this.uploads.assertUploaded(input.documentKey);
+		await this.uploads.assertUploaded(input.documentKey, {
+			purpose: "USER_DOCUMENT",
+			ownerId: userId,
+		});
 
 		// A liveness selfie can carry a second frame captured mid-challenge,
 		// uploaded the same way; its key has to be verified before we trust it.
 		const secondaryFrameKey = input.metadata?.liveness?.secondaryFrameKey;
 		if (secondaryFrameKey) {
-			await this.uploads.assertUploaded(secondaryFrameKey);
+			await this.uploads.assertUploaded(secondaryFrameKey, {
+				purpose: "USER_DOCUMENT",
+				ownerId: userId,
+			});
 		}
 
 		const document = await this.db.transaction(async (tx) => {

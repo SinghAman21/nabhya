@@ -9,7 +9,6 @@ import type {
 import {
 	useInfiniteQuery,
 	useMutation,
-	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
 import { feedApi, queryKeys, queryScopes } from "@/lib/api";
@@ -319,14 +318,21 @@ export function useFeedComments(
 	item: FeedItem | null,
 	query: Partial<FeedCommentsQuery> = {},
 ) {
-	return useQuery({
-		queryKey: queryKeys.feedComments(item?.id ?? "", query),
-		queryFn: () =>
+	const limit = query.limit ?? 50;
+	return useInfiniteQuery({
+		queryKey: [
+			...queryKeys.feedComments(item?.id ?? "", { limit }),
+			"infinite",
+		],
+		queryFn: ({ pageParam }) =>
 			feedApi.listComments(
 				KIND_TO_TYPE[item?.kind as FeedItem["kind"]],
 				item?.id as string,
-				query,
+				{ page: pageParam, limit },
 			),
+		initialPageParam: 1,
+		getNextPageParam: (lastPage) =>
+			lastPage.meta.hasMore ? lastPage.meta.page + 1 : undefined,
 		enabled: !!item,
 	});
 }

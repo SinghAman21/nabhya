@@ -71,6 +71,10 @@ export const engagementApi = {
 			ENGAGEMENT.reviews(organizationId),
 			query,
 		),
+	getMyReview: (organizationId: string) =>
+		http.get<Pick<ReviewItem, "id" | "rating" | "body"> | null>(
+			ENGAGEMENT.myReview(organizationId),
+		),
 	upsertReview: (organizationId: string, input: UpsertReviewInput) =>
 		http.post<ReviewItem>(ENGAGEMENT.reviews(organizationId), input),
 	deleteMyReview: (organizationId: string) =>

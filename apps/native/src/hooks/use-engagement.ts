@@ -116,7 +116,18 @@ export function useUpsertReview(organizationId: string) {
 			engagementApi.upsertReview(organizationId, input),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.reviews });
+			queryClient.invalidateQueries({
+				queryKey: queryKeys.myReview(organizationId),
+			});
 		},
+	});
+}
+
+export function useMyReview(organizationId: string, enabled = true) {
+	return useQuery({
+		queryKey: queryKeys.myReview(organizationId),
+		queryFn: () => engagementApi.getMyReview(organizationId),
+		enabled,
 	});
 }
 
@@ -126,6 +137,9 @@ export function useDeleteMyReview(organizationId: string) {
 		mutationFn: () => engagementApi.deleteMyReview(organizationId),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryScopes.reviews });
+			queryClient.invalidateQueries({
+				queryKey: queryKeys.myReview(organizationId),
+			});
 		},
 	});
 }

@@ -6,6 +6,7 @@ export const queryKeys = {
 	me: ["me"] as const,
 	onboardingStatus: ["onboarding", "status"] as const,
 	categories: ["categories"] as const,
+	adminCategories: ["admin", "categories"] as const,
 
 	publicEvents: (params?: unknown) => ["events", "public", params] as const,
 	publicEvent: (id: string) => ["events", "public", "detail", id] as const,
@@ -62,6 +63,7 @@ export const queryKeys = {
 	bookmarks: (params?: unknown) => ["bookmarks", params] as const,
 	following: (params?: unknown) => ["following", params] as const,
 	reviews: (id: string, params?: unknown) => ["reviews", id, params] as const,
+	myReview: (id: string) => ["reviews", id, "me"] as const,
 	orgReviews: (params?: unknown) => ["reviews", "org", params] as const,
 
 	certificates: (params?: unknown) => ["certificates", params] as const,

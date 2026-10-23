@@ -402,6 +402,18 @@ export class OrganizationsService {
 	async updateMyOrganization(userId: string, input: UpdateOrganizationInput) {
 		await this.requireOrgPermission(userId, "org.edit");
 		const organization = await this.requireOwnedOrganization(userId);
+		if (input.logo) {
+			await this.uploads.assertUploaded(input.logo, {
+				purpose: "ORG_LOGO",
+				ownerId: organization.id,
+			});
+		}
+		if (input.coverImage) {
+			await this.uploads.assertUploaded(input.coverImage, {
+				purpose: "ORG_COVER",
+				ownerId: organization.id,
+			});
+		}
 		const { categoryIds, ...fields } = input;
 
 		const updated = await this.db.transaction(async (tx) => {
@@ -527,7 +539,10 @@ export class OrganizationsService {
 
 		// Confirm the object landed in storage before recording its key - the
 		// client uploads directly, so this server never saw the bytes.
-		await this.uploads.assertUploaded(input.documentKey);
+		await this.uploads.assertUploaded(input.documentKey, {
+			purpose: "ORG_DOCUMENT",
+			ownerId: organization.id,
+		});
 
 		const document = takeFirstOrThrow(
 			await this.db

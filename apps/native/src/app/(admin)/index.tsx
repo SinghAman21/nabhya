@@ -1,5 +1,5 @@
 import type { TrendWindow } from "@nabhya/shared";
-import { useRouter } from "expo-router";
+import { type Href, useRouter } from "expo-router";
 import { LogOut } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
@@ -422,12 +422,18 @@ export default function AdminOverviewScreen() {
 			title="Overview"
 			subtitle="Superadmin console"
 			action={
-				// A labelled button, not a lone megaphone. An icon-only control
-				// ships with a visible word unless it sits in a fixed toolbar of
-				// them, and this one notifies every account on the platform.
-				<Button size="sm" onPress={() => setBroadcasting(true)}>
-					Broadcast
-				</Button>
+				<View style={{ flexDirection: "row", gap: spacing[2] }}>
+					<Button
+						variant="outline"
+						size="sm"
+						onPress={() => router.push("/(admin)/categories" as Href)}
+					>
+						Causes
+					</Button>
+					<Button size="sm" onPress={() => setBroadcasting(true)}>
+						Broadcast
+					</Button>
+				</View>
 			}
 			refreshing={query.isRefetching}
 			onRefresh={() => {

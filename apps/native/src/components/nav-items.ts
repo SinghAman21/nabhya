@@ -12,6 +12,7 @@ import {
 	Newspaper,
 	ScrollText,
 	Star,
+	Tags,
 	User,
 	Users,
 } from "lucide-react-native";
@@ -116,6 +117,12 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
 		label: "Activity",
 		href: "/(admin)/audit",
 		icon: ScrollText,
+		section: "Records",
+	},
+	{
+		label: "Categories",
+		href: "/(admin)/categories",
+		icon: Tags,
 		section: "Records",
 	},
 ];

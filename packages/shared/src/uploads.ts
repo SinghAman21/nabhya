@@ -7,6 +7,8 @@ export const uploadPurposeSchema = z.enum([
 	"ORG_COVER",
 	"AVATAR",
 	"EVENT_COVER",
+	"NEED_COVER",
+	"ANNOUNCEMENT_COVER",
 	"FINANCIAL_REPORT",
 ]);
 
