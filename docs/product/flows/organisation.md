@@ -24,7 +24,6 @@ flowchart TD
     U --> V[Appear in For You / Trending / Following]
     E --> O[Upload Financial Reports]
     E --> P[View Donations]
-    P --> Q[Download Reports]
     E --> R[Manage Team]
     R --> R1[Invite Teammate by Email]
     R1 --> R2[Teammate Accepts - becomes an NGO account with a role]
@@ -33,3 +32,7 @@ flowchart TD
     E --> S[Respond to Reviews]
     E --> T[Receive Notifications]
 ```
+
+Donation history is available in the NGO console. Donation and financial-report
+exports are not implemented yet; see the NGO report checklist for the current
+scope.

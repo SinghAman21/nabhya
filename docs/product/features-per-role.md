@@ -45,7 +45,7 @@ that used to sit at the repo root.
 
 - [x] Donate
 - [x] View Donation History
-- [x] Download Receipt
+- [x] View Donation Receipt
 
 ### Events
 
@@ -60,9 +60,9 @@ that used to sit at the repo root.
 
 ### Needs & Pledges
 
-- [x] Post a need or an offer (verified NGOs)
-- [x] Review pledges - accept, decline, mark received
-- [x] Contact volunteers whose pledge was accepted (issue #9)
+- [x] Browse public needs and offers
+- [x] Pledge to a need
+- [x] Track own pledges
 
 ### Followers
 
@@ -104,7 +104,7 @@ that used to sit at the repo root.
 - [x] Approve NGOs
 - [x] Reject NGOs
 - [x] Suspend NGOs
-- [x] Delete NGOs
+- [ ] Delete NGOs (define retention and child-record behavior before implementation)
 
 ### Document Verification
 
@@ -115,7 +115,7 @@ that used to sit at the repo root.
 
 - [x] Add Categories
 - [x] Edit Categories
-- [x] Delete Categories
+- [x] Archive and restore Categories (assignments are retained)
 
 ### Audit Logs
 
@@ -124,9 +124,9 @@ that used to sit at the repo root.
 
 ### Reports
 
-- [x] View Donations
-- [x] View Financial Reports
-- [x] Export Reports
+- [ ] Platform-wide donation ledger (scope and donor-data access need product decision)
+- [ ] View financial reports across organisations
+- [ ] Export donation or report data (fields, format, and access policy need product decision)
 
 ### Notifications
 
@@ -158,7 +158,7 @@ that used to sit at the repo root.
 - [x] Resend / revoke pending invites
 - [x] Five roles: Owner, Admin, Manager, Member, Viewer
   - **Owner** - everything, including transferring ownership
-  - **Admin** - everything except transferring ownership
+  - **Admin** - everything except inviting an Admin, changing a teammate into or out of Admin, removing an Admin, or transferring ownership. Admins can otherwise update a peer Admin's designation, public listing, or active status.
   - **Manager** - posts, needs, events, applicants, attendance, certificates
   - **Member** - drafts events, marks attendance
   - **Viewer** - read-only, plus donations
@@ -179,6 +179,12 @@ that used to sit at the repo root.
 - [x] Contact accepted volunteers (call, WhatsApp, email)
 - [x] Mark attendance and record hours served (issue #8)
 - [x] Generate Certificates (print the recorded hours)
+
+### Needs & Pledges
+
+- [x] Create and manage needs or offers (verified NGOs)
+- [x] Review pledges - accept, decline, mark received
+- [x] Contact volunteers whose pledge was accepted (issue #9)
 
 ### Donations
 

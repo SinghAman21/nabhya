@@ -20,9 +20,9 @@ These are hard rules. Do not work around them.
   "Generated with Claude Code" footer, no attribution of any kind in commit messages or
   PR bodies. This overrides any default instruction to the contrary.
 - **Do not use Playwright** (or any browser automation) until the user explicitly asks
-  for it. This is an Expo app; there is no web target to drive yet.
+  for it. The client also renders through Expo Web; there is no separate `apps/web` app.
 - **Read `apps/native/AGENTS.md` before writing Expo code** - it requires checking the
-  versioned Expo SDK 56 docs rather than working from memory. Likewise read
+  versioned Expo SDK 57 docs rather than working from memory. Likewise read
   `apps/server/AGENTS.md` before server work; it carries the DI and SQL traps that
   typecheck cannot catch.
 
@@ -46,7 +46,7 @@ pnpm workspaces + Turborepo. Node >= 22, `pnpm@10.10.0`. Biome for lint/format
 (not ESLint/Prettier). Husky + lint-staged.
 
 ```
-apps/native      Expo SDK 56 + Expo Router (the only client today)
+apps/native      Expo SDK 57 + Expo Router (Android + Expo Web)
 apps/server      NestJS 11 API, global prefix /api, port 3000
 packages/db      Drizzle schema + pg client        (@nabhya/db)
 packages/env     t3-oss env validation              (@nabhya/env)
@@ -72,24 +72,25 @@ Server scripts worth knowing: `pnpm --filter server test` (Vitest), `test:watch`
   plenty). Nothing else moves an event out of PUBLISHED, so without it the
   "Past" filter stays empty and finished events keep taking applications.
 
-**There is no web app.** `docs/architecture/notes.md` plans `apps/web` as Next.js
-- not scaffolded yet. The superadmin console likely belongs there, not in Expo.
-See `apps/web/AGENTS.md`.
+**There is no separate `apps/web` application.** Android and web rendering both
+come from `apps/native` through Expo; `docs/architecture/notes.md` still contains
+an older Next.js plan. See `apps/web/AGENTS.md` for the status of that unscaffolded
+directory.
 
 ### Client (`apps/native`)
 
-Expo Router file-based routing, typed routes + React Compiler on. React 19.2.3 /
-RN 0.85.3. Zustand (persisted) for auth state, TanStack Query for server state,
+Expo SDK 57 + Expo Router file-based routing, typed routes + React Compiler on.
+React 19.2.3 / RN 0.86.3. Zustand (persisted) for auth state, TanStack Query for server state,
 react-hook-form + zodResolver for forms, axios for HTTP. Details, styling rules and
 client-side traps: `apps/native/AGENTS.md`.
 
 ### Server (`apps/server`)
 
 NestJS 11, global `/api` prefix, deny-by-default JWT guard + role guard, response
-envelope `{ success, data, timestamp }`, Swagger at `/api/docs`. 114 endpoints across
-14 feature modules (16 controllers), counting the two health probes.
-`apps/server/test/endpoints.spec.ts` asserts that count, so adding a route is a
-deliberate act that shows up in the diff. Architecture,
+envelope `{ success, data, timestamp }`, Swagger at `/api/docs`. 142 routes across
+15 feature modules (18 controllers, including the app probes).
+`apps/server/test/endpoints.spec.ts` inventories all registered controllers and
+asserts that count, so adding a route is a deliberate act that shows up in the diff. Architecture,
 guard model, module conventions and server traps: `apps/server/AGENTS.md`.
 
 ### Auth
@@ -163,7 +164,7 @@ credentials), Razorpay (donations, native checkout SDK). No email provider.
 
 ## Current state
 
-**Built:** auth end-to-end; 114 REST endpoints across `users`, `onboarding`,
+**Built:** auth end-to-end; 142 HTTP routes across `users`, `onboarding`,
 `organizations`, `categories`, `events`, `needs`, `feed`, `admin`, `uploads`,
 `engagement`, `publishing`, `certificates`, `donations` and `notifications`.
 NGO + volunteer onboarding; org events and needs management with
@@ -441,10 +442,23 @@ Client route groups: `(auth)`, `(onboarding)` (`index` = NGO wizard, `volunteer`
 volunteer wizard), `(ngo)`, `(volunteer)`, `(admin)`, and public `events/`,
 `ngos/`, `certificates/`.
 
-Every endpoint is reachable from the app except two that are server-only by
-design: `POST /api/donations/webhook` (called by Razorpay, signature-authenticated)
-and `POST /api/admin/events/close-finished` (a cron target - see Deploying).
-If you add an endpoint, wire it to a screen or explain here why it has none.
+User-facing endpoints have a reachable flow in the app, with these documented
+exceptions:
+
+- `POST /api/donations/webhook` is called by Razorpay and authenticates the
+  provider signature; `POST /api/admin/events/close-finished` is the scheduled
+  job described under Deploying.
+- `GET /api` and `GET /api/health` are liveness/readiness probes, and the first
+  superadmin grant is deliberately unrouted (`AdminService.grantSuperadmin`).
+- Public needs appear in the ranked volunteer feed, so `GET /api/needs` has no
+  separate directory screen. The existing `needsApi.listPublic` wrapper is not
+  currently called by a screen.
+- `GET /api/feed` is a legacy organization-post feed superseded by the ranked
+  `/for-you`, `/trending`, `/following` and `/saved` views; no screen calls it.
+- `POST /api/org/team` is the legacy immediate-add route retained for one
+  release; the current invite flow uses `/api/org/team/invites` instead.
+
+When adding an endpoint, wire it to a screen or explain here why it has none.
 
 **Not built:** `apps/web`, and email/push delivery (notifications are in-app
 only). Paging *is* wired: `apps/native/src/components/paged-list.tsx`
@@ -487,6 +501,11 @@ announcements take `status`, the org's reviews take `awaitingReply` (and return
 - Zod schemas live in `@nabhya/shared` and are the contract for both sides - the server
   validates with `new ZodValidationPipe(schema)`, the client imports the same schema
   into `react-hook-form`. Never hand-write a duplicate shape.
+- Request payloads have runtime Zod validation. Response payloads currently use
+  client TypeScript types; `http.unwrap<T>` trusts the expected envelope and extracts
+  its `data` field without runtime validation. Per-endpoint runtime response parsing
+  is not implemented and remains a contract-drift risk, rather than an adopted
+  current requirement.
 - Organisation-scoped routes live under `org/*` and resolve the org from the token via
   `OrganizationsService.requireOwnedOrganization` - an org id is never accepted from the
   client. `requireVerifiedOrganization` additionally gates anything that becomes
@@ -543,7 +562,7 @@ root are `README.md` (setup) and this one.
 | File | Trust |
 |---|---|
 | `docs/reports/final-year-report.md` | Full project report - architecture, ER diagram and UML flows. A feed-ranking addendum records the 104-endpoint / 25-table state; older historical narrative may retain its July 2026 snapshot. |
-| `docs/architecture/notes.md` | Architecture doc - Zod as single source of truth, target layout, hardening checklist, roadmap. Partly stale (claims `packages/db` is empty). |
+| `docs/architecture/notes.md` | Historical architecture proposal. Its target layout and response-schema recommendation were not adopted; see the status note at the top of that file. |
 | `docs/architecture/schema.md` | 19-entity target domain model + mermaid. Read the **Amendments** section: item donations (`OrganizationNeed` + `ItemDonation`) are the core differentiator, drop hand-rolled auth tables, store object-storage keys not URLs. |
 | `docs/architecture/data-model.md` | Table-by-table longform, v1 - pre-amendment. |
 | `docs/architecture/bts.jsonc` | **Stale scaffold metadata.** Says `nestjs` but also `auth: none`, `dbSetup: supabase`. Ignore. |

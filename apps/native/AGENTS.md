@@ -2,13 +2,15 @@
 
 ## Expo HAS CHANGED
 
-Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before
-writing any code. Do not work from memory - SDK 56 APIs differ from what you think
-you know.
+Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before
+writing Expo code. Do not work from memory; SDK 57 is the version pinned by this
+app's package manifest.
 
-Repo-wide rules and context live in the root `AGENTS.md`. Expo SDK 56 + Expo Router
-(file-based, typed routes, React Compiler on), React 19.2.3 / RN 0.85.3. **No
-Playwright or browser automation** - there is no web target yet.
+Repo-wide rules and context live in the root `AGENTS.md`. Expo SDK 57 (`expo`
+`~57.0.15`) + Expo Router (file-based, typed routes, React Compiler on), React
+19.2.3 / RN 0.86.3. The app has an Android target and an Expo Web target
+(`web.output: "static"`, Metro bundler); there is no separate `apps/web` app.
+**No Playwright or browser automation** until the user explicitly asks for it.
 
 **Expo Go no longer works for this app.** `react-native-razorpay` (donation
 checkout) is a real native module and does not run in Expo Go. Every

@@ -84,10 +84,17 @@ Guard order (all global `APP_GUARD`s in `app.module.ts`):
   no timestamp/replay window (unlike the payment provider this replaced), so
   idempotency relies entirely on the PENDING-guard + unique index, not a
   freshness check.
-- Two endpoints are server-only by design (no screen): `POST /api/donations/webhook`
+- Two product-operation endpoints are server-only by design (no screen):
+  `POST /api/donations/webhook`
   and `POST /api/admin/events/close-finished` (cron target - the only thing that
   moves events out of PUBLISHED). If you add an endpoint, wire it to a screen or
   document in the root `AGENTS.md` why it has none.
+- The current HTTP surface is 142 routes across 18 controllers, including the
+  health probes. `test/endpoints.spec.ts` builds its route inventory from every
+  registered controller and keeps the public and optional-auth allowlists
+  explicit. Health probes, the first-superadmin grant, legacy `GET /api/feed`,
+  and one-release `POST /api/org/team` also have no screen; root `AGENTS.md`
+  records why each is intentional.
 
 ## Testing
 

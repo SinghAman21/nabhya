@@ -1,9 +1,10 @@
-# apps/web - not scaffolded yet
+# apps/web - no separate web package
 
-There is **no web app**. This directory holds only this guide; do not import from it,
-add it to CI, or "fix" its absence from the workspace. `docs/architecture/notes.md`
-plans it as a Next.js app, and the superadmin console currently living in the Expo
-`(admin)` group most likely belongs here once it exists.
+There is **no separate `apps/web` package**. The existing Expo app has an Android
+target and an Expo Web rendering target under `apps/native`; this directory holds
+only this guide. Do not import from it, add it to CI, or treat it as an existing
+Next.js app. `docs/architecture/notes.md` is a historical proposal for a separate
+Next.js app, and the superadmin console currently lives in the Expo `(admin)` group.
 
 If you are asked to scaffold it:
 
@@ -28,5 +29,7 @@ If you are asked to scaffold it:
   log) plus SEO-friendly public pages - NGO profiles, event pages, and the
   certificate verification page (`GET /api/certificates/:code/verify` is public by
   design).
-- Only after a web target exists does browser automation (Playwright) become
-  fair game - and still only when the user explicitly asks for it.
+- The Expo Web rendering target already exists inside `apps/native`. Do not use
+  browser automation just because that target exists; the root guide requires an
+  explicit user request. This directory's future separate web package does not
+  change that rule.

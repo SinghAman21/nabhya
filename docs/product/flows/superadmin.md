@@ -14,14 +14,16 @@ flowchart TD
     G --> H[Approve NGO]
     G --> I[Reject NGO]
     G --> J[Suspend NGO]
-    G --> K[Delete NGO]
     B --> L[Verify Documents]
     L --> M[Approve Document]
     L --> N[Reject Document]
-    B --> O[View Donations]
-    B --> P[View Reports]
     B --> Q[Audit Logs]
     B --> R[Manage Categories]
     B --> S[Broadcast Notifications]
     B --> T[Platform Analytics]
 ```
+
+The current console includes aggregate donation statistics, but no platform-wide
+donation ledger, financial-report directory, or export flow. Those capabilities
+remain unbuilt until their data scope and donor-data access rules are specified.
+NGO deletion also remains unbuilt pending retention and child-record rules.

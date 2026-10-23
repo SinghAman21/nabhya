@@ -1,5 +1,15 @@
 # Architecture Notes - Nabhya
 
+> **Status: historical proposal, superseded by the repository guides.** This file
+> describes an earlier target architecture; it is not a description of the current
+> product or an implementation checklist. The current stack and app targets are in
+> the root [AGENTS.md](../../AGENTS.md), with app-specific rules in
+> `apps/native/AGENTS.md` and `apps/server/AGENTS.md`. In particular, the current
+> app uses Supabase Auth, Drizzle/Postgres, NestJS, and Expo for Android and web;
+> there is no separate Next.js app. The per-endpoint runtime response-schema rule
+> below was proposed but was not adopted. The client currently has static TypeScript
+> response types and does not parse every response at runtime.
+
 NGO social platform: NGOs onboard and get verified; volunteers discover NGOs, donate items, or offer help.
 
 ## Principle

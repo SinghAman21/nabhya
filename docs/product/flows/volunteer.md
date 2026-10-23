@@ -9,8 +9,8 @@ flowchart TD
     B --> C[Complete Profile]
     C --> D[Upload Identity Document]
     D --> E[Wait for Verification]
-    E -->|Approved| F[Browse NGOs]
     E -->|Rejected| D
+    C --> F[Browse NGOs]
     F --> G[Search & Filter NGOs]
     F --> V[Browse For You / Trending feeds]
     V --> W[Like, save, share or comment]
@@ -32,3 +32,7 @@ flowchart TD
     S --> T[Reset Password]
     F --> U[Receive Notifications]
 ```
+
+Identity review controls the volunteer's verification status and badge; it is
+not a prerequisite to browse NGOs, use the public feed, or apply to events.
+Volunteers can continue those flows while review is pending.
