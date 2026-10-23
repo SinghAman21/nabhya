@@ -22,14 +22,16 @@
 
 % ---------------- Title page ----------------
 \newcommand\@thesistitlesmlskip{0.15in}
-\newcommand\@thesistitlemedskip{0.35in}
-\newcommand\@thesistitlebigskip{0.75in}
+\newcommand\@thesistitlemedskip{0.15in}
+\newcommand\@thesistitlebigskip{0.5in}
 
 \newcommand{\department}[1]{\gdef\@department{#1}}
 \newcommand{\reporttype}[1]{\gdef\@doctype{#1}}
 
-\gdef\@doctype{Submitted in fulfilment of the requirements \\ \vspace{0.15in} For the degree of\\ \vspace{0.2in}\large \bf B.Tech. \vspace{0.2in}\\
-Department of Information Technology}
+\gdef\@doctype{Submitted by final-year students in partial fulfilment of the\\ requirements for the award of the degree of\\[0.18in]
+{\LARGE\bfseries Bachelor of Technology}\\[0.06in]
+in\\[0.1in]
+{\Large\bfseries Information Technology}}
 \gdef\@department{(Unknown Department)}
 
 \renewcommand{\maketitle}{\begin{titlepage}
@@ -37,12 +39,12 @@ Department of Information Technology}
     \let\footnotesize\small \let\footnoterule\relax \setcounter{page}{1}
     \vspace*{0.1in}
     \begin{center}
-      \mbox{}\\
+      %
       {\bf\expandafter\uppercase\expandafter{\LARGE\@title}} \\[\@thesistitlebigskip]
       {\large  \@doctype} \\[\@thesistitlesmlskip]
       {\large by} \\[\@thesistitlesmlskip]
       {\large \bf \@author} \\ [\@thesistitlesmlskip]
-      \vspace{0.4in}{\large Supervisor }  \\[\@thesistitlesmlskip]
+      \vspace{0.2in}{\large Under the guidance of}  \\[\@thesistitlesmlskip]
       {\large \bf \@advisorname} \\[\@thesistitlesmlskip]
       \ifx\@coadvisorname\@empty
         \mbox{}\\[\@thesistitlemedskip]
@@ -50,11 +52,12 @@ Department of Information Technology}
         {\large and } \\[\@thesistitlesmlskip]
         {\large \bf \@coadvisorname} \\\vspace{0.1in}
       \fi
-      \IfFileExists{VIT.png}{\origincludegraphics[width=10cm]{VIT.png}}{%
-        \IfFileExists{images/VIT.png}{\origincludegraphics[width=10cm]{images/VIT.png}}{%
+      \IfFileExists{VIT.png}{\origincludegraphics[width=8.5cm]{VIT.png}}{%
+        \IfFileExists{images/VIT.png}{\origincludegraphics[width=8.5cm]{images/VIT.png}}{%
           \fbox{\parbox[c][1.0cm][c]{8cm}{\centering Insert VIT logo here}}}}\\[\@thesistitlesmlskip]
       {\large \MakeUppercase{\@department}} \\
-      {\large Vidyalankar Institute of Technology,\\Wadala, Mumbai - 400037.\\(Under the ambit of University of Mumbai)}\\
+      {\large Vidyalankar Institute of Technology,\\Wadala, Mumbai - 400037.\\[0.08in](Under the ambit of University of Mumbai)\\[0.18in]
+      {\bfseries Academic Year 2026--2027}}\\
     \end{center}
   \end{titlepage}
   \setcounter{footnote}{0}
@@ -257,9 +260,12 @@ Department of Information Technology}
 \pagenumbering{roman}
 
 \title{\LARGE Nabhya: A Verified NGO-Volunteer\\Connect Platform for India}
-\author{Tanay Shinde (23101B0034)\\[0.05in]
-        Aman Singh (23101B0063)\\[0.05in]
-        Tanishq Chavan (23101C0008)}
+\author{SHINDE TANAY KISHORE SHITAL\\
+        {\normalfont\normalsize Roll Number: 23101B0034}\\[0.12in]
+        SINGH AMAN DINESH ANITA\\
+        {\normalfont\normalsize Roll Number: 23101B0063}\\[0.12in]
+        CHAVAN TANISHQ RAJENDRA NILIMA\\
+        {\normalfont\normalsize Roll Number: 23101C0008}}
 \department{Department of Information Technology}
 \setguide{Prof. Deepali Shrikhande}
 \date{}
@@ -1289,7 +1295,7 @@ Key project knowledge concentrated in three students & Continuity risk if the pr
 \end{tabularx}
 \end{table}
 
-\section{Future Enhancements} \begin{itemize} \item A dedicated web application (Next.js) for superadmin operations to handle SEO-friendly public pages for NGOs, events and certificates. \item Email and push notifications with preferences for delivery and digest options. \item Allows feeds to be controlled by infinite scroll or full pagination. \item Stable migration setup prior to adding production data into the database. \item When the current latitude/longitude and Haversine proximity search is not satisfactory, a plan to switch to PostGIS for geospatial queries is made. \item Data from the organisation, including application funnels and donation trends. \item Use of regional languages (currently Hindi) to provide functionality in one of the languages spoken in the region wherever possible. \item Field testing of the platform with NGOs and volunteers, to measure its usability and performance and report on them. \end{itemize}
+\section{Future Enhancements}\label{sec:future} \begin{itemize} \item A dedicated web application (Next.js) for superadmin operations to handle SEO-friendly public pages for NGOs, events and certificates. \item Email and push notifications with preferences for delivery and digest options. \item Allows feeds to be controlled by infinite scroll or full pagination. \item Stable migration setup prior to adding production data into the database. \item When the current latitude/longitude and Haversine proximity search is not satisfactory, a plan to switch to PostGIS for geospatial queries is made. \item Data from the organisation, including application funnels and donation trends. \item Use of regional languages (currently Hindi) to provide functionality in one of the languages spoken in the region wherever possible. \item Field testing of the platform with NGOs and volunteers, to measure its usability and performance and report on them. \end{itemize}
 
 \section{Operational Readiness Checklist} \begin{itemize} \item All the environment variables that are required by the client and server have been set and checked. \item A successful verification of dependency injection is performed. \item The production build is successful. \item Supabase Storage (signed upload/download) is configured properly. \item The Supabase Auth configuration (issuer and JWKS) is correct and valid. \item The CORS origins allowed are correct. \item Committed migrations are applied and the automated tests run successfully on a clean schema. \item Readiness probe and scheduled event-closing job are set up. \item Provider configuration, webhook verification, and business approval are pending -- payment go-live remains disabled. \item Log of deployment is captured. \item Rollback/recovery steps are recorded. \end{itemize}
 
@@ -1302,6 +1308,24 @@ To sum up, Nabhya is a mobile-first solution that integrates NGO verification, v
 \noindent \newline Most of the engineering decisions come down to trust and doing the right thing. Organisation documents are reviewed before an organisation becomes public, and public listings only display verified and active organisations. Event capacity and need fulfilment counters are updated inside transactions, and important relationships are preserved through database uniqueness constraints. Payments settle only through signature-verified webhooks, and files move only through short-lived signed URLs. The integration tests (Chapter~\ref{ch:testing}) exercise a PostgreSQL-compatible database that we construct from the committed migrations.
 
 \noindent \newline  The project is also clearly bounded (Section~\ref{sec:limitations}). The web console and email and push notifications are yet to be built, full client pagination is still pending, and monetary donations are on hold until go-live. Real-world adoption and performance have not been demonstrated yet, and this should be done with field studies and validated measurements (Section~\ref{sec:future}). In this limited sense, Nabhya gives us a sufficient base for more reliable and effective giving.
+
+% ======================== PUBLICATION LIST ========================
+\chapter{Publication List}
+\label{ch:publications}
+
+\section{Research Papers}
+
+\begin{enumerate}[leftmargin=*, label=\arabic*.]
+  \item \textbf{Paper submitted}
+
+  9th International Conference on Pattern Analysis, Understanding and Learning (PAUL 2026).
+
+  \textbf{Status:} Under revision
+
+  \textbf{Last Revision Date:} 30/09/2026
+
+  \textbf{Paper title:} \textit{Trustworthy Data-Driven Infrastructure for Digital Philanthropy: A Verification-Centric Platform with Geospatial Discovery and Structured Need--Surplus Matching.}
+\end{enumerate}
 
 % ======================== REFERENCES ========================
 \clearpage\phantomsection\addcontentsline{toc}{chapter}{References}

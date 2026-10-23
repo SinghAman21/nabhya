@@ -18,14 +18,16 @@
 
 % ---------------- Title page ----------------
 \newcommand\@thesistitlesmlskip{0.15in}
-\newcommand\@thesistitlemedskip{0.35in}
-\newcommand\@thesistitlebigskip{0.75in}
+\newcommand\@thesistitlemedskip{0.15in}
+\newcommand\@thesistitlebigskip{0.5in}
 
 \newcommand{\department}[1]{\gdef\@department{#1}}
 \newcommand{\reporttype}[1]{\gdef\@doctype{#1}}
 
-\gdef\@doctype{Submitted in fulfilment of the requirements \\ \vspace{0.15in} For the degree of\\ \vspace{0.2in}\large \bf B.Tech. \vspace{0.2in}\\
-Department of Information Technology}
+\gdef\@doctype{Submitted by final-year students in partial fulfilment of the\\ requirements for the award of the degree of\\[0.18in]
+{\LARGE\bfseries Bachelor of Technology}\\[0.06in]
+in\\[0.1in]
+{\Large\bfseries Information Technology}}
 \gdef\@department{(Unknown Department)}
 
 \renewcommand{\maketitle}{\begin{titlepage}
@@ -33,12 +35,12 @@ Department of Information Technology}
     \let\footnotesize\small \let\footnoterule\relax \setcounter{page}{1}
     \vspace*{0.1in}
     \begin{center}
-      \mbox{}\\
+      %
       {\bf\expandafter\uppercase\expandafter{\LARGE\@title}} \\[\@thesistitlebigskip]
       {\large  \@doctype} \\[\@thesistitlesmlskip]
       {\large by} \\[\@thesistitlesmlskip]
       {\large \bf \@author} \\ [\@thesistitlesmlskip]
-      \vspace{0.4in}{\large Supervisor }  \\[\@thesistitlesmlskip]
+      \vspace{0.2in}{\large Under the guidance of}  \\[\@thesistitlesmlskip]
       {\large \bf \@advisorname} \\[\@thesistitlesmlskip]
       \ifx\@coadvisorname\@empty
         \mbox{}\\[\@thesistitlemedskip]
@@ -46,11 +48,12 @@ Department of Information Technology}
         {\large and } \\[\@thesistitlesmlskip]
         {\large \bf \@coadvisorname} \\\vspace{0.1in}
       \fi
-      \IfFileExists{VIT.png}{\origincludegraphics[width=10cm]{VIT.png}}{%
-        \IfFileExists{images/VIT.png}{\origincludegraphics[width=10cm]{images/VIT.png}}{%
+      \IfFileExists{VIT.png}{\origincludegraphics[width=8.5cm]{VIT.png}}{%
+        \IfFileExists{images/VIT.png}{\origincludegraphics[width=8.5cm]{images/VIT.png}}{%
           \fbox{\parbox[c][1.0cm][c]{8cm}{\centering Insert VIT logo here}}}}\\[\@thesistitlesmlskip]
       {\large \MakeUppercase{\@department}} \\
-      {\large Vidyalankar Institute of Technology,\\Wadala, Mumbai - 400037.\\(Under the ambit of University of Mumbai)}\\
+      {\large Vidyalankar Institute of Technology,\\Wadala, Mumbai - 400037.\\[0.08in](Under the ambit of University of Mumbai)\\[0.18in]
+      {\bfseries Academic Year 2026--2027}}\\
     \end{center}
   \end{titlepage}
   \setcounter{footnote}{0}
