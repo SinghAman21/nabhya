@@ -58,6 +58,7 @@ const SHELL_HEIGHT: ViewStyle =
 
 export default function NgoLayout() {
 	const role = useAuthStore((s) => s.role);
+	const email = useAuthStore((s) => s.email);
 	const { colors } = useTheme();
 	const { isDesktop } = useMedia();
 	const tabBarOptions = useTabBarOptions();
@@ -66,10 +67,21 @@ export default function NgoLayout() {
 	// Status, not `/organizations/me`: the latter 403s for a suspended org.
 	const { data: status } = useOnboardingStatus(role === "organisation");
 
+	// Signed out: straight to sign-in, never via "/" - the gate there replaces
+	// itself with login, and a layout still mounted for that frame redirecting
+	// back to "/" looped the root Stack ("Maximum update depth exceeded").
+	if (!email) return <Redirect href="/(auth)/login" />;
 	if (role !== "organisation") return <Redirect href="/" />;
 
-	if (status?.organization?.status === "SUSPENDED") {
-		return <OrgSuspended name={status.organization.organizationName} />;
+	const orgStatus = status?.organization?.status;
+	if (orgStatus === "SUSPENDED" || orgStatus === "DELETED") {
+		return (
+			<OrgSuspended
+				name={status?.organization?.organizationName}
+				deleted={orgStatus === "DELETED"}
+				reason={status?.organization?.statusReason}
+			/>
+		);
 	}
 
 	if (isDesktop) {

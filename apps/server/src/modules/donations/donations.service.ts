@@ -6,8 +6,11 @@ import type {
 	DonationCheckout,
 	DonationQuery,
 	DonationStats,
+	ExportFile,
+	OrgDonationExportQuery,
 	OrgDonationQuery,
 } from "@nabhya/shared";
+import { MAX_EXPORT_ROWS } from "@nabhya/shared";
 import {
 	BadRequestException,
 	Inject,
@@ -15,22 +18,29 @@ import {
 	Logger,
 	NotFoundException,
 } from "@nestjs/common";
-import {
-	and,
-	count,
-	countDistinct,
-	desc,
-	eq,
-	type SQL,
-	sql,
-} from "drizzle-orm";
+import { and, count, desc, eq, gte, lt, type SQL, sql } from "drizzle-orm";
 import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
-import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
+import { MailService } from "../../common/mail";
+import {
+	NGO_VERIFICATION_BUCKET,
+	STORAGE_TOKEN,
+	type StorageProvider,
+} from "../../common/storage";
+import {
+	istDayEnd,
+	istDayStart,
+	istTimestamp,
+	paginate,
+	takeFirstOrThrow,
+	toCsv,
+	toOffset,
+} from "../../common/utils";
 import { orderBySort } from "../../common/utils/order";
 import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsService } from "../organizations/organizations.service";
 import { PAYMENT_PROVIDER_TOKEN, type PaymentProvider } from "./payment.types";
+import { formatReceiptAmount, renderReceiptPdf } from "./receipt-pdf";
 
 @Injectable()
 export class DonationsService {
@@ -45,6 +55,8 @@ export class DonationsService {
 		private readonly notifications: NotificationsService,
 		@Inject(OrganizationsService)
 		private readonly organizationsService: OrganizationsService,
+		@Inject(STORAGE_TOKEN) private readonly storage: StorageProvider,
+		@Inject(MailService) private readonly mail: MailService,
 	) {}
 
 	/**
@@ -186,6 +198,10 @@ export class DonationsService {
 				});
 			}
 
+			// Fire-and-forget like the audit write: a mail outage must not make
+			// the provider retry a webhook whose payment is already recorded.
+			void this.emailReceipt(donation.id);
+
 			void this.audit.record({
 				performedBy: donation.donorUserId,
 				action: "DONATION_COMPLETED",
@@ -305,6 +321,103 @@ export class DonationsService {
 		return { ...paginate(items, totals?.value ?? 0, query), stats };
 	}
 
+	/**
+	 * The NGO's "Download report": its donations as CSV.
+	 *
+	 * The same view the NGO already has, in a file - settled donations by
+	 * default, the donor's name only where the donor allowed it, and never the
+	 * donor's email, which the NGO's list does not show either. Gated on
+	 * `money.view` like the list, and audited because the file leaves the app.
+	 */
+	async exportForMyOrganization(
+		userId: string,
+		query: OrgDonationExportQuery,
+	): Promise<ExportFile> {
+		await this.organizationsService.requireOrgPermission(userId, "money.view");
+		const organization =
+			await this.organizationsService.requireOwnedOrganization(userId);
+
+		const conditions: SQL[] = [
+			eq(donations.organizationId, organization.id),
+			eq(donations.status, query.status ?? "COMPLETED"),
+		];
+		if (query.from) {
+			conditions.push(gte(donations.createdAt, istDayStart(query.from)));
+		}
+		if (query.to) {
+			conditions.push(lt(donations.createdAt, istDayEnd(query.to)));
+		}
+
+		const rows = await this.db
+			.select({
+				id: donations.id,
+				amountMinor: donations.amountMinor,
+				currency: donations.currency,
+				status: donations.status,
+				receiptNumber: donations.receiptNumber,
+				message: donations.message,
+				isAnonymous: donations.isAnonymous,
+				donorName: sql<string | null>`case when ${donations.isAnonymous}
+					then null else ${donations.donorName} end`,
+				createdAt: donations.createdAt,
+				completedAt: donations.completedAt,
+			})
+			.from(donations)
+			.where(and(...conditions))
+			.orderBy(desc(donations.createdAt), desc(donations.id))
+			.limit(MAX_EXPORT_ROWS + 1);
+
+		const truncated = rows.length > MAX_EXPORT_ROWS;
+		const included = truncated ? rows.slice(0, MAX_EXPORT_ROWS) : rows;
+
+		const csv = toCsv(
+			[
+				"Received (IST)",
+				"Status",
+				"Amount",
+				"Currency",
+				"Receipt number",
+				"Donor",
+				"Message",
+				"Donation id",
+			],
+			included.map((row) => [
+				istTimestamp(row.completedAt ?? row.createdAt),
+				row.status,
+				Number((row.amountMinor / 100).toFixed(2)),
+				row.currency,
+				row.receiptNumber,
+				row.isAnonymous ? "Anonymous" : (row.donorName ?? ""),
+				row.message,
+				row.id,
+			]),
+		);
+
+		const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+		const fileName = `nabhya-donations-${stamp}.csv`;
+		const key = `${NGO_VERIFICATION_BUCKET}/exports/${organization.id}/${fileName}`;
+		await this.storage.putObject({
+			key,
+			body: new TextEncoder().encode(csv),
+			contentType: "text/csv",
+		});
+
+		void this.audit.record({
+			performedBy: userId,
+			action: "ORG_DONATIONS_EXPORTED",
+			entityName: "ORGANIZATION",
+			entityId: organization.id,
+			newValue: { ...query, rowCount: included.length, truncated },
+		});
+
+		return {
+			url: await this.storage.createDownloadUrl(key),
+			fileName,
+			rowCount: included.length,
+			truncated,
+		};
+	}
+
 	async getStats(organizationId: string): Promise<DonationStats> {
 		const [row] = await this.db
 			.select({
@@ -314,7 +427,11 @@ export class DonationsService {
 					filter (where ${donations.status} = 'COMPLETED')::int`,
 				pendingCount: sql<number>`count(*)
 					filter (where ${donations.status} = 'PENDING')::int`,
-				donorCount: countDistinct(donations.donorUserId),
+				// Donors beside "Received" and "Donations" count the same rows:
+				// settled gifts only. Counting every status put "1 donor" next to
+				// "0 donations" while a payment was still confirming.
+				donorCount: sql<number>`count(distinct ${donations.donorUserId})
+					filter (where ${donations.status} = 'COMPLETED')::int`,
 			})
 			.from(donations)
 			.where(eq(donations.organizationId, organizationId));
@@ -329,24 +446,7 @@ export class DonationsService {
 
 	/** Receipt for a settled donation, fetchable only by its donor. */
 	async getReceipt(userId: string, donationId: string) {
-		const [row] = await this.db
-			.select({
-				id: donations.id,
-				receiptNumber: donations.receiptNumber,
-				amountMinor: donations.amountMinor,
-				currency: donations.currency,
-				status: donations.status,
-				completedAt: donations.completedAt,
-				donorName: donations.donorName,
-				donorEmail: donations.donorEmail,
-				donorUserId: donations.donorUserId,
-				organizationName: organizations.organizationName,
-				organizationCity: organizations.city,
-			})
-			.from(donations)
-			.innerJoin(organizations, eq(donations.organizationId, organizations.id))
-			.where(eq(donations.id, donationId))
-			.limit(1);
+		const row = await this.findReceiptRow(donationId);
 
 		if (!row) throw new NotFoundException("Donation not found");
 		if (row.donorUserId !== userId) {
@@ -358,8 +458,122 @@ export class DonationsService {
 			);
 		}
 
+		const { provider: _provider, ...receipt } = row;
+		return receipt;
+	}
+
+	/**
+	 * Signed link to the receipt PDF, rendering it first if storage has never
+	 * had it or lost it - the same recover-on-read rule as certificate PDFs.
+	 * The key is derived from the donation, so there is no column to keep in
+	 * step with the object.
+	 */
+	async getReceiptPdfUrl(userId: string, donationId: string) {
+		const receipt = await this.getReceipt(userId, donationId);
+		const key = receiptKey(donationId, receipt.receiptNumber);
+
+		if (!(await this.storage.head(key))) {
+			await this.storeReceiptPdf(donationId);
+		}
+
+		return { url: await this.storage.createDownloadUrl(key) };
+	}
+
+	// ─── Internals ───────────────────────────────────────────────────────────
+
+	private async findReceiptRow(donationId: string) {
+		const [row] = await this.db
+			.select({
+				id: donations.id,
+				receiptNumber: donations.receiptNumber,
+				amountMinor: donations.amountMinor,
+				currency: donations.currency,
+				status: donations.status,
+				completedAt: donations.completedAt,
+				donorName: donations.donorName,
+				donorEmail: donations.donorEmail,
+				donorUserId: donations.donorUserId,
+				provider: donations.provider,
+				paymentReference: donations.providerPaymentId,
+				organizationName: organizations.organizationName,
+				organizationCity: organizations.city,
+				organizationRegistration: organizations.registrationNumber,
+			})
+			.from(donations)
+			.innerJoin(organizations, eq(donations.organizationId, organizations.id))
+			.where(eq(donations.id, donationId))
+			.limit(1);
 		return row;
 	}
+
+	/** Renders and stores the receipt; returns the bytes for the email. */
+	private async storeReceiptPdf(donationId: string) {
+		const row = await this.findReceiptRow(donationId);
+		if (!row || row.status !== "COMPLETED" || !row.receiptNumber) {
+			throw new BadRequestException(
+				"A receipt is only available once the payment completes.",
+			);
+		}
+
+		const pdf = await renderReceiptPdf({
+			receiptNumber: row.receiptNumber,
+			amountMinor: row.amountMinor,
+			currency: row.currency,
+			completedAt: row.completedAt ?? new Date(),
+			donorName: row.donorName,
+			donorEmail: row.donorEmail,
+			organizationName: row.organizationName,
+			organizationCity: row.organizationCity,
+			organizationRegistration: row.organizationRegistration,
+			paymentReference: row.paymentReference,
+			provider: row.provider,
+		});
+
+		await this.storage.putObject({
+			key: receiptKey(donationId, row.receiptNumber),
+			body: pdf,
+			contentType: "application/pdf",
+		});
+
+		return { row, pdf };
+	}
+
+	/**
+	 * Emails the receipt to the donor's address - the account email for a
+	 * signed-in donor, the one they typed for a guest. Never throws: it runs
+	 * after the webhook has already committed the payment.
+	 */
+	private async emailReceipt(donationId: string) {
+		try {
+			const { row, pdf } = await this.storeReceiptPdf(donationId);
+			if (!row.donorEmail || !row.receiptNumber) return;
+
+			await this.mail.sendDonationReceipt({
+				to: row.donorEmail,
+				donorName: row.donorName,
+				organizationName: row.organizationName,
+				amount: formatReceiptAmount(row.amountMinor, row.currency),
+				receiptNumber: row.receiptNumber,
+				completedAt: row.completedAt ?? new Date(),
+				pdf,
+			});
+		} catch (error) {
+			this.logger.error(
+				`Receipt for donation ${donationId} was not emailed: ${
+					error instanceof Error ? error.message : String(error)
+				}`,
+			);
+		}
+	}
+}
+
+/**
+ * Receipts carry the donor's name and email, so they live in the private
+ * documents bucket rather than feed media. The first key segment is the
+ * bucket (see `splitKey` in the Supabase provider).
+ */
+function receiptKey(donationId: string, receiptNumber: string | null) {
+	return `${NGO_VERIFICATION_BUCKET}/receipts/${donationId}/${receiptNumber ?? "receipt"}.pdf`;
 }
 
 /** e.g. NBH-2607-3F9A21 - year/month plus a slice of the uuid. */

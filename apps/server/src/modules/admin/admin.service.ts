@@ -12,10 +12,12 @@ import {
 	needs,
 	organizationCategories,
 	organizationDocuments,
+	organizationOwnershipTransfers,
 	organizations,
 	posts,
 	reviews,
 	roles,
+	teamInvites,
 	userCategories,
 	userDocuments,
 	userRoles,
@@ -60,6 +62,7 @@ import {
 	gte,
 	ilike,
 	inArray,
+	ne,
 	or,
 	type SQL,
 	sql,
@@ -177,6 +180,7 @@ export class AdminService {
 				verified: countWhere(eq(organizations.verificationStatus, "VERIFIED")),
 				rejected: countWhere(eq(organizations.verificationStatus, "REJECTED")),
 				suspended: countWhere(eq(organizations.status, "SUSPENDED")),
+				deleted: countWhere(eq(organizations.status, "DELETED")),
 			})
 			.from(organizations);
 
@@ -248,6 +252,7 @@ export class AdminService {
 			verified: 0,
 			rejected: 0,
 			suspended: 0,
+			deleted: 0,
 		};
 
 		return {
@@ -403,7 +408,13 @@ export class AdminService {
 				eq(organizations.verificationStatus, query.verificationStatus),
 			);
 		}
-		if (query.status) conditions.push(eq(organizations.status, query.status));
+		// A deleted NGO is out of the directory unless asked for by name, the
+		// same way the volunteer directory hides deleted accounts.
+		conditions.push(
+			query.status
+				? eq(organizations.status, query.status)
+				: ne(organizations.status, "DELETED"),
+		);
 		if (query.city) {
 			conditions.push(ilike(organizations.city, `%${query.city}%`));
 		}
@@ -629,6 +640,18 @@ export class AdminService {
 		return updated;
 	}
 
+	/**
+	 * Suspends, soft-deletes or reinstates an NGO.
+	 *
+	 * SUSPENDED and DELETED take the NGO off every public surface the same way
+	 * (public queries require ACTIVE) and both pull its live events and open
+	 * needs. DELETED additionally revokes pending team invites and ownership
+	 * transfers, since nobody should be joining or inheriting a removed NGO.
+	 * Nothing is hard-deleted: donations, certificates, applications and the
+	 * audit trail keep pointing at the row, and certificates stay verifiable.
+	 * Reinstating (ACTIVE) restores access but republishes nothing - which
+	 * events to reopen is the NGO's call, not the platform's.
+	 */
 	async setOrganizationStatus(
 		adminId: string,
 		organizationId: string,
@@ -642,20 +665,41 @@ export class AdminService {
 		if (!organization) {
 			throw new NotFoundException("Organization not found");
 		}
+		if (organization.status === input.status) {
+			throw new BadRequestException(
+				`This organization is already ${input.status.toLowerCase()}.`,
+			);
+		}
+		// Suspending a deleted NGO would quietly un-delete it into a different
+		// hidden state; restoring is the only way out of DELETED.
+		if (organization.status === "DELETED" && input.status === "SUSPENDED") {
+			throw new BadRequestException(
+				"Restore this organization before suspending it.",
+			);
+		}
 
+		const now = new Date();
 		const updated = await this.db.transaction(async (tx) => {
 			const [row] = await tx
 				.update(organizations)
-				.set({ status: input.status, updatedAt: new Date() })
+				.set({
+					status: input.status,
+					statusReason:
+						input.status === "ACTIVE" ? null : (input.reason ?? null),
+					deletedAt: input.status === "DELETED" ? now : null,
+					deletedBy: input.status === "DELETED" ? adminId : null,
+					updatedAt: now,
+				})
 				.where(eq(organizations.id, organizationId))
 				.returning();
 
-			// Suspending an NGO must also pull its content off the public feed,
-			// otherwise volunteers keep applying to a suspended organization.
-			if (input.status === "SUSPENDED") {
+			// Hiding an NGO must also pull its content off the public feed,
+			// otherwise volunteers keep applying to an organization they can no
+			// longer see.
+			if (input.status !== "ACTIVE") {
 				await tx
 					.update(events)
-					.set({ status: "CANCELLED", updatedAt: new Date() })
+					.set({ status: "CANCELLED", updatedAt: now })
 					.where(
 						and(
 							eq(events.organizationId, organizationId),
@@ -665,11 +709,33 @@ export class AdminService {
 
 				await tx
 					.update(needs)
-					.set({ status: "CLOSED", updatedAt: new Date() })
+					.set({ status: "CLOSED", updatedAt: now })
 					.where(
 						and(
 							eq(needs.organizationId, organizationId),
 							eq(needs.status, "OPEN"),
+						),
+					);
+			}
+
+			if (input.status === "DELETED") {
+				await tx
+					.update(teamInvites)
+					.set({ status: "REVOKED", revokedAt: now, updatedAt: now })
+					.where(
+						and(
+							eq(teamInvites.organizationId, organizationId),
+							eq(teamInvites.status, "PENDING"),
+						),
+					);
+
+				await tx
+					.update(organizationOwnershipTransfers)
+					.set({ status: "CANCELLED", updatedAt: now })
+					.where(
+						and(
+							eq(organizationOwnershipTransfers.organizationId, organizationId),
+							eq(organizationOwnershipTransfers.status, "PENDING"),
 						),
 					);
 			}

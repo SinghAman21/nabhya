@@ -6,16 +6,16 @@ import {
 	X,
 } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
-import { Platform, View } from "react-native";
+import { Animated, Easing, Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TAB_BAR_HEIGHT } from "@/components/tab-bar";
 import { Button } from "@/components/ui/button";
 import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption, H4, Label } from "@/components/ui/typography";
+import { Caption, H4, Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
-import { focusable } from "@/lib/focus";
-import { announce } from "@/lib/motion";
+import { focusable, type PressState } from "@/lib/focus";
+import { announce, motionDuration, useReducedMotion } from "@/lib/motion";
 
 /**
  * Transient feedback and confirmations, as app furniture rather than OS chrome.
@@ -331,6 +331,24 @@ const PAUSE_ON_ATTENTION = (
 		: {}
 ) as object;
 
+/** Widest a toast gets. Past ~420 a one-line message reads as a banner. */
+const TOAST_MAX_WIDTH = 420;
+
+/*
+ * Where the stack sits.
+ *
+ * **Desktop: bottom centre.** Bottom right was tried and is where the work
+ * is: a `Drawer` docks right and pins its decision buttons in the bottom-right
+ * corner, and the drawer is exactly where half of these toasts are raised
+ * from, so a corner toast covered Approve / Reject at the moment the reader
+ * looks for what happened. Centred, it lands in the reading line under the
+ * content without covering a control the app pins anywhere.
+ *
+ * **Phone: full width less the gutters**, a tab bar's height up - the bottom
+ * edge is where the tab bar, a sheet's pinned footer and a pushed page's
+ * action bar all live, and a toast at `insets.bottom + 16` sat squarely on
+ * the tab labels.
+ */
 function ToastStack({ toasts: items }: { toasts: ToastRecord[] }) {
 	const { spacing } = useTheme();
 	const { isDesktop } = useMedia();
@@ -348,13 +366,11 @@ function ToastStack({ toasts: items }: { toasts: ToastRecord[] }) {
 				position: "absolute",
 				left: 0,
 				right: 0,
-				// On a phone the bottom edge is where the tab bar, a sheet's pinned
-				// footer and a pushed page's action bar all live - a toast at
-				// `insets.bottom + 16` sat squarely on the tab labels. It clears a
-				// bar's height instead; desktop has nothing down there.
-				bottom: insets.bottom + spacing[4] + (isDesktop ? 0 : TAB_BAR_HEIGHT),
-				alignItems: isDesktop ? "flex-end" : "center",
-				paddingHorizontal: spacing[4],
+				bottom: isDesktop
+					? spacing[6]
+					: insets.bottom + spacing[3] + TAB_BAR_HEIGHT,
+				alignItems: "center",
+				paddingHorizontal: isDesktop ? spacing[6] : spacing[4],
 				gap: spacing[2],
 			}}
 		>
@@ -365,8 +381,28 @@ function ToastStack({ toasts: items }: { toasts: ToastRecord[] }) {
 	);
 }
 
+/**
+ * One toast: tone icon, the message at title weight, an optional action as a
+ * text button, and a close.
+ *
+ * It was a flat box - card fill, a hairline, a heavy black shadow in both
+ * schemes (invisible on near-black, so in dark mode it was a dark rectangle on
+ * a dark page) and the action in brand orange competing with the message.
+ *
+ * - **Light** separates with a soft two-step shadow and a hairline, since it
+ *   floats over anything from a white card to a photo.
+ * - **Dark** has no usable shadow, so it is *lifted*: `background.tertiary`,
+ *   a step above every card it can sit over, with a `border.medium` edge.
+ * - **The action is ink, not orange**, on a quiet fill so it reads as a
+ *   button; the brand colour is spent on the page's primary action, and a
+ *   toast's Undo is a secondary one.
+ * - **The icon is the only tone.** No tinted fill - a red block says "error"
+ *   louder than the sentence explaining it.
+ */
 function ToastRow({ toast: item }: { toast: ToastRecord }) {
-	const { colors, spacing, borderRadius } = useTheme();
+	const { colors, spacing, borderRadius, isDark } = useTheme();
+	const reduce = useReducedMotion();
+	const enter = useRef(new Animated.Value(reduce ? 1 : 0)).current;
 	const Icon = TONE_ICON[item.tone];
 	const ink = (
 		item.tone === "error"
@@ -376,74 +412,150 @@ function ToastRow({ toast: item }: { toast: ToastRecord }) {
 				: colors.info.ink
 	) as string;
 
+	useEffect(() => {
+		Animated.timing(enter, {
+			toValue: 1,
+			duration: motionDuration(180, reduce),
+			easing: Easing.bezier(0.22, 1, 0.36, 1),
+			useNativeDriver: Platform.OS !== "web",
+		}).start();
+	}, [enter, reduce]);
+
+	const surface = isDark
+		? {
+				backgroundColor: colors.background.tertiary,
+				borderColor: colors.border.medium,
+			}
+		: {
+				backgroundColor: colors.background.card,
+				borderColor: colors.border.hairline,
+				// Two steps on the web - a tight contact shadow under a soft
+				// ambient one - which RN's single `shadow*` cannot express.
+				...(Platform.OS === "web"
+					? ({
+							boxShadow:
+								"0 1px 2px rgba(11,11,15,0.06), 0 8px 24px rgba(11,11,15,0.12)",
+						} as object)
+					: {
+							shadowColor: "#0B0B0F",
+							shadowOpacity: 0.12,
+							shadowRadius: 24,
+							shadowOffset: { width: 0, height: 8 },
+							elevation: 8,
+						}),
+			};
+
 	return (
-		<View
+		<Animated.View
 			// An error interrupts; a confirmation waits its turn. On the web this
 			// is `aria-live`, on Android the live region - iOS is `announce()`.
 			accessibilityLiveRegion={item.tone === "error" ? "assertive" : "polite"}
 			style={{
 				flexDirection: "row",
-				alignItems: "flex-start",
-				gap: spacing[2.5],
+				alignItems: "center",
+				gap: spacing[3],
 				width: "100%",
-				maxWidth: 460,
-				paddingVertical: spacing[3],
-				paddingLeft: spacing[3.5],
-				paddingRight: spacing[2],
+				maxWidth: TOAST_MAX_WIDTH,
+				minHeight: 52,
+				paddingVertical: spacing[2],
+				paddingLeft: spacing[4],
+				paddingRight: spacing[1.5],
 				borderRadius: borderRadius.lg,
 				borderWidth: 1,
-				borderColor: colors.border.hairline,
-				backgroundColor: colors.background.card,
-				// A toast floats over content, so it needs a shadow to read as
-				// above it rather than as a stray card in the page.
-				shadowColor: "#000",
-				shadowOpacity: 0.16,
-				shadowRadius: 16,
-				shadowOffset: { width: 0, height: 6 },
-				elevation: 6,
+				...surface,
+				opacity: enter,
+				transform: [
+					{
+						translateY: enter.interpolate({
+							inputRange: [0, 1],
+							outputRange: [8, 0],
+						}),
+					},
+				],
 			}}
 		>
-			<Icon size={17} color={ink} strokeWidth={2.2} style={{ marginTop: 1 }} />
-			<Body style={{ flex: 1 }}>{item.message}</Body>
+			<Icon size={18} color={ink} strokeWidth={2.2} />
+			<Label
+				weight="semibold"
+				style={{ flex: 1, minWidth: 0, paddingVertical: spacing[1] }}
+			>
+				{item.message}
+			</Label>
 
-			{item.action ? (
-				<Pressable
-					onPress={() => {
-						dismissToast(item.id);
-						item.action?.onPress();
-					}}
-					hitSlop={6}
-					accessibilityRole="button"
-					{...focusable}
-					style={{
-						minHeight: 32,
-						justifyContent: "center",
-						paddingHorizontal: spacing[2],
-					}}
-				>
-					<Label weight="semibold" color={colors.primary.ink}>
-						{item.action.label}
-					</Label>
-				</Pressable>
-			) : null}
-
-			<Pressable
-				onPress={() => dismissToast(item.id)}
-				hitSlop={8}
-				accessibilityRole="button"
-				accessibilityLabel="Dismiss"
-				{...focusable}
+			<View
 				style={{
-					width: 32,
-					height: 32,
+					flexDirection: "row",
 					alignItems: "center",
-					justifyContent: "center",
-					borderRadius: 999,
+					gap: spacing[0.5],
 				}}
 			>
-				<X size={15} color={colors.text.quaternary as string} />
-			</Pressable>
-		</View>
+				{item.action ? (
+					<Pressable
+						onPress={() => {
+							dismissToast(item.id);
+							item.action?.onPress();
+						}}
+						hitSlop={{ top: 6, bottom: 6, left: 4, right: 0 }}
+						accessibilityRole="button"
+						accessibilityLabel={item.action.label}
+						{...focusable}
+						style={(state) => {
+							const { pressed, hovered } = state as PressState;
+							return {
+								height: 32,
+								justifyContent: "center",
+								paddingHorizontal: spacing[3],
+								borderRadius: borderRadius.md,
+								backgroundColor: pressed
+									? isDark
+										? colors.border.dark
+										: colors.background.overlay
+									: hovered
+										? isDark
+											? colors.background.overlay
+											: colors.border.hairline
+										: isDark
+											? colors.border.medium
+											: colors.background.subtle,
+							};
+						}}
+					>
+						<Caption weight="semibold" numberOfLines={1}>
+							{item.action.label}
+						</Caption>
+					</Pressable>
+				) : null}
+
+				<Pressable
+					onPress={() => dismissToast(item.id)}
+					hitSlop={6}
+					accessibilityRole="button"
+					accessibilityLabel="Dismiss"
+					{...focusable}
+					style={(state) => {
+						const { pressed, hovered } = state as PressState;
+						return {
+							width: 32,
+							height: 32,
+							alignItems: "center",
+							justifyContent: "center",
+							borderRadius: borderRadius.md,
+							backgroundColor: pressed
+								? isDark
+									? colors.border.dark
+									: colors.background.overlay
+								: hovered
+									? isDark
+										? colors.border.medium
+										: colors.background.subtle
+									: "transparent",
+						};
+					}}
+				>
+					<X size={16} strokeWidth={2} color={colors.text.tertiary as string} />
+				</Pressable>
+			</View>
+		</Animated.View>
 	);
 }
 

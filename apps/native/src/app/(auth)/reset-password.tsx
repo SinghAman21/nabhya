@@ -11,7 +11,7 @@ import { AuthSplitLayout } from "@/components/auth-split-layout";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form";
 import { toast } from "@/components/ui/overlay";
-import { Body, H2 } from "@/components/ui/typography";
+import { Body, Title } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { authService } from "@/lib/api/auth";
 import { apiErrorMessage } from "@/lib/api/http";
@@ -90,17 +90,15 @@ export default function ResetPassword() {
 	if (state === "invalid") {
 		return (
 			<AuthSplitLayout alternateLink={null}>
-				<H2 accessibilityRole="header" style={{ marginBottom: spacing[1] }}>
-					This link has expired
-				</H2>
-				<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
+				<Title accessibilityRole="header">This link no longer works</Title>
+				<Body
+					color="tertiary"
+					style={{ marginTop: spacing[1], marginBottom: spacing[7] }}
+				>
 					Reset links work once and only for a short while. Ask for a new one
 					and open it on this device.
 				</Body>
-				<Button
-					size="lg"
-					onPress={() => router.replace("/(auth)/forgot-password")}
-				>
+				<Button onPress={() => router.replace("/(auth)/forgot-password")}>
 					Send a new link
 				</Button>
 				<Button
@@ -116,10 +114,11 @@ export default function ResetPassword() {
 
 	return (
 		<AuthSplitLayout alternateLink={null}>
-			<H2 accessibilityRole="header" style={{ marginBottom: spacing[1] }}>
-				Choose a new password
-			</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
+			<Title accessibilityRole="header">Choose a new password</Title>
+			<Body
+				color="tertiary"
+				style={{ marginTop: spacing[1], marginBottom: spacing[7] }}
+			>
 				You'll be signed in once it's saved.
 			</Body>
 
@@ -142,8 +141,7 @@ export default function ResetPassword() {
 			<Button
 				onPress={onSubmit}
 				loading={loading}
-				size="lg"
-				style={{ marginTop: failure ? spacing[4] : spacing[6] }}
+				style={{ marginTop: failure ? spacing[4] : spacing[2] }}
 			>
 				Save password
 			</Button>

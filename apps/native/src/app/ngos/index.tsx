@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { Building2, MapPin } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
+import { OrgLogo } from "@/components/org-branding";
 import { PAGE_SIZE, PagedList, usePagedQuery } from "@/components/paged-list";
 import {
 	Banner,
@@ -13,7 +14,7 @@ import {
 import { SearchField } from "@/components/search-field";
 import { Button } from "@/components/ui/button";
 import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption, Label } from "@/components/ui/typography";
+import { Body, Caption } from "@/components/ui/typography";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useDebounced } from "@/hooks/useDebounced";
@@ -29,6 +30,7 @@ type Mode = "all" | "nearby";
 interface DirectoryRow {
 	id: string;
 	organizationName: string;
+	logo: string | null;
 	description: string | null;
 	city: string | null;
 	state: string | null;
@@ -103,6 +105,7 @@ export default function NgoDirectory() {
 		? nearby.items.map((item) => ({
 				id: item.id,
 				organizationName: item.organizationName,
+				logo: item.logo,
 				description: item.description,
 				city: item.city,
 				state: item.state,
@@ -111,6 +114,7 @@ export default function NgoDirectory() {
 		: list.items.map((item) => ({
 				id: item.id,
 				organizationName: item.organizationName,
+				logo: item.logo,
 				description: item.description,
 				city: item.city,
 				state: item.state,
@@ -250,20 +254,13 @@ export default function NgoDirectory() {
 								};
 							}}
 						>
-							<View
-								style={{
-									width: 40,
-									height: 40,
-									borderRadius: 20,
-									backgroundColor: colors.primary.tint,
-									alignItems: "center",
-									justifyContent: "center",
-								}}
-							>
-								<Label weight="bold" color={colors.primary.ink}>
-									{item.organizationName[0]?.toUpperCase()}
-								</Label>
-							</View>
+							{/* The NGO's own logo, initials as the fallback - the same
+							    rounded square as its page and the Following list. */}
+							<OrgLogo
+								name={item.organizationName}
+								imageKey={item.logo}
+								size={40}
+							/>
 							<View style={{ flex: 1, minWidth: 0 }}>
 								<Body weight="medium" numberOfLines={1}>
 									{item.organizationName}

@@ -8,9 +8,10 @@ import {
 	Users,
 } from "lucide-react-native";
 import { useState } from "react";
-import { ScrollView, View } from "react-native";
+import { Platform, ScrollView, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BackButton } from "@/components/back-button";
+import { ClosedState } from "@/components/closed-state";
 import {
 	ErrorState,
 	ListGroup,
@@ -28,8 +29,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { confirm, toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
-import { Body, Caption, H2, Label } from "@/components/ui/typography";
-import { VerificationNote } from "@/components/verification-note";
+import { Body, Caption, H3, Label, Title } from "@/components/ui/typography";
+import { useVerifyIdentitySheet } from "@/components/verification/verify-identity-sheet";
+import {
+	useIdentityGate,
+	VerificationNote,
+} from "@/components/verification-note";
 import {
 	useApplyToEvent,
 	usePublicEvent,
@@ -43,23 +48,37 @@ import { formatDateRange, formatDateTime } from "@/lib/format";
 import { verticalScrollbar } from "@/lib/scroll";
 import { useAuthStore } from "@/store/auth-store";
 
+/** Details plus the action card, and no wider than both need. */
+const PAGE = { maxWidth: 1080, width: "100%", alignSelf: "center" } as const;
+
+/** The action card's column. Fixed, so the details column takes the slack. */
+const ASIDE: ViewStyle = { width: 360, flexGrow: 0, flexShrink: 0 };
+
 /**
- * The reading column, shared by the back row, the body and the pinned footer
- * so all three line up - the back button used to sit at the window's left
- * edge, 230pt away from the column it belonged to.
+ * Sticks to the top of the page's own scroller on the web. It works here
+ * because the card is a *descendant* of the `ScrollView` (see the sticky note
+ * in `apps/native/AGENTS.md` - a sibling of the scroller has nothing to stick
+ * to); `alignItems: "flex-start"` on the row keeps the column content-height
+ * so there is room for it to travel.
  */
-const DESKTOP_COLUMN = {
-	maxWidth: 720,
-	width: "100%",
-	alignSelf: "center",
-} as const;
+const STICKY = (Platform.OS === "web"
+	? { position: "sticky", top: 0 }
+	: {}) as unknown as ViewStyle;
 
 /**
  * One event, laid out in the order a volunteer decides: who and what, then the
- * facts (when, where, how many places), then the description. The one action -
- * apply, or withdraw - is pinned to the bottom so it never has to be scrolled
- * to, and the optional message to the organiser lives in a sheet rather than an
- * always-open text box on the page.
+ * facts (when, where, how many places), then the description.
+ *
+ * Desktop is two columns: the details on the left, and on the right an action
+ * card holding the facts you decide on (date, place, places left, deadline)
+ * with the one action under them, sticking as the description scrolls. It was
+ * a 720 column with a display-face title in capitals and the action as a
+ * full-width bar pinned to the bottom of a 1400pt window.
+ *
+ * A phone keeps the action pinned in the footer so it never has to be
+ * scrolled to. On both, a closed event says so as a quiet line in a neutral
+ * well - never a disabled brand button, which at half opacity was a muddy
+ * orange bar that still looked pressable.
  */
 export default function EventDetail() {
 	const { id } = useLocalSearchParams<{ id: string }>();
@@ -74,6 +93,8 @@ export default function EventDetail() {
 	const query = usePublicEvent(id);
 	const { data: me } = useMe(!!email);
 	const apply = useApplyToEvent(id ?? "");
+	const gate = useIdentityGate();
+	const verify = useVerifyIdentitySheet();
 	const withdraw = useWithdrawApplication(id ?? "");
 
 	const event = query.data;
@@ -141,41 +162,41 @@ export default function EventDetail() {
 
 	const gutter = spacing[5];
 
-	/* Footer ------------------------------------------------------------------ */
-	let footer: React.ReactNode = null;
+	/* The action, in whichever state the event is in ------------------------- */
+	let action: React.ReactNode = null;
 	if (event) {
 		if (activeApplication) {
-			footer = (
+			const status = activeApplication.status;
+			action = (
 				<View
 					style={{
-						flexDirection: "row",
-						alignItems: "center",
+						flexDirection: isDesktop ? "column" : "row",
+						alignItems: isDesktop ? "stretch" : "center",
 						gap: spacing[3],
 					}}
 				>
-					<View style={{ flex: 1, minWidth: 0 }}>
+					<View style={{ flex: isDesktop ? undefined : 1, minWidth: 0 }}>
 						<Label weight="semibold" numberOfLines={1}>
-							{activeApplication.status === "ACCEPTED"
+							{status === "ACCEPTED"
 								? "You're confirmed"
-								: activeApplication.status === "PENDING"
+								: status === "PENDING"
 									? "Application sent"
 									: "Not accepted this time"}
 						</Label>
 						{/* What happens next, in order - "turn up" alone left an accepted
-						    volunteer asking how they would hear the details. Two lines:
-						    one truncated mid-sentence on a phone. */}
-						<Caption color="tertiary" numberOfLines={2}>
-							{activeApplication.status === "ACCEPTED"
+						    volunteer asking how they would hear the details. */}
+						<Caption color="tertiary" numberOfLines={isDesktop ? 4 : 2}>
+							{status === "ACCEPTED"
 								? "The organiser has your phone number and will message the details. Once they mark you present, your certificate appears in Profile."
-								: activeApplication.status === "PENDING"
+								: status === "PENDING"
 									? "The organiser reviews it next. You'll get an update in Activity."
 									: "Thanks for offering. Other events are looking for people."}
 						</Caption>
 					</View>
-					{activeApplication.status === "REJECTED" ? (
+					{status === "REJECTED" ? (
 						<Button
 							variant="outline"
-							size="sm"
+							size={isDesktop ? "default" : "sm"}
 							onPress={() => router.push("/events")}
 						>
 							Find events
@@ -183,7 +204,7 @@ export default function EventDetail() {
 					) : (
 						<Button
 							variant="outline"
-							size="sm"
+							size={isDesktop ? "default" : "sm"}
 							onPress={onWithdraw}
 							loading={withdraw.isPending}
 							accessibilityLabel="Withdraw your application"
@@ -194,27 +215,25 @@ export default function EventDetail() {
 				</View>
 			);
 		} else if (deadlinePassed) {
-			footer = (
-				<Button
-					disabled
-					onPress={() => {}}
-					accessibilityLabel="Applications closed"
-				>
-					Applications closed
-				</Button>
+			action = (
+				<ClosedState
+					title="Applications closed"
+					description={
+						event.applicationDeadline
+							? `Closed ${formatDateTime(event.applicationDeadline)}.`
+							: "This event has already started."
+					}
+				/>
 			);
 		} else if (remaining === 0) {
-			footer = (
-				<Button
-					disabled
-					onPress={() => {}}
-					accessibilityLabel="All places filled"
-				>
-					All places filled
-				</Button>
+			action = (
+				<ClosedState
+					title="All places filled"
+					description={`All ${event.volunteersNeeded} volunteers are confirmed.`}
+				/>
 			);
 		} else {
-			footer = (
+			action = (
 				<Button onPress={startApply} loading={apply.isPending}>
 					{email ? "Apply to volunteer" : "Sign in to apply"}
 				</Button>
@@ -222,28 +241,120 @@ export default function EventDetail() {
 		}
 	}
 
+	const place = event
+		? [event.venue, event.city, event.state].filter(Boolean).join(", ")
+		: "";
+
+	// An array, not a fragment: `ListGroup` draws its hairlines between children.
+	const facts = event
+		? [
+				<Fact
+					key="when"
+					icon={CalendarDays}
+					label={formatDateRange(event.startAt, event.endAt)}
+					hint="When"
+				/>,
+				place ? (
+					<Fact key="where" icon={MapPin} label={place} hint="Where" />
+				) : null,
+				<Fact
+					key="places"
+					icon={Users}
+					label={
+						remaining > 0
+							? `${remaining} of ${event.volunteersNeeded} places left`
+							: `All ${event.volunteersNeeded} places filled`
+					}
+					hint={`${event.acceptedCount} confirmed so far`}
+				/>,
+				event.applicationDeadline ? (
+					<Fact
+						key="deadline"
+						icon={Clock}
+						label={
+							deadlinePassed
+								? `Closed ${formatDateTime(event.applicationDeadline)}`
+								: `Apply by ${formatDateTime(event.applicationDeadline)}`
+						}
+						hint="Applications"
+					/>
+				) : null,
+			]
+		: [];
+
+	const organiserRow = event ? (
+		<ListRow
+			icon={Building2}
+			label={event.organization.organizationName}
+			hint="See the NGO"
+			onPress={() => router.push(`/ngos/${event.organization.id}`)}
+		/>
+	) : null;
+
+	const heading = event ? (
+		<View style={{ gap: spacing[1], marginBottom: spacing[5] }}>
+			<Caption color="secondary">{event.organization.organizationName}</Caption>
+			{isDesktop ? (
+				<Title accessibilityRole="header">{event.title}</Title>
+			) : (
+				<H3 accessibilityRole="header">{event.title}</H3>
+			)}
+			{activeApplication ? (
+				<View style={{ flexDirection: "row", marginTop: spacing[2] }}>
+					<StatusPill
+						label={`Your application: ${humanizeStatus(activeApplication.status)}`}
+						tone={applicationTone(activeApplication.status)}
+					/>
+				</View>
+			) : null}
+		</View>
+	) : null;
+
+	const about = event ? (
+		<>
+			<SectionTitle>About this event</SectionTitle>
+			<Body color="secondary" style={{ marginBottom: spacing[6] }}>
+				{event.description}
+			</Body>
+
+			{activeApplication?.reviewNote ? (
+				<Surface style={{ marginBottom: spacing[6] }}>
+					<Caption color="tertiary">Note from the organiser</Caption>
+					<Body color="secondary" style={{ marginTop: spacing[1] }}>
+						"{activeApplication.reviewNote}"
+					</Body>
+				</Surface>
+			) : null}
+		</>
+	) : null;
+
 	return (
 		<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
-			{/* Header row: 40pt back target, same row a title would sit on. */}
+			{/* Header row: the back target and where it leads, on the page grid. */}
 			<View
 				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					justifyContent: "center",
-					minHeight: 40,
-					paddingHorizontal: isDesktop ? 0 : gutter,
+					paddingHorizontal: gutter,
 					paddingTop: insets.top + spacing[2],
 					paddingBottom: spacing[2],
 				}}
 			>
 				<View
-					style={
-						isDesktop
-							? { ...DESKTOP_COLUMN, paddingHorizontal: gutter }
-							: { flex: 1 }
-					}
+					style={[
+						PAGE,
+						{
+							flexDirection: "row",
+							alignItems: "center",
+							gap: spacing[3],
+							minHeight: 40,
+						},
+					]}
 				>
 					<BackButton fallbackHref="/events" />
+					{isDesktop ? (
+						<Caption color="tertiary" numberOfLines={1} style={{ flex: 1 }}>
+							Events
+						</Caption>
+					) : null}
 				</View>
 			</View>
 
@@ -251,12 +362,49 @@ export default function EventDetail() {
 				<LoadingState />
 			) : query.isError || !event ? (
 				<ErrorState
+					title="Event not available"
 					message={apiErrorMessage(
 						query.error,
 						"This event is no longer available.",
 					)}
 					onRetry={() => query.refetch()}
 				/>
+			) : isDesktop ? (
+				<ScrollView
+					{...verticalScrollbar}
+					contentContainerStyle={{
+						paddingHorizontal: gutter,
+						paddingTop: spacing[4],
+						paddingBottom: spacing[10],
+					}}
+				>
+					<View
+						style={[
+							PAGE,
+							{
+								flexDirection: "row",
+								alignItems: "flex-start",
+								gap: spacing[8],
+							},
+						]}
+					>
+						<View style={{ flex: 1, minWidth: 0 }}>
+							{heading}
+							{about}
+							<SectionTitle>Organiser</SectionTitle>
+							<ListGroup>{organiserRow}</ListGroup>
+						</View>
+
+						<View style={[ASIDE, STICKY]}>
+							<ListGroup>
+								{facts}
+								<View key="action" style={{ padding: spacing[4] }}>
+									{action}
+								</View>
+							</ListGroup>
+						</View>
+					</View>
+				</ScrollView>
 			) : (
 				<>
 					<ScrollView
@@ -265,86 +413,19 @@ export default function EventDetail() {
 							paddingHorizontal: gutter,
 							paddingTop: spacing[2],
 							paddingBottom: spacing[8],
-							...(isDesktop ? DESKTOP_COLUMN : {}),
 						}}
 					>
-						<Caption color="secondary" style={{ marginBottom: spacing[1] }}>
-							{event.organization.organizationName}
-						</Caption>
-						<H2 accessibilityRole="header" style={{ marginBottom: spacing[3] }}>
-							{event.title}
-						</H2>
-
-						{activeApplication && (
-							<View style={{ marginBottom: spacing[4] }}>
-								<StatusPill
-									label={`Your application: ${humanizeStatus(activeApplication.status)}`}
-									tone={applicationTone(activeApplication.status)}
-								/>
-							</View>
-						)}
-
-						<View style={{ marginBottom: spacing[5] }}>
+						{heading}
+						<View style={{ marginBottom: spacing[6] }}>
 							<ListGroup>
-								<Fact
-									icon={CalendarDays}
-									label={formatDateRange(event.startAt, event.endAt)}
-									hint="When"
-								/>
-								{(event.venue || event.city) && (
-									<Fact
-										icon={MapPin}
-										label={[event.venue, event.city, event.state]
-											.filter(Boolean)
-											.join(", ")}
-										hint="Where"
-									/>
-								)}
-								<Fact
-									icon={Users}
-									label={
-										remaining > 0
-											? `${remaining} of ${event.volunteersNeeded} places left`
-											: `All ${event.volunteersNeeded} places filled`
-									}
-									hint={`${event.acceptedCount} confirmed so far`}
-								/>
-								<ListRow
-									icon={Building2}
-									label={event.organization.organizationName}
-									hint="See the NGO"
-									onPress={() => router.push(`/ngos/${event.organization.id}`)}
-								/>
-								{event.applicationDeadline && (
-									<Fact
-										icon={Clock}
-										label={
-											deadlinePassed
-												? `Closed ${formatDateTime(event.applicationDeadline)}`
-												: `Apply by ${formatDateTime(event.applicationDeadline)}`
-										}
-										hint="Applications"
-									/>
-								)}
+								{facts}
+								{organiserRow}
 							</ListGroup>
 						</View>
-
-						<SectionTitle>About this event</SectionTitle>
-						<Body color="secondary" style={{ marginBottom: spacing[5] }}>
-							{event.description}
-						</Body>
-
-						{activeApplication?.reviewNote && (
-							<Surface style={{ marginBottom: spacing[5] }}>
-								<Caption color="tertiary">Note from the organiser</Caption>
-								<Body color="secondary" style={{ marginTop: spacing[1] }}>
-									“{activeApplication.reviewNote}”
-								</Body>
-							</Surface>
-						)}
+						{about}
 					</ScrollView>
 
-					{footer && (
+					{action ? (
 						<View
 							style={{
 								paddingHorizontal: gutter,
@@ -355,11 +436,9 @@ export default function EventDetail() {
 								backgroundColor: colors.background.card,
 							}}
 						>
-							<View style={isDesktop ? DESKTOP_COLUMN : undefined}>
-								{footer}
-							</View>
+							{action}
 						</View>
-					)}
+					) : null}
 				</>
 			)}
 
@@ -372,6 +451,7 @@ export default function EventDetail() {
 					<Button
 						onPress={sendApplication}
 						loading={apply.isPending}
+						disabled={gate.blocked}
 						accessibilityLabel="Send application"
 					>
 						Send application
@@ -379,7 +459,10 @@ export default function EventDetail() {
 				}
 			>
 				<View style={{ paddingTop: spacing[2], paddingBottom: spacing[2] }}>
-					<VerificationNote onNavigate={() => setApplyOpen(false)} />
+					<VerificationNote
+						onNavigate={() => setApplyOpen(false)}
+						onVerify={verify.open}
+					/>
 					<Label style={{ marginBottom: spacing[1.5] }}>
 						Message to the organiser
 						<Caption color="tertiary"> (optional)</Caption>
@@ -397,6 +480,7 @@ export default function EventDetail() {
 					</Caption>
 				</View>
 			</Sheet>
+			{verify.sheet}
 		</View>
 	);
 }

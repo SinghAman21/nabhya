@@ -16,10 +16,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Caption, H5 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
+import { useGridColumns } from "@/hooks/useMedia";
 import { eventsApi, queryKeys } from "@/lib/api";
 import { formatDateRange } from "@/lib/format";
-import { READING_COLUMN } from "@/lib/reading-column";
 import type { ApplicationListItem } from "@/lib/types";
+
+/**
+ * Card lists run two across on a wide desktop window (the same grid as
+ * certificates) instead of one 720 column floating in a 1400pt window.
+ */
+const COLUMN = { width: "100%", maxWidth: 1040, alignSelf: "center" } as const;
 
 /**
  * Every event the volunteer has applied to, paged - the full list behind
@@ -34,6 +40,7 @@ import type { ApplicationListItem } from "@/lib/types";
 export default function MyApplications() {
 	const router = useRouter();
 	const onBrowse = () => router.push("/events");
+	const columns = Math.min(useGridColumns(), 2);
 
 	const { query, items, loadMore } = usePagedQuery({
 		queryKey: queryKeys.myApplications({ limit: PAGE_SIZE }),
@@ -41,7 +48,7 @@ export default function MyApplications() {
 	});
 
 	return (
-		<Screen style={READING_COLUMN}>
+		<Screen style={COLUMN}>
 			<ScreenHeader
 				back
 				title="Applications"
@@ -57,6 +64,8 @@ export default function MyApplications() {
 				loadMore={loadMore}
 				loadingLabel="Loading your applications"
 				keyExtractor={(item) => item.id}
+				numColumns={columns}
+				noun="applications"
 				empty={
 					<EmptyState
 						icon={CalendarCheck}

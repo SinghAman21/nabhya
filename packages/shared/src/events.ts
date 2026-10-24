@@ -18,6 +18,15 @@ export const applicationStatusSchema = z.enum([
 export type EventStatus = z.infer<typeof eventStatusSchema>;
 export type ApplicationStatus = z.infer<typeof applicationStatusSchema>;
 
+/**
+ * Applications on one event by state, across the whole event rather than the
+ * page - so a filter chip can say "Pending 3" before it is pressed. `all`
+ * excludes nothing; `WITHDRAWN` is counted but has no chip.
+ */
+export type ApplicationStatusCounts = Record<ApplicationStatus, number> & {
+	all: number;
+};
+
 // ─── Create / update ─────────────────────────────────────────────────────────
 
 const eventBaseSchema = z.object({

@@ -1,4 +1,5 @@
 import { Search, X } from "lucide-react-native";
+import type { Ref } from "react";
 import { TextInput, View } from "react-native";
 import { Pressable } from "@/components/ui/pressable";
 import { useTheme } from "@/hooks/use-theme";
@@ -28,6 +29,11 @@ export function SearchField({
 	autoCapitalize = "none",
 	maxWidth,
 	compact,
+	large,
+	onFocus,
+	inputRef,
+	accessibilityLabel,
+	expanded,
 }: {
 	value: string;
 	onChange: (next: string) => void;
@@ -48,6 +54,15 @@ export function SearchField({
 	maxWidth?: number;
 	/** 40pt instead of 44, for a field sitting inside a chrome row rather than on a page. */
 	compact?: boolean;
+	/** 48pt, for the search page itself, where the field is the whole task. */
+	large?: boolean;
+	/** For a field that opens a panel of suggestions when focused. */
+	onFocus?: () => void;
+	inputRef?: Ref<TextInput>;
+	/** Overrides the placeholder as the spoken name. */
+	accessibilityLabel?: string;
+	/** Set when the field controls a floating panel: announced as a combobox state. */
+	expanded?: boolean;
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
 
@@ -60,7 +75,7 @@ export function SearchField({
 				alignItems: "center",
 				gap: spacing[2.5],
 				width: "100%",
-				height: compact ? 40 : 44,
+				height: compact ? 40 : large ? 48 : 44,
 				...(maxWidth ? { maxWidth } : {}),
 				paddingHorizontal: spacing[3.5],
 				borderRadius: borderRadius.md,
@@ -68,12 +83,14 @@ export function SearchField({
 			}}
 		>
 			<Search
-				size={compact ? 16 : 17}
+				size={compact ? 16 : large ? 18 : 17}
 				color={colors.text.quaternary as string}
 				strokeWidth={1.9}
 			/>
 			<TextInput
+				ref={inputRef}
 				value={value}
+				onFocus={onFocus}
 				onChangeText={onChange}
 				autoFocus={autoFocus}
 				onSubmitEditing={() => onSubmit?.(value)}
@@ -83,7 +100,10 @@ export function SearchField({
 				autoCapitalize={autoCapitalize}
 				autoCorrect={false}
 				returnKeyType="search"
-				accessibilityLabel={placeholder}
+				accessibilityLabel={accessibilityLabel ?? placeholder}
+				{...(expanded === undefined
+					? {}
+					: { accessibilityState: { expanded } })}
 				style={{
 					flex: 1,
 					fontFamily: "MonaSans",

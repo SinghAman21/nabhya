@@ -34,6 +34,8 @@ export async function createUser(
 		role?: "volunteer" | "organisation" | "superadmin";
 		fullName?: string;
 		status?: "ACTIVE" | "SUSPENDED";
+		/** Applying and pledging require VERIFIED; the column defaults to PENDING. */
+		verificationStatus?: "PENDING" | "VERIFIED" | "REJECTED";
 		createdAt?: Date;
 	} = {},
 ) {
@@ -43,6 +45,9 @@ export async function createUser(
 			email: `user-${unique()}@example.com`,
 			fullName: options.fullName ?? "Test User",
 			status: options.status ?? "ACTIVE",
+			...(options.verificationStatus
+				? { verificationStatus: options.verificationStatus }
+				: {}),
 			...(options.createdAt ? { createdAt: options.createdAt } : {}),
 		})
 		.returning();

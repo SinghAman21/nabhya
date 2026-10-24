@@ -3,11 +3,11 @@ import { useRouter } from "expo-router";
 import { HandCoins, Package } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
+import { PageTabs } from "@/components/page-tabs";
 import { PAGE_SIZE, PagedList, usePagedQuery } from "@/components/paged-list";
 import {
 	EmptyState,
 	ErrorState,
-	FilterChips,
 	ListGroup,
 	LoadingState,
 	Screen,
@@ -25,12 +25,19 @@ import { confirm, toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption, H3, H5 } from "@/components/ui/typography";
 import { useDonationReceipt } from "@/hooks/use-engagement";
+import { useDonationReceiptPdf } from "@/hooks/use-finance";
 import { useWithdrawPledge } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/use-theme";
+import { useGridColumns } from "@/hooks/useMedia";
 import { apiErrorMessage, donationsApi, needsApi, queryKeys } from "@/lib/api";
 import { formatDateTime, formatRelative } from "@/lib/format";
-import { READING_COLUMN } from "@/lib/reading-column";
 import type { MyDonation } from "@/lib/types";
+
+/**
+ * Card lists run two across on a wide desktop window (the same grid as
+ * certificates) instead of one 720 column floating in a 1400pt window.
+ */
+const COLUMN = { width: "100%", maxWidth: 1040, alignSelf: "center" } as const;
 
 type Tab = "items" | "money";
 
@@ -46,15 +53,19 @@ const TABS: Array<{ value: Tab; label: string }> = [
  * union type: their shapes share almost nothing, and forcing them together
  * needs casts that hide real mistakes. Reached from Profile, so it gets a back
  * button rather than a tab title.
+ *
+ * Items / Money are `PageTabs`, not `FilterChips`: they are two kinds of record
+ * about one subject, not a filter over one list, and a filled pill read as
+ * "this list is narrowed".
  */
 export default function Donations() {
 	const [tab, setTab] = useState<Tab>("items");
 
 	return (
-		<Screen style={READING_COLUMN}>
+		<Screen style={COLUMN}>
 			<ScreenHeader back title="Your giving" />
 
-			<FilterChips options={TABS} value={tab} onChange={setTab} />
+			<PageTabs tabs={TABS} value={tab} onChange={setTab} />
 
 			{tab === "items" ? <ItemPledges /> : <MoneyDonations />}
 		</Screen>
@@ -65,6 +76,7 @@ function ItemPledges() {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
 	const withdraw = useWithdrawPledge();
+	const columns = Math.min(useGridColumns(), 2);
 
 	const confirmWithdraw = async (needId: string) => {
 		const ok = await confirm({
@@ -96,6 +108,7 @@ function ItemPledges() {
 			loadMore={loadMore}
 			loadingLabel="Loading your pledges"
 			keyExtractor={(item) => item.id}
+			numColumns={columns}
 			empty={
 				<EmptyState
 					icon={Package}
@@ -199,6 +212,7 @@ function ItemPledges() {
 function MoneyDonations() {
 	const router = useRouter();
 	const [receiptId, setReceiptId] = useState<string | null>(null);
+	const columns = Math.min(useGridColumns(), 2);
 
 	const { query, items, loadMore } = usePagedQuery({
 		queryKey: queryKeys.myDonations({ limit: PAGE_SIZE }),
@@ -213,6 +227,7 @@ function MoneyDonations() {
 				loadMore={loadMore}
 				loadingLabel="Loading your donations"
 				keyExtractor={(item) => item.id}
+				numColumns={columns}
 				empty={
 					<EmptyState
 						icon={HandCoins}
@@ -326,6 +341,7 @@ function ReceiptSheet({
 	const { spacing } = useTheme();
 	const query = useDonationReceipt(id ?? undefined);
 	const receipt = query.data;
+	const pdf = useDonationReceiptPdf();
 
 	return (
 		<Sheet
@@ -333,9 +349,29 @@ function ReceiptSheet({
 			onClose={onClose}
 			title="Receipt"
 			footer={
-				<Button variant="outline" onPress={onClose}>
-					Done
-				</Button>
+				<View
+					style={{
+						flexDirection: "row",
+						justifyContent: "flex-end",
+						gap: spacing[2],
+					}}
+				>
+					<Button variant="ghost" onPress={onClose}>
+						Done
+					</Button>
+					<Button
+						onPress={() =>
+							id &&
+							pdf.mutate(id, {
+								onError: (error) => toast.error(apiErrorMessage(error)),
+							})
+						}
+						loading={pdf.isPending}
+						disabled={!receipt}
+					>
+						Download PDF
+					</Button>
+				</View>
 			}
 		>
 			<View style={{ paddingTop: spacing[1], paddingBottom: spacing[2] }}>
@@ -364,6 +400,12 @@ function ReceiptSheet({
 									.join(", ")}
 							/>
 							<ReceiptRow label="From" value={receipt.donorName ?? "-"} />
+							{receipt.paymentReference && (
+								<ReceiptRow
+									label="Payment ref."
+									value={receipt.paymentReference}
+								/>
+							)}
 							<ReceiptRow
 								label="Date"
 								value={
@@ -373,6 +415,11 @@ function ReceiptSheet({
 								}
 							/>
 						</ListGroup>
+						<Caption color="tertiary" style={{ marginTop: spacing[3] }}>
+							A copy was emailed to {receipt.donorEmail ?? "you"} when the
+							payment completed. This acknowledges your payment; it is not an
+							80G tax-exemption certificate.
+						</Caption>
 					</>
 				)}
 			</View>

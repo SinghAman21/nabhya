@@ -228,8 +228,14 @@ describe("OrganizationsService", () => {
 			const need = await createNeed(db, org.id);
 			await createNeed(db, org.id, { status: "CLOSED" });
 			await createPledge(db, need.id, volunteer.id);
+			await db
+				.insert(follows)
+				.values({ userId: volunteer.id, organizationId: org.id });
 			// Another NGO's rows must not leak into the counts.
 			await createEvent(db, other.id, { status: "PUBLISHED" });
+			await db
+				.insert(follows)
+				.values({ userId: volunteer.id, organizationId: other.id });
 
 			const overview = await service.getMyOverview(owner.id);
 
@@ -240,6 +246,8 @@ describe("OrganizationsService", () => {
 				eventsWithApplicants: 2,
 				pendingPledges: 1,
 				needsWithPledges: 1,
+				draftEvents: 1,
+				followers: 1,
 			});
 		});
 	});

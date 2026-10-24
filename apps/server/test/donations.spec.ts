@@ -1,9 +1,29 @@
 import { donations } from "@nabhya/db/schema";
-import { orgDonationQuerySchema } from "@nabhya/shared";
-import { BadRequestException } from "@nestjs/common";
+import {
+	donationCheckoutResponseSchema,
+	donationReceiptResponseSchema,
+	exportFileResponseSchema,
+	orgDonationExportSchema,
+	orgDonationQuerySchema,
+	signedUrlResponseSchema,
+} from "@nabhya/shared";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+	afterAll,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest";
 import { AuditService } from "../src/common/audit";
+import type {
+	DonationReceiptEmailInput,
+	MailService,
+} from "../src/common/mail";
+import { StubStorageProvider } from "../src/common/storage";
 import { DonationsService } from "../src/modules/donations/donations.service";
 import { StubPaymentProvider } from "../src/modules/donations/stub-payment.provider";
 import { NotificationsService } from "../src/modules/notifications/notifications.service";
@@ -15,6 +35,14 @@ describe("DonationsService", () => {
 	let db: TestDb;
 	let close: () => Promise<void>;
 	let service: DonationsService;
+	let storage: StubStorageProvider;
+	const sentReceipts: DonationReceiptEmailInput[] = [];
+	const mail = {
+		sendTeamInvite: async () => {},
+		sendDonationReceipt: async (input: DonationReceiptEmailInput) => {
+			sentReceipts.push(input);
+		},
+	} as unknown as MailService;
 
 	beforeAll(async () => {
 		({ db, close } = await createTestDb());
@@ -25,12 +53,15 @@ describe("DonationsService", () => {
 			audit,
 			null as never,
 		);
+		storage = new StubStorageProvider();
 		service = new DonationsService(
 			db as never,
 			audit,
 			new StubPaymentProvider(),
 			notifications,
 			organizationsService,
+			storage,
+			mail,
 		);
 	});
 
@@ -41,6 +72,188 @@ describe("DonationsService", () => {
 	beforeEach(async () => {
 		await truncateAll(db);
 		await seedRoles(db);
+		sentReceipts.length = 0;
+	});
+
+	/** Drives a checkout to COMPLETED the only way production can: a webhook. */
+	async function settle(donationId: string, amountMinor: number) {
+		await service.handleWebhook(
+			JSON.stringify({
+				event: "payment.captured",
+				payload: {
+					payment: {
+						entity: {
+							id: `pay_${donationId.slice(0, 8)}`,
+							amount: amountMinor,
+							notes: { referenceId: donationId },
+						},
+					},
+				},
+			}),
+			{},
+		);
+	}
+
+	describe("receipts", () => {
+		it("emails the receipt PDF to a guest donor once the payment lands", async () => {
+			const org = await verifiedOrg();
+			const checkout = await service.createCheckout(
+				{
+					organizationId: org.id,
+					amountMinor: 150_000,
+					isAnonymous: false,
+					donorName: "Guest Giver",
+					donorEmail: "guest@example.com",
+				},
+				null,
+			);
+
+			await settle(checkout.donationId, 150_000);
+
+			await vi.waitFor(() => expect(sentReceipts).toHaveLength(1));
+			const sent = sentReceipts[0];
+			expect(sent?.to).toBe("guest@example.com");
+			expect(sent?.amount).toBe("INR 1,500.00");
+			expect(sent?.receiptNumber).toMatch(/^NBH-/);
+			// A real PDF, not an empty buffer.
+			expect(
+				Buffer.from(sent?.pdf ?? [])
+					.subarray(0, 5)
+					.toString(),
+			).toBe("%PDF-");
+		});
+
+		it("does not email a receipt for a failed payment", async () => {
+			const org = await verifiedOrg();
+			const donor = await createUser(db, { role: "volunteer" });
+			const checkout = await service.createCheckout(
+				{ organizationId: org.id, amountMinor: 100_000, isAnonymous: false },
+				{ id: donor.id, email: donor.email, name: donor.fullName },
+			);
+			await service.handleWebhook(
+				JSON.stringify({
+					event: "payment.failed",
+					payload: {
+						payment: {
+							entity: { notes: { referenceId: checkout.donationId } },
+						},
+					},
+				}),
+				{},
+			);
+
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			expect(sentReceipts).toHaveLength(0);
+		});
+
+		it("hands the donor a signed link to the stored PDF", async () => {
+			const org = await verifiedOrg();
+			const donor = await createUser(db, { role: "volunteer" });
+			const checkout = await service.createCheckout(
+				{ organizationId: org.id, amountMinor: 100_000, isAnonymous: false },
+				{ id: donor.id, email: donor.email, name: donor.fullName },
+			);
+			await settle(checkout.donationId, 100_000);
+
+			const wire = (value: unknown) => JSON.parse(JSON.stringify(value));
+			expect(
+				donationCheckoutResponseSchema.safeParse(wire(checkout)).error,
+			).toBeUndefined();
+			expect(
+				donationReceiptResponseSchema.safeParse(
+					wire(await service.getReceipt(donor.id, checkout.donationId)),
+				).error,
+			).toBeUndefined();
+
+			const pdfLink = await service.getReceiptPdfUrl(
+				donor.id,
+				checkout.donationId,
+			);
+			expect(signedUrlResponseSchema.safeParse(pdfLink).error).toBeUndefined();
+			const { url } = pdfLink;
+			expect(decodeURIComponent(url)).toContain(
+				`receipts/${checkout.donationId}/`,
+			);
+		});
+
+		it("refuses the receipt to anyone but the donor", async () => {
+			const org = await verifiedOrg();
+			const donor = await createUser(db, { role: "volunteer" });
+			const stranger = await createUser(db, { role: "volunteer" });
+			const checkout = await service.createCheckout(
+				{ organizationId: org.id, amountMinor: 100_000, isAnonymous: false },
+				{ id: donor.id, email: donor.email, name: donor.fullName },
+			);
+			await settle(checkout.donationId, 100_000);
+
+			await expect(
+				service.getReceiptPdfUrl(stranger.id, checkout.donationId),
+			).rejects.toBeInstanceOf(NotFoundException);
+		});
+
+		it("has no receipt while the payment is pending", async () => {
+			const org = await verifiedOrg();
+			const donor = await createUser(db, { role: "volunteer" });
+			const checkout = await service.createCheckout(
+				{ organizationId: org.id, amountMinor: 100_000, isAnonymous: false },
+				{ id: donor.id, email: donor.email, name: donor.fullName },
+			);
+
+			await expect(
+				service.getReceiptPdfUrl(donor.id, checkout.donationId),
+			).rejects.toBeInstanceOf(BadRequestException);
+		});
+	});
+
+	describe("the NGO's CSV export", () => {
+		it("exports settled donations, hiding anonymous donors and every email", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const named = await createUser(db, {
+				role: "volunteer",
+				fullName: "Named Donor",
+			});
+			const hidden = await createUser(db, {
+				role: "volunteer",
+				fullName: "Secret Donor",
+			});
+
+			const a = await service.createCheckout(
+				{ organizationId: org.id, amountMinor: 100_000, isAnonymous: false },
+				{ id: named.id, email: named.email, name: named.fullName },
+			);
+			const b = await service.createCheckout(
+				{ organizationId: org.id, amountMinor: 50_000, isAnonymous: true },
+				{ id: hidden.id, email: hidden.email, name: hidden.fullName },
+			);
+			// Left pending: not in a default export.
+			await service.createCheckout(
+				{ organizationId: org.id, amountMinor: 70_000, isAnonymous: false },
+				{ id: named.id, email: named.email, name: named.fullName },
+			);
+			await settle(a.donationId, 100_000);
+			await settle(b.donationId, 50_000);
+
+			const put = vi.spyOn(storage, "putObject");
+			const file = await service.exportForMyOrganization(
+				owner.id,
+				orgDonationExportSchema.parse({}),
+			);
+			expect(file.rowCount).toBe(2);
+			expect(file.truncated).toBe(false);
+			expect(exportFileResponseSchema.safeParse(file).error).toBeUndefined();
+
+			const stored = put.mock.calls.find(([input]) =>
+				input.key.includes("/exports/"),
+			)?.[0];
+			put.mockRestore();
+			expect(stored?.contentType).toBe("text/csv");
+			const csv = new TextDecoder().decode(stored?.body);
+			expect(csv).toContain("Named Donor");
+			expect(csv).toContain('"Anonymous"');
+			expect(csv).not.toContain("Secret Donor");
+			expect(csv).not.toContain(named.email);
+		});
 	});
 
 	async function verifiedOrg() {

@@ -51,10 +51,15 @@ const SHELL_HEIGHT: ViewStyle =
  */
 export default function AdminLayout() {
 	const role = useAuthStore((s) => s.role);
+	const email = useAuthStore((s) => s.email);
 	const { colors } = useTheme();
 	const { isDesktop } = useMedia();
 	const tabBarOptions = useTabBarOptions();
 
+	// Signed out: straight to sign-in, never via "/" - the gate there replaces
+	// itself with login, and a layout still mounted for that frame redirecting
+	// back to "/" looped the root Stack ("Maximum update depth exceeded").
+	if (!email) return <Redirect href="/(auth)/login" />;
 	if (role !== "superadmin") return <Redirect href="/" />;
 
 	if (isDesktop) {
@@ -133,6 +138,8 @@ export default function AdminLayout() {
 					}}
 				/>
 				<Tabs.Screen name="categories" options={{ href: null }} />
+				{/* Off the phone tab bar like Causes: reached from Overview. */}
+				<Tabs.Screen name="finance" options={{ href: null }} />
 			</Tabs>
 		</View>
 	);

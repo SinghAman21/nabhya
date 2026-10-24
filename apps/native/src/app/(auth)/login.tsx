@@ -7,10 +7,11 @@ import { useForm } from "react-hook-form";
 import { AuthError, authErrorCopy } from "@/components/auth-error";
 import { AuthSplitLayout } from "@/components/auth-split-layout";
 import { GoogleSignInButton } from "@/components/google-signin-button";
+import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form";
 import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption, H2 } from "@/components/ui/typography";
+import { Body, Caption, Title } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { authService } from "@/lib/api/auth";
 import { apiErrorMessage } from "@/lib/api/http";
@@ -84,12 +85,15 @@ export default function Login() {
 				</Pressable>
 			}
 		>
-			<H2 accessibilityRole="header" style={{ marginBottom: spacing[1] }}>
-				Welcome back
-			</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
-				Sign in to pick up where you left off.
+			<Title accessibilityRole="header">Welcome back</Title>
+			<Body
+				color="tertiary"
+				style={{ marginTop: spacing[1], marginBottom: spacing[7] }}
+			>
+				Sign in to your volunteer or NGO account.
 			</Body>
+
+			<GoogleSignInButton onError={(message) => setFailure({ message })} />
 
 			<FormField
 				control={form.control}
@@ -116,20 +120,19 @@ export default function Login() {
 				returnKeyType="go"
 				onSubmitEditing={onSubmit}
 				accessibilityLabel="Password"
-			/>
-			<Button
-				variant="link"
-				size="sm"
-				onPress={() =>
-					router.push({
-						pathname: "/(auth)/forgot-password",
-						params: { email: form.getValues("email") },
-					})
+				labelAction={
+					<TextAction
+						label="Forgot password?"
+						tone="brand"
+						onPress={() =>
+							router.push({
+								pathname: "/(auth)/forgot-password",
+								params: { email: form.getValues("email") },
+							})
+						}
+					/>
 				}
-				style={{ alignSelf: "flex-end" }}
-			>
-				Forgot password?
-			</Button>
+			/>
 
 			<AuthError
 				message={failure?.message ?? null}
@@ -146,13 +149,10 @@ export default function Login() {
 			<Button
 				onPress={onSubmit}
 				loading={loading}
-				size="lg"
-				style={{ marginTop: failure ? spacing[4] : spacing[6] }}
+				style={{ marginTop: failure ? spacing[4] : spacing[2] }}
 			>
 				Sign in
 			</Button>
-
-			<GoogleSignInButton onError={(message) => setFailure({ message })} />
 		</AuthSplitLayout>
 	);
 }

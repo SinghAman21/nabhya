@@ -8,8 +8,9 @@ import type { TableColumn, TableSort } from "@/components/admin/data-table";
 import { AdminScreen } from "@/components/admin/list-chrome";
 import { SelectMenu, type SelectOption } from "@/components/admin/select-menu";
 import { Toolbar, useTableView } from "@/components/admin/toolbar";
-import { ApplicantsSheet } from "@/components/applicants-sheet";
+import { ApplicantsDrawer } from "@/components/applicants-sheet";
 import { EventFormSheet } from "@/components/event-form-sheet";
+import { UrgentMark } from "@/components/ngo/record-summary";
 import { PendingCount, RowActions } from "@/components/ngo/table-cells";
 import { PagedList, usePagedQuery } from "@/components/paged-list";
 import {
@@ -249,15 +250,18 @@ export default function NgoEvents() {
 				publishBlockedReason={publishBlocked}
 			/>
 
-			<ApplicantsSheet
-				eventId={reviewingLive?.id ?? null}
-				eventTitle={reviewingLive?.title ?? ""}
-				remainingPlaces={
-					reviewingLive
-						? reviewingLive.volunteersNeeded - reviewingLive.acceptedCount
-						: 0
-				}
+			<ApplicantsDrawer
+				event={reviewingLive}
 				onClose={() => setReviewing(null)}
+				// Closes the record, then opens the editor - one drawer at a time.
+				onEdit={
+					reviewingLive && canEdit(reviewingLive)
+						? (event) => {
+								setReviewing(null);
+								setEditing(event);
+							}
+						: undefined
+				}
 			/>
 		</>
 	);
@@ -266,7 +270,9 @@ export default function NgoEvents() {
 		return (
 			<AdminScreen
 				title="Events"
-				subtitle={subtitle}
+				// The table already counts the rows beneath; a second "5 posts"
+				// above the title said nothing new.
+				subtitle="Volunteer calls, from draft to certificates"
 				action={newEvent}
 				toolbar={
 					<Toolbar view={view} onViewChange={setView}>
@@ -527,9 +533,9 @@ function EventRow({
 					label={humanizeStatus(event.status)}
 					tone={eventStatusTone(event.status)}
 				/>
-				{pending > 0 && (
-					<StatusPill label={`${pending} to review`} tone="warning" />
-				)}
+				{/* "N waiting" is the footer's line already; a second, tinted
+				    copy up here was the loudest thing on the card. */}
+				{event.isUrgent && <UrgentMark />}
 			</View>
 
 			<Body weight="bold" numberOfLines={1}>

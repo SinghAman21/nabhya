@@ -7,6 +7,7 @@ import {
 	HandCoins,
 	HeartHandshake,
 	House,
+	Landmark,
 	LayoutDashboard,
 	Megaphone,
 	Newspaper,
@@ -112,6 +113,12 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
 		href: "/(admin)/volunteers",
 		icon: Users,
 		section: "Directory",
+	},
+	{
+		label: "Finance",
+		href: "/(admin)/finance",
+		icon: Landmark,
+		section: "Records",
 	},
 	{
 		label: "Activity",

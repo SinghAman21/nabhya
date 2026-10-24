@@ -17,6 +17,7 @@ import {
 } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
+import { AccountSignOut } from "@/components/account-sign-out";
 import { ChoiceChips, MultiChoiceChips } from "@/components/choice-chips";
 import { Field, useFieldInputStyle } from "@/components/form-field";
 import {
@@ -42,7 +43,6 @@ import {
 	LoadingState,
 	Screen,
 } from "@/components/screen-shell";
-import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { confirm } from "@/components/ui/overlay";
@@ -135,7 +135,7 @@ export default function OrgOnboarding() {
 	const signOut = useSignOut();
 
 	const draft = useOnboardingStore((s) => s.org);
-	const merge = useOnboardingStore((s) => s.mergeOrg);
+	const mergeDraft = useOnboardingStore((s) => s.mergeOrg);
 	const clear = useOnboardingStore((s) => s.clearOrg);
 	const step = useOnboardingStore((s) => s.orgStep);
 	const setStep = useOnboardingStore((s) => s.setOrgStep);
@@ -151,6 +151,19 @@ export default function OrgOnboarding() {
 	const updateOrg = useUpdateMyOrganization();
 
 	const [errors, setErrors] = useState<FieldErrors>({});
+	// Editing a field clears its error. Errors are only set on Continue, so a
+	// fixed phone number kept saying "Enter a valid phone number" until the
+	// next press - the form contradicting what was plainly typed.
+	const merge = (fields: Parameters<typeof mergeDraft>[0]) => {
+		mergeDraft(fields);
+		setErrors((current) => {
+			const stale = Object.keys(fields).filter((key) => key in current);
+			if (stale.length === 0) return current;
+			const next = { ...current };
+			for (const key of stale) delete next[key];
+			return next;
+		});
+	};
 	const [submitError, setSubmitError] = useState<string | null>(null);
 	const [createdName, setCreatedName] = useState<string | null>(null);
 	const [brandingFailed, setBrandingFailed] = useState(false);
@@ -430,22 +443,20 @@ export default function OrgOnboarding() {
 		<WizardShell
 			steps={STEPS}
 			step={step}
+			heading="Register your NGO"
 			title={copy.title}
 			lede={copy.lede}
 			error={submitError}
 			// Withheld mid-submit: stepping back while "Create organisation" is
 			// in flight would leave the review behind a request still landing.
 			{...(step > 0 && !complete.isPending ? { onBack: back } : {})}
+			// Every step, not only the first: the account is just as wrong on
+			// step three, and the draft-discard confirm covers the cost.
 			exit={
-				step === 0 ? (
-					<TextAction
-						label={
-							signOut.isPending ? "Signing out…" : "Not your NGO? Sign out"
-						}
-						onPress={signOutFromWizard}
-						disabled={signOut.isPending}
-					/>
-				) : null
+				<AccountSignOut
+					onPress={signOutFromWizard}
+					pending={signOut.isPending}
+				/>
 			}
 			// Not on the review: by then it has been read four times, and under
 			// the list on a phone it is one more block between the reader and
@@ -958,7 +969,8 @@ function ReviewStep({
 						value:
 							draft.latitude !== undefined && draft.longitude !== undefined
 								? "Saved - you'll appear in “near me”"
-								: "Not saved",
+								: // Optional; "Not saved" read as something that failed.
+									"Not shared - optional",
 						onEdit: () => onEdit(1),
 					},
 				]}

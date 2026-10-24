@@ -153,3 +153,29 @@ derived from `canTeamRole`, plus suspended/left/removed teammates shut out of
 all of them); additions in admin, certificates,
 endpoints, engagement, events, impact, needs, onboarding, organizations,
 publishing specs.
+
+---
+
+## NGO review drawers and dashboard counts (2026-10-24)
+
+No new routes, no schema change. Three response additions, each read by one
+NGO screen:
+
+- `GET /api/org/events/:id/applications` now returns `counts` beside
+  `items`/`meta`: `{ PENDING, ACCEPTED, REJECTED, WITHDRAWN, all }` across the
+  whole event, ignoring the `status` filter and the page - so the applicants
+  drawer's chips read "Pending 3 / Accepted 2" before either is pressed. One
+  `GROUP BY status` (`EventsService.applicationCounts`). Type
+  `ApplicationStatusCounts` in `@nabhya/shared` `events.ts`.
+- `GET /api/org/needs/:id/pledges` the same, `{ PENDING, ACCEPTED, REJECTED,
+  COMPLETED, CANCELLED, all }` (`NeedsService.pledgeCounts`,
+  `PledgeStatusCounts` in `needs.ts`).
+- `GET /api/organizations/me/overview` (`OrgOverview`) gains `draftEvents`
+  and `followers`, two more `count()`s in the existing `Promise.all`, so the
+  dashboard can show a number on every row.
+
+Tests: "counts applicants by state across the event, whatever the filter"
+(`events.spec.ts`), "counts every state across the need, whatever the
+filter" (`needs.spec.ts`), and the overview `toEqual` in
+`organizations.spec.ts` extended with a draft event and a follower (plus
+another org's follower that must not leak in).

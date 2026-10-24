@@ -47,6 +47,7 @@ export function SelectMenu<T extends string>({
 	onChange,
 	align = "start",
 	minWidth = 200,
+	onOpenChange,
 }: {
 	/** The noun. Shown on the trigger before the value, and as the a11y label. */
 	label: string;
@@ -56,9 +57,18 @@ export function SelectMenu<T extends string>({
 	/** `end` opens the panel right-aligned, for a control near the right edge. */
 	align?: "start" | "end";
 	minWidth?: number;
+	/**
+	 * Told when the panel opens or closes. A caller near the end of a scroll
+	 * body (the dossier timeline) uses it to reserve room below the trigger, so
+	 * the absolutely positioned panel is not clipped by the drawer's scroller.
+	 */
+	onOpenChange?: (open: boolean) => void;
 }) {
-	const { colors, spacing, borderRadius, elevation, isDark } = useTheme();
+	const { colors, spacing, borderRadius, elevation } = useTheme();
 	const [open, setOpen] = useState(false);
+	useEffect(() => {
+		onOpenChange?.(open);
+	}, [open, onOpenChange]);
 	const wrapper = useRef<View>(null);
 	const trigger = useRef<View>(null);
 	const optionRefs = useRef<Array<View | null>>([]);
@@ -152,7 +162,14 @@ export function SelectMenu<T extends string>({
 	}, [open, options.length]);
 
 	return (
-		<View ref={wrapper} style={{ position: "relative" }}>
+		// **The wrapper rises while open.** react-native-web gives every `View`
+		// `zIndex: 0`, so every View is its own stacking context: the panel's
+		// own `zIndex` only orders it inside this wrapper, and anything later in
+		// the document (the next select, the timeline's date headings) painted
+		// over it. Raising the wrapper fixes siblings; a caller whose row sits
+		// above other content raises that row too (the toolbar and the timeline
+		// filter row both do).
+		<View ref={wrapper} style={{ position: "relative", zIndex: open ? 50 : 0 }}>
 			<Pressable
 				ref={trigger}
 				onPress={() => setOpen((previous) => !previous)}
@@ -201,7 +218,10 @@ export function SelectMenu<T extends string>({
 						paddingVertical: spacing[1],
 						borderRadius: borderRadius.lg,
 						backgroundColor: colors.background.card,
-						borderWidth: isDark ? 1 : 0,
+						// A hairline in both modes: in a drawer the panel lands on
+						// cards of its own colour, where a light shadow alone left
+						// its edge for the eye to guess.
+						borderWidth: 1,
 						borderColor: colors.border.hairline,
 						...elevation.card,
 					}}

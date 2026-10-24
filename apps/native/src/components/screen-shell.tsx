@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react-native";
-import { useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
 	ActivityIndicator,
 	Animated,
@@ -11,13 +11,25 @@ import {
 	type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BackButton } from "@/components/back-button";
+import { BackButton, useShowBack } from "@/components/back-button";
+import {
+	CHIP_HEIGHT,
+	CHIP_RING_ROOM,
+	Chip,
+	type ChipOption,
+} from "@/components/choice-chips";
 import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption, H2, H3, Label } from "@/components/ui/typography";
-import { typography } from "@/constants/design-system";
+import {
+	Body,
+	Caption,
+	H2,
+	H3,
+	Label,
+	Title,
+} from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
-import { useGridColumns } from "@/hooks/useMedia";
-import { focusable } from "@/lib/focus";
+import { useGridColumns, useMedia } from "@/hooks/useMedia";
+import { focusable, type PressState } from "@/lib/focus";
 import { useReducedMotion } from "@/lib/motion";
 
 /**
@@ -28,9 +40,6 @@ import { useReducedMotion } from "@/lib/motion";
  * brand orange reserved for actions. If a screen needs a box it needs a
  * `Surface`; if it needs a list of boxes it needs a `ListGroup`.
  */
-
-/** react-native-web reports `focused`/`hovered` here; native only sets `pressed`. */
-type PressState = { pressed: boolean; focused?: boolean; hovered?: boolean };
 
 /* -------------------------------------------------------------------------- */
 /* Page                                                                       */
@@ -48,23 +57,35 @@ type PressState = { pressed: boolean; focused?: boolean; hovered?: boolean };
 export function Screen({
 	children,
 	style,
+	measure = "page",
 }: {
 	children: React.ReactNode;
 	/** View styles are typed so callers get React Native/CSS-like autocomplete. */
 	style?: StyleProp<ViewStyle>;
+	/**
+	 * How wide the page reads inside the desktop `AppShell`. `page` (the
+	 * default) caps at `SHELL_PAGE_MAX_WIDTH` for lists and timelines;
+	 * `reading` at `SHELL_READING_MAX_WIDTH` for a form or a single document.
+	 * Ignored everywhere else - a phone, and the role groups' own layouts.
+	 */
+	measure?: "page" | "reading";
 }) {
 	const { colors, spacing } = useTheme();
 	const insets = useSafeAreaInsets();
+	const frame = useContext(ShellFrameContext);
 
 	return (
 		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				paddingTop: insets.top + spacing[5],
-				paddingHorizontal: spacing[5],
-				...style,
-			}}
+			style={[
+				{
+					flex: 1,
+					backgroundColor: colors.background.warm,
+					paddingTop: insets.top + spacing[5],
+					paddingHorizontal: spacing[5],
+				},
+				style,
+				frame ? shellMeasure(frame, measure) : null,
+			]}
 		>
 			{children}
 		</View>
@@ -72,60 +93,130 @@ export function Screen({
 }
 
 /* -------------------------------------------------------------------------- */
+/* Desktop shell frame                                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Which desktop chrome a shared screen is drawn inside, published by
+ * `AppShell` (`null` on a phone and inside the role groups, which lay out
+ * their own pages). Lives here rather than in `app-shell.tsx` so `Screen` can
+ * read it without importing the sidebar.
+ */
+export type ShellFrame = "rail" | "topbar";
+export const ShellFrameContext = createContext<ShellFrame | null>(null);
+
+/** A list or timeline page beside the rail / under the top bar. */
+export const SHELL_PAGE_MAX_WIDTH = 1040;
+/** A form or one document - `edit-profile`, a certificate. */
+export const SHELL_READING_MAX_WIDTH = 760;
+
+/**
+ * The width rule for a shared screen on desktop, applied over whatever the
+ * screen passed (most pass `READING_COLUMN`, a 720 column centred in the
+ * window - which beside a 264pt rail floated a narrow card in the middle of
+ * the content area with dead space on both sides).
+ *
+ * - **Beside the rail** the page is left-aligned in the content area, so its
+ *   edge sits one gutter from the rail like every `(ngo)` page.
+ * - **Under the top bar** there is no rail to align to, so it is centred, the
+ *   way the volunteer's own pages sit under the same bar.
+ */
+function shellMeasure(
+	frame: ShellFrame,
+	measure: "page" | "reading",
+): ViewStyle {
+	return {
+		width: "100%",
+		maxWidth:
+			measure === "reading" ? SHELL_READING_MAX_WIDTH : SHELL_PAGE_MAX_WIDTH,
+		alignSelf: frame === "rail" ? "flex-start" : "center",
+	};
+}
+
+/* -------------------------------------------------------------------------- */
 /* Screen header                                                              */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Two shapes, one component. A top-level tab gets the display-face title on
- * its own line. A pushed page passes `back`, which puts the back button, a
- * smaller title and the action on one 40pt row - the title no longer floats
- * under a lone arrow with a gap that changes from screen to screen.
+ * Two shapes, one component. A top-level page gets `Title` - the text face,
+ * sentence case - on its own line. A pushed page passes `back`, which puts
+ * the back button, a smaller sentence-case title (`H3`) and the action on one
+ * 40pt row - the title no longer floats under a lone arrow with a gap that
+ * changes from screen to screen.
+ *
+ * Titles used to be the display face (`H2`, and `H3` forced into it), which
+ * only draws capitals: every page shouted NOTIFICATIONS, YOUR GIVING. The
+ * display face is for brand panels.
+ *
+ * **`back` is a request, not a guarantee.** On desktop web a page listed in
+ * `NAV_DESTINATIONS` (back-button.tsx) is reached from the rail or the top
+ * bar, which stay on screen - so it draws the top-level shape with no
+ * chevron. See `useShowBack`.
  */
 export function ScreenHeader({
 	title,
 	subtitle,
 	action,
-	back,
+	back: wantsBack,
 }: {
 	title: string;
-	subtitle?: string;
+	subtitle?: string | undefined;
 	action?: React.ReactNode;
 	/** Render the back button inline, left of the title. */
 	back?: boolean;
 }) {
 	const { spacing } = useTheme();
+	const { isDesktop } = useMedia();
+	const showBack = useShowBack();
+	const back = wantsBack && showBack;
 
 	if (back) {
+		/*
+		 * On a phone the action gets its own row under the title. Chevron,
+		 * title and "Download report" on one 390pt row cut the title to
+		 * "DONATI…" - the one word that says where you are was the thing that
+		 * gave way. Indented by the chevron's width so it lines up with the
+		 * title it belongs to.
+		 */
+		const stackAction = Boolean(action) && !isDesktop;
 		return (
-			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					justifyContent: "space-between",
-					gap: spacing[3],
-					marginBottom: spacing[5],
-					minHeight: 40,
-				}}
-			>
-				<BackButton />
-				{/* Title beside the chevron, not pushed to the far edge: with
-				    space-between and no flex it floated to the middle when there
-				    was an action and to the right edge when there wasn't. */}
-				<View style={{ flex: 1, minWidth: 0 }}>
-					<H3
-						accessibilityRole="header"
-						numberOfLines={1}
-						style={{ fontFamily: typography.fontFamily.display }}
-					>
-						{title}
-					</H3>
-					{subtitle && (
-						<Caption color="tertiary" numberOfLines={2}>
-							{subtitle}
-						</Caption>
-					)}
+			<View style={{ marginBottom: spacing[5], gap: spacing[3] }}>
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						justifyContent: "space-between",
+						gap: spacing[3],
+						minHeight: 40,
+					}}
+				>
+					<BackButton />
+					{/* Title beside the chevron, not pushed to the far edge: with
+					    space-between and no flex it floated to the middle when
+					    there was an action and to the right edge when there
+					    wasn't. */}
+					<View style={{ flex: 1, minWidth: 0 }}>
+						<H3 accessibilityRole="header" numberOfLines={2}>
+							{title}
+						</H3>
+						{subtitle ? (
+							<Caption color="tertiary" numberOfLines={2}>
+								{subtitle}
+							</Caption>
+						) : null}
+					</View>
+					{stackAction ? null : action}
 				</View>
-				{action}
+				{stackAction ? (
+					<View
+						style={{
+							flexDirection: "row",
+							paddingLeft: 40 + spacing[3],
+						}}
+					>
+						{action}
+					</View>
+				) : null}
 			</View>
 		);
 	}
@@ -141,17 +232,19 @@ export function ScreenHeader({
 				minHeight: 40,
 			}}
 		>
-			<View style={{ flex: 1 }}>
-				{subtitle && (
+			<View style={{ flex: 1, minWidth: 0 }}>
+				<Title accessibilityRole="header" numberOfLines={2}>
+					{title}
+				</Title>
+				{subtitle ? (
 					<Caption
 						color="tertiary"
-						numberOfLines={1}
-						style={{ marginBottom: spacing[0.5] }}
+						numberOfLines={2}
+						style={{ marginTop: spacing[0.5] }}
 					>
 						{subtitle}
 					</Caption>
-				)}
-				<H2 accessibilityRole="header">{title}</H2>
+				) : null}
 			</View>
 			{action}
 		</View>
@@ -188,6 +281,8 @@ export function Surface({
 	footer?: React.ReactNode;
 }) {
 	const { colors, spacing, borderRadius, elevation, isDark } = useTheme();
+	// Only the footer variant needs it: see below.
+	const [bodyPressed, setBodyPressed] = useState(false);
 
 	const base = {
 		backgroundColor: colors.background.card,
@@ -196,36 +291,69 @@ export function Surface({
 		// per screen on a small phone. Radius and elevation carry the separation.
 		padding: padded ? spacing[4] : 0,
 		...(isDark ? {} : elevation.card),
-		...style,
+		...(style as ViewStyle),
 	};
 
 	if (!onPress) {
 		return (
 			<View style={base}>
-				{children}
+				<RowCorners.Provider value={padded ? NO_CORNERS : CARD_CORNERS}>
+					{children}
+				</RowCorners.Provider>
 				{footer}
 			</View>
 		);
 	}
 
 	if (footer) {
-		// The card is the surface; only the body is the press target. The body
-		// carries the padding so its hover tint reaches the card's edges.
+		/*
+		 * The whole card lights up, not the top two thirds of it. The body used
+		 * to be the only pressable, so hovering it tinted a block that stopped
+		 * dead above the footer - on the needs and events cards, half a card.
+		 *
+		 * The card is now an outer `Pressable` with **no role** and no tab stop:
+		 * on the web it is a `<div>`, so the footer's buttons are not nested in
+		 * a `<button>`, and it exists to (a) draw the hover tint across the
+		 * whole card and (b) take a mouse press anywhere that is not a control.
+		 * The *body* is still the real button - it carries the role, the focus
+		 * ring and the accessible name from its text - and the footer controls
+		 * sit beside it as separate press targets. Inner responders win, so a
+		 * footer button never fires the card.
+		 *
+		 * A press on the body makes the body the responder, which the outer
+		 * card cannot see; `bodyPressed` carries that one bit so the press tint
+		 * also covers the whole card. Children are props, so this re-renders the
+		 * card's own views, not the content inside them.
+		 */
 		const { padding: _padding, ...shell } = base;
 		return (
-			<View style={{ ...shell, overflow: "hidden" }}>
+			<Pressable
+				onPress={onPress}
+				accessible={false}
+				focusable={false}
+				style={(state) => {
+					const { pressed, hovered } = state as PressState;
+					const lit = pressed || hovered || bodyPressed;
+					return {
+						...shell,
+						overflow: "hidden",
+						backgroundColor: lit
+							? colors.background.subtle
+							: colors.background.card,
+					};
+				}}
+			>
 				<Pressable
 					onPress={onPress}
+					onPressIn={() => setBodyPressed(true)}
+					onPressOut={() => setBodyPressed(false)}
 					accessibilityRole="button"
 					{...focusable}
-					style={(state) => {
-						const { pressed, hovered } = state as PressState;
-						return {
-							padding: padded ? spacing[4] : 0,
-							paddingBottom: 0,
-							backgroundColor:
-								pressed || hovered ? colors.background.subtle : "transparent",
-						};
+					style={{
+						padding: padded ? spacing[4] : 0,
+						paddingBottom: 0,
+						borderTopLeftRadius: borderRadius.xl,
+						borderTopRightRadius: borderRadius.xl,
 					}}
 				>
 					{children}
@@ -238,7 +366,7 @@ export function Surface({
 				>
 					{footer}
 				</View>
-			</View>
+			</Pressable>
 		);
 	}
 
@@ -331,7 +459,7 @@ export function SectionTitle({
 export function ListGroup({ children }: { children: React.ReactNode }) {
 	const { colors } = useTheme();
 	const rows = (Array.isArray(children) ? children.flat() : [children]).filter(
-		Boolean,
+		(row) => Boolean(row) && typeof row !== "string",
 	);
 
 	return (
@@ -348,11 +476,42 @@ export function ListGroup({ children }: { children: React.ReactNode }) {
 							}}
 						/>
 					)}
-					{row}
+					<RowCorners.Provider
+						value={cornersFor(index === 0, index === rows.length - 1)}
+					>
+						{row}
+					</RowCorners.Provider>
 				</View>
 			))}
 		</Surface>
 	);
+}
+
+/**
+ * Which of a row's corners touch its card's rounded corners.
+ *
+ * A row's hover tint is a rectangle, and the card's `overflow: hidden` is the
+ * only thing that rounds it - which a row outside a `ListGroup` (a lone
+ * disclosure row in a `Surface`, as on Team) or a card whose clip does not
+ * reach the row cannot rely on. So the row rounds its own tint: `ListGroup`
+ * says first / last, and an unpadded `Surface` says "both" for a row placed in
+ * it directly.
+ */
+interface Corners {
+	top: boolean;
+	bottom: boolean;
+}
+const NO_CORNERS: Corners = { top: false, bottom: false };
+const CARD_CORNERS: Corners = { top: true, bottom: true };
+const FIRST_CORNERS: Corners = { top: true, bottom: false };
+const LAST_CORNERS: Corners = { top: false, bottom: true };
+const RowCorners = createContext<Corners>(NO_CORNERS);
+
+function cornersFor(first: boolean, last: boolean): Corners {
+	if (first && last) return CARD_CORNERS;
+	if (first) return FIRST_CORNERS;
+	if (last) return LAST_CORNERS;
+	return NO_CORNERS;
 }
 
 export function ListRow({
@@ -363,12 +522,23 @@ export function ListRow({
 	onPress,
 	chevron = true,
 	accessibilityLabel,
+	action,
 }: {
 	icon?: LucideIcon;
 	label: string;
 	hint?: string;
-	/** Trailing content - a count, a pill, a switch. Replaces the chevron. */
+	/**
+	 * Trailing content - a count, a pill. Replaces the chevron. Drawn *inside*
+	 * the row's press target, so it must not be a control: use `action`.
+	 */
 	value?: React.ReactNode;
+	/**
+	 * A control of its own at the row's end - "remove this recent search".
+	 * Rendered beside the row's pressable, never inside it: inside, it was a
+	 * `<button>` in a `<button>` on the web, and a screen reader read the row
+	 * as one button with no way to reach the second.
+	 */
+	action?: React.ReactNode;
 	onPress?: () => void;
 	/** Set false for an action row (sign out) that does not navigate anywhere. */
 	chevron?: boolean;
@@ -380,7 +550,9 @@ export function ListRow({
 	 */
 	accessibilityLabel?: string;
 }) {
-	const { colors, spacing } = useTheme();
+	const { colors, spacing, borderRadius } = useTheme();
+	const corners = useContext(RowCorners);
+	const radius = borderRadius.xl;
 
 	const content = (
 		<View
@@ -404,11 +576,11 @@ export function ListRow({
 				<Body weight="medium" numberOfLines={1}>
 					{label}
 				</Body>
-				{hint && (
+				{hint ? (
 					<Caption color="tertiary" numberOfLines={1}>
 						{hint}
 					</Caption>
-				)}
+				) : null}
 			</View>
 			{value ?? (onPress && chevron ? <Chevron /> : null)}
 		</View>
@@ -416,7 +588,11 @@ export function ListRow({
 
 	if (!onPress) return content;
 
-	return (
+	// With an `action` beside it the press target stops short of the card's
+	// right edge, so only its left corners can meet the card's.
+	const right = !action;
+
+	const row = (
 		<Pressable
 			onPress={onPress}
 			accessibilityRole="button"
@@ -427,13 +603,29 @@ export function ListRow({
 			style={(state) => {
 				const { pressed, hovered } = state as PressState;
 				return {
-					backgroundColor:
-						pressed || hovered ? colors.background.subtle : "transparent",
+					borderTopLeftRadius: corners.top ? radius : 0,
+					borderTopRightRadius: corners.top && right ? radius : 0,
+					borderBottomLeftRadius: corners.bottom ? radius : 0,
+					borderBottomRightRadius: corners.bottom && right ? radius : 0,
+					backgroundColor: pressed
+						? colors.background.overlay
+						: hovered
+							? colors.background.subtle
+							: "transparent",
 				};
 			}}
 		>
 			{content}
 		</Pressable>
+	);
+
+	if (!action) return row;
+
+	return (
+		<View style={{ flexDirection: "row", alignItems: "center" }}>
+			<View style={{ flex: 1, minWidth: 0 }}>{row}</View>
+			<View style={{ paddingRight: spacing[2] }}>{action}</View>
+		</View>
 	);
 }
 
@@ -557,23 +749,55 @@ export interface Stat {
  * be its own outlined card in its own colour, which turned a summary into a
  * mosaic - six boxes, four hues, no hierarchy.
  */
+/** Narrowest a stat cell may get before the row breaks into a grid. */
+const METRIC_MIN_CELL = 104;
+
+/**
+ * Columns for `count` stats in `width`, balanced so a wrap never leaves one
+ * cell alone on its row: five stats at four-across become 3 + 2, four on a
+ * phone become 2 + 2.
+ */
+function metricColumns(count: number, width: number) {
+	if (count <= 1) return 1;
+	if (width <= 0) return Math.min(count, 4);
+	const fit = Math.max(1, Math.min(count, Math.floor(width / METRIC_MIN_CELL)));
+	const rows = Math.ceil(count / fit);
+	return Math.ceil(count / rows);
+}
+
+/*
+ * Dividers are drawn from the cell's *position in the grid*, never from its
+ * index in the list. The old row was a flex-wrap with `borderLeftWidth` on
+ * every cell but the first, so whichever cell wrapped to a new line kept its
+ * divider and drew it down the card's left edge. The grid is now computed from
+ * the measured width: a vertical rule only between cells on the same row, a
+ * horizontal one only between rows.
+ */
 export function MetricRow({ stats }: { stats: Stat[] }) {
 	const { colors, spacing } = useTheme();
+	const [width, setWidth] = useState(0);
+	const columns = metricColumns(stats.length, width);
 
 	return (
 		<Surface padded={false}>
-			<View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+			<View
+				onLayout={(event) => {
+					const next = Math.round(event.nativeEvent.layout.width);
+					setWidth((prev) => (prev === next ? prev : next));
+				}}
+				style={{ flexDirection: "row", flexWrap: "wrap" }}
+			>
 				{stats.map((stat, index) => (
 					<View
 						key={stat.label}
 						style={{
-							flexGrow: 1,
-							flexBasis: stats.length > 4 ? "33%" : 0,
-							minWidth: 92,
+							width: `${100 / columns}%`,
 							paddingVertical: spacing[4],
 							paddingHorizontal: spacing[4],
-							borderLeftWidth: index === 0 ? 0 : 1,
+							borderLeftWidth: index % columns === 0 ? 0 : 1,
 							borderLeftColor: colors.border.hairline,
+							borderTopWidth: index >= columns ? 1 : 0,
+							borderTopColor: colors.border.hairline,
 						}}
 					>
 						<H2
@@ -628,11 +852,11 @@ export function Banner({
 			<Body weight="bold" color={palette.ink}>
 				{title}
 			</Body>
-			{description && (
+			{description ? (
 				<Caption color="secondary" style={{ marginTop: spacing[0.5] }}>
 					{description}
 				</Caption>
-			)}
+			) : null}
 		</>
 	);
 
@@ -698,14 +922,14 @@ export function EmptyState({
 			<Body weight="bold" style={{ marginTop: spacing[4] }}>
 				{title}
 			</Body>
-			{description && (
+			{description ? (
 				<Caption
 					color="tertiary"
 					style={{ textAlign: "center", marginTop: spacing[1] }}
 				>
 					{description}
 				</Caption>
-			)}
+			) : null}
 			{action && <View style={{ marginTop: spacing[5] }}>{action}</View>}
 		</View>
 	);
@@ -725,11 +949,11 @@ export function LoadingState({ label }: { label?: string }) {
 				size="small"
 				color={colors.text.quaternary as string}
 			/>
-			{label && (
+			{label ? (
 				<Caption color="tertiary" style={{ marginTop: spacing[3] }}>
 					{label}
 				</Caption>
-			)}
+			) : null}
 		</View>
 	);
 }
@@ -983,78 +1207,67 @@ export function SkeletonList({
 /* -------------------------------------------------------------------------- */
 
 /**
- * Selection is monochrome - an ink pill, not an orange one. Orange is the
- * colour of *doing* something in this app; a filter is not an action, and
- * spending the brand on it left nothing to spend on the primary button.
+ * One row of filters over one list: the chip recipe from `choice-chips.tsx`
+ * (36pt, one line, ink fill when selected, quiet fill otherwise) in a
+ * horizontal scroller.
+ *
+ * **Nothing in the row can be clipped.** A horizontal `ScrollView` is
+ * `overflow: hidden` on both axes, so a chip flush with its edge loses the
+ * first pixels of its pill and every pixel of its focus ring (2px at a 2px
+ * offset). The content carries `CHIP_RING_ROOM` of padding on every side and
+ * the scroller takes the same amount back as negative margin, so the first
+ * chip still lines up with the page's text edge while its fill and ring sit
+ * inside the clip. The height is fixed, so a column parent cannot squeeze it.
  */
 export function FilterChips<T extends string>({
 	options,
 	value,
 	onChange,
 	inline,
+	label,
 }: {
-	options: Array<{ value: T; label: string }>;
+	options: ReadonlyArray<ChipOption<T>>;
 	value: T;
 	onChange: (value: T) => void;
 	/** Drops the bottom margin, for sitting beside a search field on one row. */
 	inline?: boolean;
+	/** Names the row for assistive tech - "Filter applicants". */
+	label?: string;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
+	const room = CHIP_RING_ROOM;
 
 	return (
 		<ScrollView
 			horizontal
 			showsHorizontalScrollIndicator={false}
 			accessibilityRole="tablist"
+			{...(label ? { accessibilityLabel: label } : {})}
 			style={{
-				height: 32,
-				maxHeight: 32,
+				height: CHIP_HEIGHT + room * 2,
+				minHeight: CHIP_HEIGHT + room * 2,
+				maxHeight: CHIP_HEIGHT + room * 2,
 				flexGrow: 0,
-				marginBottom: inline ? 0 : spacing[5],
+				margin: -room,
+				marginBottom: (inline ? 0 : spacing[5]) - room,
 			}}
 			contentContainerStyle={{
 				flexDirection: "row",
 				alignItems: "center",
 				gap: spacing[2],
+				padding: room,
 			}}
 		>
-			{options.map((option) => {
-				const active = option.value === value;
-				return (
-					<Pressable
-						key={option.value}
-						onPress={() => onChange(option.value)}
-						hitSlop={8}
-						accessibilityRole="tab"
-						accessibilityState={{ selected: active }}
-						accessibilityLabel={option.label}
-						{...focusable}
-						style={(state) => {
-							const { pressed } = state as PressState;
-							return {
-								minHeight: 32,
-								justifyContent: "center",
-								paddingHorizontal: spacing[3.5],
-								borderRadius: 999,
-								backgroundColor: active
-									? (colors.text.primary as string)
-									: pressed
-										? colors.background.subtle
-										: "transparent",
-								borderWidth: active ? 0 : 1,
-								borderColor: colors.border.medium,
-							};
-						}}
-					>
-						<Caption
-							weight="medium"
-							color={active ? (colors.text.inverse as string) : "secondary"}
-						>
-							{option.label}
-						</Caption>
-					</Pressable>
-				);
-			})}
+			{options.map((option) => (
+				<Chip
+					key={option.value}
+					label={option.label}
+					count={option.count}
+					active={option.value === value}
+					role="tab"
+					onPress={() => onChange(option.value)}
+				/>
+			))}
 		</ScrollView>
 	);
 }

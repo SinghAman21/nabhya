@@ -46,11 +46,12 @@ that used to sit at the repo root.
 - [x] Donate
 - [x] View Donation History
 - [x] View Donation Receipt
+- [x] Download the receipt as a PDF; a copy is emailed (guests too)
 
 ### Events
 
 - [x] View Events
-- [x] Apply for Events
+- [x] Apply for Events (requires a verified identity)
 - [x] Track Application Status
 
 ### Certificates
@@ -61,7 +62,7 @@ that used to sit at the repo root.
 ### Needs & Pledges
 
 - [x] Browse public needs and offers
-- [x] Pledge to a need
+- [x] Pledge to a need (requires a verified identity)
 - [x] Track own pledges
 
 ### Followers
@@ -104,7 +105,7 @@ that used to sit at the repo root.
 - [x] Approve NGOs
 - [x] Reject NGOs
 - [x] Suspend NGOs
-- [ ] Delete NGOs (define retention and child-record behavior before implementation)
+- [x] Delete NGOs (soft delete with a reason; records retained; restorable)
 
 ### Document Verification
 
@@ -124,9 +125,9 @@ that used to sit at the repo root.
 
 ### Reports
 
-- [ ] Platform-wide donation ledger (scope and donor-data access need product decision)
-- [ ] View financial reports across organisations
-- [ ] Export donation or report data (fields, format, and access policy need product decision)
+- [x] Platform-wide donation ledger (every status, totals over the filter)
+- [x] View financial reports across organisations
+- [x] Export the donation ledger as CSV (audited)
 
 ### Notifications
 
@@ -190,7 +191,7 @@ that used to sit at the repo root.
 
 - [x] View Donations
 - [x] View Donor Messages
-- [ ] Download Reports (planned - no export endpoint yet)
+- [x] Download Reports (donations as CSV; no donor emails)
 
 ### Announcements
 

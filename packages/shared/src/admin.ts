@@ -12,7 +12,7 @@ export const orgVerificationStatusSchema = z.enum([
 	"REJECTED",
 ]);
 
-export const orgStatusSchema = z.enum(["ACTIVE", "SUSPENDED"]);
+export const orgStatusSchema = z.enum(["ACTIVE", "SUSPENDED", "DELETED"]);
 export const userStatusSchema = z.enum(["ACTIVE", "SUSPENDED", "DELETED"]);
 export const docVerificationStatusSchema = z.enum([
 	"PENDING",
@@ -119,8 +119,8 @@ export const setOrgStatusSchema = z
 		status: orgStatusSchema,
 		reason: z.string().trim().max(500).optional(),
 	})
-	.refine((v) => v.status !== "SUSPENDED" || !!v.reason?.length, {
-		message: "A reason is required when suspending an organization",
+	.refine((v) => v.status === "ACTIVE" || !!v.reason?.length, {
+		message: "A reason is required when suspending or deleting an organization",
 		path: ["reason"],
 	});
 
@@ -372,6 +372,7 @@ export interface AdminOverview {
 		verified: number;
 		rejected: number;
 		suspended: number;
+		deleted: number;
 	};
 	users: {
 		total: number;

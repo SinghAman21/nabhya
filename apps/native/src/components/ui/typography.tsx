@@ -223,6 +223,52 @@ export function Micro({ className, ...props }: TypographyProps) {
 }
 
 /**
+ * The brand's voice line - "HELP THAT SHOWS UP." on the auth panel. NeutralFace
+ * only draws capitals, so this is the one place it is allowed to run past a
+ * single word: at 56pt a capital headline is a poster, at 26pt on a form it is
+ * shouting. `lg` is the desktop panel, `md` the phone's hero.
+ */
+export function Display({
+	size = "lg",
+	className,
+	...props
+}: TypographyProps & { size?: "lg" | "md" }) {
+	return (
+		<BaseText
+			family="display"
+			size={size === "lg" ? 56 : 32}
+			lineHeight={size === "lg" ? 58 : 34}
+			tracking={size === "lg" ? -1.4 : -0.8}
+			maxScale={1.1}
+			className={className}
+			{...props}
+		/>
+	);
+}
+
+/**
+ * A page title in the text face, sentence case - "Welcome back", "Your
+ * organisation". The auth screens and the wizards used `H2`, whose display face
+ * set every one of them in capitals: WELCOME BACK, YOUR ORGANISATION, HOW WILL
+ * YOU USE NABHYA? - three lines on a phone, and the loudest thing on a form
+ * whose job is the fields under it.
+ */
+export function Title({ className, ...props }: TypographyProps) {
+	return (
+		<BaseText
+			family="sans"
+			size={28}
+			lineHeight={34}
+			weight="bold"
+			tracking={-0.7}
+			maxScale={1.3}
+			className={className}
+			{...props}
+		/>
+	);
+}
+
+/**
  * The NABHYA wordmark, spaced out as a logotype rather than set as a word.
  * The only place in the app with positive tracking, so it lives here rather
  * than as a `letterSpacing` override on an `H1` and a `Label` at the call site.

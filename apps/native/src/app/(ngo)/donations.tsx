@@ -23,11 +23,13 @@ import {
 } from "@/components/screen-shell";
 import { StatusPill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/overlay";
 import { Body, BodySmall, Caption } from "@/components/ui/typography";
+import { useExportOrgDonations } from "@/hooks/use-finance";
 import { useOrgAccess } from "@/hooks/use-org-access";
 import { useTheme } from "@/hooks/use-theme";
 import { useGridColumns, useMedia } from "@/hooks/useMedia";
-import { donationsApi, queryKeys } from "@/lib/api";
+import { apiErrorMessage, donationsApi, queryKeys } from "@/lib/api";
 import { formatDate, formatRelative } from "@/lib/format";
 import type { OrgDonation } from "@/lib/types";
 
@@ -90,6 +92,38 @@ export default function OrgDonations() {
 
 	const stats = first?.stats;
 	const columns = useGridColumns();
+	const exporter = useExportOrgDonations();
+
+	// The report is the list in a file: the same status the screen shows, so
+	// "Download report" never hands over a different set of rows.
+	const download = () =>
+		exporter.mutate(
+			{ status },
+			{
+				onSuccess: (file) =>
+					file.rowCount === 0
+						? toast.info("Nothing to download yet - no donations in this view.")
+						: toast.success(
+								`Downloaded ${file.rowCount.toLocaleString("en-IN")} donation${file.rowCount === 1 ? "" : "s"}.`,
+							),
+				// Says which action failed; a bare reason ("Network error") in a
+				// toast reads as the whole screen breaking.
+				onError: (error) =>
+					toast.error(
+						`Couldn't prepare the report. ${apiErrorMessage(error, "Try again in a moment.")}`,
+					),
+			},
+		);
+	const downloadButton = moneyBlocked ? undefined : (
+		<Button
+			size="sm"
+			variant="outline"
+			onPress={download}
+			loading={exporter.isPending}
+		>
+			Download report
+		</Button>
+	);
 
 	const numbers =
 		stats && (stats.completedCount > 0 || stats.pendingCount > 0) ? (
@@ -153,6 +187,7 @@ export default function OrgDonations() {
 			<AdminScreen
 				title="Donations"
 				subtitle="Money received through Nabhya"
+				action={downloadButton}
 				{...(locked
 					? {}
 					: {
@@ -201,6 +236,7 @@ export default function OrgDonations() {
 				back
 				title="Donations"
 				subtitle="Money received through Nabhya"
+				action={downloadButton}
 			/>
 
 			{locked ?? (

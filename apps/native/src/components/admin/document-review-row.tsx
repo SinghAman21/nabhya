@@ -227,25 +227,29 @@ export function DocumentReviewRow({
 					<View
 						style={{
 							flexDirection: "row",
+							justifyContent: "flex-end",
 							gap: spacing[2],
 							marginTop: spacing[2.5],
 						}}
 					>
+						{/* Cancel, then the confirm - the order `ReasonStep` and the
+						    confirm dialog use, so the destructive press is always
+						    the last one in the row. */}
+						<Button
+							size="sm"
+							variant="outline"
+							onPress={cancelReject}
+							disabled={review.isPending}
+						>
+							Cancel
+						</Button>
 						<Button
 							size="sm"
 							variant="destructive"
 							onPress={confirmReject}
 							loading={review.isPending}
 						>
-							Confirm rejection
-						</Button>
-						<Button
-							size="sm"
-							variant="ghost"
-							onPress={cancelReject}
-							disabled={review.isPending}
-						>
-							Cancel
+							Reject document
 						</Button>
 					</View>
 				</View>

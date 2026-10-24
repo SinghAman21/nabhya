@@ -3,7 +3,13 @@ import { useState } from "react";
 import { View } from "react-native";
 import { UserActivityTimeline } from "@/components/admin/activity-timeline";
 import { DocumentReviewRow } from "@/components/admin/document-review-row";
-import { FactGroup, ReasonStep, Section } from "@/components/admin/sheet-parts";
+import {
+	DangerButton,
+	DecisionBar,
+	FactGroup,
+	ReasonStep,
+	Section,
+} from "@/components/admin/sheet-parts";
 import {
 	Banner,
 	ErrorState,
@@ -150,9 +156,13 @@ export function UserDetailSheet({
 						onConfirm={asking === "delete" ? deleteAccount : suspend}
 					/>
 				) : user ? (
-					<View
-						style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[2] }}
-					>
+					// Grouped at the far end, sized to their labels, and at most one
+					// fill: these are the only decisions here, and they are not part
+					// of anything on the left. Suspend is the common, reversible act
+					// and takes the fill; delete is rarer and quieter - a red label,
+					// not a second red block beside the first. Both ask for a reason.
+					<DecisionBar>
+						<View style={{ flexGrow: 1 }} />
 						{deleted ? (
 							<Button
 								variant="outline"
@@ -163,23 +173,33 @@ export function UserDetailSheet({
 							</Button>
 						) : (
 							<>
-								<Button
-									variant={suspended ? "outline" : "destructive"}
-									onPress={suspended ? reinstate : () => setAsking("suspend")}
-									loading={setStatus.isPending}
-								>
-									{suspended ? "Reinstate account" : "Suspend account"}
-								</Button>
-								<Button
-									variant="destructive"
+								<DangerButton
+									tone="text"
 									onPress={() => setAsking("delete")}
-									loading={setStatus.isPending}
+									disabled={setStatus.isPending}
 								>
 									Delete account
-								</Button>
+								</DangerButton>
+								{suspended ? (
+									<Button
+										variant="outline"
+										onPress={reinstate}
+										loading={setStatus.isPending}
+									>
+										Reinstate account
+									</Button>
+								) : (
+									<Button
+										variant="destructive"
+										onPress={() => setAsking("suspend")}
+										disabled={setStatus.isPending}
+									>
+										Suspend account
+									</Button>
+								)}
 							</>
 						)}
-					</View>
+					</DecisionBar>
 				) : undefined
 			}
 		>

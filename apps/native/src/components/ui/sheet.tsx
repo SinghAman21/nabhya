@@ -8,7 +8,7 @@ import BottomSheet, {
 	BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { Check, X } from "lucide-react-native";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Children, useCallback, useEffect, useRef, useState } from "react";
 import {
 	FlatList,
 	type FlatListProps,
@@ -24,7 +24,7 @@ import {
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { OverlayHost } from "@/components/ui/overlay";
-import { Pressable } from "@/components/ui/pressable";
+import { Pressable, PressableBoundary } from "@/components/ui/pressable";
 import { Body, Caption, H4 } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
@@ -88,8 +88,38 @@ export interface SheetProps {
 
 export function Sheet(props: SheetProps) {
 	const { isDesktop } = useMedia();
-	if (Platform.OS === "web" || isDesktop) return <WebSheet {...props} />;
-	return <NativeSheet {...props} />;
+	const safe = {
+		...props,
+		children: textSafe(props.children),
+		footer: textSafe(props.footer),
+	};
+	if (Platform.OS === "web" || isDesktop) return <WebSheet {...safe} />;
+	return <NativeSheet {...safe} />;
+}
+
+/**
+ * Makes a sheet's (or drawer's) slot content safe to drop into a `View`.
+ *
+ * A bare string in a `View` is a crash on native and, on the web, the console
+ * error "Unexpected text node: . A text node cannot be a child of a <View>" -
+ * with nothing after the colon, because the string is usually `""`: a
+ * `{subtitle && <Caption/>}` or `{note && ...}` whose value was an empty
+ * string renders the string itself. Top-level strings and numbers are wrapped
+ * in `Body`, and empty or whitespace-only ones are dropped. Strings nested
+ * deeper inside a caller's own `View` are still the caller's to fix.
+ */
+export function textSafe(node: React.ReactNode): React.ReactNode {
+	if (node === null || node === undefined || typeof node === "boolean") {
+		return node;
+	}
+	if (typeof node === "string" || typeof node === "number") {
+		const text = String(node);
+		return text.trim() ? <Body>{text}</Body> : null;
+	}
+	if (Array.isArray(node)) {
+		return Children.map(node, (child) => textSafe(child));
+	}
+	return node;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -205,61 +235,63 @@ function NativeSheet({
 	 * gesture root inside a Modal, hence the wrapper.
 	 */
 	return (
-		<Modal
-			visible
-			transparent
-			statusBarTranslucent
-			navigationBarTranslucent
-			animationType="fade"
-			onRequestClose={requestClose}
-		>
-			<GestureHandlerRootView style={{ flex: 1 }}>
-				<BottomSheet
-					ref={sheetRef}
-					index={0}
-					animateOnMount
-					onClose={handleClosed}
-					enablePanDownToClose
-					enableDynamicSizing={!detents}
-					snapPoints={detents}
-					maxDynamicContentSize={height - insets.top - spacing[6]}
-					topInset={insets.top}
-					keyboardBehavior="interactive"
-					keyboardBlurBehavior="restore"
-					android_keyboardInputMode="adjustResize"
-					backdropComponent={renderBackdrop}
-					handleComponent={renderHandle}
-					footerComponent={footer ? renderFooter : undefined}
-					backgroundStyle={{
-						backgroundColor: colors.background.sheet,
-						// backgroundColor: "#111111",
+		<PressableBoundary>
+			<Modal
+				visible
+				transparent
+				statusBarTranslucent
+				navigationBarTranslucent
+				animationType="fade"
+				onRequestClose={requestClose}
+			>
+				<GestureHandlerRootView style={{ flex: 1 }}>
+					<BottomSheet
+						ref={sheetRef}
+						index={0}
+						animateOnMount
+						onClose={handleClosed}
+						enablePanDownToClose
+						enableDynamicSizing={!detents}
+						snapPoints={detents}
+						maxDynamicContentSize={height - insets.top - spacing[6]}
+						topInset={insets.top}
+						keyboardBehavior="interactive"
+						keyboardBlurBehavior="restore"
+						android_keyboardInputMode="adjustResize"
+						backdropComponent={renderBackdrop}
+						handleComponent={renderHandle}
+						footerComponent={footer ? renderFooter : undefined}
+						backgroundStyle={{
+							backgroundColor: colors.background.sheet,
+							// backgroundColor: "#111111",
 
-						borderRadius: borderRadius["2xl"],
-					}}
-				>
-					{scrollable ? (
-						<BottomSheetScrollView
-							keyboardShouldPersistTaps="handled"
-							{...verticalScrollbar}
-							onScroll={onScroll}
-							contentContainerStyle={{
-								paddingHorizontal: spacing[5],
-								paddingBottom: bottomPad,
-							}}
-						>
-							{children}
-						</BottomSheetScrollView>
-					) : (
-						<BottomSheetView style={{ flex: 1, paddingBottom: bottomPad }}>
-							{children}
-						</BottomSheetView>
-					)}
-				</BottomSheet>
-			</GestureHandlerRootView>
-			{/* A toast raised from inside this sheet has to be drawn inside the
+							borderRadius: borderRadius["2xl"],
+						}}
+					>
+						{scrollable ? (
+							<BottomSheetScrollView
+								keyboardShouldPersistTaps="handled"
+								{...verticalScrollbar}
+								onScroll={onScroll}
+								contentContainerStyle={{
+									paddingHorizontal: spacing[5],
+									paddingBottom: bottomPad,
+								}}
+							>
+								{children}
+							</BottomSheetScrollView>
+						) : (
+							<BottomSheetView style={{ flex: 1, paddingBottom: bottomPad }}>
+								{children}
+							</BottomSheetView>
+						)}
+					</BottomSheet>
+				</GestureHandlerRootView>
+				{/* A toast raised from inside this sheet has to be drawn inside the
 			    Modal: the root host sits underneath it. See `ui/overlay.tsx`. */}
-			<OverlayHost />
-		</Modal>
+				<OverlayHost />
+			</Modal>
+		</PressableBoundary>
 	);
 }
 
@@ -333,7 +365,7 @@ function WebSheet({
 				</View>
 			)}
 
-			{footer && (
+			{footer ? (
 				<View
 					style={{
 						paddingHorizontal: spacing[5],
@@ -345,44 +377,46 @@ function WebSheet({
 				>
 					{footer}
 				</View>
-			)}
+			) : null}
 		</View>
 	);
 
 	return (
-		<Modal
-			visible={visible}
-			transparent
-			animationType={isDesktop ? "fade" : "slide"}
-			statusBarTranslucent
-			onRequestClose={onClose}
-		>
-			<KeyboardAvoidingView
-				behavior={Platform.OS === "ios" ? "padding" : undefined}
-				style={{ flex: 1, justifyContent: isDesktop ? "center" : "flex-end" }}
+		<PressableBoundary>
+			<Modal
+				visible={visible}
+				transparent
+				animationType={isDesktop ? "fade" : "slide"}
+				statusBarTranslucent
+				onRequestClose={onClose}
 			>
-				<Pressable
-					onPress={onClose}
-					accessibilityRole="button"
-					accessibilityLabel="Dismiss"
-					// Out of the tab order: on the web it was the first stop in the
-					// dialog, an invisible full-screen "button" with no ring. Escape
-					// and the header's Close cover the keyboard; a screen reader
-					// still finds it.
-					focusable={false}
-					style={{
-						position: "absolute",
-						top: 0,
-						right: 0,
-						bottom: 0,
-						left: 0,
-						backgroundColor: "rgba(17, 17, 17, 0.45)",
-					}}
-				/>
-				{panel}
-			</KeyboardAvoidingView>
-			<OverlayHost />
-		</Modal>
+				<KeyboardAvoidingView
+					behavior={Platform.OS === "ios" ? "padding" : undefined}
+					style={{ flex: 1, justifyContent: isDesktop ? "center" : "flex-end" }}
+				>
+					<Pressable
+						onPress={onClose}
+						accessibilityRole="button"
+						accessibilityLabel="Dismiss"
+						// Out of the tab order: on the web it was the first stop in the
+						// dialog, an invisible full-screen "button" with no ring. Escape
+						// and the header's Close cover the keyboard; a screen reader
+						// still finds it.
+						focusable={false}
+						style={{
+							position: "absolute",
+							top: 0,
+							right: 0,
+							bottom: 0,
+							left: 0,
+							backgroundColor: "rgba(17, 17, 17, 0.45)",
+						}}
+					/>
+					{panel}
+				</KeyboardAvoidingView>
+				<OverlayHost />
+			</Modal>
+		</PressableBoundary>
 	);
 }
 
@@ -423,7 +457,7 @@ export function SheetChrome({
 				borderBottomColor: divided ? colors.border.hairline : "transparent",
 			}}
 		>
-			{grabber && (
+			{grabber ? (
 				<View
 					style={{
 						alignSelf: "center",
@@ -434,8 +468,8 @@ export function SheetChrome({
 						backgroundColor: colors.border.dark,
 					}}
 				/>
-			)}
-			{children}
+			) : null}
+			{textSafe(children)}
 		</View>
 	);
 }
@@ -471,7 +505,10 @@ export function SheetHeader({
 					<H4 accessibilityRole="header" numberOfLines={2}>
 						{title}
 					</H4>
-					{subtitle && (
+					{/* A ternary, never `subtitle &&`: an empty-string subtitle (an
+					    unloaded title passed as `?? ""`) rendered the "" itself and
+					    raised "Unexpected text node" on the web. */}
+					{subtitle?.trim() ? (
 						<Caption
 							color="tertiary"
 							numberOfLines={1}
@@ -479,7 +516,7 @@ export function SheetHeader({
 						>
 							{subtitle}
 						</Caption>
-					)}
+					) : null}
 				</View>
 				<Pressable
 					onPress={onClose}
@@ -588,7 +625,7 @@ export function SheetOption({
 		>
 			<View style={{ flex: 1 }}>
 				<Body weight={selected ? "semibold" : "normal"}>{label}</Body>
-				{hint && <Caption color="quaternary">{hint}</Caption>}
+				{hint ? <Caption color="quaternary">{hint}</Caption> : null}
 			</View>
 			{selected && (
 				<Check size={18} color={colors.primary.ink} strokeWidth={2.4} />

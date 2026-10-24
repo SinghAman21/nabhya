@@ -126,7 +126,7 @@ function EditProfile() {
 
 	const leave = () => {
 		if (router.canGoBack()) router.back();
-		else router.replace("/(volunteer)/profile");
+		else router.replace("/(volunteer)/me");
 	};
 
 	const save = () => {
@@ -177,7 +177,7 @@ function EditProfile() {
 	}));
 
 	return (
-		<Screen style={READING_COLUMN}>
+		<Screen measure="reading" style={READING_COLUMN}>
 			<ScreenHeader
 				back
 				title="Edit profile"

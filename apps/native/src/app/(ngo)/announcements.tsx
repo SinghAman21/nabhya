@@ -12,6 +12,7 @@ import { AdminScreen } from "@/components/admin/list-chrome";
 import { SelectMenu, type SelectOption } from "@/components/admin/select-menu";
 import { Toolbar, useTableView } from "@/components/admin/toolbar";
 import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
+import { FormFooterRow, useFormButtonGrow } from "@/components/ngo/form-footer";
 import { RowActions } from "@/components/ngo/table-cells";
 import { PagedList, usePagedQuery } from "@/components/paged-list";
 import {
@@ -25,10 +26,10 @@ import {
 import { StatusPill } from "@/components/status-pill";
 import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
+import { Drawer } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { confirm, toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
-import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption } from "@/components/ui/typography";
 import {
 	useCreateAnnouncement,
@@ -440,6 +441,7 @@ function AnnouncementSheet({
 	onClose: () => void;
 }) {
 	const { colors, spacing } = useTheme();
+	const grow = useFormButtonGrow();
 	const inputStyle = useFieldInputStyle();
 	const textAreaStyle = useFieldInputStyle(140);
 	const [title, setTitle] = useState("");
@@ -513,26 +515,38 @@ function AnnouncementSheet({
 				: "Publish update";
 
 	return (
-		<Sheet
+		<Drawer
 			visible={visible}
 			onClose={onClose}
+			wide
 			title={isEditing ? "Edit update" : "New update"}
 			subtitle="Publishing notifies everyone who follows you."
 			footer={
 				<View style={{ gap: spacing[2] }}>
 					<FieldError message={errors.form} />
-					<Button onPress={() => submit("PUBLISHED")} loading={saving}>
-						{publishLabel}
-					</Button>
-					{(!isEditing || announcement?.status === "DRAFT") && (
-						<Button
-							variant="outline"
-							onPress={() => submit("DRAFT")}
-							disabled={saving}
-						>
-							{isEditing ? "Keep as draft" : "Save as draft"}
-						</Button>
-					)}
+					<FormFooterRow
+						secondary={
+							!isEditing || announcement?.status === "DRAFT" ? (
+								<Button
+									variant="outline"
+									onPress={() => submit("DRAFT")}
+									disabled={saving}
+									style={grow}
+								>
+									{isEditing ? "Keep as draft" : "Save as draft"}
+								</Button>
+							) : undefined
+						}
+						primary={
+							<Button
+								onPress={() => submit("PUBLISHED")}
+								loading={saving}
+								style={grow}
+							>
+								{publishLabel}
+							</Button>
+						}
+					/>
 				</View>
 			}
 		>
@@ -602,6 +616,6 @@ function AnnouncementSheet({
 					</View>
 				</Pressable>
 			</View>
-		</Sheet>
+		</Drawer>
 	);
 }

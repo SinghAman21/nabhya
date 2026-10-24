@@ -194,3 +194,78 @@ export function ReasonStep({
 		</View>
 	);
 }
+
+/**
+ * The dossier footer's button row. Both drawers use it, so their footers
+ * cannot drift into two recipes.
+ *
+ * Buttons **size to their labels** and wrap; none of them is full width. A
+ * 100%-wide "Approve organization" in a 720pt panel is a banner, not a control
+ * - the same reason the feed card's CTA hugs its label. Wrapping rather than
+ * scrolling because on a narrow panel four buttons on two lines is readable and
+ * four buttons you have to push sideways is not.
+ */
+export function DecisionBar({ children }: { children: React.ReactNode }) {
+	const { spacing } = useTheme();
+	return (
+		<View
+			style={{
+				flexDirection: "row",
+				alignItems: "center",
+				flexWrap: "wrap",
+				gap: spacing[2],
+			}}
+		>
+			{children}
+		</View>
+	);
+}
+
+/**
+ * A destructive action that is *not* the footer's primary.
+ *
+ * The footers had "Suspend" and "Delete" as two filled red buttons side by
+ * side: two equally loud alarms, so neither read as the main act, and the
+ * heavier one (delete) sat where the hand lands last. At most one footer
+ * button is a fill. A second destructive action is `outline` (a red hairline
+ * and red label - still unmistakably destructive) or `text` (red label only,
+ * for the rarer of the two), and it still opens the same `ReasonStep`, so
+ * quieter never means less guarded.
+ */
+export function DangerButton({
+	tone = "outline",
+	onPress,
+	disabled,
+	loading,
+	size = "default",
+	accessibilityLabel,
+	children,
+}: {
+	tone?: "outline" | "text";
+	onPress: () => void;
+	disabled?: boolean;
+	loading?: boolean;
+	size?: "default" | "sm";
+	/** When the label alone does not say what it acts on (a row of posts). */
+	accessibilityLabel?: string;
+	children: string;
+}) {
+	const { colors } = useTheme();
+	return (
+		<Button
+			variant={tone === "outline" ? "outline" : "ghost"}
+			size={size}
+			onPress={onPress}
+			disabled={disabled}
+			loading={loading}
+			accessibilityLabel={accessibilityLabel ?? children}
+			style={
+				tone === "outline" ? { borderColor: colors.error.border } : undefined
+			}
+		>
+			<Label weight="bold" color={colors.error.ink as string}>
+				{children}
+			</Label>
+		</Button>
+	);
+}

@@ -24,7 +24,17 @@ export const orgVerificationStatusEnum = pgEnum("org_verification_status", [
 	"VERIFIED",
 	"REJECTED",
 ]);
-export const orgStatusEnum = pgEnum("org_status", ["ACTIVE", "SUSPENDED"]);
+/**
+ * `DELETED` is a soft delete: the row and everything hanging off it (events,
+ * donations, certificates, audit trail) are kept, the NGO disappears from every
+ * public surface exactly as a suspended one does, and a superadmin can restore
+ * it. Nothing in the platform hard-deletes an organization.
+ */
+export const orgStatusEnum = pgEnum("org_status", [
+	"ACTIVE",
+	"SUSPENDED",
+	"DELETED",
+]);
 export const documentTypeEnum = pgEnum("document_type", [
 	"NGO_REGISTRATION_CERTIFICATE",
 	"PAN_CARD",
@@ -108,6 +118,13 @@ export const organizations = pgTable(
 		}),
 		reviewedAt: timestamp("reviewed_at"),
 		status: orgStatusEnum("status").default("ACTIVE"),
+		/** Why the NGO is suspended or deleted. Cleared on reinstatement. */
+		statusReason: text("status_reason"),
+		/** Set only while `status` is DELETED. */
+		deletedAt: timestamp("deleted_at"),
+		deletedBy: uuid("deleted_by").references(() => users.id, {
+			onDelete: "set null",
+		}),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},

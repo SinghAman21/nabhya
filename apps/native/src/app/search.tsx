@@ -1,16 +1,14 @@
 import { FlashList } from "@shopify/flash-list";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import type { LucideIcon } from "lucide-react-native";
 import {
-	Bookmark,
 	Building2,
 	CalendarDays,
-	Clock,
 	HeartHandshake,
-	Megaphone,
+	MessageSquareText,
 	Search,
-	X,
 } from "lucide-react-native";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, type ViewToken } from "react-native";
 import { withAppShell } from "@/components/app-shell";
 import { BackButton } from "@/components/back-button";
@@ -20,13 +18,27 @@ import {
 	EmptyState,
 	ErrorState,
 	FilterChips,
-	ListGroup,
-	ListRow,
-	LoadingState,
 	Screen,
-	SectionTitle,
+	SkeletonList,
+	Surface,
 } from "@/components/screen-shell";
 import { SearchField } from "@/components/search-field";
+import {
+	feedEntry,
+	groupFeed,
+	isSearchTab,
+	orgEntry,
+	SEARCH_SUGGESTIONS,
+	SEARCH_TABS,
+	type SearchEntry,
+	SearchEntryRow,
+	type SearchSection,
+	SearchSectionHeading,
+	type SearchTab,
+	TAB_NOUN,
+	useStartSections,
+} from "@/components/search-panel";
+import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
 import { Caption } from "@/components/ui/typography";
@@ -36,65 +48,75 @@ import { useSearch } from "@/hooks/use-search";
 import { useTheme } from "@/hooks/use-theme";
 import { useDebounced } from "@/hooks/useDebounced";
 import { apiErrorMessage } from "@/lib/api";
-import { focusable } from "@/lib/focus";
+import { focusable, type PressState } from "@/lib/focus";
 import { useRecentSearches } from "@/lib/recent-searches";
 import { verticalScrollbar } from "@/lib/scroll";
-import type { FeedItem, FeedKind, FeedNeedItem } from "@/lib/types";
+import type { FeedItem, FeedNeedItem } from "@/lib/types";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
  * Search, as its own page.
  *
  * There is more to find than one list can hold - an NGO by name, a specific
- * item, an event in another city - so the field gets a screen with a keyboard
- * up from the first frame. Before a term is typed the page teaches what it can
- * find: a few example searches and the two browse destinations. Once a term is
- * in, result tabs split by what the person is looking for: everything, NGOs,
- * needs, events or updates. Search is the one place the city scope is dropped
- * on purpose - someone typing a name wants that name, wherever it is.
+ * item, an event in another city - so the field gets a screen with the
+ * keyboard up from the first frame. Search is the one place the city scope is
+ * dropped on purpose: someone typing a name wants that name, wherever it is.
  *
- * Recent terms sit above the examples once there are any, because on a phone
- * the commonest search is one already made: the same NGO, the same item, a day
- * later. They are device-local (`lib/recent-searches.ts`) and a term is only
- * recorded when it is committed - the Search key, or opening a result - so the
- * list holds words rather than the prefixes typed on the way to them.
+ * **Before typing** it offers what search is for, in the order it is used:
+ * recent searches (device-local, `lib/recent-searches.ts`), suggestions that
+ * each name the tab they belong to, and the two browse destinations. The same
+ * sections drop from the desktop search field (`SearchFloat`), so the two
+ * never teach different things.
+ *
+ * **Once a term is in**, results are rows, not feed cards: a search result is
+ * something you scan for and open, and a column of full cards showed two
+ * results per screen. All groups the top three of each kind with "See all";
+ * a kind tab lists them all. Updates are the exception - they have no page of
+ * their own to open, so that tab reads them in place as cards.
+ *
+ * `/search?q=&tab=` opens straight onto results - the desktop panel's "See
+ * all results" and Enter both land here.
  */
 
-type Scope = "all" | "ngos" | FeedKind;
-
-const SCOPES: { value: Scope; label: string }[] = [
-	{ value: "all", label: "All" },
-	{ value: "ngos", label: "NGOs" },
-	{ value: "need", label: "Needs" },
-	{ value: "event", label: "Events" },
-	{ value: "story", label: "Updates" },
-	{ value: "post", label: "Posts" },
-];
-
-/** Concrete, not abstract: a person should be able to tap one and see results. */
-const EXAMPLES = [
-	"Blankets",
-	"Books",
-	"Food drive",
-	"Medical camp",
-	"Tree planting",
-	"Teaching",
-	"Old age home",
-	"Laptops",
-];
+const PAGE_LIMIT = 30;
+const ALL_PER_KIND = 3;
 
 function SearchScreen() {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
+	const params = useLocalSearchParams<{ q?: string; tab?: string }>();
 	const email = useAuthStore((state) => state.email);
-	const [query, setQuery] = useState("");
-	const [scope, setScope] = useState<Scope>("all");
+	const [query, setQuery] = useState(params.q ?? "");
+	const [tab, setTab] = useState<SearchTab>(
+		isSearchTab(params.tab) ? params.tab : "all",
+	);
 	const [responding, setResponding] = useState<FeedNeedItem | null>(null);
 	const recent = useRecentSearches();
 
+	// Pushed again with a new term (the desktop field, a deep link).
+	useEffect(() => {
+		if (params.q !== undefined) setQuery(params.q);
+		if (isSearchTab(params.tab)) setTab(params.tab);
+	}, [params.q, params.tab]);
+
 	const term = useDebounced(query.trim());
+	const typed = query.trim().length > 0;
 	const active = term.length > 0;
-	const result = useSearch(term, scope, active);
+
+	// "Updates" is two scopes on the server - announcements and posts.
+	const primary = useSearch(
+		term,
+		tab === "updates" ? "story" : tab,
+		active,
+		PAGE_LIMIT,
+	);
+	const posts = useSearch(
+		term,
+		"post",
+		active && tab === "updates",
+		PAGE_LIMIT,
+	);
+
 	const toggleFollow = useToggleFollow();
 	const like = useFeedReaction("like");
 	const save = useFeedReaction("save");
@@ -121,219 +143,113 @@ function SearchScreen() {
 		return false;
 	}, [email, router]);
 
-	const orgItems = active ? (result.data?.organizations.items ?? []) : [];
-	const feedItems = active ? (result.data?.feed.items ?? []) : [];
-	const loading = active && result.isLoading;
-	const error = active && result.isError ? result.error : null;
+	/** Opening a result is as much a commit as pressing Search. */
+	const open = useCallback(
+		(href: string) => {
+			if (query.trim()) recent.record(query);
+			router.push(href as never);
+		},
+		[query, recent, router],
+	);
+	const browse = useCallback(
+		(href: string) => router.push(href as never),
+		[router],
+	);
+	const pickTerm = useCallback((value: string, nextTab?: SearchTab) => {
+		setQuery(value);
+		setTab(nextTab ?? "all");
+	}, []);
+
+	const startSections = useStartSections({
+		recent,
+		onTerm: pickTerm,
+		open: browse,
+	});
+
+	/* ---- Results, by tab ------------------------------------------------- */
+	const orgs = primary.data?.organizations.items ?? [];
+	const grouped = useMemo(
+		() => groupFeed(primary.data?.feed.items ?? []),
+		[primary.data],
+	);
+	const updates = useMemo(() => {
+		if (tab !== "updates") return grouped.updates;
+		const merged = [...grouped.updates, ...(posts.data?.feed.items ?? [])];
+		const unique = new Map(
+			merged.map((item) => [`${item.kind}:${item.id}`, item]),
+		);
+		return [...unique.values()].sort((a, b) =>
+			b.postedAt.localeCompare(a.postedAt),
+		);
+	}, [tab, grouped.updates, posts.data]);
+
+	const toUpdates = useCallback(() => setTab("updates"), []);
+	const sections = useMemo<SearchSection[]>(() => {
+		const orgRows = orgs.map((org) => orgEntry(org, open));
+		const row = (item: FeedItem) => feedEntry(item, open, toUpdates);
+		const kinds: Array<{
+			key: Exclude<SearchTab, "all" | "updates">;
+			title: string;
+			entries: SearchEntry[];
+		}> = [
+			{ key: "ngos", title: "NGOs", entries: orgRows },
+			{ key: "need", title: "Needs", entries: grouped.need.map(row) },
+			{ key: "event", title: "Events", entries: grouped.event.map(row) },
+		];
+		if (tab === "all") {
+			const all: SearchSection[] = kinds
+				.filter((kind) => kind.entries.length > 0)
+				.map((kind) => ({
+					key: kind.key,
+					title: kind.title,
+					entries: kind.entries.slice(0, ALL_PER_KIND),
+					...(kind.entries.length > ALL_PER_KIND
+						? {
+								action: {
+									label: "See all",
+									onPress: () => setTab(kind.key),
+								},
+							}
+						: {}),
+				}));
+			if (grouped.updates.length > 0) {
+				all.push({
+					key: "updates",
+					title: "Updates",
+					entries: grouped.updates.slice(0, ALL_PER_KIND).map(row),
+					action: { label: "See all", onPress: toUpdates },
+				});
+			}
+			return all;
+		}
+		const one = kinds.find((kind) => kind.key === tab);
+		return one && one.entries.length > 0
+			? [{ key: one.key, entries: one.entries }]
+			: [];
+	}, [tab, orgs, grouped, open, toUpdates]);
+
+	const showCards = tab === "updates";
+	const loading =
+		typed &&
+		(!active ||
+			primary.isLoading ||
+			(showCards && posts.isLoading) ||
+			// Placeholder data from the previous term stands in while the next
+			// one loads - fine to look at, not grounds for "nothing found".
+			primary.isPlaceholderData);
+	const error = active
+		? (primary.error ?? (showCards ? posts.error : null))
+		: null;
 	const nothing =
 		active &&
 		!loading &&
 		!error &&
-		orgItems.length === 0 &&
-		feedItems.length === 0;
+		(showCards ? updates.length === 0 : sections.length === 0);
 
-	/** Opening a result is as much a commit as pressing Search. */
-	const openOrg = (organizationId: string) => {
-		recent.record(query);
-		router.push(`/ngos/${organizationId}`);
-	};
-
-	/* ---- Before typing: teach what search can do ------------------------- */
-	const guide = (
-		<View style={{ paddingTop: spacing[5] }}>
-			{recent.terms.length > 0 && (
-				<View style={{ marginBottom: spacing[6] }}>
-					<View
-						style={{
-							flexDirection: "row",
-							alignItems: "center",
-							justifyContent: "space-between",
-						}}
-					>
-						<SectionTitle>Recent</SectionTitle>
-						<Pressable
-							onPress={recent.clear}
-							hitSlop={8}
-							accessibilityRole="button"
-							accessibilityLabel="Clear recent searches"
-							{...focusable}
-							style={{ minHeight: 32, justifyContent: "center" }}
-						>
-							<Caption weight="medium" color={colors.primary.ink}>
-								Clear
-							</Caption>
-						</Pressable>
-					</View>
-					<ListGroup>
-						{recent.terms.map((term) => (
-							<ListRow
-								key={term}
-								icon={Clock}
-								label={term}
-								onPress={() => setQuery(term)}
-								value={
-									<Pressable
-										onPress={() => recent.remove(term)}
-										accessibilityRole="button"
-										accessibilityLabel={`Remove ${term} from recent searches`}
-										{...focusable}
-										// A 44pt target, pulled into the row's own padding by
-										// the negative margin so the row does not grow to fit
-										// it. At 32 it relied on hitSlop, which the focus ring
-										// and the pressed state never showed.
-										style={{
-											width: 44,
-											height: 44,
-											marginVertical: -spacing[1.5],
-											alignItems: "center",
-											justifyContent: "center",
-											borderRadius: 999,
-										}}
-									>
-										<X
-											size={14}
-											color={colors.text.quaternary as string}
-											strokeWidth={2}
-										/>
-									</Pressable>
-								}
-							/>
-						))}
-					</ListGroup>
-				</View>
-			)}
-
-			<SectionTitle>Try searching for</SectionTitle>
-			<View
-				style={{
-					flexDirection: "row",
-					flexWrap: "wrap",
-					gap: spacing[2],
-					marginBottom: spacing[6],
-				}}
-			>
-				{EXAMPLES.map((example) => (
-					<Pressable
-						key={example}
-						onPress={() => setQuery(example)}
-						accessibilityRole="button"
-						accessibilityLabel={`Search ${example}`}
-						{...focusable}
-						style={({ pressed }) => ({
-							minHeight: 36,
-							justifyContent: "center",
-							paddingHorizontal: spacing[3.5],
-							borderRadius: 999,
-							backgroundColor: pressed
-								? colors.background.tertiary
-								: colors.background.subtle,
-						})}
-					>
-						<Caption weight="medium" color="secondary">
-							{example}
-						</Caption>
-					</Pressable>
-				))}
-			</View>
-
-			<SectionTitle>Or browse</SectionTitle>
-			<ListGroup>
-				<ListRow
-					icon={Building2}
-					label="All verified NGOs"
-					hint="Every organisation on Nabhya, by city"
-					onPress={() => router.push("/ngos")}
-				/>
-				<ListRow
-					icon={Bookmark}
-					label="NGOs you follow"
-					hint="Saved organisations"
-					onPress={() => router.push("/bookmarks")}
-				/>
-				<ListRow
-					icon={CalendarDays}
-					label="Upcoming events"
-					hint="Everything you can sign up for"
-					onPress={() => router.push("/events")}
-				/>
-			</ListGroup>
-
-			<View style={{ marginTop: spacing[6], gap: spacing[1] }}>
-				<Caption color="quaternary">
-					Search looks at post titles, descriptions and NGO names across all of
-					India.
-				</Caption>
-			</View>
-		</View>
-	);
-
-	/* ---- Results ----------------------------------------------------------- */
-	const resultsHeader = (
-		<View style={{ paddingTop: spacing[3] }}>
-			<FilterChips options={SCOPES} value={scope} onChange={setScope} />
-			{orgItems.length > 0 && (scope === "all" || scope === "ngos") && (
-				<View style={{ marginBottom: spacing[5] }}>
-					<SectionTitle>NGOs</SectionTitle>
-					<ListGroup>
-						{orgItems.map((org) => (
-							<ListRow
-								key={org.id}
-								icon={Building2}
-								label={org.organizationName}
-								hint={
-									[org.city, org.state].filter(Boolean).join(", ") ||
-									"Verified NGO"
-								}
-								onPress={() => openOrg(org.id)}
-							/>
-						))}
-					</ListGroup>
-				</View>
-			)}
-			{feedItems.length > 0 && scope === "all" && (
-				<SectionTitle>Posts across India</SectionTitle>
-			)}
-		</View>
-	);
-
-	const footer = !active ? null : loading ? (
-		<LoadingState label="Searching…" />
-	) : error ? (
-		<ErrorState
-			message={apiErrorMessage(error)}
-			onRetry={() => result.refetch()}
-		/>
-	) : nothing ? (
-		<EmptyState
-			icon={scopeIcon(scope)}
-			title={`No ${scopeNoun(scope)} for “${term}”`}
-			description={
-				scope === "all"
-					? "Check the spelling, or try a broader word like “blankets” or “teaching”."
-					: "Try the All tab - it may be listed as something else."
-			}
-		/>
-	) : active && feedItems.length > 0 ? (
-		<View style={{ paddingVertical: spacing[8], alignItems: "center" }}>
-			<Caption color="quaternary">That&apos;s everything</Caption>
-		</View>
-	) : null;
-
-	/*
-	 * Stable handlers, so `FeedCard`'s `memo` can actually hold.
-	 *
-	 * Written inline in `renderItem` these were a new function on every render,
-	 * which fails the memo comparison for every card in the list - so a like,
-	 * which now writes straight into the query cache, re-rendered every card
-	 * and every video player in it. Each closes only over a mutation's `mutate`,
-	 * which react-query keeps stable, so these dependencies never change.
-	 */
-	// Follow vanishes from the card on press, so the toast is the only sign it
-	// worked and the only way back short of the NGO page. The name comes from a
-	// ref so this handler stays stable for the memoised card.
-	const feedItemsRef = useRef<FeedItem[]>([]);
+	/* ---- Stable handlers for the memoised `FeedCard` ---------------------- */
+	const updatesRef = useRef<FeedItem[]>([]);
 	useEffect(() => {
-		feedItemsRef.current = feedItems;
+		updatesRef.current = updates;
 	});
 	const handleToggleFollow = useCallback(
 		(organizationId: string, following: boolean) => {
@@ -343,7 +259,7 @@ function SearchScreen() {
 				{
 					onSuccess: () => {
 						if (following) return;
-						const name = feedItemsRef.current.find(
+						const name = updatesRef.current.find(
 							(row) => row.organization?.id === organizationId,
 						)?.organization?.organizationName;
 						toast.success(name ? `Following ${name}` : "Following", {
@@ -354,7 +270,7 @@ function SearchScreen() {
 							},
 						});
 					},
-					onError: (error) => toast.error(apiErrorMessage(error)),
+					onError: (err) => toast.error(apiErrorMessage(err)),
 				},
 			);
 		},
@@ -373,38 +289,139 @@ function SearchScreen() {
 		[requireSignIn, save.mutate],
 	);
 
+	/* ---- Before typing ---------------------------------------------------- */
+	const start = (
+		<View style={{ paddingTop: spacing[5], gap: spacing[6] }}>
+			{startSections.map((section) =>
+				section.key === "suggested" ? (
+					<View key={section.key}>
+						<SearchSectionHeading title="Try searching for" />
+						<View
+							style={{
+								flexDirection: "row",
+								flexWrap: "wrap",
+								gap: spacing[2],
+							}}
+						>
+							{SEARCH_SUGGESTIONS.map((item) => (
+								<SuggestionChip
+									key={item.term}
+									label={item.term}
+									icon={item.icon}
+									onPress={() => pickTerm(item.term, item.tab)}
+								/>
+							))}
+						</View>
+					</View>
+				) : (
+					<EntryGroup key={section.key} section={section} />
+				),
+			)}
+			<Caption color="quaternary" style={{ paddingHorizontal: spacing[1] }}>
+				Search looks at NGO names and at the titles and descriptions of needs,
+				events and updates, across all of India.
+			</Caption>
+		</View>
+	);
+
+	/* ---- Results ---------------------------------------------------------- */
+	const results = (
+		<View style={{ paddingTop: spacing[4], gap: spacing[5] }}>
+			{loading && sections.length === 0 && !showCards ? (
+				<SkeletonList variant="row" count={5} label="Searching" />
+			) : error ? (
+				<ErrorState
+					message={apiErrorMessage(error)}
+					onRetry={() => {
+						primary.refetch();
+						if (showCards) posts.refetch();
+					}}
+				/>
+			) : nothing ? (
+				<EmptyState
+					icon={tabIcon(tab)}
+					title={`No ${TAB_NOUN[tab]} for "${term}"`}
+					description={
+						tab === "all"
+							? "Check the spelling, or try a broader word like blankets or teaching."
+							: "Try All - it may be listed as something else."
+					}
+					{...(tab === "all"
+						? {}
+						: {
+								action: (
+									<Button
+										variant="link"
+										size="sm"
+										onPress={() => setTab("all")}
+									>
+										Search everything
+									</Button>
+								),
+							})}
+				/>
+			) : showCards ? null : (
+				sections.map((section) => (
+					<EntryGroup key={section.key} section={section} />
+				))
+			)}
+		</View>
+	);
+
+	const footer =
+		showCards && active && !error && updates.length > 0 ? (
+			<View style={{ paddingVertical: spacing[8], alignItems: "center" }}>
+				<Caption color="quaternary">That's everything</Caption>
+			</View>
+		) : showCards && loading && updates.length === 0 ? (
+			<SkeletonList count={2} label="Searching" />
+		) : null;
+
 	return (
-		<Screen style={{ paddingHorizontal: 0 }}>
+		<Screen style={{ paddingHorizontal: 0 }} measure="reading">
 			<View
 				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[2],
-					paddingHorizontal: spacing[5],
-					paddingBottom: spacing[3],
+					paddingHorizontal: spacing[4],
+					paddingBottom: typed ? spacing[3] : spacing[4],
+					gap: spacing[3],
 					borderBottomWidth: 1,
 					borderBottomColor: colors.border.hairline,
 				}}
 			>
-				{/* The full 40pt control, as on every pushed page. It was narrowed to
-				    24 to buy the search field width, which left a target smaller
-				    than the glyph's own row. Centred because BackButton top-aligns
-				    itself for `ScreenHeader`, and the field beside it is 44. */}
-				<BackButton style={{ alignSelf: "center" }} />
-				<View style={{ flex: 1 }}>
-					<SearchField
-						value={query}
-						onChange={setQuery}
-						onSubmit={recent.record}
-						pending={query.trim() !== term}
-						placeholder="Search items, events, causes or NGOs"
-						autoFocus
-					/>
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						gap: spacing[2],
+					}}
+				>
+					{/* The full 40pt control, centred against the 48pt field. */}
+					<BackButton style={{ alignSelf: "center" }} />
+					<View style={{ flex: 1 }}>
+						<SearchField
+							value={query}
+							onChange={setQuery}
+							onSubmit={recent.record}
+							pending={typed && query.trim() !== term}
+							placeholder="Search NGOs, needs, events"
+							accessibilityLabel="Search NGOs, needs, events and updates"
+							large
+							autoFocus={!params.q}
+						/>
+					</View>
 				</View>
+				{typed && (
+					<FilterChips
+						options={SEARCH_TABS}
+						value={tab}
+						onChange={setTab}
+						inline
+					/>
+				)}
 			</View>
 
 			<FlashList
-				data={feedItems}
+				data={showCards && active ? updates : []}
 				keyExtractor={(item: FeedItem) => `${item.kind}:${item.id}`}
 				renderItem={({ item }) => (
 					<FeedCard
@@ -415,18 +432,19 @@ function SearchScreen() {
 						onToggleSave={handleToggleSave}
 					/>
 				)}
-				ListHeaderComponent={active ? resultsHeader : guide}
+				ListHeaderComponent={
+					<View style={{ paddingHorizontal: spacing[4] }}>
+						{typed ? results : start}
+					</View>
+				}
 				ListFooterComponent={footer}
-				ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
+				ItemSeparatorComponent={() => <View style={{ height: spacing[2] }} />}
 				keyboardShouldPersistTaps="handled"
 				keyboardDismissMode="on-drag"
 				onViewableItemsChanged={onViewableItemsChanged}
 				viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
 				{...verticalScrollbar}
-				contentContainerStyle={{
-					paddingHorizontal: spacing[5],
-					paddingBottom: spacing[12],
-				}}
+				contentContainerStyle={{ paddingBottom: spacing[12] }}
 			/>
 
 			<PledgeSheet
@@ -437,33 +455,85 @@ function SearchScreen() {
 	);
 }
 
-function scopeIcon(scope: Scope) {
-	switch (scope) {
+/** A section of rows on one surface, under its heading. */
+function EntryGroup({ section }: { section: SearchSection }) {
+	const { spacing } = useTheme();
+	return (
+		<View>
+			{section.title && (
+				<SearchSectionHeading title={section.title} action={section.action} />
+			)}
+			<Surface padded={false} style={{ padding: spacing[1.5] }}>
+				{section.entries.map((entry) => (
+					<SearchEntryRow key={entry.key} entry={entry} />
+				))}
+			</Surface>
+		</View>
+	);
+}
+
+/**
+ * A suggestion, with the glyph of the tab it searches - a need, an event, an
+ * NGO - so a row of them reads as a set of kinds rather than loose words.
+ */
+function SuggestionChip({
+	label,
+	icon: Icon,
+	onPress,
+}: {
+	label: string;
+	icon: LucideIcon;
+	onPress: () => void;
+}) {
+	const { colors, spacing } = useTheme();
+	return (
+		<Pressable
+			onPress={onPress}
+			accessibilityRole="button"
+			accessibilityLabel={`Search ${label}`}
+			hitSlop={4}
+			{...focusable}
+			style={(state) => {
+				const { pressed, hovered } = state as PressState;
+				return {
+					flexDirection: "row",
+					alignItems: "center",
+					gap: spacing[2],
+					height: 38,
+					paddingLeft: spacing[3],
+					paddingRight: spacing[3.5],
+					borderRadius: 999,
+					borderWidth: 1,
+					borderColor: colors.border.medium,
+					backgroundColor:
+						pressed || hovered ? colors.background.subtle : "transparent",
+				};
+			}}
+		>
+			<Icon
+				size={15}
+				color={colors.text.tertiary as string}
+				strokeWidth={1.9}
+			/>
+			<Caption weight="medium" color="secondary">
+				{label}
+			</Caption>
+		</Pressable>
+	);
+}
+
+function tabIcon(tab: SearchTab): LucideIcon {
+	switch (tab) {
 		case "ngos":
 			return Building2;
 		case "need":
 			return HeartHandshake;
 		case "event":
 			return CalendarDays;
-		case "story":
-			return Megaphone;
+		case "updates":
+			return MessageSquareText;
 		default:
 			return Search;
-	}
-}
-
-function scopeNoun(scope: Scope) {
-	switch (scope) {
-		case "ngos":
-			return "NGOs";
-		case "need":
-			return "needs";
-		case "event":
-			return "events";
-		case "story":
-			return "updates";
-		default:
-			return "results";
 	}
 }
 

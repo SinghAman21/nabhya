@@ -422,14 +422,31 @@ export default function AdminOverviewScreen() {
 			title="Overview"
 			subtitle="Superadmin console"
 			action={
-				<View style={{ flexDirection: "row", gap: spacing[2] }}>
-					<Button
-						variant="outline"
-						size="sm"
-						onPress={() => router.push("/(admin)/categories" as Href)}
-					>
-						Causes
-					</Button>
+				<View
+					style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[2] }}
+				>
+					{/* Finance and Categories are rail rows on desktop, so the
+					    shortcuts are for the phone, whose tab bar leaves them out.
+					    "Categories", as the page and the rail name it - it said
+					    "Causes", a third word for the same screen. */}
+					{!isDesktop && (
+						<>
+							<Button
+								variant="outline"
+								size="sm"
+								onPress={() => router.push("/(admin)/categories" as Href)}
+							>
+								Categories
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								onPress={() => router.push("/(admin)/finance" as Href)}
+							>
+								Finance
+							</Button>
+						</>
+					)}
 					<Button size="sm" onPress={() => setBroadcasting(true)}>
 						Broadcast
 					</Button>

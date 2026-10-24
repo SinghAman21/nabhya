@@ -83,6 +83,8 @@ describe("team permission matrix", () => {
 				new StubPaymentProvider(),
 				notifications,
 				organizations,
+				new StubStorageProvider(),
+				null as never,
 			),
 			engagement: new EngagementService(
 				database as never,

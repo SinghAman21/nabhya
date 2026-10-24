@@ -1,10 +1,12 @@
 import { formatFinancialYear } from "@nabhya/shared";
+import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
 	Bookmark,
 	FileText,
 	MessageSquare,
 	Newspaper,
+	ShieldCheck,
 	Star,
 } from "lucide-react-native";
 import { useState } from "react";
@@ -18,7 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BackButton } from "@/components/back-button";
 import { DonateSheet } from "@/components/donate-sheet";
 import { InitialAvatar } from "@/components/initial-avatar";
-import { OrgCover, OrgLogo } from "@/components/org-branding";
+import { OrgLogo } from "@/components/org-branding";
 import { PageTabs } from "@/components/page-tabs";
 import {
 	LoadMoreButton,
@@ -34,7 +36,6 @@ import {
 	ListGroup,
 	ListRow,
 	LoadingState,
-	MetricRow,
 	SectionTitle,
 	Surface,
 } from "@/components/screen-shell";
@@ -46,7 +47,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { confirm, toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption, H2, H3, Label } from "@/components/ui/typography";
+import {
+	Body,
+	Caption,
+	H3,
+	H4,
+	Label,
+	Title,
+} from "@/components/ui/typography";
 import {
 	useFinancialReports,
 	useOrganization,
@@ -61,6 +69,7 @@ import {
 	useToggleFollow,
 } from "@/hooks/use-engagement";
 import { useMe } from "@/hooks/use-profile";
+import { useStoredImageUrl } from "@/hooks/use-stored-image";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import {
@@ -123,7 +132,7 @@ const TABS: Array<{ value: Tab; label: string }> = [
 
 export default function NgoProfilePage() {
 	const { id } = useLocalSearchParams<{ id: string }>();
-	const { colors, spacing } = useTheme();
+	const { colors, spacing, borderRadius } = useTheme();
 	const { isDesktop } = useMedia();
 	const insets = useSafeAreaInsets();
 	const router = useRouter();
@@ -204,32 +213,30 @@ export default function NgoProfilePage() {
 
 	const data = org.data;
 	const gutter = spacing[5];
-	const location =
-		[data?.city, data?.state].filter(Boolean).join(", ") || "Location not set";
-
-	const logoSize = isDesktop ? 92 : 72;
-	const logoOverlap = Math.round(logoSize * 0.45);
+	const location = [data?.city, data?.state].filter(Boolean).join(", ");
+	const verified = data?.verificationStatus === "VERIFIED";
+	const name = data?.organizationName ?? "this NGO";
 
 	const donateButton = (
 		// No sign-in wall: guests give with a receipt email (optional-auth checkout).
 		<Button
 			onPress={() => setDonateOpen(true)}
-			accessibilityLabel={`Donate to ${data?.organizationName ?? "this NGO"}`}
+			accessibilityLabel={`Donate to ${name}`}
 		>
 			Donate
 		</Button>
 	);
 
+	// Outline in both states: Donate is the page's one filled action, and two
+	// orange buttons side by side left neither of them primary.
 	const followButton = canEngage ? (
 		<Button
-			variant={following ? "outline" : "default"}
+			variant="outline"
 			size={isDesktop ? "default" : "sm"}
 			onPress={onFollow}
 			loading={toggleFollow.isPending}
 			accessibilityLabel={
-				following
-					? `Following ${data?.organizationName ?? "this NGO"}. Tap to unfollow`
-					: `Follow ${data?.organizationName ?? "this NGO"}`
+				following ? `Following ${name}. Tap to unfollow` : `Follow ${name}`
 			}
 			accessibilityState={{ selected: following }}
 		>
@@ -237,10 +244,11 @@ export default function NgoProfilePage() {
 		</Button>
 	) : null;
 
+	const saveSize = isDesktop ? 48 : 38;
 	const saveControl = !canEngage ? null : (
 		<Pressable
 			onPress={onBookmark}
-			hitSlop={8}
+			hitSlop={isDesktop ? 0 : 4}
 			disabled={toggleBookmark.isPending}
 			accessibilityRole="button"
 			accessibilityLabel={
@@ -251,97 +259,188 @@ export default function NgoProfilePage() {
 				disabled: toggleBookmark.isPending,
 			}}
 			{...focusable}
-			style={({ pressed }) => ({
-				width: 40,
-				height: 40,
-				borderRadius: 999,
-				alignItems: "center",
-				justifyContent: "center",
-				backgroundColor: pressed
-					? colors.background.tertiary
-					: colors.background.subtle,
-			})}
+			style={(state) => {
+				const { pressed, hovered } = state as {
+					pressed: boolean;
+					hovered?: boolean;
+				};
+				return {
+					width: saveSize,
+					height: saveSize,
+					borderRadius: borderRadius.lg,
+					borderWidth: 1,
+					borderColor: colors.border.medium,
+					alignItems: "center",
+					justifyContent: "center",
+					backgroundColor:
+						pressed || hovered ? colors.background.tertiary : "transparent",
+				};
+			}}
 		>
 			<Bookmark
-				size={20}
+				size={18}
+				strokeWidth={2}
 				color={colors.text.primary as string}
 				fill={bookmarked ? (colors.text.primary as string) : "transparent"}
 			/>
 		</Pressable>
 	);
 
+	const stats = [
+		{ label: "Followers", value: data?.followerCount ?? 0 },
+		{ label: "Volunteers", value: impact.data?.volunteersEngaged },
+		{ label: "Hours given", value: impact.data?.volunteerHours },
+		{ label: "Events", value: impact.data?.eventsHosted },
+	];
+
+	const inset = isDesktop ? spacing[6] : spacing[4];
+
+	/*
+	 * The hero is one card: a cover band, the identity row, the stats.
+	 *
+	 * With no cover the band is a short neutral strip, not a tinted block: the
+	 * old placeholder was `primary.tint` at full height, which in dark mode is a
+	 * flat brown rectangle that read as a failed image. The logo sits *in* the
+	 * identity row, on the card's own padding, instead of hanging half over the
+	 * band - the overlap only works when there is a photo for it to sit on, and
+	 * most NGOs have none.
+	 */
 	const hero = data ? (
 		<Surface padded={false} style={{ overflow: "hidden" }}>
-			<OrgCover
+			<NgoCover
 				imageKey={data.coverImage}
-				height={isDesktop ? 184 : 120}
-				empty=""
+				height={data.coverImage ? (isDesktop ? 200 : 124) : isDesktop ? 72 : 48}
 			/>
-			<View style={{ paddingHorizontal: gutter, paddingBottom: spacing[5] }}>
+			<View style={{ padding: inset, gap: spacing[4] }}>
 				<View
 					style={{
-						marginTop: -logoOverlap,
-						marginBottom: spacing[3],
-						// Paints the logo over the cover it overlaps.
-						zIndex: 1,
-						alignSelf: "flex-start",
+						flexDirection: "row",
+						alignItems: isDesktop ? "center" : "flex-start",
+						gap: isDesktop ? spacing[5] : spacing[3.5],
 					}}
 				>
 					<OrgLogo
 						name={data.organizationName}
 						imageKey={data.logo}
-						size={logoSize}
-						ring
+						size={isDesktop ? 80 : 60}
 					/>
+					<View style={{ flex: 1, minWidth: 0, gap: spacing[1] }}>
+						{isDesktop ? (
+							<Title accessibilityRole="header" numberOfLines={2}>
+								{data.organizationName}
+							</Title>
+						) : (
+							<H3 accessibilityRole="header" numberOfLines={3}>
+								{data.organizationName}
+							</H3>
+						)}
+						<View
+							style={{
+								flexDirection: "row",
+								flexWrap: "wrap",
+								alignItems: "center",
+								columnGap: spacing[3],
+								rowGap: spacing[1],
+							}}
+						>
+							{verified ? (
+								<View
+									style={{
+										flexDirection: "row",
+										alignItems: "center",
+										gap: spacing[1],
+									}}
+								>
+									<ShieldCheck
+										size={14}
+										strokeWidth={2.2}
+										color={colors.success.ink as string}
+									/>
+									<Caption weight="medium" color={colors.success.ink as string}>
+										Verified NGO
+									</Caption>
+								</View>
+							) : (
+								<StatusPill
+									label={humanizeStatus(data.verificationStatus)}
+									tone={verificationTone(data.verificationStatus)}
+								/>
+							)}
+							<Caption color="tertiary">
+								{[
+									location || null,
+									data.foundingYear ? `Since ${data.foundingYear}` : null,
+								]
+									.filter(Boolean)
+									.join(" · ")}
+							</Caption>
+						</View>
+					</View>
+
+					{isDesktop ? (
+						<View
+							style={{
+								flexDirection: "row",
+								alignItems: "center",
+								gap: spacing[2],
+							}}
+						>
+							{saveControl}
+							{followButton}
+							{donateButton}
+						</View>
+					) : null}
 				</View>
 
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "flex-start",
-						gap: spacing[3],
-					}}
-				>
-					<View style={{ flex: 1, minWidth: 0 }}>
-						<H2 accessibilityRole="header">{data.organizationName}</H2>
-						<Caption color="tertiary" style={{ marginTop: spacing[1] }}>
-							{location}
-							{data.foundingYear ? ` · Since ${data.foundingYear}` : ""}
+				{isDesktop || !canEngage ? null : (
+					<View
+						style={{
+							flexDirection: "row",
+							alignItems: "center",
+							gap: spacing[2],
+						}}
+					>
+						<View style={{ flex: 1 }}>{followButton}</View>
+						{saveControl}
+					</View>
+				)}
+
+				{data.categories?.length ? (
+					<View
+						style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[2] }}
+					>
+						{data.categories.map((category) => (
+							<StatusPill key={category.id} label={category.name} />
+						))}
+					</View>
+				) : null}
+			</View>
+
+			{/* Four figures in equal columns under one hairline. No dividers
+			    between them: a `MetricRow` wraps on a phone and draws a rule
+			    down the left edge of its second line. */}
+			<View
+				style={{
+					flexDirection: "row",
+					borderTopWidth: 1,
+					borderTopColor: colors.border.hairline,
+					paddingHorizontal: inset,
+					paddingVertical: spacing[4],
+					gap: spacing[3],
+				}}
+			>
+				{stats.map((stat) => (
+					<View key={stat.label} style={{ flex: 1, minWidth: 0 }}>
+						<H4 numberOfLines={1}>
+							{stat.value === undefined ? "-" : String(stat.value)}
+						</H4>
+						<Caption color="tertiary" numberOfLines={1}>
+							{stat.label}
 						</Caption>
 					</View>
-					{/* Desktop has the action card; a phone follows from the hero. */}
-					{isDesktop ? null : followButton}
-				</View>
-
-				<View
-					style={{
-						flexDirection: "row",
-						flexWrap: "wrap",
-						gap: spacing[2],
-						marginTop: spacing[3],
-					}}
-				>
-					<StatusPill
-						label={humanizeStatus(data.verificationStatus)}
-						tone={verificationTone(data.verificationStatus)}
-					/>
-					{data.categories?.map((category) => (
-						<StatusPill key={category.id} label={category.name} />
-					))}
-				</View>
+				))}
 			</View>
 		</Surface>
-	) : null;
-
-	const metrics = impact.data ? (
-		<MetricRow
-			stats={[
-				{ label: "Followers", value: data?.followerCount ?? 0 },
-				{ label: "Volunteers", value: impact.data.volunteersEngaged },
-				{ label: "Hours given", value: impact.data.volunteerHours },
-				{ label: "Events", value: impact.data.eventsHosted },
-			]}
-		/>
 	) : null;
 
 	const tabs = <PageTabs tabs={TABS} value={tab} onChange={setTab} />;
@@ -367,39 +466,14 @@ export default function NgoProfilePage() {
 		</>
 	) : null;
 
-	/**
-	 * Desktop only. The two actions a visitor has, in the column they are
-	 * looking at rather than welded to the bottom of the window.
-	 */
-	const actionCard = data ? (
-		<Surface>
-			<View style={{ gap: spacing[3] }}>
-				{donateButton}
-				{followButton}
-				{canEngage ? (
-					<Button
-						variant="outline"
-						onPress={onBookmark}
-						loading={toggleBookmark.isPending}
-						accessibilityState={{ selected: bookmarked }}
-					>
-						{bookmarked ? "Shortlisted" : "Add to shortlist"}
-					</Button>
-				) : null}
-				<Caption color="quaternary">
-					Donations are collected by Nabhya and passed to the organisation. You
-					get a receipt either way.
-				</Caption>
-			</View>
-		</Surface>
-	) : null;
-
 	return (
 		<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
+			{/* The back row says where you are, so the chevron is not a lone
+			    glyph floating over the hero. */}
 			<View
 				style={{
 					paddingTop: insets.top + spacing[2],
-					paddingBottom: spacing[2],
+					paddingBottom: spacing[3],
 					paddingHorizontal: gutter,
 				}}
 			>
@@ -409,13 +483,15 @@ export default function NgoProfilePage() {
 						{
 							flexDirection: "row",
 							alignItems: "center",
-							justifyContent: "space-between",
+							gap: spacing[3],
 							minHeight: 40,
 						},
 					]}
 				>
 					<BackButton fallbackHref="/ngos" />
-					{isDesktop ? null : saveControl}
+					<Caption color="tertiary" numberOfLines={1} style={{ flex: 1 }}>
+						{data ? `NGOs / ${data.organizationName}` : "NGOs"}
+					</Caption>
 				</View>
 			</View>
 
@@ -423,6 +499,7 @@ export default function NgoProfilePage() {
 				<LoadingState />
 			) : org.isError || !data ? (
 				<ErrorState
+					title="NGO not available"
 					message={apiErrorMessage(org.error, "This NGO is not available.")}
 					onRetry={() => org.refetch()}
 				/>
@@ -442,22 +519,14 @@ export default function NgoProfilePage() {
 								<View
 									style={{
 										flexDirection: "row",
-										gap: spacing[6],
+										alignItems: "flex-start",
+										gap: spacing[8],
 										marginTop: spacing[6],
 									}}
 								>
-									<View
-										style={{
-											flex: MAIN_COLUMN,
-											minWidth: 0,
-											gap: spacing[6],
-										}}
-									>
-										{metrics}
-										<View>
-											{tabs}
-											{panel}
-										</View>
+									<View style={{ flex: MAIN_COLUMN, minWidth: 0 }}>
+										{tabs}
+										{panel}
 									</View>
 									<View
 										style={{
@@ -466,20 +535,20 @@ export default function NgoProfilePage() {
 											gap: spacing[6],
 										}}
 									>
-										{actionCard}
 										<View>
 											<SectionTitle>Details</SectionTitle>
 											<OrgFacts organization={data} />
 										</View>
+										<Caption color="tertiary">
+											Donations are collected by Nabhya and passed to the
+											organisation. You get a receipt either way.
+										</Caption>
 									</View>
 								</View>
 							) : (
-								<View style={{ marginTop: spacing[5], gap: spacing[5] }}>
-									{metrics}
-									<View>
-										{tabs}
-										{panel}
-									</View>
+								<View style={{ marginTop: spacing[5] }}>
+									{tabs}
+									{panel}
 								</View>
 							)}
 						</View>
@@ -523,11 +592,48 @@ export default function NgoProfilePage() {
 	);
 }
 
+/**
+ * The cover band, with a neutral fallback. `OrgCover` (shared with the NGO's
+ * own editor) fills an empty band with the brand tint and an upload prompt,
+ * which is right for the owner and wrong for a visitor.
+ */
+function NgoCover({
+	imageKey,
+	height,
+}: {
+	imageKey: string | null | undefined;
+	height: number;
+}) {
+	const { colors } = useTheme();
+	const url = useStoredImageUrl(imageKey);
+
+	return (
+		<View style={{ height, backgroundColor: colors.background.subtle }}>
+			{url ? (
+				<Image
+					source={{ uri: url }}
+					contentFit="cover"
+					style={{ width: "100%", height: "100%" }}
+					accessibilityIgnoresInvertColors
+				/>
+			) : null}
+		</View>
+	);
+}
+
 /* -------------------------------------------------------------------------- */
 /* Facts                                                                      */
 /* -------------------------------------------------------------------------- */
 
 type Organization = NonNullable<ReturnType<typeof useOrganization>["data"]>;
+
+/** The registration wizard's own labels; `humanizeStatus` printed "Section8". */
+const ORG_TYPE_LABELS: Record<string, string> = {
+	trust: "Trust",
+	society: "Society",
+	section8: "Section 8 company",
+	others: "Other",
+};
 
 /**
  * The registry record. On desktop it lives in the aside; on a phone there is no
@@ -536,7 +642,13 @@ type Organization = NonNullable<ReturnType<typeof useOrganization>["data"]>;
  */
 function OrgFacts({ organization }: { organization: Organization }) {
 	const facts: Fact[] = [
-		{ label: "Type", value: humanizeStatus(organization.orgType) },
+		// A missing type is left out, not shown as "Unknown".
+		{
+			label: "Type",
+			value: organization.orgType
+				? (ORG_TYPE_LABELS[organization.orgType] ?? null)
+				: null,
+		},
 		{ label: "Registration number", value: organization.registrationNumber },
 		{
 			label: "Founded",

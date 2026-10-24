@@ -7,6 +7,7 @@ import {
 	posts,
 	postsMedia,
 	reviews,
+	teamInvites,
 	userCategories,
 } from "@nabhya/db/schema";
 import {
@@ -17,8 +18,9 @@ import {
 	adminUserQuerySchema,
 	auditLogQuerySchema,
 	documentQueueQuerySchema,
+	setOrgStatusSchema,
 } from "@nabhya/shared";
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import {
 	afterAll,
 	beforeAll,
@@ -234,6 +236,131 @@ describe("AdminService", () => {
 
 			const stored = await db.query.events.findMany({});
 			expect(stored[0]?.status).toBe("DRAFT");
+		});
+	});
+
+	describe("deleting an organization", () => {
+		async function deletable() {
+			const admin = await createUser(db, { role: "superadmin" });
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			return { admin, owner, org };
+		}
+
+		it("hides the NGO, keeps its records, and revokes pending invites", async () => {
+			const { admin, owner, org } = await deletable();
+			await createEvent(db, org.id, { status: "PUBLISHED" });
+			await db.insert(donations).values({
+				organizationId: org.id,
+				amountMinor: 50_000,
+				status: "COMPLETED",
+			});
+			await db.insert(teamInvites).values({
+				organizationId: org.id,
+				email: "new@example.com",
+				role: "MEMBER",
+				tokenHash: "hash",
+				expiresAt: new Date(Date.now() + 86_400_000),
+			});
+
+			const updated = await service.setOrganizationStatus(admin.id, org.id, {
+				status: "DELETED",
+				reason: "Fraudulent registration",
+			});
+
+			expect(updated?.status).toBe("DELETED");
+			expect(updated?.statusReason).toBe("Fraudulent registration");
+			expect(updated?.deletedBy).toBe(admin.id);
+			expect(updated?.deletedAt).toBeTruthy();
+
+			const [event] = await db.query.events.findMany({});
+			expect(event?.status).toBe("CANCELLED");
+			const [invite] = await db.query.teamInvites.findMany({});
+			expect(invite?.status).toBe("REVOKED");
+			// Nothing is hard-deleted.
+			expect(await db.query.donations.findMany({})).toHaveLength(1);
+
+			// The team is locked out of org routes with the right message.
+			const organizations = new OrganizationsService(
+				db as never,
+				new AuditService(db as never),
+				null as never,
+			);
+			await expect(
+				organizations.requireOwnedOrganization(owner.id),
+			).rejects.toBeInstanceOf(ForbiddenException);
+		});
+
+		it("requires a reason in the contract", () => {
+			expect(setOrgStatusSchema.safeParse({ status: "DELETED" }).success).toBe(
+				false,
+			);
+			expect(
+				setOrgStatusSchema.safeParse({ status: "DELETED", reason: "Duplicate" })
+					.success,
+			).toBe(true);
+		});
+
+		it("drops deleted NGOs from the directory unless asked for", async () => {
+			const { admin, org } = await deletable();
+			const other = await createUser(db, { role: "organisation" });
+			await createOrganization(db, other.id);
+			await service.setOrganizationStatus(admin.id, org.id, {
+				status: "DELETED",
+				reason: "Duplicate",
+			});
+
+			const all = await service.listOrganizations(
+				adminOrgQuerySchema.parse({}),
+			);
+			expect(all.items.map((row) => row.id)).not.toContain(org.id);
+			expect(all.items).toHaveLength(1);
+
+			const deleted = await service.listOrganizations(
+				adminOrgQuerySchema.parse({ status: "DELETED" }),
+			);
+			expect(deleted.items.map((row) => row.id)).toEqual([org.id]);
+
+			const overview = await service.getOverview();
+			expect(overview.organizations.deleted).toBe(1);
+		});
+
+		it("restores a deleted NGO and clears the deletion record", async () => {
+			const { admin, owner, org } = await deletable();
+			await service.setOrganizationStatus(admin.id, org.id, {
+				status: "DELETED",
+				reason: "Mistake",
+			});
+
+			const restored = await service.setOrganizationStatus(admin.id, org.id, {
+				status: "ACTIVE",
+			});
+
+			expect(restored?.status).toBe("ACTIVE");
+			expect(restored?.statusReason).toBeNull();
+			expect(restored?.deletedAt).toBeNull();
+			const organizations = new OrganizationsService(
+				db as never,
+				new AuditService(db as never),
+				null as never,
+			);
+			const back = await organizations.requireOwnedOrganization(owner.id);
+			expect(back.id).toBe(org.id);
+		});
+
+		it("will not suspend a deleted NGO", async () => {
+			const { admin, org } = await deletable();
+			await service.setOrganizationStatus(admin.id, org.id, {
+				status: "DELETED",
+				reason: "Duplicate",
+			});
+
+			await expect(
+				service.setOrganizationStatus(admin.id, org.id, {
+					status: "SUSPENDED",
+					reason: "Also bad",
+				}),
+			).rejects.toBeInstanceOf(BadRequestException);
 		});
 	});
 

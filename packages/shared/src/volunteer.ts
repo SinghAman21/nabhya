@@ -11,6 +11,14 @@ import {
  * each with its own schema so the client can validate per screen, plus a merged
  * payload for the single submit at the end.
  */
+/**
+ * The 403 a volunteer gets when applying or pledging before their identity is
+ * verified. Shared so the client can recognise it and route to verification
+ * rather than toasting a sentence.
+ */
+export const IDENTITY_REQUIRED_MESSAGE =
+	"Verify your identity before applying to events or pledging to needs.";
+
 export const volunteerProfileStepSchema = z.object({
 	fullName: z
 		.string()

@@ -119,13 +119,16 @@ export const lightColors = {
 	 * Dark in both schemes - it is the logotype's ground, not a surface.
 	 */
 	brand: {
-		surface: "#0A0A0A",
+		/** The same warm near-black as dark mode. It was #0A0A0A here, so the
+		 *  brand panel was a neutral black in light mode and a warm brown in
+		 *  dark - two brands depending on a phone setting. */
+		surface: "#1F1712",
 		ink: "#FFFFFF",
-		/** Body copy on `surface` (7.8:1). */
+		/** Body copy on `surface` (7.0:1). */
 		muted: "#A3A3A3",
-		/** Small print on `surface` (6.1:1). */
+		/** Small print on `surface` (5.5:1). */
 		faint: "#8F8F8F",
-		rule: "#222222",
+		rule: "#3A2E26",
 	},
 	shadow: "#00000050",
 } as const;
@@ -253,6 +256,34 @@ export const darkColors = {
  * theme, so a scrim that flipped to white in light mode would wash the image
  * out. White ink on a 55% black scrim reads on any frame.
  */
+/**
+ * The grounds of the brand panels (`components/panel-wash.tsx`): a dark,
+ * near-flat colour with one faint tonal wash in a corner - enough that the
+ * panel is not a flat slab, never enough to read as a glow. One set for both
+ * schemes on purpose, like `mediaColors`: each panel is its own dark ground.
+ *
+ * An earlier pass drew a solid orange sun and rings here. It was the loudest
+ * thing on the sign-in screen; the panel should frame the words, not compete.
+ */
+export const panelGrounds = {
+	/** Sign-in and sign-up: warm, the brand's own ground. */
+	ember: { ground: "#16100D", wash: "#FF7E40", strength: 0.16 },
+	/** The onboarding rail: a deep blue, quieter - a working surface. */
+	dusk: { ground: "#0E1322", wash: "#4F7BFF", strength: 0.18 },
+} as const;
+
+export type PanelGround = keyof typeof panelGrounds;
+
+/** Rules, wells and secondary type on a panel ground - white at low alpha. */
+export const panelInk = {
+	fill: "rgba(255,255,255,0.05)",
+	border: "rgba(255,255,255,0.1)",
+	/** Body copy (>= 7:1 on either ground). */
+	muted: "rgba(255,255,255,0.68)",
+	/** Small print (>= 4.6:1). */
+	faint: "rgba(255,255,255,0.5)",
+} as const;
+
 export const mediaColors = {
 	ink: "#FFFFFF",
 	/** Secondary text over the viewer's black ground (the "2 / 5" counter). */

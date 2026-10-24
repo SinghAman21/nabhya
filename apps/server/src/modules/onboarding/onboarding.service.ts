@@ -28,6 +28,8 @@ export interface OnboardingStatus {
 		organizationName: string;
 		verificationStatus: string | null;
 		status: string | null;
+		/** Why a suspended or deleted NGO is hidden, for its own team. */
+		statusReason: string | null;
 	} | null;
 	verificationStatus: string | null;
 }
@@ -233,6 +235,7 @@ export class OnboardingService {
 				organizationName: organizations.organizationName,
 				verificationStatus: organizations.verificationStatus,
 				status: organizations.status,
+				statusReason: organizations.statusReason,
 				isOwner: organizationAdmins.isOwner,
 			})
 			.from(organizationAdmins)
@@ -260,6 +263,7 @@ export class OnboardingService {
 				organizationName: true,
 				verificationStatus: true,
 				status: true,
+				statusReason: true,
 			},
 		});
 		return owned ? { ...owned, isOwner: true } : null;

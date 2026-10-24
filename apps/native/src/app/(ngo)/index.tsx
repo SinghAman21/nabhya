@@ -13,6 +13,7 @@ import {
 	PenLine,
 	ShieldCheck,
 	Star,
+	UserPlus,
 	Users,
 } from "lucide-react-native";
 import { useState } from "react";
@@ -35,7 +36,7 @@ import {
 	Surface,
 } from "@/components/screen-shell";
 import { Pressable } from "@/components/ui/pressable";
-import { Caption, H5, Label } from "@/components/ui/typography";
+import { Caption, H3, H5, Label } from "@/components/ui/typography";
 import { useOrganizationImpact } from "@/hooks/use-directory";
 import { useOrgAccess } from "@/hooks/use-org-access";
 import { useMyOrganization, useOrgOverview } from "@/hooks/use-organization";
@@ -80,13 +81,14 @@ import { useAuthStore } from "@/store/auth-store";
  */
 
 const STICKY_ASIDE = {
-	width: 320,
+	width: 340,
+	flexShrink: 0,
 	position: "sticky",
 	top: 0,
 	alignSelf: "flex-start",
 } as unknown as ViewStyle;
 
-const DESKTOP_MAX_WIDTH = 1080;
+const DESKTOP_MAX_WIDTH = 1280;
 
 export default function NgoDashboard() {
 	const { colors, spacing } = useTheme();
@@ -121,6 +123,8 @@ export default function NgoDashboard() {
 	const needsWithPledges = overview?.needsWithPledges ?? 0;
 	const openNeeds = overview?.openNeeds ?? 0;
 	const publishedEvents = overview?.publishedEvents ?? 0;
+	const draftEvents = overview?.draftEvents ?? 0;
+	const followers = overview?.followers ?? 0;
 	const waiting = pendingApplications + pendingPledges;
 
 	/*
@@ -130,7 +134,7 @@ export default function NgoDashboard() {
 	 * how many parents the pending rows sit on. When that is one, find it on the
 	 * first page and go straight to its sheet; when it is several, or the one
 	 * is not on page 1, the list is still the honest destination - every row
-	 * there carries its own "to review" pill. Only fetched when it can help.
+	 * there carries its own "to review" count. Only fetched when it can help.
 	 */
 	const pendingEventQuery = useQuery({
 		queryKey: queryKeys.orgEvents({ dashboard: "pending-lookup" }),
@@ -266,77 +270,123 @@ export default function NgoDashboard() {
 		</View>
 	);
 
+	const plural = (n: number, one: string, many = `${one}s`) =>
+		`${n} ${n === 1 ? one : many}`;
+
+	/*
+	 * The three decisions, always all three, each with its number. They used
+	 * to appear only when non-zero, so the section's shape changed with the
+	 * data and "All caught up" said nothing about which of the three was
+	 * clear. A zero now reads as a zero - muted, "Nothing waiting" - and the
+	 * row still opens its list.
+	 */
+	const openApplicants = () =>
+		router.push(
+			pendingEventId
+				? { pathname: "/(ngo)/events", params: { review: pendingEventId } }
+				: "/(ngo)/events",
+		);
+	const openPledges = () =>
+		router.push(
+			pendingNeedId
+				? { pathname: "/(ngo)/needs", params: { review: pendingNeedId } }
+				: "/(ngo)/needs",
+		);
+	const openReviews = () =>
+		router.push({ pathname: "/(ngo)/reviews", params: { show: "awaiting" } });
+
+	const decisionItems: Array<{
+		key: string;
+		icon: LucideIcon;
+		label: string;
+		value: number;
+		hint: string;
+		onPress: () => void;
+	}> = [
+		{
+			key: "applicants",
+			icon: CalendarDays,
+			label: "Applicants to review",
+			value: pendingApplications,
+			hint:
+				pendingApplications > 0
+					? `Across ${plural(eventsWithApplicants, "event")}`
+					: "Nothing waiting",
+			onPress: openApplicants,
+		},
+		{
+			key: "pledges",
+			icon: HeartHandshake,
+			label: "Pledges to review",
+			value: pendingPledges,
+			hint:
+				pendingPledges > 0
+					? `On ${plural(needsWithPledges, "post")}`
+					: "Nothing waiting",
+			onPress: openPledges,
+		},
+		...(canReply
+			? [
+					{
+						key: "reviews",
+						icon: Star,
+						label: "Reviews to answer",
+						value: awaitingReplies,
+						hint:
+							awaitingReplies > 0
+								? "Your reply shows publicly"
+								: "Nothing waiting",
+						onPress: openReviews,
+					},
+				]
+			: []),
+	];
+
 	const decisions = (
 		<View>
-			<SectionTitle>Needs your decision</SectionTitle>
-			{waiting + awaitingReplies === 0 ? (
-				<Surface>
-					<H5>All caught up</H5>
-					<Caption color="tertiary" style={{ marginTop: spacing[0.5] }}>
-						New applicants, pledges and reviews to answer will appear here.
-					</Caption>
-				</Surface>
+			<SectionTitle>
+				{waiting + awaitingReplies === 0
+					? "Needs your decision - all caught up"
+					: "Needs your decision"}
+			</SectionTitle>
+			{isDesktop ? (
+				<View style={{ flexDirection: "row", gap: spacing[3] }}>
+					{decisionItems.map((item) => (
+						<DecisionTile
+							key={item.key}
+							icon={item.icon}
+							label={item.label}
+							value={item.value}
+							hint={item.hint}
+							onPress={item.onPress}
+						/>
+					))}
+				</View>
 			) : (
 				<ListGroup>
-					{pendingApplications > 0 && (
+					{decisionItems.map((item) => (
 						<ListRow
-							icon={CalendarDays}
-							label={`${pendingApplications} applicant${pendingApplications === 1 ? "" : "s"} to review`}
-							hint={`Across ${eventsWithApplicants} event${eventsWithApplicants === 1 ? "" : "s"}`}
-							value={<Count value={pendingApplications} />}
-							onPress={() =>
-								router.push(
-									pendingEventId
-										? {
-												pathname: "/(ngo)/events",
-												params: { review: pendingEventId },
-											}
-										: "/(ngo)/events",
-								)
+							key={item.key}
+							icon={item.icon}
+							label={item.label}
+							hint={item.hint}
+							value={
+								<Count
+									value={item.value}
+									tone={item.value > 0 ? "warning" : "neutral"}
+								/>
 							}
+							accessibilityLabel={`${item.label}: ${item.value}`}
+							onPress={item.onPress}
 						/>
-					)}
-					{pendingPledges > 0 && (
-						<ListRow
-							icon={HeartHandshake}
-							label={`${pendingPledges} pledge${pendingPledges === 1 ? "" : "s"} to review`}
-							hint={`On ${needsWithPledges} post${needsWithPledges === 1 ? "" : "s"} - people offering what you asked for`}
-							value={<Count value={pendingPledges} />}
-							onPress={() =>
-								router.push(
-									pendingNeedId
-										? {
-												pathname: "/(ngo)/needs",
-												params: { review: pendingNeedId },
-											}
-										: "/(ngo)/needs",
-								)
-							}
-						/>
-					)}
-					{awaitingReplies > 0 && (
-						<ListRow
-							icon={Star}
-							label={`${awaitingReplies} review${awaitingReplies === 1 ? "" : "s"} to answer`}
-							hint="Your reply shows publicly under each one"
-							value={<Count value={awaitingReplies} />}
-							onPress={() =>
-								router.push({
-									pathname: "/(ngo)/reviews",
-									params: { show: "awaiting" },
-								})
-							}
-						/>
-					)}
+					))}
 				</ListGroup>
 			)}
 		</View>
 	);
 
-	// No "Waiting on you" here: it was the sum of the rows directly above, the
-	// same number printed twice on one screen. Each count is a row that opens
-	// the list it counts - as two big numerals they were a report you could
-	// read but not act on, one navigation away from the thing they described.
+	// Each count is a row that opens the list it counts. Followers has no
+	// list of its own, so it is a plain row with no press.
 	const numbers = (
 		<View>
 			<SectionTitle>At a glance</SectionTitle>
@@ -349,11 +399,27 @@ export default function NgoDashboard() {
 					onPress={() => router.push("/(ngo)/events")}
 				/>
 				<ListRow
+					icon={PenLine}
+					label="Draft events"
+					hint={draftEvents > 0 ? "Only your team can see these" : undefined}
+					value={<Count value={draftEvents} tone="neutral" />}
+					accessibilityLabel={`${draftEvents} draft events. Open events`}
+					onPress={() => router.push("/(ngo)/events")}
+				/>
+				<ListRow
 					icon={HeartHandshake}
 					label="Open needs"
 					value={<Count value={openNeeds} tone="neutral" />}
 					accessibilityLabel={`${openNeeds} open needs. Open needs`}
 					onPress={() => router.push("/(ngo)/needs")}
+				/>
+				<ListRow
+					icon={UserPlus}
+					label="Followers"
+					hint="Volunteers who see your posts in Following"
+					value={<Count value={followers} tone="neutral" chevron={false} />}
+					accessibilityLabel={`${followers} followers`}
+					chevron={false}
 				/>
 			</ListGroup>
 		</View>
@@ -494,29 +560,31 @@ export default function NgoDashboard() {
 		<ErrorState message={apiErrorMessage(error)} onRetry={refetchAll} />
 	) : isDesktop ? (
 		/*
-		 * Two columns, capped and centred. The decisions and the numbers are
-		 * what a coordinator scans; creation and the leftover destinations are
-		 * what they reach for, so they sit in the narrow aside where they do not
-		 * push the numbers below the fold.
+		 * The decisions run the full width as three tiles, each with its
+		 * number - the first thing a coordinator reads, and comparable at a
+		 * glance. Under them, two columns: the counts and the public impact
+		 * on the left, creation and the leftover destinations in the aside,
+		 * where they do not push the numbers below the fold.
 		 */
 		<View
 			style={{
 				width: "100%",
 				maxWidth: DESKTOP_MAX_WIDTH,
 				alignSelf: "center",
-				flexDirection: "row",
 				gap: spacing[6],
 			}}
 		>
-			<View style={{ flex: 1, gap: spacing[6] }}>
-				{verification}
-				{decisions}
-				{numbers}
-				{impactBlock}
-			</View>
-			<View style={[STICKY_ASIDE, { gap: spacing[6] }]}>
-				{quickActions}
-				{manage}
+			{verification}
+			{decisions}
+			<View style={{ flexDirection: "row", gap: spacing[6] }}>
+				<View style={{ flex: 1, minWidth: 0, gap: spacing[6] }}>
+					{numbers}
+					{impactBlock}
+				</View>
+				<View style={[STICKY_ASIDE, { gap: spacing[6] }]}>
+					{quickActions}
+					{manage}
+				</View>
 			</View>
 		</View>
 	) : (
@@ -642,9 +710,12 @@ function ActionTile({
 function Count({
 	value,
 	tone = "warning",
+	chevron = true,
 }: {
 	value: number;
 	tone?: "warning" | "neutral";
+	/** Off for a row that opens nothing. */
+	chevron?: boolean;
 }) {
 	const { colors, spacing } = useTheme();
 
@@ -659,11 +730,75 @@ function Count({
 			<H5 color={tone === "warning" ? colors.warning.ink : undefined}>
 				{value}
 			</H5>
-			<ChevronRight
-				size={16}
-				strokeWidth={1.75}
-				color={colors.text.quaternary as string}
-			/>
+			{chevron && (
+				<ChevronRight
+					size={16}
+					strokeWidth={1.75}
+					color={colors.text.quaternary as string}
+				/>
+			)}
+		</View>
+	);
+}
+
+/**
+ * One decision on desktop: what it is, how many, and where they sit - the
+ * whole tile opens the list. The number takes warning ink only when there is
+ * something to do, so three tiles reading 0 are three quiet tiles and one
+ * reading 4 is the one the eye lands on.
+ */
+function DecisionTile({
+	icon: Icon,
+	label,
+	value,
+	hint,
+	onPress,
+}: {
+	icon: LucideIcon;
+	label: string;
+	value: number;
+	hint: string;
+	onPress: () => void;
+}) {
+	const { colors, spacing } = useTheme();
+	return (
+		<View style={{ flex: 1, minWidth: 0 }}>
+			<Surface onPress={onPress}>
+				<View style={{ gap: spacing[2] }}>
+					<View
+						style={{
+							flexDirection: "row",
+							alignItems: "center",
+							gap: spacing[2],
+						}}
+					>
+						<Icon
+							size={16}
+							strokeWidth={2}
+							color={colors.text.quaternary as string}
+						/>
+						<Caption
+							color="secondary"
+							weight="medium"
+							numberOfLines={1}
+							style={{ flex: 1 }}
+						>
+							{label}
+						</Caption>
+						<ChevronRight
+							size={16}
+							strokeWidth={1.75}
+							color={colors.text.quaternary as string}
+						/>
+					</View>
+					<H3 color={value > 0 ? (colors.warning.ink as string) : "quaternary"}>
+						{value}
+					</H3>
+					<Caption color="tertiary" numberOfLines={1}>
+						{hint}
+					</Caption>
+				</View>
+			</Surface>
 		</View>
 	);
 }

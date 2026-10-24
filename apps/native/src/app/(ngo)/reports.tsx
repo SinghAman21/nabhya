@@ -5,7 +5,7 @@ import {
 	formatFinancialYear,
 } from "@nabhya/shared";
 import { useRouter } from "expo-router";
-import { FileText, Upload } from "lucide-react-native";
+import { FileText, Image as ImageIcon, Upload } from "lucide-react-native";
 import { useState } from "react";
 import {
 	ActivityIndicator,
@@ -14,23 +14,25 @@ import {
 	View,
 } from "react-native";
 import { ChoiceChips } from "@/components/choice-chips";
+import { FeedMediaViewer } from "@/components/feed/feed-media";
 import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
+import { FormFooterRow, useFormButtonGrow } from "@/components/ngo/form-footer";
 import {
 	Banner,
 	EmptyState,
 	ErrorState,
 	GridCell,
-	LoadingState,
 	Screen,
 	ScreenHeader,
+	SkeletonList,
 	Surface,
 } from "@/components/screen-shell";
 import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
+import { Drawer } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { confirm, toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
-import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption } from "@/components/ui/typography";
 import {
 	useCreateFinancialReport,
@@ -42,10 +44,10 @@ import { useOrgAccess } from "@/hooks/use-org-access";
 import { useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
 import { useFileUpload } from "@/hooks/use-upload";
-import { useGridColumns } from "@/hooks/useMedia";
-import { apiErrorMessage } from "@/lib/api";
+import { useGridColumns, useMedia } from "@/hooks/useMedia";
+import { apiErrorMessage, uploadsApi } from "@/lib/api";
 import { focusable } from "@/lib/focus";
-import { formatRelative } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { verticalScrollbar } from "@/lib/scroll";
 import type { FinancialReport } from "@/lib/types";
 
@@ -61,6 +63,11 @@ const TYPES: Array<{ value: ReportType; label: string }> = (
 	] as ReportType[]
 ).map((value) => ({ value, label: FINANCIAL_REPORT_LABELS[value] }));
 
+/** A report scanned as a photo opens in the app; a PDF goes to the OS viewer. */
+function isImageKey(key: string) {
+	return /\.(jpe?g|png|webp|gif|heic)$/i.test(key);
+}
+
 /**
  * Transparency documents an NGO publishes voluntarily.
  *
@@ -73,11 +80,21 @@ const TYPES: Array<{ value: ReportType; label: string }> = (
  * verified - and such an NGO cannot have published one (`reports.manage` plus
  * verification, server-side). So the query waits for verification and the
  * screen says what unlocks it, instead of opening on an error.
+ *
+ * **View** opens an image in the app's own viewer (`FeedMediaViewer`, the
+ * feed's), and a PDF in the browser or the OS viewer, which renders one far
+ * better than anything we would draw. It used to send both outside the app,
+ * so a photographed certificate left the app to show one picture.
  */
 export default function OrgReports() {
-	const { colors, spacing, borderRadius } = useTheme();
+	const { colors, spacing } = useTheme();
 	const router = useRouter();
+	const { isDesktop } = useMedia();
 	const [composing, setComposing] = useState(false);
+	const [viewer, setViewer] = useState<{ title: string; url: string } | null>(
+		null,
+	);
+	const [opening, setOpening] = useState<string | null>(null);
 	const access = useOrgAccess();
 
 	const me = useMe();
@@ -107,12 +124,29 @@ export default function OrgReports() {
 		});
 	};
 
+	const view = async (report: FinancialReport) => {
+		setOpening(report.id);
+		try {
+			if (isImageKey(report.documentKey)) {
+				const { url } = await uploadsApi.downloadUrl(report.documentKey);
+				setViewer({ title: report.title, url });
+			} else {
+				await openDocument.mutateAsync(report.documentKey);
+			}
+		} catch (error) {
+			toast.error(apiErrorMessage(error));
+		} finally {
+			setOpening(null);
+		}
+	};
+
 	const openCreate = () => setComposing(true);
 
 	return (
 		<Screen>
 			<ScreenHeader
-				back
+				// A rail destination on desktop; a pushed page on a phone.
+				back={!isDesktop}
 				title="Reports"
 				subtitle="Public on your profile"
 				action={
@@ -143,7 +177,7 @@ export default function OrgReports() {
 
 			{!access.isVerified || access.isSuspended ? null : me.isLoading ||
 				query.isLoading ? (
-				<LoadingState />
+				<SkeletonList variant="card" columns={columns} count={3} />
 			) : me.isError || query.isError ? (
 				<ErrorState
 					message={apiErrorMessage(me.error ?? query.error)}
@@ -180,88 +214,151 @@ export default function OrgReports() {
 					}
 					renderItem={({ item }) => (
 						<GridCell>
-							<Surface>
-								<View
-									style={{
-										flexDirection: "row",
-										alignItems: "center",
-										gap: spacing[3],
-									}}
-								>
-									<View
-										style={{
-											width: 40,
-											height: 40,
-											borderRadius: borderRadius.md,
-											alignItems: "center",
-											justifyContent: "center",
-											backgroundColor: colors.background.subtle,
-										}}
-									>
-										<FileText
-											size={18}
-											color={colors.text.secondary as string}
-											strokeWidth={1.75}
-										/>
-									</View>
-									<View style={{ flex: 1, minWidth: 0 }}>
-										<Body weight="bold" numberOfLines={1}>
-											{item.title}
-										</Body>
-										<Caption color="tertiary" numberOfLines={1}>
-											{FINANCIAL_REPORT_LABELS[
-												item.type as keyof typeof FINANCIAL_REPORT_LABELS
-											] ?? item.type}{" "}
-											· {formatFinancialYear(item.financialYear)}
-										</Caption>
-									</View>
-								</View>
-
-								<View
-									style={{
-										flexDirection: "row",
-										alignItems: "center",
-										justifyContent: "space-between",
-										marginTop: spacing[3],
-										paddingTop: spacing[3],
-										borderTopWidth: 1,
-										borderTopColor: colors.border.hairline,
-									}}
-								>
-									<Caption color="quaternary">
-										Published {formatRelative(item.createdAt)}
-									</Caption>
-									<View style={{ flexDirection: "row", gap: spacing[3] }}>
-										<TextAction
-											label={
-												openDocument.isPending &&
-												openDocument.variables === item.documentKey
-													? "Opening…"
-													: "View"
-											}
-											tone="brand"
-											disabled={openDocument.isPending}
-											onPress={() => openDocument.mutate(item.documentKey)}
-											accessibilityLabel={`View ${item.title}`}
-										/>
-										{canWithdraw && (
-											<TextAction
-												label="Withdraw"
-												tone="danger"
-												onPress={() => confirmDelete(item)}
-												accessibilityLabel={`Withdraw ${item.title}`}
-											/>
-										)}
-									</View>
-								</View>
-							</Surface>
+							<ReportCard
+								report={item}
+								opening={opening === item.id}
+								onView={() => view(item)}
+								onWithdraw={canWithdraw ? () => confirmDelete(item) : undefined}
+							/>
 						</GridCell>
 					)}
 				/>
 			)}
 
 			<ReportSheet visible={composing} onClose={() => setComposing(false)} />
+
+			{viewer && (
+				<FeedMediaViewer
+					visible
+					media={[
+						{ id: viewer.url, type: "IMAGE", url: viewer.url, sortOrder: 0 },
+					]}
+					initialIndex={0}
+					// No like, comment, save or share on a report - the viewer
+					// drops its action bar when none is given.
+					actions={{
+						headline: viewer.title,
+						liked: false,
+						saved: false,
+						commentCount: 0,
+					}}
+					onClose={() => setViewer(null)}
+				/>
+			)}
 		</Screen>
+	);
+}
+
+/**
+ * One report. The title leads (two lines, since "Audited statement of
+ * accounts 2024-25" is a normal title), with what kind of document it is and
+ * which year it covers under it, and the file kind on the tile so a donor
+ * knows whether View leaves the app. The footer holds the date and the two
+ * actions as separate controls.
+ */
+function ReportCard({
+	report,
+	opening,
+	onView,
+	onWithdraw,
+}: {
+	report: FinancialReport;
+	opening: boolean;
+	onView: () => void;
+	onWithdraw?: () => void;
+}) {
+	const { colors, spacing, borderRadius } = useTheme();
+	const image = isImageKey(report.documentKey);
+	const Icon = image ? ImageIcon : FileText;
+	const typeLabel =
+		FINANCIAL_REPORT_LABELS[
+			report.type as keyof typeof FINANCIAL_REPORT_LABELS
+		] ?? report.type;
+
+	return (
+		<Surface
+			footer={
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						justifyContent: "space-between",
+						gap: spacing[3],
+						marginTop: spacing[3],
+						paddingTop: spacing[3],
+						borderTopWidth: 1,
+						borderTopColor: colors.border.hairline,
+					}}
+				>
+					<Caption color="quaternary" numberOfLines={1} style={{ flex: 1 }}>
+						Published {formatDate(report.createdAt)}
+					</Caption>
+					<View style={{ flexDirection: "row", gap: spacing[4] }}>
+						<TextAction
+							label={opening ? "Opening..." : image ? "View" : "Open PDF"}
+							tone="brand"
+							disabled={opening}
+							onPress={onView}
+							accessibilityLabel={`View ${report.title}`}
+						/>
+						{onWithdraw && (
+							<TextAction
+								label="Withdraw"
+								tone="danger"
+								onPress={onWithdraw}
+								accessibilityLabel={`Withdraw ${report.title}`}
+							/>
+						)}
+					</View>
+				</View>
+			}
+		>
+			<View
+				style={{
+					flexDirection: "row",
+					alignItems: "flex-start",
+					gap: spacing[3],
+				}}
+			>
+				<View
+					style={{
+						width: 40,
+						height: 40,
+						borderRadius: borderRadius.md,
+						alignItems: "center",
+						justifyContent: "center",
+						backgroundColor: colors.background.subtle,
+					}}
+				>
+					<Icon
+						size={18}
+						color={colors.text.secondary as string}
+						strokeWidth={1.75}
+					/>
+				</View>
+				<View style={{ flex: 1, minWidth: 0 }}>
+					<Body weight="bold" numberOfLines={2}>
+						{report.title}
+					</Body>
+					<Caption
+						color="tertiary"
+						numberOfLines={1}
+						style={{ marginTop: spacing[0.5] }}
+					>
+						{typeLabel} · {formatFinancialYear(report.financialYear)}
+					</Caption>
+					{report.notes ? (
+						<Caption
+							color="quaternary"
+							numberOfLines={2}
+							style={{ marginTop: spacing[1] }}
+						>
+							{report.notes}
+						</Caption>
+					) : null}
+				</View>
+			</View>
+		</Surface>
 	);
 }
 
@@ -273,6 +370,7 @@ function ReportSheet({
 	onClose: () => void;
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
+	const grow = useFormButtonGrow();
 	const inputStyle = useFieldInputStyle();
 	const currentYear = new Date().getFullYear();
 
@@ -345,21 +443,27 @@ function ReportSheet({
 	};
 
 	return (
-		<Sheet
+		<Drawer
 			visible={visible}
 			onClose={close}
+			wide
 			title="Publish a report"
 			subtitle="Visible to everyone on your public profile."
 			footer={
 				<View style={{ gap: spacing[2] }}>
 					<FieldError message={errors.form} />
-					<Button
-						onPress={submit}
-						loading={create.isPending}
-						disabled={isUploading}
-					>
-						Publish
-					</Button>
+					<FormFooterRow
+						primary={
+							<Button
+								onPress={submit}
+								loading={create.isPending}
+								disabled={isUploading}
+								style={grow}
+							>
+								Publish report
+							</Button>
+						}
+					/>
 				</View>
 			}
 		>
@@ -375,7 +479,7 @@ function ReportSheet({
 
 				<Field label="Title" error={errors.title}>
 					<Input
-						placeholder="e.g. Annual Report 2024–25"
+						placeholder="e.g. Annual report 2024-25"
 						value={title}
 						onChangeText={setTitle}
 						style={inputStyle}
@@ -449,7 +553,7 @@ function ReportSheet({
 						<View style={{ flex: 1, minWidth: 0 }}>
 							<Body weight="medium" numberOfLines={1}>
 								{isUploading
-									? "Uploading…"
+									? "Uploading..."
 									: (fileName ?? "Attach the document")}
 							</Body>
 							<Caption color="quaternary">
@@ -459,6 +563,6 @@ function ReportSheet({
 					</Pressable>
 				</Field>
 			</View>
-		</Sheet>
+		</Drawer>
 	);
 }

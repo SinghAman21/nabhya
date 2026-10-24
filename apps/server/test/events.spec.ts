@@ -126,7 +126,10 @@ describe("EventsService", () => {
 				{ organizationId: org.id, userId: viewer.id, role: "VIEWER" },
 			]);
 			const event = await createEvent(db, org.id);
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 
 			await service.apply(volunteer.id, event.id, {});
 
@@ -141,11 +144,33 @@ describe("EventsService", () => {
 			expect(sent[0]?.entityId).toBe(event.id);
 		});
 
+		it("refuses a volunteer whose identity is not verified", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const event = await createEvent(db, org.id);
+
+			for (const verificationStatus of ["PENDING", "REJECTED"] as const) {
+				const volunteer = await createUser(db, {
+					role: "volunteer",
+					verificationStatus,
+				});
+				await expect(
+					service.apply(volunteer.id, event.id, {}),
+				).rejects.toBeInstanceOf(ForbiddenException);
+			}
+
+			const applications = await db.query.eventApplications.findMany({});
+			expect(applications).toHaveLength(0);
+		});
+
 		it("rejects a second application from the same volunteer", async () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
 			const event = await createEvent(db, org.id);
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 
 			await service.apply(volunteer.id, event.id, {});
 
@@ -158,7 +183,10 @@ describe("EventsService", () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
 			const event = await createEvent(db, org.id);
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 
 			await service.apply(volunteer.id, event.id, {});
 			await service.withdraw(volunteer.id, event.id);
@@ -177,7 +205,10 @@ describe("EventsService", () => {
 			const event = await createEvent(db, org.id, { volunteersNeeded: 1 });
 			const orgAuth = authUserFor(owner, ["organisation"]);
 
-			const first = await createUser(db, { role: "volunteer" });
+			const first = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 			const application = await service.apply(first.id, event.id, {});
 			await service.reviewApplication(
 				orgAuth.id,
@@ -186,7 +217,10 @@ describe("EventsService", () => {
 				{ status: "ACCEPTED" },
 			);
 
-			const second = await createUser(db, { role: "volunteer" });
+			const second = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 			await expect(
 				service.apply(second.id, event.id, {}),
 			).rejects.toBeInstanceOf(ConflictException);
@@ -199,8 +233,14 @@ describe("EventsService", () => {
 			const org = await createOrganization(db, owner.id);
 			const event = await createEvent(db, org.id, { volunteersNeeded: 1 });
 
-			const a = await createUser(db, { role: "volunteer" });
-			const b = await createUser(db, { role: "volunteer" });
+			const a = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
+			const b = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 			const appA = await createApplication(db, event.id, a.id);
 			const appB = await createApplication(db, event.id, b.id);
 
@@ -231,7 +271,10 @@ describe("EventsService", () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
 			const event = await createEvent(db, org.id, { volunteersNeeded: 3 });
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 			const application = await createApplication(db, event.id, volunteer.id);
 
 			await service.reviewApplication(owner.id, event.id, application.id, {
@@ -251,7 +294,10 @@ describe("EventsService", () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
 			const event = await createEvent(db, org.id, { volunteersNeeded: 2 });
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 			const application = await createApplication(db, event.id, volunteer.id);
 
 			await service.reviewApplication(owner.id, event.id, application.id, {
@@ -269,7 +315,10 @@ describe("EventsService", () => {
 			const ownerA = await createUser(db, { role: "organisation" });
 			const orgA = await createOrganization(db, ownerA.id);
 			const event = await createEvent(db, orgA.id);
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 			const application = await createApplication(db, event.id, volunteer.id);
 
 			const ownerB = await createUser(db, { role: "organisation" });
@@ -280,6 +329,40 @@ describe("EventsService", () => {
 					status: "ACCEPTED",
 				}),
 			).rejects.toBeInstanceOf(ForbiddenException);
+		});
+
+		it("counts applicants by state across the event, whatever the filter", async () => {
+			// The review drawer's chips say "Pending 2 / Accepted 1" before either
+			// is pressed, so the counts ignore the status filter and the page.
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const event = await createEvent(db, org.id, { volunteersNeeded: 5 });
+			for (const status of [
+				"PENDING",
+				"PENDING",
+				"ACCEPTED",
+				"WITHDRAWN",
+			] as const) {
+				const volunteer = await createUser(db, {
+					role: "volunteer",
+					verificationStatus: "VERIFIED",
+				});
+				await createApplication(db, event.id, volunteer.id, { status });
+			}
+
+			const page = await service.listApplicants(owner.id, event.id, {
+				page: 1,
+				limit: 1,
+				status: "ACCEPTED",
+			});
+			expect(page.items).toHaveLength(1);
+			expect(page.counts).toEqual({
+				PENDING: 2,
+				ACCEPTED: 1,
+				REJECTED: 0,
+				WITHDRAWN: 1,
+				all: 4,
+			});
 		});
 	});
 
@@ -389,7 +472,10 @@ describe("EventsService", () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
 			const event = await createEvent(db, org.id);
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 			const application = await createApplication(db, event.id, volunteer.id);
 
 			await service.reviewApplication(owner.id, event.id, application.id, {
@@ -458,12 +544,18 @@ describe("EventsService - correlated counts", () => {
 		const event = await createEvent(db, org.id);
 
 		for (let i = 0; i < 3; i++) {
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 			await createApplication(db, event.id, volunteer.id, {
 				status: "PENDING",
 			});
 		}
-		const accepted = await createUser(db, { role: "volunteer" });
+		const accepted = await createUser(db, {
+			role: "volunteer",
+			verificationStatus: "VERIFIED",
+		});
 		await createApplication(db, event.id, accepted.id, { status: "ACCEPTED" });
 
 		const result = await service.listForMyOrganization(
@@ -528,7 +620,10 @@ describe("EventsService - correlated counts", () => {
 			const busy = await createEvent(db, org.id, { title: "Busy" });
 			await createEvent(db, org.id, { title: "Quiet" });
 			for (let i = 0; i < 2; i++) {
-				const volunteer = await createUser(db, { role: "volunteer" });
+				const volunteer = await createUser(db, {
+					role: "volunteer",
+					verificationStatus: "VERIFIED",
+				});
 				await createApplication(db, busy.id, volunteer.id);
 			}
 

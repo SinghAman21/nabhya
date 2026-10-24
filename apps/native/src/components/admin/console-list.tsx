@@ -6,7 +6,7 @@ import { ResultCount } from "@/components/admin/list-chrome";
 import type { TableView } from "@/components/admin/toolbar";
 import { LoadMoreFooter } from "@/components/load-more-footer";
 import type { PagedQuery } from "@/components/paged-list";
-import { ErrorState, LoadingState } from "@/components/screen-shell";
+import { ErrorState, SkeletonList } from "@/components/screen-shell";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { apiErrorMessage } from "@/lib/api";
@@ -41,7 +41,7 @@ import { apiErrorMessage } from "@/lib/api";
  * loads. Here those rows are dimmed and inert rather than replaced by
  * `LoadingState`: a spinner in place of the table on every header press
  * collapsed the page's height, threw the reader back to the top, and made a
- * 200ms round trip look like a reload. `LoadingState` is now only for the very
+ * 200ms round trip look like a reload. The skeleton is now only for the very
  * first load, when there is nothing to keep.
  */
 export function ConsoleList<T, K extends string>({
@@ -95,8 +95,21 @@ export function ConsoleList<T, K extends string>({
 	const { isDesktop, width } = useMedia();
 	const stale = query.isPlaceholderData;
 
+	const asTable = isDesktop && view === "table";
+
+	// The first load is a skeleton in the shape about to land - hairline rows
+	// for the table, cards otherwise - not a centred spinner: the spinner left
+	// the toolbar sitting over an empty page that then jumped to forty rows.
 	if (query.isLoading) {
-		return <LoadingState {...(loadingLabel ? { label: loadingLabel } : {})} />;
+		return (
+			<View style={{ paddingTop: spacing[6] }}>
+				<SkeletonList
+					variant={asTable ? "row" : "card"}
+					count={asTable ? 8 : 4}
+					{...(loadingLabel ? { label: loadingLabel } : {})}
+				/>
+			</View>
+		);
 	}
 
 	if (query.isError && items.length === 0) {
@@ -114,8 +127,6 @@ export function ConsoleList<T, K extends string>({
 	if (items.length === 0) {
 		return <View style={stale ? { opacity: 0.5 } : null}>{empty}</View>;
 	}
-
-	const asTable = isDesktop && view === "table";
 
 	return (
 		<View

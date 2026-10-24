@@ -120,6 +120,13 @@
 			"when": 1790000300000,
 			"tag": "0016_hours_served",
 			"breakpoints": true
+		},
+		{
+			"idx": 17,
+			"version": "7",
+			"when": 1790000400000,
+			"tag": "0017_org_soft_delete",
+			"breakpoints": true
 		}
 	]
 }

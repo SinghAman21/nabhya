@@ -167,7 +167,6 @@ function FeedCardImpl({
 		headline,
 		liked,
 		saved,
-		likeCount: item.engagement.likes,
 		commentCount: item.engagement.comments,
 		...(onToggleLike ? { onToggleLike: () => onToggleLike(item, liked) } : {}),
 		...(onToggleSave ? { onToggleSave: () => onToggleSave(item, saved) } : {}),

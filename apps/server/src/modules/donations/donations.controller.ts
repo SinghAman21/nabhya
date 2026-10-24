@@ -1,11 +1,13 @@
 import type {
 	CreateDonationInput,
 	DonationQuery,
+	OrgDonationExportQuery,
 	OrgDonationQuery,
 } from "@nabhya/shared";
 import {
 	createDonationSchema,
 	donationQuerySchema,
+	orgDonationExportSchema,
 	orgDonationQuerySchema,
 } from "@nabhya/shared";
 import {
@@ -105,6 +107,18 @@ export class DonationsController {
 		return this.donationsService.getReceipt(user.id, id);
 	}
 
+	@Get("me/donations/:id/receipt/pdf")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({
+		summary: "Signed download link for the receipt PDF, rendering it if lost",
+	})
+	getReceiptPdf(
+		@CurrentUser() user: AuthUser,
+		@Param("id", ParseUUIDPipe) id: string,
+	) {
+		return this.donationsService.getReceiptPdfUrl(user.id, id);
+	}
+
 	@Get("org/donations")
 	@Roles("organisation")
 	@ApiBearerAuth("access-token")
@@ -115,5 +129,19 @@ export class DonationsController {
 		query: OrgDonationQuery,
 	) {
 		return this.donationsService.listForMyOrganization(user.id, query);
+	}
+
+	@Post("org/donations/export")
+	@Roles("organisation")
+	@ApiBearerAuth("access-token")
+	@ApiOperation({
+		summary: "Download the NGO's donations as CSV; returns a signed link",
+	})
+	exportForOrg(
+		@CurrentUser() user: AuthUser,
+		@Body(new ZodValidationPipe(orgDonationExportSchema))
+		body: OrgDonationExportQuery,
+	) {
+		return this.donationsService.exportForMyOrganization(user.id, body);
 	}
 }

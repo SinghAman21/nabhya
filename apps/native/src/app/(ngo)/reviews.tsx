@@ -9,6 +9,7 @@ import { SelectMenu, type SelectOption } from "@/components/admin/select-menu";
 import { Toolbar } from "@/components/admin/toolbar";
 import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
 import { InitialAvatar } from "@/components/initial-avatar";
+import { FormFooterRow, useFormButtonGrow } from "@/components/ngo/form-footer";
 import { PagedList, usePagedQuery } from "@/components/paged-list";
 import {
 	Banner,
@@ -498,6 +499,7 @@ function ReplySheet({
 }) {
 	const { colors, spacing } = useTheme();
 	const textAreaStyle = useFieldInputStyle(120);
+	const buttonGrow = useFormButtonGrow();
 	const [reply, setReply] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const respond = useReplyToReview();
@@ -536,11 +538,21 @@ function ReplySheet({
 				review ? `To ${review.user.fullName ?? "a volunteer"}` : undefined
 			}
 			footer={
+				// The drawers' shared footer: the action sized to its label on
+				// desktop, not a 400pt orange bar unlike every other form drawer.
 				<View style={{ gap: spacing[2] }}>
 					<FieldError message={error} />
-					<Button onPress={submit} loading={respond.isPending}>
-						{review?.reply ? "Save reply" : "Post reply"}
-					</Button>
+					<FormFooterRow
+						primary={
+							<Button
+								onPress={submit}
+								loading={respond.isPending}
+								style={buttonGrow}
+							>
+								{review?.reply ? "Save reply" : "Post reply"}
+							</Button>
+						}
+					/>
 				</View>
 			}
 		>

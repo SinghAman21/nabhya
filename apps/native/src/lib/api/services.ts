@@ -12,6 +12,7 @@ import type {
 	AdminTrends,
 	AdminUserQuery,
 	ApplicationQuery,
+	ApplicationStatusCounts,
 	ApplyToEventInput,
 	AuditLogQuery,
 	BulkResult,
@@ -36,8 +37,10 @@ import type {
 	OrgEventQuery,
 	OrgNeedQuery,
 	OrgOverview,
+	Paginated,
 	PaginationQuery,
 	PledgeQuery,
+	PledgeStatusCounts,
 	PublicEventQuery,
 	PublicNeedQuery,
 	ReviewApplicationInput,
@@ -60,6 +63,7 @@ import type {
 	UploadTicketResponse,
 	UploadUserDocumentInput,
 } from "@nabhya/shared";
+import { onboardingStatusResponseSchema } from "@nabhya/shared";
 import { toFeedItem } from "@/lib/feed-adapter";
 import type {
 	AdminOrgDetail,
@@ -118,7 +122,12 @@ export const usersApi = {
 };
 
 export const onboardingApi = {
-	status: () => http.get<OnboardingStatus>(ONBOARDING.STATUS),
+	status: () =>
+		http.get<OnboardingStatus>(
+			ONBOARDING.STATUS,
+			undefined,
+			onboardingStatusResponseSchema,
+		),
 	// The payload types are the schemas' *input* side: the wizards post raw form
 	// values and the server normalises them. Posting the client-parsed output
 	// fails validation - `optionalText` turns "" into null, and null is not
@@ -141,9 +150,23 @@ export const categoriesApi = {
 };
 
 export const searchApi = {
-	search: (
+	/**
+	 * The feed half arrives as raw ranked rows, like every feed endpoint, and
+	 * goes through `toFeedItem` the same way. It used to be cast straight to
+	 * `FeedItem`, so no row had a `kind` and every need, event and update was
+	 * filtered out - search only ever found NGOs.
+	 */
+	search: async (
 		query: Pick<SearchQuery, "search"> & Partial<Omit<SearchQuery, "search">>,
-	) => http.get<SearchResults>(SEARCH.LIST, query),
+	): Promise<SearchResults> => {
+		const result = await http.get<
+			Omit<SearchResults, "feed"> & { feed: Paginated<FeedApiItem> }
+		>(SEARCH.LIST, query);
+		return {
+			...result,
+			feed: { ...result.feed, items: result.feed.items.map(toFeedItem) },
+		};
+	},
 };
 
 export const organizationsApi = {
@@ -232,7 +255,10 @@ export const orgEventsApi = {
 	remove: (id: string) =>
 		http.delete<{ deleted: boolean }>(ORG_EVENTS.detail(id)),
 	applicants: (id: string, query: Partial<ApplicationQuery>) =>
-		http.getPage<EventApplicant>(ORG_EVENTS.applications(id), query),
+		// The page plus every state's count on the event, whatever the filter.
+		http.getPage<EventApplicant>(ORG_EVENTS.applications(id), query) as Promise<
+			Paginated<EventApplicant> & { counts?: ApplicationStatusCounts }
+		>,
 	reviewApplication: (
 		id: string,
 		applicationId: string,
@@ -268,7 +294,9 @@ export const orgNeedsApi = {
 	remove: (id: string) =>
 		http.delete<{ deleted: boolean }>(ORG_NEEDS.detail(id)),
 	pledges: (id: string, query: Partial<PledgeQuery>) =>
-		http.getPage<NeedPledge>(ORG_NEEDS.pledges(id), query),
+		http.getPage<NeedPledge>(ORG_NEEDS.pledges(id), query) as Promise<
+			Paginated<NeedPledge> & { counts?: PledgeStatusCounts }
+		>,
 	reviewPledge: (id: string, pledgeId: string, input: ReviewPledgeInput) =>
 		http.patch<NeedPledge>(ORG_NEEDS.reviewPledge(id, pledgeId), input),
 };

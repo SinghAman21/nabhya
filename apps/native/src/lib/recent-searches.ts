@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { storage } from "@/lib/storage";
 
 const KEY = "nabhya-recent-searches";
@@ -78,5 +78,10 @@ export function useRecentSearches() {
 
 	const clear = useCallback(() => persist([]), [persist]);
 
-	return { terms, record, remove, clear };
+	// One object per change, not per render, so a caller can list it as a
+	// dependency without re-running on every keystroke.
+	return useMemo(
+		() => ({ terms, record, remove, clear }),
+		[terms, record, remove, clear],
+	);
 }

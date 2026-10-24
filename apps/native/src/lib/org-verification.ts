@@ -116,7 +116,9 @@ export function orgVerificationStep(
 	status: OrgVerificationStatus | null | undefined,
 	uploadedRequired: number,
 ): number {
-	if (status === "VERIFIED") return 2;
+	// Past the last stage: every dot is a tick. Returning the last index drew
+	// "Verified" as an unfinished "3" on a verified organisation.
+	if (status === "VERIFIED") return ORG_VERIFICATION_STEPS.length;
 	return uploadedRequired >= ORG_REQUIRED_DOCUMENTS.length ? 1 : 0;
 }
 

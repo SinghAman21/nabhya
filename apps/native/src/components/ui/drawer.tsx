@@ -8,8 +8,8 @@ import {
 	View,
 } from "react-native";
 import { OverlayHost } from "@/components/ui/overlay";
-import { Pressable } from "@/components/ui/pressable";
-import { Sheet, SheetHeader } from "@/components/ui/sheet";
+import { Pressable, PressableBoundary } from "@/components/ui/pressable";
+import { Sheet, SheetHeader, textSafe } from "@/components/ui/sheet";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { motionDuration, useReducedMotion } from "@/lib/motion";
@@ -71,7 +71,12 @@ export function Drawer(props: DrawerProps) {
 			</Sheet>
 		);
 	}
-	return <DesktopDrawer {...props} />;
+	// Same guard the sheet applies to its own slots - see `textSafe`.
+	return (
+		<DesktopDrawer {...props} footer={textSafe(props.footer)}>
+			{textSafe(props.children)}
+		</DesktopDrawer>
+	);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -167,81 +172,83 @@ function DesktopDrawer({
 	if (!mounted) return null;
 
 	return (
-		<Modal
-			visible
-			transparent
-			animationType="none"
-			statusBarTranslucent
-			onRequestClose={requestClose}
-		>
-			<View style={{ flex: 1 }}>
-				<Pressable
-					onPress={requestClose}
-					accessibilityRole="button"
-					accessibilityLabel="Dismiss"
-					// Not a tab stop - see the same scrim in `sheet.tsx`.
-					focusable={false}
-					style={{
-						position: "absolute",
-						top: 0,
-						right: 0,
-						bottom: 0,
-						left: 0,
-						backgroundColor: "rgba(17, 17, 17, 0.45)",
-					}}
-				/>
-				<Animated.View
-					accessibilityLabel={title}
-					accessibilityViewIsModal
-					style={{
-						position: "absolute",
-						top: 0,
-						bottom: 0,
-						right: 0,
-						width: panelWidth,
-						maxHeight: height,
-						backgroundColor: colors.background.sheet,
-						transform: [{ translateX: slide }],
-						...(isDark ? {} : elevation.raised),
-					}}
-				>
-					<SheetHeader
-						title={title}
-						subtitle={subtitle}
-						onClose={requestClose}
-						divided={scrolled}
-						grabber={false}
+		<PressableBoundary>
+			<Modal
+				visible
+				transparent
+				animationType="none"
+				statusBarTranslucent
+				onRequestClose={requestClose}
+			>
+				<View style={{ flex: 1 }}>
+					<Pressable
+						onPress={requestClose}
+						accessibilityRole="button"
+						accessibilityLabel="Dismiss"
+						// Not a tab stop - see the same scrim in `sheet.tsx`.
+						focusable={false}
+						style={{
+							position: "absolute",
+							top: 0,
+							right: 0,
+							bottom: 0,
+							left: 0,
+							backgroundColor: "rgba(17, 17, 17, 0.45)",
+						}}
 					/>
-					<ScrollView
-						keyboardShouldPersistTaps="handled"
-						{...verticalScrollbar}
-						onScroll={(e) => setScrolled(e.nativeEvent.contentOffset.y > 4)}
-						scrollEventThrottle={32}
-						contentContainerStyle={{
-							paddingHorizontal: spacing[5],
-							paddingTop: spacing[4],
-							paddingBottom: spacing[4],
+					<Animated.View
+						accessibilityLabel={title}
+						accessibilityViewIsModal
+						style={{
+							position: "absolute",
+							top: 0,
+							bottom: 0,
+							right: 0,
+							width: panelWidth,
+							maxHeight: height,
+							backgroundColor: colors.background.sheet,
+							transform: [{ translateX: slide }],
+							...(isDark ? {} : elevation.raised),
 						}}
 					>
-						{children}
-					</ScrollView>
-					{footer && (
-						<View
-							style={{
+						<SheetHeader
+							title={title}
+							subtitle={subtitle}
+							onClose={requestClose}
+							divided={scrolled}
+							grabber={false}
+						/>
+						<ScrollView
+							keyboardShouldPersistTaps="handled"
+							{...verticalScrollbar}
+							onScroll={(e) => setScrolled(e.nativeEvent.contentOffset.y > 4)}
+							scrollEventThrottle={32}
+							contentContainerStyle={{
 								paddingHorizontal: spacing[5],
-								paddingTop: spacing[3],
+								paddingTop: spacing[4],
 								paddingBottom: spacing[4],
-								borderTopWidth: 1,
-								borderTopColor: colors.border.hairline,
 							}}
 						>
-							{footer}
-						</View>
-					)}
-				</Animated.View>
-			</View>
-			{/* Same reason as the sheet's: the root host is below this Modal. */}
-			<OverlayHost />
-		</Modal>
+							{children}
+						</ScrollView>
+						{footer ? (
+							<View
+								style={{
+									paddingHorizontal: spacing[5],
+									paddingTop: spacing[3],
+									paddingBottom: spacing[4],
+									borderTopWidth: 1,
+									borderTopColor: colors.border.hairline,
+								}}
+							>
+								{footer}
+							</View>
+						) : null}
+					</Animated.View>
+				</View>
+				{/* Same reason as the sheet's: the root host is below this Modal. */}
+				<OverlayHost />
+			</Modal>
+		</PressableBoundary>
 	);
 }

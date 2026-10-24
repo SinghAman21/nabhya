@@ -4,33 +4,17 @@ import {
 	feedTabSchema,
 	type NeedType,
 } from "@nabhya/shared";
-import {
-	BookOpen,
-	Boxes,
-	BriefcaseBusiness,
-	Building2,
-	CalendarDays,
-	HeartHandshake,
-	Layers3,
-	Leaf,
-	Megaphone,
-	MessageSquareText,
-	PackageOpen,
-	SlidersHorizontal,
-	Sparkles,
-	Stethoscope,
-	TreePine,
-	UsersRound,
-	Utensils,
-} from "lucide-react-native";
+import { SlidersHorizontal } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
+import { MultiChoiceChips } from "@/components/choice-chips";
 import { Button } from "@/components/ui/button";
 import { Pressable } from "@/components/ui/pressable";
 import { Sheet } from "@/components/ui/sheet";
-import { Caption, Label } from "@/components/ui/typography";
+import { Caption, Label, Micro } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
-import { focusable } from "@/lib/focus";
+import { useMedia } from "@/hooks/useMedia";
+import { focusable, type PressState } from "@/lib/focus";
 import type { Category, FeedKind } from "@/lib/types";
 
 export const ALL_CAUSES = "";
@@ -72,16 +56,12 @@ export function feedContentQuery(content: FeedContent): {
 	}
 }
 
-const CONTENT_OPTIONS: Array<{
-	value: FeedContent;
-	label: string;
-	icon: typeof Layers3;
-}> = [
-	{ value: "all", label: "Everything", icon: Layers3 },
-	{ value: "want", label: "Needs", icon: HeartHandshake },
-	{ value: "offer", label: "Offers", icon: PackageOpen },
-	{ value: "event", label: "Events", icon: CalendarDays },
-	{ value: "update", label: "Updates", icon: MessageSquareText },
+const CONTENT_OPTIONS: Array<{ value: FeedContent; label: string }> = [
+	{ value: "all", label: "All" },
+	{ value: "want", label: "Needs" },
+	{ value: "offer", label: "Offers" },
+	{ value: "event", label: "Events" },
+	{ value: "update", label: "Updates" },
 ];
 
 const TABS = feedTabSchema.options.map((value) => ({
@@ -89,17 +69,29 @@ const TABS = feedTabSchema.options.map((value) => ({
 	label: FEED_TAB_LABELS[value],
 }));
 
+/** How many filters the sheet has set: each cause, plus a content choice. */
+export function feedFilterCount(
+	categoryIds: string[],
+	content: FeedContent,
+): number {
+	return categoryIds.length + (content === "all" ? 0 : 1);
+}
+
 /**
  * The one row that shapes the feed: the lens (For you, Following, Trending,
- * Urgent) scrolling sideways, and a filter button pinned at the right edge
- * that opens the cause picker. One row, not two - the cause is chosen rarely
- * and the lens often, so the rare control folds into a sheet and the row
- * stays a single line of chips.
+ * Urgent) and the filter button at the far end that opens the sheet. One
+ * row, not two - the cause is chosen rarely and the lens often, so the rare
+ * control folds into a sheet and the row stays a single line.
  *
- * The chips bleed to the screen edge - negative margin out of the page
- * gutter, the gutter put back as scroll padding - so the first chip lines up
- * with the cards and the last slides under the filter button instead of
- * stopping short of it.
+ * The chips bleed to the screen edge on a phone - negative margin out of the
+ * page gutter, the gutter put back as scroll padding - so the first chip
+ * lines up with the cards and the last slides under the filter button
+ * instead of stopping short of it.
+ *
+ * The button carries the **count** of filters on, not a dot: a dot says
+ * "something is set" and leaves the reader to open the sheet to find out
+ * how much. On desktop it is labelled ("Filters 2"); on a phone it is the
+ * glyph and the count.
  */
 export function FeedTabs({
 	tab,
@@ -107,16 +99,22 @@ export function FeedTabs({
 	gutter,
 	onOpenFilters,
 	filterActive,
+	filterCount,
 }: {
 	tab: FeedTab;
 	onTab: (tab: FeedTab) => void;
 	/** The page's horizontal padding, so the row can bleed past it. */
 	gutter: number;
 	onOpenFilters: () => void;
-	/** True when a cause is selected: the button shows a dot. */
-	filterActive: boolean;
+	/** Older callers: true when anything is set. `filterCount` wins. */
+	filterActive?: boolean;
+	/** Filters on in the sheet - see `feedFilterCount`. */
+	filterCount?: number;
 }) {
 	const { colors, spacing } = useTheme();
+	const { isDesktop } = useMedia();
+	const count = filterCount ?? (filterActive ? 1 : 0);
+	const active = count > 0;
 
 	return (
 		<View
@@ -133,40 +131,41 @@ export function FeedTabs({
 				accessibilityLabel="Feed"
 				style={{ flex: 1 }}
 				contentContainerStyle={{
-					gap: spacing[2],
+					gap: spacing[1.5],
 					alignItems: "center",
 					paddingLeft: gutter,
 					paddingRight: spacing[3],
 				}}
 			>
 				{TABS.map((option) => {
-					const active = option.value === tab;
+					const selected = option.value === tab;
 					return (
 						<Pressable
 							key={option.value}
 							onPress={() => onTab(option.value)}
-							hitSlop={6}
+							hitSlop={4}
 							accessibilityRole="tab"
-							accessibilityState={{ selected: active }}
+							accessibilityState={{ selected }}
 							accessibilityLabel={option.label}
 							{...focusable}
-							style={({ pressed }) => ({
-								height: 36,
-								justifyContent: "center",
-								paddingHorizontal: spacing[3.5],
-								borderRadius: 999,
-								backgroundColor: active
-									? (colors.text.primary as string)
-									: pressed
-										? (colors.background.subtle as string)
-										: "transparent",
-								borderWidth: active ? 0 : 1,
-								borderColor: colors.border.medium,
-							})}
+							style={(state) => {
+								const { pressed, hovered } = state as PressState;
+								return {
+									height: 36,
+									justifyContent: "center",
+									paddingHorizontal: spacing[3.5],
+									borderRadius: 999,
+									backgroundColor: selected
+										? (colors.text.primary as string)
+										: pressed || hovered
+											? (colors.background.subtle as string)
+											: "transparent",
+								};
+							}}
 						>
 							<Caption
 								weight="semibold"
-								color={active ? (colors.text.inverse as string) : "secondary"}
+								color={selected ? (colors.text.inverse as string) : "secondary"}
 							>
 								{option.label}
 							</Caption>
@@ -175,66 +174,90 @@ export function FeedTabs({
 				})}
 			</ScrollView>
 
-			{/* Pinned, with a soft fade so chips visibly slide under it. */}
 			<View
 				style={{
 					paddingLeft: spacing[2],
 					paddingRight: gutter,
-					backgroundColor: colors.background.warm,
 				}}
 			>
 				<Pressable
 					onPress={onOpenFilters}
-					hitSlop={6}
+					hitSlop={4}
 					accessibilityRole="button"
-					accessibilityLabel={
-						filterActive ? "Filters, one cause selected" : "Filters"
-					}
+					accessibilityLabel={active ? `Filters, ${count} on` : "Filters"}
 					{...focusable}
-					style={({ pressed }) => ({
-						width: 36,
-						height: 36,
-						borderRadius: 999,
-						alignItems: "center",
-						justifyContent: "center",
-						borderWidth: 1,
-						borderColor: filterActive
-							? (colors.text.primary as string)
-							: colors.border.medium,
-						backgroundColor: pressed
-							? (colors.background.subtle as string)
-							: "transparent",
-					})}
+					style={(state) => {
+						const { pressed, hovered } = state as PressState;
+						return {
+							flexDirection: "row",
+							alignItems: "center",
+							gap: spacing[1.5],
+							height: 36,
+							minWidth: 36,
+							justifyContent: "center",
+							paddingHorizontal: isDesktop || active ? spacing[3] : 0,
+							borderRadius: 999,
+							borderWidth: 1,
+							borderColor: active
+								? (colors.text.primary as string)
+								: colors.border.medium,
+							backgroundColor:
+								pressed || hovered
+									? (colors.background.subtle as string)
+									: "transparent",
+						};
+					}}
 				>
 					<SlidersHorizontal
-						size={16}
+						size={15}
 						strokeWidth={2}
 						color={colors.text.primary as string}
 					/>
-					{filterActive && (
-						<View
-							style={{
-								position: "absolute",
-								top: 6,
-								right: 6,
-								width: 7,
-								height: 7,
-								borderRadius: 999,
-								backgroundColor: colors.primary.main,
-								borderWidth: 1.5,
-								borderColor: colors.background.warm,
-							}}
-						/>
+					{isDesktop && (
+						<Caption weight="semibold" color="primary">
+							Filters
+						</Caption>
 					)}
+					{active && <CountBadge count={count} />}
 				</Pressable>
 			</View>
 		</View>
 	);
 }
 
+/** Ink on the page: the count, not a decorative dot. */
+function CountBadge({ count }: { count: number }) {
+	const { colors, spacing } = useTheme();
+	return (
+		<View
+			style={{
+				minWidth: 18,
+				height: 18,
+				paddingHorizontal: spacing[1],
+				borderRadius: 999,
+				alignItems: "center",
+				justifyContent: "center",
+				backgroundColor: colors.text.primary as string,
+			}}
+		>
+			<Micro weight="bold" color={colors.text.inverse as string}>
+				{count}
+			</Micro>
+		</View>
+	);
+}
+
 /**
- * The cause picker. Changes are staged until Apply, and causes are multi-select
- * so a volunteer can follow more than one vertical at once.
+ * What to see, and which causes. Changes are staged until Apply - on a
+ * phone the sheet covers the feed, so filtering live would mean tapping
+ * through a list nobody can see.
+ *
+ * This was two tile grids: five 96pt tiles for the content type (four
+ * across, so "Updates" wrapped alone and stretched the full width) and the
+ * same tile per cause, whose 88pt minimum broke "Environment" and
+ * "Healthcare" mid-word. The content type is now a single-line segmented
+ * control - five short peers, exactly one chosen - and causes are wrapping
+ * chips that size to their names, so no label can break.
  */
 export function FeedFilterSheet({
 	visible,
@@ -253,12 +276,10 @@ export function FeedFilterSheet({
 	content: FeedContent;
 	onContent: (value: FeedContent) => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const [draftCategoryIds, setDraftCategoryIds] = useState(categoryIds);
 	const [draftContent, setDraftContent] = useState(content);
 
-	// Drafts, applied on Apply: on a phone the sheet covers the feed, so
-	// filtering live would mean tapping through a list nobody can see.
 	useEffect(() => {
 		if (visible) {
 			setDraftCategoryIds(categoryIds);
@@ -283,72 +304,66 @@ export function FeedFilterSheet({
 		setDraftContent("all");
 	};
 
-	// Both halves count, so the button says how many filters are actually on.
-	const activeCount =
-		draftCategoryIds.length + (draftContent === "all" ? 0 : 1);
+	const activeCount = feedFilterCount(draftCategoryIds, draftContent);
 
 	return (
 		<Sheet
 			visible={visible}
 			onClose={onClose}
-			title="Shape your feed"
-			subtitle="Choose what you want to see first."
+			title="Filters"
 			footer={
-				<View style={{ flexDirection: "row", gap: spacing[2] }}>
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						gap: spacing[3],
+					}}
+				>
 					<Button
-						variant="outline"
-						// size="sm"
+						variant="ghost"
 						onPress={reset}
-						style={{
-							flex: 1,
-							backgroundColor: colors.background.subtle,
-						}}
+						disabled={activeCount === 0}
+						accessibilityLabel="Reset filters"
 					>
 						Reset
 					</Button>
 					<Button onPress={apply} style={{ flex: 1 }}>
-						{activeCount > 0
-							? `Apply filters (${activeCount})`
-							: "Apply filters"}
+						{activeCount > 0 ? `Apply (${activeCount})` : "Apply"}
 					</Button>
 				</View>
 			}
 		>
-			<View style={{ paddingBottom: spacing[2], gap: spacing[5] }}>
-				<FilterSection title="What you want to see">
-					{CONTENT_OPTIONS.map((option) => (
-						<FilterCard
-							key={option.value}
-							label={option.label}
-							icon={option.icon}
-							selected={draftContent === option.value}
-							// Tapping the selected one clears back to Everything, so
-							// the row never becomes a trap with no way out.
-							onPress={() =>
-								setDraftContent(
-									draftContent === option.value ? "all" : option.value,
-								)
-							}
-						/>
-					))}
+			<View style={{ paddingBottom: spacing[3], gap: spacing[6] }}>
+				<FilterSection title="Show">
+					<Segmented
+						label="Show"
+						options={CONTENT_OPTIONS}
+						value={draftContent}
+						onChange={setDraftContent}
+					/>
 				</FilterSection>
 
-				<FilterSection title="Cause">
-					<FilterCard
-						label="All causes"
-						icon={Sparkles}
-						selected={draftCategoryIds.length === 0}
-						onPress={() => setDraftCategoryIds([])}
-					/>
-					{categories.map((category, index) => (
-						<FilterCard
-							key={category.id}
-							label={category.name}
-							icon={categoryIcon(category.name, index)}
-							selected={draftCategoryIds.includes(category.id)}
-							onPress={() => toggleCategory(category.id)}
+				<FilterSection
+					title="Causes"
+					hint={
+						draftCategoryIds.length === 0
+							? "Any cause"
+							: `${draftCategoryIds.length} selected`
+					}
+				>
+					{categories.length === 0 ? (
+						<Caption color="quaternary">No causes to filter by yet.</Caption>
+					) : (
+						<MultiChoiceChips
+							label="Causes"
+							options={categories.map((category) => ({
+								value: category.id,
+								label: category.name,
+							}))}
+							values={draftCategoryIds}
+							onToggle={toggleCategory}
 						/>
-					))}
+					)}
 				</FilterSection>
 			</View>
 		</Sheet>
@@ -357,98 +372,103 @@ export function FeedFilterSheet({
 
 function FilterSection({
 	title,
+	hint,
 	children,
 }: {
 	title: string;
+	hint?: string;
 	children: React.ReactNode;
 }) {
 	const { spacing } = useTheme();
 	return (
-		<View style={{ gap: spacing[2] }}>
-			<Caption color="tertiary">{title}</Caption>
+		<View style={{ gap: spacing[3] }}>
 			<View
 				style={{
 					flexDirection: "row",
-					flexWrap: "wrap",
-					gap: spacing[2],
+					alignItems: "baseline",
+					justifyContent: "space-between",
 				}}
 			>
-				{children}
+				<Label weight="semibold" accessibilityRole="header">
+					{title}
+				</Label>
+				{hint && <Caption color="quaternary">{hint}</Caption>}
 			</View>
+			{children}
 		</View>
 	);
 }
 
-function FilterCard({
+/**
+ * A single-line segmented control: equal segments on an inset track, the
+ * chosen one lifted onto the card surface. Radio semantics.
+ */
+function Segmented<T extends string>({
 	label,
-	icon: Icon,
-	selected,
-	onPress,
+	options,
+	value,
+	onChange,
 }: {
 	label: string;
-	icon: typeof Layers3;
-	selected: boolean;
-	onPress: () => void;
+	options: ReadonlyArray<{ value: T; label: string }>;
+	value: T;
+	onChange: (value: T) => void;
 }) {
-	const { colors, spacing, borderRadius } = useTheme();
-	return (
-		<Pressable
-			onPress={onPress}
-			accessibilityRole="radio"
-			accessibilityState={{ checked: selected }}
-			{...focusable}
-			style={({ pressed }) => ({
-				flexGrow: 1,
-				flexBasis: 0,
-				minWidth: 88,
-				minHeight: 96,
-				alignItems: "flex-start",
-				justifyContent: "space-between",
-				padding: spacing[3],
-				borderRadius: borderRadius.md,
-				backgroundColor: selected
-					? colors.primary.tint
-					: pressed
-						? colors.background.tertiary
-						: colors.background.subtle,
-			})}
-		>
-			<Icon
-				size={20}
-				color={(selected ? colors.primary.ink : colors.text.tertiary) as string}
-				strokeWidth={1.9}
-			/>
-			<Label
-				weight={"medium"}
-				numberOfLines={2}
-				color={selected ? (colors.primary.ink as string) : "secondary"}
-				style={{ maxWidth: "100%", flexShrink: 1, textAlign: "left" }}
-			>
-				{label}
-			</Label>
-		</Pressable>
-	);
-}
+	const { colors, spacing, borderRadius, elevation, isDark } = useTheme();
 
-function categoryIcon(name: string, index: number) {
-	const normalized = name.toLowerCase();
-	if (normalized.includes("education") || normalized.includes("teach"))
-		return BookOpen;
-	if (normalized.includes("health") || normalized.includes("medical"))
-		return Stethoscope;
-	if (normalized.includes("food") || normalized.includes("hunger"))
-		return Utensils;
-	if (normalized.includes("environment") || normalized.includes("climate"))
-		return Leaf;
-	if (normalized.includes("tree") || normalized.includes("nature"))
-		return TreePine;
-	if (normalized.includes("women") || normalized.includes("child"))
-		return UsersRound;
-	if (normalized.includes("shelter") || normalized.includes("housing"))
-		return Building2;
-	if (normalized.includes("livelihood") || normalized.includes("employment"))
-		return BriefcaseBusiness;
-	if (normalized.includes("community") || normalized.includes("social"))
-		return Megaphone;
-	return [Boxes, HeartHandshake, Sparkles][index % 3] ?? Boxes;
+	return (
+		<View
+			accessibilityRole="radiogroup"
+			accessibilityLabel={label}
+			style={{
+				flexDirection: "row",
+				padding: 3,
+				gap: 2,
+				borderRadius: borderRadius.md,
+				backgroundColor: colors.background.subtle,
+			}}
+		>
+			{options.map((option) => {
+				const selected = option.value === value;
+				return (
+					<Pressable
+						key={option.value}
+						onPress={() => onChange(option.value)}
+						accessibilityRole="radio"
+						accessibilityLabel={option.label}
+						accessibilityState={{ checked: selected }}
+						{...focusable}
+						style={(state) => {
+							const { hovered } = state as PressState;
+							return {
+								flex: 1,
+								minWidth: 0,
+								height: 36,
+								alignItems: "center",
+								justifyContent: "center",
+								paddingHorizontal: spacing[1],
+								borderRadius: borderRadius.md - 2,
+								backgroundColor: selected
+									? isDark
+										? colors.background.overlay
+										: colors.background.card
+									: hovered
+										? colors.background.tertiary
+										: "transparent",
+								...(selected && !isDark ? elevation.card : {}),
+							};
+						}}
+					>
+						<Caption
+							weight="semibold"
+							numberOfLines={1}
+							color={selected ? "primary" : "tertiary"}
+						>
+							{option.label}
+						</Caption>
+					</Pressable>
+				);
+			})}
+		</View>
+	);
 }

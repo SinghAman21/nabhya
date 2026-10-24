@@ -27,7 +27,7 @@ import {
 	View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Pressable } from "@/components/ui/pressable";
+import { Pressable, PressableBoundary } from "@/components/ui/pressable";
 import { Caption, Label, Micro } from "@/components/ui/typography";
 import { mediaColors } from "@/constants/design-system";
 import { useTheme } from "@/hooks/use-theme";
@@ -76,7 +76,7 @@ export interface MediaViewerActions {
 	headline: string;
 	liked: boolean;
 	saved: boolean;
-	likeCount: number;
+	/** Above zero only. There is deliberately no like count - see the card. */
 	commentCount: number;
 	onToggleLike?: () => void;
 	onToggleSave?: () => void;
@@ -605,6 +605,12 @@ export function FeedMediaViewer({
 	const insets = useSafeAreaInsets();
 	const { width: windowWidth } = useWindowDimensions();
 	const [index, setIndex] = useState(initialIndex);
+	const hasActions = !!(
+		actions.onToggleLike ||
+		actions.onComment ||
+		actions.onToggleSave ||
+		actions.onShare
+	);
 	const scrollRef = useRef<ScrollView>(null);
 
 	// Swipe-down to dismiss, production-style: the content follows the
@@ -667,170 +673,177 @@ export function FeedMediaViewer({
 	}, [visible, initialIndex, windowWidth, translateY]);
 
 	return (
-		<Modal
-			visible={visible}
-			animationType="fade"
-			transparent
-			statusBarTranslucent
-			onRequestClose={onClose}
-			{...(Platform.OS === "ios"
-				? { presentationStyle: "overFullScreen" as const }
-				: {})}
-		>
-			<Animated.View
-				style={{
-					flex: 1,
-					backgroundColor: mediaColors.viewer,
-					opacity: backdropOpacity,
-				}}
-				{...pan.panHandlers}
+		<PressableBoundary>
+			<Modal
+				visible={visible}
+				animationType="fade"
+				transparent
+				statusBarTranslucent
+				onRequestClose={onClose}
+				{...(Platform.OS === "ios"
+					? { presentationStyle: "overFullScreen" as const }
+					: {})}
 			>
-				<Animated.View style={{ flex: 1, transform: [{ translateY }] }}>
-					{/* Top: close, title, counter. */}
-					<View
-						style={{
-							flexDirection: "row",
-							alignItems: "center",
-							gap: spacing[2],
-							paddingTop: insets.top + spacing[2],
-							paddingHorizontal: spacing[2],
-							paddingBottom: spacing[2],
-						}}
-					>
-						<Pressable
-							onPress={onClose}
-							accessibilityRole="button"
-							accessibilityLabel="Close media viewer"
-							hitSlop={8}
+				<Animated.View
+					style={{
+						flex: 1,
+						backgroundColor: mediaColors.viewer,
+						opacity: backdropOpacity,
+					}}
+					{...pan.panHandlers}
+				>
+					<Animated.View style={{ flex: 1, transform: [{ translateY }] }}>
+						{/* Top: close, title, counter. */}
+						<View
 							style={{
-								width: 44,
-								height: 44,
-								borderRadius: 22,
+								flexDirection: "row",
 								alignItems: "center",
-								justifyContent: "center",
+								gap: spacing[2],
+								paddingTop: insets.top + spacing[2],
+								paddingHorizontal: spacing[2],
+								paddingBottom: spacing[2],
 							}}
 						>
-							<X size={24} color={mediaColors.ink} strokeWidth={2} />
-						</Pressable>
-						<Label
-							weight="semibold"
-							numberOfLines={1}
-							style={{ flex: 1, color: mediaColors.ink }}
-						>
-							{actions.headline}
-						</Label>
-						{media.length > 1 && (
-							<Caption
-								weight="medium"
+							<Pressable
+								onPress={onClose}
+								accessibilityRole="button"
+								accessibilityLabel="Close media viewer"
+								hitSlop={8}
 								style={{
-									color: mediaColors.inkMuted,
-									minWidth: 40,
-									textAlign: "right",
+									width: 44,
+									height: 44,
+									borderRadius: 22,
+									alignItems: "center",
+									justifyContent: "center",
 								}}
 							>
-								{index + 1} / {media.length}
-							</Caption>
-						)}
-					</View>
+								<X size={24} color={mediaColors.ink} strokeWidth={2} />
+							</Pressable>
+							<Label
+								weight="semibold"
+								numberOfLines={1}
+								style={{ flex: 1, color: mediaColors.ink }}
+							>
+								{actions.headline}
+							</Label>
+							{media.length > 1 && (
+								<Caption
+									weight="medium"
+									style={{
+										color: mediaColors.inkMuted,
+										minWidth: 40,
+										textAlign: "right",
+									}}
+								>
+									{index + 1} / {media.length}
+								</Caption>
+							)}
+						</View>
 
-					{/* Middle: the media, swipeable. Mounted only while open so
+						{/* Middle: the media, swipeable. Mounted only while open so
 				    video players are created on demand and released on close. */}
-					{visible && (
-						<ScrollView
-							ref={scrollRef}
-							horizontal
-							pagingEnabled
-							showsHorizontalScrollIndicator={false}
-							onMomentumScrollEnd={(e) => {
-								setIndex(
-									Math.max(
-										0,
-										Math.min(
-											media.length - 1,
-											Math.round(e.nativeEvent.contentOffset.x / windowWidth),
+						{visible && (
+							<ScrollView
+								ref={scrollRef}
+								horizontal
+								pagingEnabled
+								showsHorizontalScrollIndicator={false}
+								onMomentumScrollEnd={(e) => {
+									setIndex(
+										Math.max(
+											0,
+											Math.min(
+												media.length - 1,
+												Math.round(e.nativeEvent.contentOffset.x / windowWidth),
+											),
 										),
-									),
-								);
-							}}
-							style={{ flex: 1 }}
-						>
-							{media.map((m, i) => (
-								<View key={m.id} style={{ width: windowWidth, flex: 1 }}>
-									{m.type === "IMAGE" ? (
-										<Image
-											source={{ uri: m.url }}
-											recyclingKey={m.id}
-											contentFit="contain"
-											transition={200}
-											accessibilityLabel={`Image ${i + 1} of ${media.length}`}
-											accessibilityIgnoresInvertColors
-											style={{ flex: 1 }}
-										/>
-									) : (
-										<ViewerVideoPage uri={m.url} active={i === index} />
-									)}
-								</View>
-							))}
-						</ScrollView>
-					)}
+									);
+								}}
+								style={{ flex: 1 }}
+							>
+								{media.map((m, i) => (
+									<View key={m.id} style={{ width: windowWidth, flex: 1 }}>
+										{m.type === "IMAGE" ? (
+											<Image
+												source={{ uri: m.url }}
+												recyclingKey={m.id}
+												contentFit="contain"
+												transition={200}
+												accessibilityLabel={`Image ${i + 1} of ${media.length}`}
+												accessibilityIgnoresInvertColors
+												style={{ flex: 1 }}
+											/>
+										) : (
+											<ViewerVideoPage uri={m.url} active={i === index} />
+										)}
+									</View>
+								))}
+							</ScrollView>
+						)}
 
-					{/* Bottom: the same four actions as the card. */}
-					<View
-						style={{
-							flexDirection: "row",
-							alignItems: "center",
-							justifyContent: "space-around",
-							paddingHorizontal: spacing[4],
-							paddingTop: spacing[2],
-							paddingBottom: insets.bottom + spacing[3],
-						}}
-					>
-						<ViewerAction
-							label={actions.liked ? "Unlike" : "Like"}
-							count={actions.likeCount}
-							active={actions.liked}
-							onPress={actions.onToggleLike}
-						>
-							<Heart
-								size={24}
-								color={actions.liked ? mediaColors.liked : mediaColors.ink}
-								strokeWidth={1.8}
-								fill={actions.liked ? mediaColors.liked : "transparent"}
-							/>
-						</ViewerAction>
-						<ViewerAction
-							label={`Comments on ${actions.headline}`}
-							count={actions.commentCount}
-							onPress={actions.onComment}
-						>
-							<MessageCircle
-								size={24}
-								color={mediaColors.ink}
-								strokeWidth={1.8}
-							/>
-						</ViewerAction>
-						<ViewerAction
-							label={actions.saved ? "Unsave" : "Save"}
-							active={actions.saved}
-							onPress={actions.onToggleSave}
-						>
-							<Bookmark
-								size={24}
-								color={mediaColors.ink}
-								strokeWidth={1.8}
-								fill={actions.saved ? mediaColors.ink : "transparent"}
-							/>
-						</ViewerAction>
-						<ViewerAction
-							label={`Share ${actions.headline}`}
-							onPress={actions.onShare}
-						>
-							<Share2 size={24} color={mediaColors.ink} strokeWidth={1.8} />
-						</ViewerAction>
-					</View>
+						{/* Bottom: the same four actions as the card - or, for a
+						    caller with none (a report's scanned page), only the
+						    safe-area gap, rather than four controls that do nothing. */}
+						{!hasActions ? (
+							<View style={{ height: insets.bottom + spacing[3] }} />
+						) : (
+							<View
+								style={{
+									flexDirection: "row",
+									alignItems: "center",
+									justifyContent: "space-around",
+									paddingHorizontal: spacing[4],
+									paddingTop: spacing[2],
+									paddingBottom: insets.bottom + spacing[3],
+								}}
+							>
+								<ViewerAction
+									label={actions.liked ? "Unlike" : "Like"}
+									active={actions.liked}
+									onPress={actions.onToggleLike}
+								>
+									<Heart
+										size={24}
+										color={actions.liked ? mediaColors.liked : mediaColors.ink}
+										strokeWidth={1.8}
+										fill={actions.liked ? mediaColors.liked : "transparent"}
+									/>
+								</ViewerAction>
+								<ViewerAction
+									label={`Comments on ${actions.headline}`}
+									count={actions.commentCount}
+									onPress={actions.onComment}
+								>
+									<MessageCircle
+										size={24}
+										color={mediaColors.ink}
+										strokeWidth={1.8}
+									/>
+								</ViewerAction>
+								<ViewerAction
+									label={actions.saved ? "Unsave" : "Save"}
+									active={actions.saved}
+									onPress={actions.onToggleSave}
+								>
+									<Bookmark
+										size={24}
+										color={mediaColors.ink}
+										strokeWidth={1.8}
+										fill={actions.saved ? mediaColors.ink : "transparent"}
+									/>
+								</ViewerAction>
+								<ViewerAction
+									label={`Share ${actions.headline}`}
+									onPress={actions.onShare}
+								>
+									<Share2 size={24} color={mediaColors.ink} strokeWidth={1.8} />
+								</ViewerAction>
+							</View>
+						)}
+					</Animated.View>
 				</Animated.View>
-			</Animated.View>
-		</Modal>
+			</Modal>
+		</PressableBoundary>
 	);
 }
 

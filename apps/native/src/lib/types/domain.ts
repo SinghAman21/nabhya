@@ -17,7 +17,7 @@ export type OrgVerificationStatus =
 	| "UNDER_REVIEW"
 	| "VERIFIED"
 	| "REJECTED";
-export type OrgStatus = "ACTIVE" | "SUSPENDED";
+export type OrgStatus = "ACTIVE" | "SUSPENDED" | "DELETED";
 export type UserStatus = "ACTIVE" | "SUSPENDED" | "DELETED";
 export type DocVerificationStatus = "PENDING" | "VERIFIED" | "REJECTED";
 
@@ -76,6 +76,8 @@ export interface OnboardingStatus {
 		organizationName: string;
 		verificationStatus: OrgVerificationStatus | null;
 		status: OrgStatus | null;
+		/** Why a suspended or deleted organisation is hidden. */
+		statusReason: string | null;
 	} | null;
 	verificationStatus: string | null;
 }
@@ -384,6 +386,9 @@ export interface AdminOrgDetail {
 	verificationStatus: OrgVerificationStatus | null;
 	rejectionReason: string | null;
 	status: OrgStatus | null;
+	/** The reviewer's reason for a suspension or deletion. */
+	statusReason?: string | null;
+	deletedAt?: string | null;
 	createdAt: string;
 	owner: {
 		id: string;
@@ -554,7 +559,10 @@ export interface MyDonation {
 	};
 }
 
-/** The 80G-style receipt, available only once the payment has completed. */
+/**
+ * The donation receipt, available only once the payment has completed. An
+ * acknowledgement of payment, not an 80G certificate - see `receipt-pdf.ts`.
+ */
 export interface DonationReceipt {
 	id: string;
 	receiptNumber: string | null;
@@ -566,6 +574,9 @@ export interface DonationReceipt {
 	donorEmail: string | null;
 	organizationName: string;
 	organizationCity: string | null;
+	organizationRegistration?: string | null;
+	/** The payment provider's id, for matching a bank statement. */
+	paymentReference?: string | null;
 }
 
 export interface OrgDonation {

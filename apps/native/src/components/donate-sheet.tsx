@@ -246,17 +246,17 @@ export function DonateSheet({
 						// is being confirmed.
 						if (me?.roles.includes("volunteer")) {
 							toast.success(
-								"Thank you - we're confirming your donation now. It shows under Your giving, with a receipt, once it lands.",
+								"Thank you - we're confirming your donation now. Your receipt is emailed and appears under Your giving once it lands.",
 								{
 									label: "View",
-									onPress: () => router.push("/(volunteer)/donations"),
+									onPress: () => router.push("/(volunteer)/giving"),
 								},
 							);
 						} else {
 							toast.success(
 								me
-									? "Thank you - we're confirming your donation now."
-									: `Thank you - we're confirming your donation now. ${guestEmail.trim()} is attached to the donation record. Email receipts aren't available yet.`,
+									? "Thank you - we're confirming your donation now. Your receipt will be emailed to you."
+									: `Thank you - we're confirming your donation now. Your receipt will be emailed to ${guestEmail.trim()}.`,
 							);
 						}
 					} catch (err: unknown) {

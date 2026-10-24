@@ -9,11 +9,13 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { View } from "react-native";
 import { ChoiceChips } from "@/components/choice-chips";
+import { DateTimeField } from "@/components/date-time-field";
 import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
+import { FormFooterRow, useFormButtonGrow } from "@/components/ngo/form-footer";
 import { Button } from "@/components/ui/button";
+import { Drawer } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/overlay";
-import { Sheet } from "@/components/ui/sheet";
 import { useCreateNeed, useUpdateNeed } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
@@ -43,8 +45,14 @@ const URGENCIES: Array<{ value: NeedUrgency; label: string; hint: string }> = [
 ];
 
 /**
- * Create-a-post sheet for the NGO Needs tab. Validation comes straight from the
- * shared schema, so the inline errors match what the API would reject.
+ * Create or edit a need (or an offer) from the NGO Needs tab. Validation comes
+ * straight from the shared schema, so the inline errors match what the API
+ * would reject.
+ *
+ * A right-hand `Drawer` (`wide`) on desktop, with the needs list still
+ * visible beside it, and a sheet on a phone; the action is pinned in the
+ * footer and sized to its label (`FormFooterRow`). It was a centred dialog
+ * with a full-width Publish bar.
  */
 export function NeedFormSheet({
 	visible,
@@ -61,6 +69,7 @@ export function NeedFormSheet({
 	need?: OrgNeedListItem | null;
 }) {
 	const { spacing } = useTheme();
+	const grow = useFormButtonGrow();
 	const inputStyle = useFieldInputStyle();
 	const textAreaStyle = useFieldInputStyle(110);
 	const createNeed = useCreateNeed();
@@ -95,6 +104,7 @@ export function NeedFormSheet({
 			urgency: need.urgency,
 			city: need.city ?? "",
 			state: defaultState ?? "",
+			expiresAt: need.expiresAt ? new Date(need.expiresAt) : undefined,
 		});
 		setFormError(null);
 	}, [need, form, defaultState]);
@@ -136,12 +146,15 @@ export function NeedFormSheet({
 	const type = form.watch("type");
 	const urgency = form.watch("urgency");
 	const quantity = form.watch("quantity");
+	const expiresAt = form.watch("expiresAt");
+	const noun = type === "OFFER" ? "offer" : "need";
 
 	return (
-		<Sheet
+		<Drawer
 			visible={visible}
 			onClose={close}
-			title={isEditing ? "Edit post" : "New post"}
+			wide
+			title={isEditing ? `Edit ${noun}` : `New ${noun}`}
 			subtitle={
 				isEditing
 					? "Changes go live as soon as you save."
@@ -150,9 +163,13 @@ export function NeedFormSheet({
 			footer={
 				<View style={{ gap: spacing[2] }}>
 					<FieldError message={formError} />
-					<Button onPress={onSubmit} loading={saving}>
-						{isEditing ? "Save changes" : "Publish post"}
-					</Button>
+					<FormFooterRow
+						primary={
+							<Button onPress={onSubmit} loading={saving} style={grow}>
+								{isEditing ? "Save changes" : `Publish ${noun}`}
+							</Button>
+						}
+					/>
 				</View>
 			}
 		>
@@ -241,6 +258,16 @@ export function NeedFormSheet({
 					/>
 				</Field>
 
+				<DateTimeField
+					label="Closes on (optional)"
+					value={expiresAt instanceof Date ? expiresAt : undefined}
+					onChange={(next) =>
+						form.setValue("expiresAt", next, { shouldValidate: true })
+					}
+					error={errors.expiresAt?.message}
+					hint="Leave empty to keep it open until the target is met or you close it."
+				/>
+
 				<View style={{ flexDirection: "row", gap: spacing[3] }}>
 					<Field label="City" error={errors.city?.message} style={{ flex: 1 }}>
 						<Input
@@ -268,6 +295,6 @@ export function NeedFormSheet({
 					</Field>
 				</View>
 			</View>
-		</Sheet>
+		</Drawer>
 	);
 }

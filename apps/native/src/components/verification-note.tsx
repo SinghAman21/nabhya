@@ -1,33 +1,58 @@
 import { useRouter } from "expo-router";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import { Banner } from "@/components/screen-shell";
 import { useIdentityStatus } from "@/hooks/use-documents";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
- * One line, shown inside the apply and pledge sheets to a volunteer who is not
- * verified yet: NGOs accept verified volunteers first.
+ * Whether the signed-in volunteer may apply or pledge yet.
  *
- * That constraint used to live only on the Profile banner, so a volunteer
- * learned it after applying - if at all - from an application that sat
- * pending. Said before the submit button, it is something they can act on.
- * Shown, never blocking: an unverified volunteer may still apply.
- *
- * `onNavigate` closes the host sheet first: the sheet is a modal, and pushing
- * a route under it would leave the verification screen hidden behind it.
+ * The server refuses both until the identity is VERIFIED
+ * (`assertIdentityVerified`); this mirrors it so the submit button is disabled
+ * with the reason beside it, instead of the volunteer filling in a message and
+ * learning on submit. `blocked` is false while loading so the button does not
+ * flash disabled for a verified volunteer - the server still has the last say.
  */
-export function VerificationNote({ onNavigate }: { onNavigate: () => void }) {
-	const { spacing } = useTheme();
-	const router = useRouter();
+export function useIdentityGate() {
 	const email = useAuthStore((s) => s.email);
 	const role = useAuthStore((s) => s.role);
 	const isVolunteer = !!email && role === "volunteer";
 	const identity = useIdentityStatus(isVolunteer);
 
-	if (!isVolunteer || identity.loading || identity.state === "verified") {
-		return null;
-	}
+	return {
+		identity,
+		isVolunteer,
+		blocked: isVolunteer && !identity.loading && identity.state !== "verified",
+	};
+}
+
+/**
+ * One line, shown inside the apply and pledge sheets to a volunteer who is not
+ * verified yet: applying and pledging need a verified identity.
+ *
+ * Said before the submit button so it is something they can act on, with the
+ * button beneath it disabled by the same `useIdentityGate`.
+ *
+ * `onNavigate` closes the host sheet first: the sheet is a modal, and anything
+ * opened under it would be hidden behind it. With `onVerify` the screen that
+ * owns the host sheet then opens its `VerifyIdentitySheet` - sequentially,
+ * never nested, and a beat later on native so the first modal has finished
+ * dismissing (iOS will not present over a modal that is still leaving).
+ * Without it the note falls back to the `/verify-identity` route.
+ */
+export function VerificationNote({
+	onNavigate,
+	onVerify,
+}: {
+	onNavigate: () => void;
+	onVerify?: () => void;
+}) {
+	const { spacing } = useTheme();
+	const router = useRouter();
+	const { identity, blocked } = useIdentityGate();
+
+	if (!blocked) return null;
 
 	// Someone who has already sent their ID has nothing to do; telling them to
 	// "verify now" read as if the submission had been lost.
@@ -37,27 +62,27 @@ export function VerificationNote({ onNavigate }: { onNavigate: () => void }) {
 					tone: "info" as const,
 					title: "Your ID is being checked",
 					description:
-						"You can apply meanwhile - NGOs see the verified badge once it's approved.",
+						"You can apply and pledge as soon as it's approved - usually within a day.",
 				}
 			: identity.state === "partial"
 				? {
 						tone: "warning" as const,
 						title: "Your identity submission is incomplete",
 						description:
-							"Finish the missing photo and submit both documents for review.",
+							"Finish the missing photo and submit both documents. Applying and pledging open once they're approved.",
 					}
 				: identity.state === "rejected"
 					? {
 							tone: "warning" as const,
 							title: "Your ID needs another look",
 							description:
-								"NGOs accept verified volunteers first. Tap to retake your photos.",
+								"Applying and pledging need a verified ID. Tap to retake your photos.",
 						}
 					: {
 							tone: "info" as const,
-							title: "NGOs accept verified volunteers first",
+							title: "Verify your ID to take part",
 							description:
-								"Verify your ID - an Aadhaar photo and a selfie. Tap to start.",
+								"NGOs meet volunteers in person, so applying and pledging need an Aadhaar photo and a selfie. Tap to start.",
 						};
 
 	return (
@@ -69,7 +94,11 @@ export function VerificationNote({ onNavigate }: { onNavigate: () => void }) {
 					: {
 							onPress: () => {
 								onNavigate();
-								router.push("/verify-identity");
+								if (!onVerify) {
+									router.push("/verify-identity");
+									return;
+								}
+								setTimeout(onVerify, Platform.OS === "web" ? 0 : 350);
 							},
 						})}
 			/>

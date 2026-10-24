@@ -1,35 +1,51 @@
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+import { storage } from "@/lib/storage";
 
 interface FeedState {
-	/** The Discover search term. */
+	/**
+	 * A feed search term. Nothing writes it today: the desktop top bar's field
+	 * is now a global search (`components/search-panel.tsx`) that opens
+	 * results rather than filtering the feed under it. Kept so a future
+	 * in-feed filter has one place to live.
+	 */
 	search: string;
 	setSearch: (search: string) => void;
-	/** City scope. Empty string means All India. */
+	/** City scope. Empty string (`ALL_INDIA`) means unscoped. */
 	city: string;
 	setCity: (city: string) => void;
-	/** True once the user has picked a city themselves. */
-	cityTouched: boolean;
 }
 
 /**
- * Discover's search term and city scope, owned outside the screen.
+ * The feed's city scope, owned outside the screen.
  *
- * On desktop the search field lives in the top bar and on mobile it lives in the
- * page, so the value has to outlive whichever one is mounted - and there must be
- * exactly one of them. Two fields bound to two pieces of state is how a screen
- * ends up filtered by a term the visible input does not show.
+ * **The default is All India, always.** It used to apply the volunteer's
+ * profile city on first load (and fall back to Mumbai when a detected city
+ * came up empty), so a new volunteer's first feed was one city's handful of
+ * rows - on a young platform, often none - with nothing on screen explaining
+ * why. Their home city is now a one-tap row at the top of the picker, never
+ * applied on their behalf.
  *
- * `cityTouched` is what lets the feed default to the user's profile city without
- * fighting them: the default applies until they choose, and their choice then
- * stands. Without the flag, every profile refetch would reset their selection.
- *
- * Not persisted: a stale search or a city they were only passing through, restored
- * on next launch, looks like an empty feed.
+ * The city is persisted, because it is only ever set by the person choosing
+ * it: an explicit choice should survive a relaunch, and the default it
+ * replaces is the widest view rather than a guess. The search term is not.
  */
-export const useFeedStore = create<FeedState>((set) => ({
-	search: "",
-	setSearch: (search) => set({ search }),
-	city: "",
-	setCity: (city) => set({ city, cityTouched: true }),
-	cityTouched: false,
-}));
+export const useFeedStore = create<FeedState>()(
+	persist(
+		(set) => ({
+			search: "",
+			setSearch: (search) => set({ search }),
+			city: "",
+			setCity: (city) => set({ city }),
+		}),
+		{
+			name: "nabhya-feed-scope",
+			storage: createJSONStorage(() => ({
+				getItem: (key) => storage.get(key),
+				setItem: (key, value) => storage.set(key, value),
+				removeItem: (key) => storage.remove(key),
+			})),
+			partialize: (state) => ({ city: state.city }),
+		},
+	),
+);

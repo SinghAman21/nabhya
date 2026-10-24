@@ -253,7 +253,7 @@ describe("UsersService", () => {
 
 		/** Mimic a completed direct-to-storage upload so assertUploaded passes. */
 		async function stashUpload(userId: string, name: string) {
-			const key = `user-documents/${userId}/${name}`;
+			const key = `ngo_verification/user-documents/${userId}/${name}`;
 			await storage.putObject({
 				key,
 				body: new Uint8Array(64),
@@ -326,7 +326,7 @@ describe("UsersService", () => {
 					metadata: {
 						liveness: {
 							challenge: "BLINK",
-							secondaryFrameKey: `user-documents/${user.id}/missing.jpg`,
+							secondaryFrameKey: `ngo_verification/user-documents/${user.id}/missing.jpg`,
 						},
 					},
 				}),

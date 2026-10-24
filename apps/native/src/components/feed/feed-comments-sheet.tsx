@@ -107,7 +107,7 @@ export function FeedCommentsSheet({
 						<CommentRow
 							comment={comment}
 							canDelete={comment.user.id === userId}
-							onDelete={() => deleteComment.mutate(comment.id)}
+							onDelete={() => deleteComment.mutate({ id: comment.id, item })}
 						/>
 					)}
 					ListFooterComponent={

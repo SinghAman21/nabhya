@@ -10,7 +10,8 @@ export default function OnboardingLayout() {
 	// no credentials - every submit then left without an Authorization header and
 	// came back 401, with no route back to the login screen. On web it also
 	// stopped a signed-out visitor opening /volunteer directly.
-	if (!email) return <Redirect href="/" />;
+	// Straight to sign-in, not "/": see the note in `(ngo)/_layout.tsx`.
+	if (!email) return <Redirect href="/(auth)/login" />;
 
 	return (
 		<Stack screenOptions={HEADERLESS}>

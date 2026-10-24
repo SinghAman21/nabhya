@@ -11,6 +11,7 @@ export * from "./needs";
 export * from "./onboarding";
 export * from "./organization";
 export * from "./publishing";
+export * from "./responses";
 export * from "./roles";
 export * from "./search";
 export * from "./uploads";

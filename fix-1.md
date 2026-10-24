@@ -27,13 +27,22 @@ and what still needs a product decision.
 | F15–F16: public reactions and comment paging | Signed-out search reactions prompt sign-in with a route to login. Feed comments now load later pages and expose retry for a failed page. |
 | F17 and product-document mismatches | Updated app/target and SDK documentation, the 142-route inventory, legacy endpoint exceptions, the scheduler comment, NGO/volunteer role checklists, identity-flow ordering, report-export wording, and the architecture note status. |
 
-## Still needs product input
+## Formerly awaiting product input - now built (uncommitted)
 
-- **Delete NGO:** Define soft-delete versus hard-delete, public visibility, retention/anonymization, linked users/events/donations/certificates, and audit behavior before adding a destructive operation. The checklist now marks this unbuilt.
-- **Superadmin finance/report console:** Decide which donation states and financial reports are in scope, which donor fields are visible, who may access donor data, required filters, export format/columns, and audit requirements. These checklist items are now unchecked; no ledger/export routes were added.
-- **Downloadable or emailed donation receipts:** The current product is view-only, with no email provider configured. If a downloadable artifact or email delivery is still required, provide its required fields/branding, delivery provider, and guest-data/privacy expectations.
-- **Volunteer verification gate:** Product docs now match current behavior: identity verification does not block browsing or applying. If verification should gate applications or acceptance, specify the exact gate and update both UI and server policy.
-- **Runtime response schemas:** No per-endpoint response parsing was added. The architecture notes are historical and the current guides state this limitation. If runtime validation is required, decide the rollout scope and whether generated/shared schemas are expected across all routes.
+Each item was built with the default below; change the decision and the code
+follows from the named file.
+
+| Item | Decision taken | Where |
+|---|---|---|
+| Delete NGO | Soft delete with a required reason, restorable. Hidden like a suspension; live events cancelled, open needs closed, pending invites and ownership transfers revoked. Donations, certificates, applications and audit rows retained. Directory hides deleted NGOs unless filtered to them. | `AdminService.setOrganizationStatus`, migration `0017_org_soft_delete`, `org-detail-sheet.tsx`, `org-suspended.tsx` |
+| Finance console | Ledger over every status with totals over the filter; filters for status, IST date window, NGO and search; superadmins see real donors on anonymous gifts. CSV export of exactly the filtered rows, capped at 50,000, formula-guarded, audited as `DONATIONS_EXPORTED`. Cross-NGO financial reports list. NGO "Download report" CSV without donor emails. | `FinanceService`, `(admin)/finance.tsx`, `DonationsService.exportForMyOrganization` |
+| Receipts | PDF receipt (acknowledgement of payment, explicitly not 80G) stored privately and rebuilt if lost; emailed via Resend with the PDF attached on webhook completion, guests included. | `receipt-pdf.ts`, `MailService.sendDonationReceipt`, `GET /me/donations/:id/receipt/pdf` |
+| Verification gate | Applying to events and pledging to needs require a VERIFIED identity; browsing, following, reviewing and donating stay open. | `common/utils/identity.ts`, `verification-note.tsx` |
+| Runtime response schemas | Envelope on every response, `{ items, meta }` on every page, full schemas for onboarding status, checkout, receipts, exports and the ledger. Throws in dev, warns in prod; server specs parse real output through the same schemas. | `packages/shared/src/responses.ts`, `lib/api/http.ts` |
+
+Route count is now 147. Verification: server, shared and native typecheck;
+all 24 server spec files (414 tests) pass, including the previously stale
+`users.spec.ts` storage keys; `verify:di` passes.
 
 ## Verification and limits
 

@@ -140,6 +140,21 @@ export function authErrorCopy(
 		}
 	}
 
+	// Our API's throttler ("ThrottlerException: Too Many Requests") and
+	// Supabase's own limits ("Email rate limit exceeded", "For security
+	// purposes, you can only request this after 42 seconds") all mean the same
+	// thing to the person: nothing is wrong with what they typed, wait a bit.
+	if (
+		text.includes("too many requests") ||
+		text.includes("rate limit") ||
+		text.includes("for security purposes")
+	) {
+		return {
+			message:
+				"Too many attempts in a short time. Wait a minute, then try again.",
+		};
+	}
+
 	if (text.includes("network") || text.includes("fetch")) {
 		return {
 			message: "We couldn't reach Nabhya. Check your connection and try again.",

@@ -80,6 +80,39 @@ export type CreateFinancialReportInput = z.infer<
 	typeof createFinancialReportSchema
 >;
 
+/**
+ * The superadmin's cross-NGO view of transparency documents. Every report an
+ * NGO has filed, including those of suspended or deleted NGOs - the console is
+ * where a reviewer checks the books of an organisation the public can no
+ * longer see. `search` matches the title and the NGO's name.
+ */
+export const adminFinancialReportQuerySchema = paginationQuerySchema.extend({
+	organizationId: z.uuid().optional(),
+	type: financialReportTypeSchema.optional(),
+	financialYear: z.coerce.number().int().min(1990).max(2100).optional(),
+	search: z.string().trim().max(120).optional(),
+});
+
+export type AdminFinancialReportQuery = z.infer<
+	typeof adminFinancialReportQuerySchema
+>;
+
+export interface AdminFinancialReportRow {
+	id: string;
+	type: FinancialReportType;
+	title: string;
+	financialYear: number;
+	documentKey: string;
+	notes: string | null;
+	createdAt: string;
+	organization: {
+		id: string;
+		organizationName: string;
+		status: string | null;
+		verificationStatus: string | null;
+	};
+}
+
 /** Labels the FY the way Indian NGOs write it: 2025 → "FY 2025–26". */
 export function formatFinancialYear(year: number): string {
 	return `FY ${year}–${String((year + 1) % 100).padStart(2, "0")}`;

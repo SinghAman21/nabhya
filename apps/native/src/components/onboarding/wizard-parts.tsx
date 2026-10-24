@@ -1,8 +1,9 @@
 import type { LucideIcon } from "lucide-react-native";
-import type { ReactNode } from "react";
+import { createContext, type ReactNode, useContext } from "react";
 import { View } from "react-native";
 import { ListGroup, ListRow, SectionTitle } from "@/components/screen-shell";
-import { Body, Caption, H2, Label } from "@/components/ui/typography";
+import { Body, Caption, Label, Title } from "@/components/ui/typography";
+import { panelInk } from "@/constants/design-system";
 import { useTheme } from "@/hooks/use-theme";
 
 /**
@@ -15,11 +16,19 @@ import { useTheme } from "@/hooks/use-theme";
 /* -------------------------------------------------------------------------- */
 
 /**
+ * Which ground the aside is drawn on. `WizardShell` provides `brand` inside the
+ * desktop rail, where theme ink would be dark grey on dark brown in light mode;
+ * everywhere else it is the page.
+ */
+export const WizardSurfaceContext = createContext<"page" | "brand">("page");
+
+/**
  * What is being asked and why, as a short list of headed lines.
  *
- * Not a `Surface`: on desktop this is a column beside the form, and a card
- * there reads as a second form. Hairline-separated lines with an icon well is
- * the same recipe the verification screen's aside uses.
+ * Not a `Surface`: beside the form a card reads as a second form, and at the
+ * end of a phone's step it is one more box between the reader and the button.
+ * Hairline-free lines with an icon well, in theme ink on the page and in
+ * brand ink in the rail.
  */
 export function WizardAside({
 	title,
@@ -29,10 +38,16 @@ export function WizardAside({
 	points: ReadonlyArray<{ icon: LucideIcon; title: string; body: string }>;
 }) {
 	const { colors, spacing } = useTheme();
+	const onBrand = useContext(WizardSurfaceContext) === "brand";
+	const ink = onBrand ? colors.brand.ink : (colors.text.primary as string);
+	const muted = onBrand ? panelInk.muted : (colors.text.tertiary as string);
 
 	return (
 		<View style={{ gap: spacing[4] }}>
-			<Label weight="semibold" color="tertiary">
+			<Label
+				weight="semibold"
+				color={onBrand ? panelInk.faint : (colors.text.tertiary as string)}
+			>
 				{title}
 			</Label>
 			<View style={{ gap: spacing[5] }}>
@@ -46,20 +61,26 @@ export function WizardAside({
 								width: 32,
 								height: 32,
 								borderRadius: 16,
-								backgroundColor: colors.primary.tint,
 								alignItems: "center",
 								justifyContent: "center",
+								...(onBrand
+									? { backgroundColor: panelInk.fill }
+									: { backgroundColor: colors.primary.tint }),
 							}}
 						>
 							<Icon
 								size={16}
 								strokeWidth={2}
-								color={colors.primary.ink as string}
+								color={
+									onBrand ? panelInk.muted : (colors.primary.ink as string)
+								}
 							/>
 						</View>
 						<View style={{ flex: 1, minWidth: 0, gap: spacing[0.5] }}>
-							<Label weight="semibold">{pointTitle}</Label>
-							<Caption color="tertiary">{body}</Caption>
+							<Label weight="semibold" color={ink}>
+								{pointTitle}
+							</Label>
+							<Caption color={muted}>{body}</Caption>
 						</View>
 					</View>
 				))}
@@ -166,7 +187,7 @@ export function WizardDone({
 					/>
 				</View>
 				<View style={{ gap: spacing[1.5] }}>
-					<H2 accessibilityRole="header">{title}</H2>
+					<Title accessibilityRole="header">{title}</Title>
 					<Body color="tertiary">{lede}</Body>
 				</View>
 			</View>

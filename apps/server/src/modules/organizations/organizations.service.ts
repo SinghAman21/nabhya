@@ -93,9 +93,11 @@ export class OrganizationsService {
 			);
 		}
 
-		if (organization.status === "SUSPENDED") {
+		if (organization.status !== "ACTIVE") {
 			throw new ForbiddenException(
-				"This organization is suspended and cannot perform this action.",
+				organization.status === "DELETED"
+					? "This organization has been removed from Nabhya."
+					: "This organization is suspended and cannot perform this action.",
 			);
 		}
 
@@ -462,7 +464,7 @@ export class OrganizationsService {
 	}
 
 	/**
-	 * Whole-org counts for the NGO dashboard. Four small aggregates rather
+	 * Whole-org counts for the NGO dashboard. Six small aggregates rather
 	 * than one query with correlated subqueries - see the server guide's trap
 	 * about those - and each is an index range on `organization_id`.
 	 */
@@ -470,50 +472,61 @@ export class OrganizationsService {
 		const organization = await this.requireOwnedOrganization(userId);
 		const orgId = organization.id;
 
-		const [[publishedEvents], [openNeeds], [applications], [pledges]] =
-			await Promise.all([
-				this.db
-					.select({ value: count() })
-					.from(events)
-					.where(
-						and(
-							eq(events.organizationId, orgId),
-							eq(events.status, "PUBLISHED"),
-						),
+		const [
+			[publishedEvents],
+			[openNeeds],
+			[applications],
+			[pledges],
+			[draftEvents],
+			[followers],
+		] = await Promise.all([
+			this.db
+				.select({ value: count() })
+				.from(events)
+				.where(
+					and(eq(events.organizationId, orgId), eq(events.status, "PUBLISHED")),
+				),
+			this.db
+				.select({ value: count() })
+				.from(needs)
+				.where(and(eq(needs.organizationId, orgId), eq(needs.status, "OPEN"))),
+			this.db
+				.select({
+					total: count(),
+					parents: countDistinct(eventApplications.eventId),
+				})
+				.from(eventApplications)
+				.innerJoin(events, eq(eventApplications.eventId, events.id))
+				.where(
+					and(
+						eq(events.organizationId, orgId),
+						eq(eventApplications.status, "PENDING"),
 					),
-				this.db
-					.select({ value: count() })
-					.from(needs)
-					.where(
-						and(eq(needs.organizationId, orgId), eq(needs.status, "OPEN")),
+				),
+			this.db
+				.select({
+					total: count(),
+					parents: countDistinct(needPledges.needId),
+				})
+				.from(needPledges)
+				.innerJoin(needs, eq(needPledges.needId, needs.id))
+				.where(
+					and(
+						eq(needs.organizationId, orgId),
+						eq(needPledges.status, "PENDING"),
 					),
-				this.db
-					.select({
-						total: count(),
-						parents: countDistinct(eventApplications.eventId),
-					})
-					.from(eventApplications)
-					.innerJoin(events, eq(eventApplications.eventId, events.id))
-					.where(
-						and(
-							eq(events.organizationId, orgId),
-							eq(eventApplications.status, "PENDING"),
-						),
-					),
-				this.db
-					.select({
-						total: count(),
-						parents: countDistinct(needPledges.needId),
-					})
-					.from(needPledges)
-					.innerJoin(needs, eq(needPledges.needId, needs.id))
-					.where(
-						and(
-							eq(needs.organizationId, orgId),
-							eq(needPledges.status, "PENDING"),
-						),
-					),
-			]);
+				),
+			this.db
+				.select({ value: count() })
+				.from(events)
+				.where(
+					and(eq(events.organizationId, orgId), eq(events.status, "DRAFT")),
+				),
+			this.db
+				.select({ value: count() })
+				.from(follows)
+				.where(eq(follows.organizationId, orgId)),
+		]);
 
 		return {
 			publishedEvents: publishedEvents?.value ?? 0,
@@ -522,6 +535,8 @@ export class OrganizationsService {
 			eventsWithApplicants: applications?.parents ?? 0,
 			pendingPledges: pledges?.total ?? 0,
 			needsWithPledges: pledges?.parents ?? 0,
+			draftEvents: draftEvents?.value ?? 0,
+			followers: followers?.value ?? 0,
 		};
 	}
 

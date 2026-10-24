@@ -18,10 +18,15 @@ export const throttlerConfig: ThrottlerModuleOptions = {
 			ttl: 60_000,
 			limit: 120,
 		},
+		// @nestjs/throttler v6 applies EVERY named throttler to EVERY route, so
+		// this default is what an un-annotated route gets: it must not bind
+		// tighter than "default". It was 10, which capped every read (users/me,
+		// the unread count) at 10/min and 429'd an ordinary page-to-page walk.
+		// Opted-in routes set their own tight limit with @Throttle.
 		{
 			name: "strict",
 			ttl: 60_000,
-			limit: 10,
+			limit: 120,
 		},
 	],
 };

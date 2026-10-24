@@ -71,6 +71,17 @@ tap to edit and the other had a read-only table; one had a dead step.
 
 - **The primary action is pinned in the footer**, not the last thing in the
   scroll body. Continue used to sit below the fold on the NGO address step.
+- **Wide windows get the rail (>= 1024).** A deep-blue panel (`PanelWash`
+  `dusk`, the sign-in ground's quieter sibling) on the left with the wizard's `heading`, every step by name (done / current / to
+  come) and the aside in brand ink (`WizardSurfaceContext`). This was wrong: a
+  five-segment bar, an aside floating in a third column, and Continue as a
+  720pt orange bar. In the rail the footer is a row - Back left, Continue sized
+  to its label right - and the chevron is dropped, so there is still one Back.
+  Phones keep the bar (now in the brand fill), the chevron and full-width
+  Continue.
+- **The way out is `AccountSignOut`: the email, then "Sign out", on every
+  step.** It was "Not your NGO? Sign out" on step one only - a riddle that read
+  as the screen doubting you. Role select uses the same control.
 - **Progress is `WizardProgress`, not `StepIndicator`.** Five labelled dots
   truncate to "Orga…" on a 360dp screen. `StepIndicator` is still right for
   `(ngo)/verification`, which has three stages and room for their names.
@@ -204,6 +215,32 @@ tap to edit and the other had a read-only table; one had a dead step.
   the commonest cause. Sign-up's "already registered" offers Sign in. Everything
   else falls through to the real message, which is deliberate: "email not
   confirmed", a 401 and a dead network each need a different response.
+- **The brand panel states the promise, not just the name.** It was the
+  wordmark, a paragraph and a rule on 960pt of flat brown. It now carries the
+  voice line (`Display`, the only place NeutralFace runs past one word) and
+  `BRAND_VALUES` from `components/brand.tsx` - three lines, each mapped to a
+  real mechanism (document review, needs with quantities, verifiable
+  certificates). Keep them checkable; a slogan the product cannot back is worse
+  than the empty panel. The ground is `PanelWash` (`panelGrounds` in the token
+  file): a dark colour with **one faint wash** from a corner. A solid orange
+  sun with rings was tried and rejected as the loudest thing on the screen, and
+  a multi-colour blurred glow was rejected before it shipped - keep this
+  ground quiet. Type on it is white or `panelInk`. On a phone the hero sits
+  **inside** the scroll view so it scrolls away under the keyboard.
+- **Titles are `Title`, sentence case.** `H2` is the display face, which only
+  has capitals: WELCOME BACK and HOW WILL YOU USE NABHYA? were three shouting
+  lines on a phone. Auth, role select and both wizards use `Title`.
+- **Google comes first, with its mark.** It was last, an outline button with
+  no G. `Button` takes `leading` for a provider logo; the four Google hexes in
+  `google-signin-button.tsx` are the one correct hardcoded colour, since a logo
+  must not theme. "Forgot password?" is `FormField`'s `labelAction`, on the
+  password's label row.
+- **Role select is two full journeys on desktop, with no confirm.** Each column
+  lists its wizard's steps and the gate after them (ID check / document
+  review) and ends in a button named for the choice. The phone keeps the card
+  plus `confirm`, because a whole-card target is easy to hit by accident while
+  scrolling - and the confirm passes `destructive: false`: it was a red
+  Continue, which reads as a delete.
 - **Password fields pass `revealable`, not `secureTextEntry`.** `FormField` owns
   the toggle (`components/ui/form.tsx`). A masked field with no reveal is the
   biggest cause of a sign-in failure the user cannot explain - autocorrect, caps
@@ -228,6 +265,22 @@ defines.
   does both, and also drops the onboarding drafts - the one piece of persisted
   state that is neither auth nor cache, and the one that would otherwise hand the
   next person a form pre-filled with someone else's registration number.
+- **Sign-out leaves first, then forgets.** `useSignOut` drops pushed screens,
+  replaces the root route with `/(auth)/login`, *then* clears the store and
+  drafts, and clears the query cache a tick later. It used to clear first and
+  let guards route: every role layout redirected to `/`, the gate replaced
+  itself with login, and the still-mounted layout redirected back - "Maximum
+  update depth exceeded" at the root `Stack`, or a crash on device. **A guard
+  that finds no session redirects to `/(auth)/login` directly, never to `/`.**
+  Role-based mismatches (signed in, wrong group) still go through `/`.
+- **No button inside a button.** react-native-web renders
+  `accessibilityRole="button"` as `<button>`, so a control passed into a
+  pressable row or card through a prop is invalid HTML. `ListRow` takes
+  `action` (drawn beside the press target) and `Surface` takes `footer` for
+  exactly this. As a backstop, `ui/pressable.tsx` demotes a nested button on
+  the web and warns in dev with its label - treat that warning as a bug to fix,
+  not a pass. Anything that portals (`Modal` in sheet, drawer, media viewer)
+  sits in a `PressableBoundary`.
 - Feed rows arrive as one generic server shape; `lib/feed-adapter.ts` is the only
   place that knows its `content` keys. Screens read `FeedItem` (`kind` union) and
   call `useFeed` / `useFeedReaction` / `useToggleFollow` - never the raw endpoints.
@@ -293,6 +346,27 @@ Screens compose `components/screen-shell.tsx` (`ScreenHeader`, `Surface`,
   left every pushed page that is not also a sidebar destination with no visible
   way back. The browser's own control is the *browser's* history, sits outside
   the viewport, and is never reached by tabbing the page.
+- **Chips are one recipe** (`Chip` in `choice-chips.tsx`, behind `FilterChips`,
+  `ChoiceChips`, `MultiChoiceChips`): 36pt, one line, solid ink when selected,
+  a quiet fill (no border) otherwise, an optional `count`. Scrolling rows pad
+  their content so the first chip's fill and focus ring are never clipped. Form
+  choices wrap rather than scroll - an option past the edge is one nobody sees.
+- **`Surface` with a `footer` tints as one card** - the outer card is a
+  role-less pressable, the body is the button, footer controls sit beside it.
+  `ListRow` rounds its own hover to its group's corners. `MetricRow` lays out a
+  balanced grid and draws rules only between cells.
+- **Sheet and drawer children are made text-safe** (`textSafe()` in
+  `ui/sheet.tsx`): `{subtitle && <Caption/>}` with `subtitle=""` rendered the
+  empty string into a `View` ("Unexpected text node"). Guard strings with a
+  ternary or `?.trim()`, never `&&`.
+- **Toasts** sit bottom-centre on desktop (bottom-right is where drawers pin
+  their decisions), lifted surface plus hairline, tone on the icon only, the
+  action an ink text button.
+- **The logo is drawn, not typed** - `components/logo.tsx` (`wordmark` /
+  `mark`). Icons, favicon, splash and the OG image are rendered from the same
+  paths by `assets/images/brand-src/render-brand.mjs` (see its header); the web
+  head and OG tags live in `app/+html.tsx`, and `og:image` is absolute only
+  when `EXPO_PUBLIC_SITE_URL` is set at build time.
 - **Every sheet is `components/ui/sheet.tsx`.** Native is `@gorhom/bottom-sheet`
   (pan to dismiss, detents, keyboard-aware, pinned title and footer); web is a
   `Modal` behind the same props. Never import `Modal` in a screen. Body content
@@ -325,12 +399,49 @@ Screens compose `components/screen-shell.tsx` (`ScreenHeader`, `Surface`,
   empty. The section previously held only All / Needs / Offers, so "events I
   can turn up to" had no control at all even though the server had taken `kind`
   all along. Both feeds (volunteer home and `(ngo)/feed`) use the same value.
-- The volunteer home header is two rows ("Home" with the city chip and search on
-  the right, then the lens chips with a filter button). Search is its own route,
-  `app/search.tsx`, with example searches before typing and All / NGOs / Needs /
-  Events / Updates result tabs (the feed API takes `kind`). The cause filter is a
-  sheet. Notifications live in Activity - no bell on Home. Appearance is a row in
-  the volunteer Profile (`useAppTheme().preference`), not a floating toggle.
+- **The volunteer feed opens on All India, always.** `store/feed-store.ts`
+  persists only a city the person *chose*; the profile city is a one-tap row in
+  the picker (All India first, then Your city, location, Popular, A-Z), never
+  applied for them. It used to apply `me.city` with a Mumbai fallback, so a new
+  volunteer's first feed was one city's handful of rows. `useSignOut` resets it.
+- The volunteer home header: `Title` "Home", the city chip and (phone) search,
+  then the lens chips with a filter button that shows a count
+  (`feedFilterCount()`). The filter sheet is one segmented content-type control
+  plus wrapping cause chips - tiles there produced a full-width "Updates" tile
+  and labels broken mid-word. Notifications live in Activity - no bell on Home.
+
+### Desktop shape, and when there is a back button
+
+- **Back.** `NAV_DESTINATIONS` in `components/back-button.tsx` lists the pages
+  reachable from the rail, top bar or account menu (`/notifications`, `/impact`,
+  `/certificates`, `/bookmarks`, `/following`, `/saved`, `/verify-identity`,
+  `/edit-profile`). On desktop those draw **no** back button - `ScreenHeader
+  back` falls back to the top-level title. Detail pages (`/events/<id>`,
+  `/ngos/<id>`, `/needs/<id>`, `/certificates/<code>`) and `/search` keep it.
+  Phones keep back on every pushed page. Rail destinations inside `(ngo)` show
+  back on phone only. A sidebar *and* a back chevron *and* a narrow centred
+  column on one page was the bug this replaced.
+- **Width.** `AppShell` tells `Screen` which chrome it drew
+  (`ShellFrameContext`). Beside the rail a shared page is left-aligned and
+  capped at `SHELL_PAGE_MAX_WIDTH` (1040); under the volunteer top bar it is
+  centred in the 1180 frame, capped the same. `Screen measure="reading"` caps at
+  760 for a form or a single document. A list that owns an inner scroller with
+  its own scrollbar inside a card is wrong - the page is the scroller.
+- **Nested stacks inside `withAppShell` use `useStackOptions()`**
+  (`lib/stack-options.ts`). The app has no React Navigation theme, so a stack
+  card is the library's light grey; a capped screen inside it showed two grey
+  strips in dark mode (the certificates list).
+- **A record, or a create/edit form, opens in a right `Drawer` on desktop**
+  (`xl` for records, `wide` for forms; a sheet on a phone): the NGO applicants
+  and pledges drawers lead with the event/need summary and carry status chips
+  with counts (`counts` on the two list endpoints); event, need, announcement
+  and report forms pin `FormFooterRow` (draft secondary, publish sized to its
+  label). Identity verification is a sheet (`VerifyIdentitySheet`), with
+  `/verify-identity` kept for deep links.
+- **Appearance is `AppearanceMenu`** (`components/appearance-menu.tsx`): an
+  anchored, non-portalled popover on desktop (sidebar footer, volunteer
+  account menu, profile row), `AppearanceSheet` on phones. Never a centred
+  dialog for a three-way choice.
 
 ### Scrolling on web
 
@@ -721,6 +832,13 @@ the numbers.
   two clear-button treatments, two heights, one `accessibilityRole="search"`
   between them. `compact` and `maxWidth` cover the top bar's 40pt/440 variant;
   `pending` dims the clear button while a keystroke waits on the debounce.
+  **Search is global, not a feed filter.** The desktop top bar and the NGO
+  feed header host `SearchFloat` (`components/search-panel.tsx`): an anchored
+  panel with recents, suggestions and live top results, Enter or "See all" to
+  `/search?q=`. The phone search page has the same start state and kind tabs.
+  RNW gives every `View` `zIndex: 0`, so an anchored panel's trigger and its
+  ancestors must be lifted while open (`select-menu.tsx`, the top bar and the
+  appearance menu all do it) or later siblings paint over it.
 - Role vocabulary is `volunteer` / `organisation` / `superadmin` from
   `@nabhya/shared` `roles.ts` - do not reintroduce the old `ngo` alias, and do not
   reintroduce `setGuestMode()` in `auth-store.ts`.

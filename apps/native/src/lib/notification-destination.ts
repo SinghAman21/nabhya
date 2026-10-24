@@ -35,7 +35,7 @@ export function notificationDestination(
 			// Only the NGO has a list of reviews to open.
 			return ngo ? "/(ngo)/reviews" : null;
 		case "DONATION":
-			return ngo ? "/(ngo)/donations" : "/(volunteer)/donations";
+			return ngo ? "/(ngo)/donations" : "/(volunteer)/giving";
 		case "ORGANIZATION_DOCUMENT":
 			return "/(ngo)/verification";
 		case "USER_DOCUMENT":

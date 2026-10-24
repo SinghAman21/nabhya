@@ -36,9 +36,11 @@ export function useOrgAccess() {
 
 	const status = org.data?.verificationStatus;
 	const isVerified = status === "VERIFIED";
+	// A deleted organisation is held to the same lock as a suspended one.
+	const hidden = (value: string | null | undefined) =>
+		value === "SUSPENDED" || value === "DELETED";
 	const isSuspended =
-		onboarding.data?.organization?.status === "SUSPENDED" ||
-		org.data?.status === "SUSPENDED";
+		hidden(onboarding.data?.organization?.status) || hidden(org.data?.status);
 
 	const can = (action: OrgPermissionAction) =>
 		team.isLoading || team.role === null ? !team.isError : team.can(action);

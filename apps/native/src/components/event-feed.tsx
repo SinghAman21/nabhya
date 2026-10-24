@@ -1,17 +1,17 @@
 import { useRouter } from "expo-router";
-import { CalendarDays, MapPin, Search, Users } from "lucide-react-native";
+import { CalendarDays, MapPin, Users } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
+import { OrgLogo } from "@/components/org-branding";
 import { PAGE_SIZE, PagedList, usePagedQuery } from "@/components/paged-list";
 import { EmptyState, FilterChips, Surface } from "@/components/screen-shell";
+import { SearchField } from "@/components/search-field";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Caption, H5, Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { useDebounced } from "@/hooks/useDebounced";
-import { useMedia } from "@/hooks/useMedia";
+import { useGridColumns, useMedia } from "@/hooks/useMedia";
 import { eventsApi, queryKeys } from "@/lib/api";
-import { focusWithin } from "@/lib/focus";
 import { formatDateRange } from "@/lib/format";
 import type { PublicEvent } from "@/lib/types";
 
@@ -25,7 +25,8 @@ const WHEN_FILTERS: Array<{ value: When; label: string }> = [
 
 /**
  * The browsable list of public events: search, an Upcoming / Past / All lens,
- * and a paged list of cards. Three columns on desktop, one on a phone.
+ * and a paged list of cards. Up to three columns on desktop (by window
+ * width, `useGridColumns`), one on a phone.
  *
  * The search field and chips sit above the list rather than inside it, so a
  * keystroke that empties the results does not unmount the field mid-word.
@@ -37,8 +38,9 @@ export function EventFeed({
 	header?: React.ReactNode;
 	contentPaddingTop?: number;
 }) {
-	const { colors, spacing, borderRadius } = useTheme();
+	const { spacing } = useTheme();
 	const { isDesktop } = useMedia();
+	const columns = useGridColumns();
 	const router = useRouter();
 	const [search, setSearch] = useState("");
 	const [when, setWhen] = useState<When>("upcoming");
@@ -58,38 +60,33 @@ export function EventFeed({
 		<View style={{ flex: 1, paddingTop: contentPaddingTop }}>
 			{header}
 
+			{/* One row on desktop: the field and its lens side by side, so the
+			    grid starts a row higher. Stacked on a phone. */}
 			<View
-				{...focusWithin}
 				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[2],
-					backgroundColor: colors.background.subtle,
-					borderRadius: borderRadius.lg,
-					paddingHorizontal: spacing[3.5],
-					marginBottom: spacing[3],
+					flexDirection: isDesktop ? "row" : "column",
+					alignItems: isDesktop ? "center" : "stretch",
+					gap: isDesktop ? spacing[4] : spacing[3],
+					marginBottom: spacing[5],
 				}}
 			>
-				<Search size={18} color={colors.text.quaternary as string} />
-				<Input
-					placeholder="Search events or NGOs"
-					value={search}
-					onChangeText={setSearch}
-					autoCapitalize="none"
-					autoCorrect={false}
-					returnKeyType="search"
-					accessibilityLabel="Search events"
-					style={{
-						flex: 1,
-						backgroundColor: "transparent",
-						borderWidth: 0,
-						paddingHorizontal: 0,
-						paddingVertical: spacing[3],
-					}}
+				<View style={{ flex: isDesktop ? 1 : undefined }}>
+					<SearchField
+						value={search}
+						onChange={setSearch}
+						placeholder="Search events or NGOs"
+						accessibilityLabel="Search events"
+						pending={search.trim() !== debouncedSearch}
+						maxWidth={isDesktop ? 480 : undefined}
+					/>
+				</View>
+				<FilterChips
+					options={WHEN_FILTERS}
+					value={when}
+					onChange={setWhen}
+					inline
 				/>
 			</View>
-
-			<FilterChips options={WHEN_FILTERS} value={when} onChange={setWhen} />
 
 			<PagedList
 				query={query}
@@ -97,7 +94,9 @@ export function EventFeed({
 				loadMore={loadMore}
 				loadingLabel="Finding events"
 				keyExtractor={(item) => item.id}
-				numColumns={isDesktop ? 3 : 1}
+				// The shared breakpoints (1 / 2 / 3 by window width), not a flat 3:
+				// at 800pt three columns were 240pt cards with titles in two words.
+				numColumns={columns}
 				empty={
 					<EmptyState
 						icon={CalendarDays}
@@ -158,10 +157,8 @@ export function EventCard({
 	event: PublicEvent;
 	onPress: () => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const remaining = Math.max(event.volunteersNeeded - event.acceptedCount, 0);
-	const orgInitial =
-		event.organization.organizationName?.charAt(0).toUpperCase() ?? "E";
 	const place = event.city ?? "Online";
 
 	return (
@@ -174,20 +171,11 @@ export function EventCard({
 					marginBottom: spacing[3],
 				}}
 			>
-				<View
-					style={{
-						width: 32,
-						height: 32,
-						borderRadius: 16,
-						backgroundColor: colors.primary.tint,
-						alignItems: "center",
-						justifyContent: "center",
-					}}
-				>
-					<Caption weight="bold" color={colors.primary.ink}>
-						{orgInitial}
-					</Caption>
-				</View>
+				<OrgLogo
+					name={event.organization.organizationName}
+					imageKey={event.organization.logo}
+					size={32}
+				/>
 				<Caption color="secondary" numberOfLines={1} style={{ flex: 1 }}>
 					{event.organization.organizationName}
 				</Caption>

@@ -74,8 +74,11 @@ export const notificationTypeSchema = z.enum([
 
 export type NotificationType = z.infer<typeof notificationTypeSchema>;
 
+// `stringbool` for the reason given above: the client always sends the flag,
+// and `coerce.boolean` read `unreadOnly=false` as true, so "All" listed only
+// unread notifications and looked empty once everything had been read.
 export const notificationQuerySchema = paginationQuerySchema.extend({
-	unreadOnly: z.coerce.boolean().default(false),
+	unreadOnly: z.stringbool().default(false),
 });
 
 export type NotificationQuery = z.infer<typeof notificationQuerySchema>;

@@ -6,7 +6,11 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/overlay";
 import { Sheet } from "@/components/ui/sheet";
 import { Body, Caption, Label } from "@/components/ui/typography";
-import { VerificationNote } from "@/components/verification-note";
+import { useVerifyIdentitySheet } from "@/components/verification/verify-identity-sheet";
+import {
+	useIdentityGate,
+	VerificationNote,
+} from "@/components/verification-note";
 import { useCreatePledge } from "@/hooks/use-needs";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
@@ -29,18 +33,33 @@ export function PledgeSheet({
 	onClose: () => void;
 }) {
 	const need = listItem;
+	// Owned here, outside the pledge sheet, so the gate can close the pledge and
+	// open verification in its place - one modal at a time.
+	const verify = useVerifyIdentitySheet();
 
-	if (!need) return null;
-
-	return <PledgeSheetContent key={need.id} need={need} onClose={onClose} />;
+	return (
+		<>
+			{need ? (
+				<PledgeSheetContent
+					key={need.id}
+					need={need}
+					onClose={onClose}
+					onVerify={verify.open}
+				/>
+			) : null}
+			{verify.sheet}
+		</>
+	);
 }
 
 function PledgeSheetContent({
 	need,
 	onClose,
+	onVerify,
 }: {
 	need: PublicNeed;
 	onClose: () => void;
+	onVerify: () => void;
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
 	const [quantity, setQuantity] = useState("");
@@ -48,6 +67,7 @@ function PledgeSheetContent({
 	const [error, setError] = useState<string | null>(null);
 	const pledge = useCreatePledge(need.id);
 	const router = useRouter();
+	const gate = useIdentityGate();
 
 	const isWant = need.type === "WANT";
 	const remaining =
@@ -104,17 +124,21 @@ function PledgeSheetContent({
 			title={isWant ? "Offer to help" : "Claim this"}
 			subtitle={need.organization.organizationName}
 			footer={
-				<Button onPress={submit} loading={pledge.isPending}>
+				<Button
+					onPress={submit}
+					loading={pledge.isPending}
+					disabled={gate.blocked}
+				>
 					{isWant ? "Send offer" : "Request this"}
 				</Button>
 			}
 		>
-			<VerificationNote onNavigate={onClose} />
+			<VerificationNote onNavigate={onClose} onVerify={onVerify} />
 			<View
 				style={{
 					padding: spacing[3.5],
 					borderRadius: borderRadius.md,
-					backgroundColor: colors.background.warm,
+					backgroundColor: colors.background.subtle,
 					marginBottom: spacing[5],
 				}}
 			>
@@ -133,7 +157,10 @@ function PledgeSheetContent({
 						How many {need.unit ?? "items"}?
 					</Label>
 					<Input
-						placeholder={remaining ? String(remaining) : "e.g. 10"}
+						// "Up to 4", not "4": a bare number in the box read as a value
+						// already filled in, and sending it empty then failed.
+						placeholder={remaining ? `Up to ${remaining}` : "e.g. 10"}
+						accessibilityLabel={`How many ${need.unit ?? "items"}`}
 						value={quantity}
 						onChangeText={(v) => setQuantity(v.replace(/\D/g, ""))}
 						keyboardType="number-pad"
@@ -152,10 +179,13 @@ function PledgeSheetContent({
 			</Label>
 			<Input
 				placeholder={
+					// Needs are people as often as things ("4 tutors"), so the prompt
+					// cannot assume items to drop off.
 					isWant
-						? "Condition of the items, when you can drop them off…"
+						? "When you can help, and anything the NGO should know…"
 						: "How you'll use these, when you can collect…"
 				}
+				accessibilityLabel="Message to the NGO"
 				value={message}
 				onChangeText={setMessage}
 				multiline

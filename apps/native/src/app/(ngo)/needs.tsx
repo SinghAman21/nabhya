@@ -14,9 +14,10 @@ import { AdminScreen } from "@/components/admin/list-chrome";
 import { SelectMenu, type SelectOption } from "@/components/admin/select-menu";
 import { Toolbar, useTableView } from "@/components/admin/toolbar";
 import { NeedFormSheet } from "@/components/need-form-sheet";
+import { NeedKicker, UrgentMark } from "@/components/ngo/record-summary";
 import { PendingCount, RowActions } from "@/components/ngo/table-cells";
 import { PagedList, usePagedQuery } from "@/components/paged-list";
-import { PledgesSheet } from "@/components/pledges-sheet";
+import { PledgesDrawer } from "@/components/pledges-sheet";
 import {
 	Banner,
 	EmptyState,
@@ -46,8 +47,8 @@ type StatusFilter = "ANY" | NeedStatus;
 
 const FILTERS: Array<SelectOption<TypeFilter>> = [
 	{ value: "ALL", label: "All" },
-	{ value: "WANT", label: "We need", hint: "Asking for something" },
-	{ value: "OFFER", label: "We're giving", hint: "Surplus you can pass on" },
+	{ value: "WANT", label: "Needs help", hint: "Asking for something" },
+	{ value: "OFFER", label: "Giving away", hint: "Surplus you can pass on" },
 ];
 
 /**
@@ -209,7 +210,19 @@ export default function NgoNeeds() {
 
 	const sheets = (
 		<>
-			<PledgesSheet need={reviewingLive} onClose={() => setReviewing(null)} />
+			<PledgesDrawer
+				need={reviewingLive}
+				onClose={() => setReviewing(null)}
+				// Closes the record, then opens the editor - one drawer at a time.
+				onEdit={
+					canEdit
+						? (need) => {
+								setReviewing(null);
+								setEditing(need);
+							}
+						: undefined
+				}
+			/>
 
 			<NeedFormSheet
 				visible={sheetOpen || !!editing}
@@ -228,7 +241,9 @@ export default function NgoNeeds() {
 		return (
 			<AdminScreen
 				title="Needs"
-				subtitle={subtitle}
+				// The table already counts the rows beneath; a second "5 posts"
+				// above the title said nothing new.
+				subtitle="Requests and offers in the volunteer feed"
 				action={newNeed}
 				toolbar={
 					<Toolbar view={view} onViewChange={setView}>
@@ -320,7 +335,10 @@ function needColumns({
 			key: "title",
 			header: "Post",
 			sortKey: "title",
-			minWidth: 240,
+			// The fixed columns plus this floor must fit a 1440 window beside the
+			// rail (~1100): at 240 the table ran ~80pt past the page and clipped
+			// "Remove" off the end of every row.
+			minWidth: 200,
 			render: (need) => (
 				<View style={{ minWidth: 0, alignSelf: "stretch" }}>
 					<Body weight="medium" numberOfLines={1}>
@@ -335,19 +353,20 @@ function needColumns({
 		{
 			key: "type",
 			header: "Type",
-			width: 120,
+			width: 100,
+			// A word, not a tinted pill: two hues down a column is colour
+			// carrying a label the header already names.
 			render: (need) => (
-				<StatusPill
-					label={need.type === "WANT" ? "We need" : "We're giving"}
-					tone={need.type === "WANT" ? "info" : "success"}
-				/>
+				<Caption color="secondary" numberOfLines={1}>
+					{need.type === "WANT" ? "Needs help" : "Giving away"}
+				</Caption>
 			),
 		},
 		{
 			key: "status",
 			header: "Status",
 			sortKey: "status",
-			width: 104,
+			width: 96,
 			render: (need) =>
 				need.status === "OPEN" ? (
 					<Caption color="quaternary">Open</Caption>
@@ -359,7 +378,7 @@ function needColumns({
 			key: "progress",
 			header: "Progress",
 			sortKey: "fulfilled",
-			width: 150,
+			width: 128,
 			align: "end",
 			render: (need) => (
 				<Caption color="tertiary" numberOfLines={1}>
@@ -383,7 +402,7 @@ function needColumns({
 			wideOnly: true,
 			render: (need) =>
 				need.urgency === "HIGH" ? (
-					<StatusPill label="Urgent" tone="error" />
+					<UrgentMark />
 				) : (
 					<Caption color="quaternary">{humanizeStatus(need.urgency)}</Caption>
 				),
@@ -392,7 +411,7 @@ function needColumns({
 			key: "posted",
 			header: "Posted",
 			sortKey: "createdAt",
-			width: 104,
+			width: 96,
 			align: "end",
 			render: (need) => (
 				<Caption color="quaternary">{formatDate(need.createdAt)}</Caption>
@@ -491,24 +510,14 @@ function NeedRow({
 				</View>
 			}
 		>
-			<View
-				style={{
-					flexDirection: "row",
-					alignItems: "center",
-					gap: spacing[2],
-					marginBottom: spacing[2.5],
-				}}
-			>
-				<StatusPill
-					label={need.type === "WANT" ? "We need" : "We're giving"}
-					tone={need.type === "WANT" ? "info" : "success"}
+			{/* Direction, urgency and state as type - the feed card's kicker. */}
+			<View style={{ marginBottom: spacing[2] }}>
+				<NeedKicker
+					type={need.type}
+					urgency={need.urgency}
+					status={need.status}
+					trailing={`Posted ${formatRelative(need.createdAt)}`}
 				/>
-				{need.urgency === "HIGH" && <StatusPill label="Urgent" tone="error" />}
-				{need.status !== "OPEN" && (
-					<StatusPill label={humanizeStatus(need.status)} tone="neutral" />
-				)}
-				<View style={{ flex: 1 }} />
-				<Caption color="quaternary">{formatRelative(need.createdAt)}</Caption>
 			</View>
 
 			<Body weight="bold" numberOfLines={1}>

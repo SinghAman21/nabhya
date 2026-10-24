@@ -1,5 +1,6 @@
 import { Platform, View, type ViewStyle } from "react-native";
 import { ADMIN_NAV_ITEMS, NGO_NAV_ITEMS } from "@/components/nav-items";
+import { ShellFrameContext } from "@/components/screen-shell";
 import { Sidebar } from "@/components/sidebar";
 import { TopBar, TopBarContent } from "@/components/top-bar";
 import { useMyOrganization } from "@/hooks/use-organization";
@@ -25,6 +26,24 @@ import { useAuthStore } from "@/store/auth-store";
  *
  * A signed-out visitor on a public page gets the capped column and no rail,
  * which is the honest answer: there is no navigation to offer them yet.
+ *
+ * ## Width
+ *
+ * The shell publishes which chrome it drew through `ShellFrameContext`, and
+ * `Screen` (screen-shell.tsx) sizes the page from it - so the rule lives in
+ * one place instead of in each screen's `style`:
+ *
+ * - **Rail** (`organisation`, `superadmin`): the content area runs from the
+ *   rail to the window edge with no cap of its own, and the page inside it is
+ *   left-aligned at `SHELL_PAGE_MAX_WIDTH` (1040; 760 for `measure="reading"`)
+ *   one gutter from the rail. It was a 720 column centred in a 1440 box, which
+ *   floated a narrow card mid-window with dead space either side of it.
+ * - **Top bar** (`volunteer`): the same 1180 frame `(volunteer)/_layout.tsx`
+ *   uses, with the page centred in it - there is no rail to align to.
+ * - **Signed out**: the top-bar frame, without the bar.
+ *
+ * Pages that are rail / top-bar destinations also drop their back chevron on
+ * desktop; that rule is `NAV_DESTINATIONS` in `back-button.tsx`.
  */
 
 /** Matches `(ngo)/_layout.tsx` - see the note there on why this is capped. */
@@ -71,9 +90,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 				<TopBar
 					home="/(volunteer)"
 					activityHref="/(volunteer)/activity"
-					profileHref="/(volunteer)/profile"
+					profileHref="/(volunteer)/me"
 				/>
-				<TopBarContent>{children}</TopBarContent>
+				<ShellFrameContext.Provider value="topbar">
+					<TopBarContent>{children}</TopBarContent>
+				</ShellFrameContext.Provider>
 			</View>
 		);
 	}
@@ -84,6 +105,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 			? ADMIN_NAV_ITEMS
 			: null;
 
+	if (!navItems) {
+		// Signed out: no chrome to offer, so the top bar's frame without the bar.
+		return (
+			<View
+				style={{
+					flex: 1,
+					...SHELL_HEIGHT,
+					backgroundColor: colors.background.warm,
+				}}
+			>
+				<ShellFrameContext.Provider value="topbar">
+					<TopBarContent>{children}</TopBarContent>
+				</ShellFrameContext.Provider>
+			</View>
+		);
+	}
+
 	return (
 		<View
 			style={{
@@ -93,25 +131,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 				backgroundColor: colors.background.warm,
 			}}
 		>
-			{navItems ? (
-				<Sidebar
-					navItems={navItems}
-					brandTitle={isOrg ? org?.organizationName : undefined}
-				/>
-			) : null}
-			<View style={{ flex: 1, minWidth: 0, alignItems: "center" }}>
-				<View
-					style={{
-						flex: 1,
-						// Without this a flex item is floored at its content height,
-						// which is the other half of the unscrollable-page problem.
-						minHeight: 0,
-						width: "100%",
-						maxWidth: CONTENT_MAX_WIDTH,
-					}}
-				>
+			<Sidebar
+				navItems={navItems}
+				brandTitle={isOrg ? org?.organizationName : undefined}
+			/>
+			<View
+				style={{
+					flex: 1,
+					minWidth: 0,
+					// Without this a flex item is floored at its content height,
+					// which is the other half of the unscrollable-page problem.
+					minHeight: 0,
+					// Left-aligned, not centred: `Screen` caps the page at
+					// SHELL_PAGE_MAX_WIDTH and pins it one gutter from the rail. A
+					// centred box put the page's left edge wherever the window width
+					// happened to leave it. The 1440 cap stays for screens that draw
+					// without `Screen` (the hero detail pages).
+					maxWidth: CONTENT_MAX_WIDTH,
+				}}
+			>
+				<ShellFrameContext.Provider value="rail">
 					{children}
-				</View>
+				</ShellFrameContext.Provider>
 			</View>
 		</View>
 	);

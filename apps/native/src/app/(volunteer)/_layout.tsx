@@ -7,12 +7,22 @@ import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { useAuthStore } from "@/store/auth-store";
 
+/*
+ * Route names here must not repeat one in `(ngo)`: groups drop out of the URL,
+ * so a reload of a shared `/profile` resolved to the NGO screen, whose guard
+ * bounced the volunteer and looped the root Stack. Hence `me` and `giving`.
+ */
 export default function VolunteerLayout() {
 	const role = useAuthStore((s) => s.role);
+	const email = useAuthStore((s) => s.email);
 	const { colors } = useTheme();
 	const { isDesktop } = useMedia();
 	const tabBarOptions = useTabBarOptions();
 
+	// Signed out: straight to sign-in, never via "/" - the gate there replaces
+	// itself with login, and a layout still mounted for that frame redirecting
+	// back to "/" looped the root Stack ("Maximum update depth exceeded").
+	if (!email) return <Redirect href="/(auth)/login" />;
 	if (role !== "volunteer") return <Redirect href="/" />;
 
 	/*
@@ -26,7 +36,7 @@ export default function VolunteerLayout() {
 				<TopBar
 					home="/(volunteer)"
 					activityHref="/(volunteer)/activity"
-					profileHref="/(volunteer)/profile"
+					profileHref="/(volunteer)/me"
 					searchable
 				/>
 				<TopBarContent>
@@ -57,10 +67,10 @@ export default function VolunteerLayout() {
 				/>
 				{/* Still routable - Activity links into them for the fuller list -
 				    but no longer destinations of their own. */}
-				<Tabs.Screen name="donations" options={{ href: null }} />
+				<Tabs.Screen name="giving" options={{ href: null }} />
 				<Tabs.Screen name="applications" options={{ href: null }} />
 				<Tabs.Screen
-					name="profile"
+					name="me"
 					options={{
 						title: "Profile",
 						tabBarIcon: ({ color, size }) => <User size={size} color={color} />,

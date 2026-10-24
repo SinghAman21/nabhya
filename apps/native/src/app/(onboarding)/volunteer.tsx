@@ -15,6 +15,7 @@ import {
 } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
+import { AccountSignOut } from "@/components/account-sign-out";
 import { MultiChoiceChips } from "@/components/choice-chips";
 import { Field, useFieldInputStyle } from "@/components/form-field";
 import { LocationFields } from "@/components/onboarding/location-fields";
@@ -31,7 +32,6 @@ import {
 	WizardDone,
 } from "@/components/onboarding/wizard-parts";
 import { ErrorState, LoadingState, Screen } from "@/components/screen-shell";
-import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { confirm } from "@/components/ui/overlay";
@@ -90,7 +90,7 @@ export default function VolunteerOnboarding() {
 	const signOut = useSignOut();
 
 	const draft = useOnboardingStore((s) => s.volunteer);
-	const merge = useOnboardingStore((s) => s.mergeVolunteer);
+	const mergeDraft = useOnboardingStore((s) => s.mergeVolunteer);
 	const clear = useOnboardingStore((s) => s.clearVolunteer);
 	const step = useOnboardingStore((s) => s.volunteerStep);
 	const setStep = useOnboardingStore((s) => s.setVolunteerStep);
@@ -104,6 +104,19 @@ export default function VolunteerOnboarding() {
 	const complete = useCompleteVolunteerOnboarding();
 
 	const [errors, setErrors] = useState<FieldErrors>({});
+	// Editing a field clears its error. Errors are only set on Continue, so a
+	// fixed phone number kept saying "Enter a valid phone number" until the
+	// next press - the form contradicting what was plainly typed.
+	const merge = (fields: Parameters<typeof mergeDraft>[0]) => {
+		mergeDraft(fields);
+		setErrors((current) => {
+			const stale = Object.keys(fields).filter((key) => key in current);
+			if (stale.length === 0) return current;
+			const next = { ...current };
+			for (const key of stale) delete next[key];
+			return next;
+		});
+	};
 	const [submitError, setSubmitError] = useState<string | null>(null);
 	const [done, setDone] = useState(false);
 	const [photoUploading, setPhotoUploading] = useState(false);
@@ -124,8 +137,8 @@ export default function VolunteerOnboarding() {
 		const seed: Partial<VolunteerDraft> = {};
 		if (!current.fullName && me.data.name) seed.fullName = me.data.name;
 		if (!current.phone && me.data.phone) seed.phone = me.data.phone;
-		if (Object.keys(seed).length > 0) merge(seed);
-	}, [isHydrated, me.data, merge]);
+		if (Object.keys(seed).length > 0) mergeDraft(seed);
+	}, [isHydrated, me.data, mergeDraft]);
 
 	/**
 	 * A resumed draft resumes where it stopped, but never past the first step
@@ -352,20 +365,20 @@ export default function VolunteerOnboarding() {
 		<WizardShell
 			steps={STEPS}
 			step={step}
+			heading="Your volunteer profile"
 			title={copy.title}
 			lede={copy.lede}
 			error={submitError}
 			// Withheld mid-submit, as in the NGO wizard: stepping back while
 			// "Finish setup" is in flight leaves the review behind a live request.
 			{...(step > 0 && !complete.isPending ? { onBack: back } : {})}
+			// Every step, not only the first: the account is just as wrong on
+			// step three, and the draft-discard confirm covers the cost.
 			exit={
-				step === 0 ? (
-					<TextAction
-						label={signOut.isPending ? "Signing out…" : "Not you? Sign out"}
-						onPress={signOutFromWizard}
-						disabled={signOut.isPending}
-					/>
-				) : null
+				<AccountSignOut
+					onPress={signOutFromWizard}
+					pending={signOut.isPending}
+				/>
 			}
 			// Not on the review - see the NGO wizard: the lede already says what
 			// finishing does, and a reassurance block under the list is a third
@@ -672,7 +685,8 @@ function ReviewStep({
 						value:
 							draft.latitude !== undefined && draft.longitude !== undefined
 								? "Saved - nearby NGOs will rank first"
-								: "Not saved",
+								: // Optional, and "Not saved" read as something that failed.
+									"Not shared - optional",
 						onEdit: () => onEdit(1),
 					},
 				]}

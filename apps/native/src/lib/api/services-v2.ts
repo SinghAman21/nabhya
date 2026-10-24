@@ -7,10 +7,12 @@ import type {
 	DonationCheckout,
 	DonationQuery,
 	DonationStats,
+	ExportFile,
 	IssueCertificateInput,
 	MarkAttendanceInput,
 	MarkReadInput,
 	NotificationQuery,
+	OrgDonationExportQuery,
 	OrgDonationQuery,
 	OrgReviewQuery,
 	Paginated,
@@ -20,6 +22,12 @@ import type {
 	ReviewSummary,
 	RevokeCertificateInput,
 	UpsertReviewInput,
+} from "@nabhya/shared";
+import {
+	donationCheckoutResponseSchema,
+	donationReceiptResponseSchema,
+	exportFileResponseSchema,
+	signedUrlResponseSchema,
 } from "@nabhya/shared";
 import type {
 	BookmarkListItem,
@@ -123,10 +131,31 @@ export const certificatesApi = {
 
 export const donationsApi = {
 	createCheckout: (input: CreateDonationInput) =>
-		http.post<DonationCheckout>(DONATIONS.CHECKOUT, input),
+		http.post<DonationCheckout>(
+			DONATIONS.CHECKOUT,
+			input,
+			donationCheckoutResponseSchema,
+		),
 	listMine: (query: Partial<DonationQuery>) =>
 		http.getPage<MyDonation>(DONATIONS.MINE, query),
-	receipt: (id: string) => http.get<DonationReceipt>(DONATIONS.receipt(id)),
+	receipt: (id: string) =>
+		http.get<DonationReceipt>(
+			DONATIONS.receipt(id),
+			undefined,
+			donationReceiptResponseSchema,
+		),
+	receiptPdfUrl: (id: string) =>
+		http.get<{ url: string }>(
+			DONATIONS.receiptPdf(id),
+			undefined,
+			signedUrlResponseSchema,
+		),
+	exportForOrg: (query: OrgDonationExportQuery) =>
+		http.post<ExportFile>(
+			DONATIONS.ORG_EXPORT,
+			query,
+			exportFileResponseSchema,
+		),
 	listForOrg: (query: Partial<OrgDonationQuery>) =>
 		http.get<Paginated<OrgDonation> & { stats: DonationStats }>(
 			DONATIONS.ORG,

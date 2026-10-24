@@ -2,6 +2,7 @@ import { View } from "react-native";
 import { Field } from "@/components/form-field";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "@/hooks/use-theme";
+import { stateForCity } from "@/lib/cities";
 
 /**
  * The city, asked only when it is not the NGO's own.
@@ -70,7 +71,16 @@ export function PlaceField({
 				<Input
 					placeholder="Which city?"
 					value={city}
-					onChangeText={onCity}
+					onChangeText={(next) => {
+						onCity(next);
+						// With no state on file the box beside this one is required;
+						// a city we know names its own state, so fill it rather than
+						// fail "State is required" on a typed "Mumbai".
+						if (!stateOnFile && !state.trim()) {
+							const known = stateForCity(next);
+							if (known) onState(known);
+						}
+					}}
 					editable={!disabled}
 					accessibilityLabel="City"
 					autoFocus

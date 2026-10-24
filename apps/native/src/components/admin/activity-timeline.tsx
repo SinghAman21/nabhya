@@ -11,7 +11,7 @@ import {
 } from "@/hooks/use-admin-lists";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
-import { formatDate, formatRelative } from "@/lib/format";
+import { formatRelative } from "@/lib/format";
 import { SelectMenu } from "./select-menu";
 
 /**
@@ -119,27 +119,50 @@ function TimelineBody({
 	onKindChange: (next: AdminActivityKind | "ALL") => void;
 	emptyHint: string;
 }) {
-	const { spacing } = useTheme();
+	const { colors, spacing } = useTheme();
+	const [menuOpen, setMenuOpen] = useState(false);
 
 	const groups = useMemo(() => groupByDay(items), [items]);
+	const options = [
+		{ value: "ALL" as const, label: "All activity" },
+		...kinds.map((entry) => ({
+			value: entry as AdminActivityKind | "ALL",
+			label: humanizeStatus(entry),
+		})),
+	];
 
 	return (
-		<View style={{ gap: spacing[3] }}>
-			<View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[2] }}>
+		<View
+			style={{
+				gap: spacing[3],
+				// The timeline is the last thing in the dossier, so an open panel
+				// over a short (or empty) list would run past the end of the
+				// drawer's scroll content and be clipped. Reserve its height while
+				// it is open: 36pt per option, its padding, and the trigger.
+				minHeight: menuOpen ? 40 + options.length * 36 + spacing[2] : 0,
+			}}
+		>
+			{/* Raised above the groups below it: on the web every View is its
+			    own stacking context, so without this the date headings painted
+			    straight through the open panel. */}
+			<View
+				style={{
+					flexDirection: "row",
+					flexWrap: "wrap",
+					alignItems: "center",
+					gap: spacing[2],
+					zIndex: menuOpen ? 20 : 1,
+				}}
+			>
 				<SelectMenu<AdminActivityKind | "ALL">
 					label="Type"
 					value={kind}
 					onChange={onKindChange}
-					options={[
-						{ value: "ALL", label: "All activity" },
-						...kinds.map((entry) => ({
-							value: entry as AdminActivityKind | "ALL",
-							label: humanizeStatus(entry),
-						})),
-					]}
+					onOpenChange={setMenuOpen}
+					options={options}
 				/>
 				{total > 0 && (
-					<Caption color="quaternary" style={{ alignSelf: "center" }}>
+					<Caption color="quaternary">
 						{total} {total === 1 ? "item" : "items"}
 					</Caption>
 				)}
@@ -164,9 +187,28 @@ function TimelineBody({
 				<View style={{ gap: spacing[4] }}>
 					{groups.map((group) => (
 						<View key={group.key} style={{ gap: spacing[2] }}>
-							<Caption weight="semibold" color="tertiary">
-								{group.label}
-							</Caption>
+							{/* The day gets a row of its own, ruled off, so it reads as
+							    a heading over the cards rather than as a caption that
+							    belongs to the one above. */}
+							<View
+								accessibilityRole="header"
+								style={{
+									flexDirection: "row",
+									alignItems: "center",
+									gap: spacing[2],
+								}}
+							>
+								<Caption weight="semibold" color="tertiary">
+									{group.label}
+								</Caption>
+								<View
+									style={{
+										flex: 1,
+										height: 1,
+										backgroundColor: colors.border.hairline,
+									}}
+								/>
+							</View>
 							<View style={{ gap: spacing[2] }}>
 								{group.items.map((item) => (
 									<ActivityCard key={`${item.kind}:${item.id}`} item={item} />
@@ -189,7 +231,10 @@ function groupByDay(items: AdminActivityItem[]) {
 		if (entry) {
 			entry.items.push(item);
 		} else {
-			map.set(item.groupKey, { label: item.groupLabel, items: [item] });
+			map.set(item.groupKey, {
+				label: dayLabel(item.groupKey, item.groupLabel),
+				items: [item],
+			});
 			order.push(item.groupKey);
 		}
 	}
@@ -199,6 +244,32 @@ function groupByDay(items: AdminActivityItem[]) {
 		return { key, ...group };
 	});
 }
+
+/**
+ * The server buckets by UTC day and sends the bucket as its label
+ * ("2026-10-17"), which is a key, not something to read. Format it as a day -
+ * in UTC, so the label cannot slide to the previous date west of Greenwich.
+ */
+const DAY_LABEL = new Intl.DateTimeFormat("en-IN", {
+	weekday: "short",
+	day: "numeric",
+	month: "short",
+	year: "numeric",
+	timeZone: "UTC",
+});
+
+function dayLabel(key: string, fallback: string) {
+	const date = /^\d{4}-\d{2}-\d{2}$/.test(key)
+		? new Date(`${key}T00:00:00Z`)
+		: null;
+	if (!date || Number.isNaN(date.getTime())) return fallback;
+	return DAY_LABEL.format(date);
+}
+
+const TIME_OF_DAY = new Intl.DateTimeFormat("en-IN", {
+	hour: "numeric",
+	minute: "2-digit",
+});
 
 /**
  * One timeline row.
@@ -247,7 +318,10 @@ export function ActivityCard({ item }: { item: AdminActivityItem }) {
 			>
 				<StatusPill label={humanizeStatus(item.kind)} tone="neutral" />
 				<Caption color="quaternary">
-					{formatRelative(item.occurredAt)} · {formatDate(item.occurredAt)}
+					{/* The day is the group heading above, so the row says only how
+					    long ago and at what time. */}
+					{formatRelative(item.occurredAt)} ·{" "}
+					{TIME_OF_DAY.format(new Date(item.occurredAt))}
 				</Caption>
 			</View>
 

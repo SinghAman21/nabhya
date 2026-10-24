@@ -337,6 +337,23 @@ export function useFeedComments(
 	});
 }
 
+/** A row with its comment count moved by `delta`, floored at zero. */
+function withCommentDelta(row: FeedItem, delta: number): FeedItem {
+	return {
+		...row,
+		engagement: {
+			...row.engagement,
+			comments: Math.max(0, row.engagement.comments + delta),
+		},
+	};
+}
+
+/**
+ * Comments patch the row's count in place rather than invalidating `["feed"]`,
+ * for the same reason as `useFeedReaction`: the refetch re-ran the ranker, so
+ * posting a comment reordered the feed under the open comments sheet and could
+ * swap the card it was written on.
+ */
 export function useCreateFeedComment() {
 	const queryClient = useQueryClient();
 	return useMutation({
@@ -346,7 +363,9 @@ export function useCreateFeedComment() {
 			queryClient.invalidateQueries({
 				queryKey: ["feed", "comments", variables.item.id],
 			});
-			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
+			patchFeedRow(queryClient, variables.item, (row) =>
+				withCommentDelta(row, 1),
+			);
 		},
 	});
 }
@@ -354,10 +373,15 @@ export function useCreateFeedComment() {
 export function useDeleteFeedComment() {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: (id: string) => feedApi.deleteComment(id),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["feed", "comments"] });
-			queryClient.invalidateQueries({ queryKey: queryScopes.feed });
+		mutationFn: ({ id }: { id: string; item: FeedItem }) =>
+			feedApi.deleteComment(id),
+		onSuccess: (_data, variables) => {
+			queryClient.invalidateQueries({
+				queryKey: ["feed", "comments", variables.item.id],
+			});
+			patchFeedRow(queryClient, variables.item, (row) =>
+				withCommentDelta(row, -1),
+			);
 		},
 	});
 }

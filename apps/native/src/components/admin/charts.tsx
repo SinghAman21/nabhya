@@ -5,7 +5,7 @@ import Svg, { Circle, Line, Path } from "react-native-svg";
 import { vizPalette } from "@/components/admin/viz-tokens";
 import { Surface } from "@/components/screen-shell";
 import { Pressable } from "@/components/ui/pressable";
-import { Caption, H2, H4, Label } from "@/components/ui/typography";
+import { Caption, H4, Label, Title } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { focusable, type PressState } from "@/lib/focus";
 
@@ -105,9 +105,12 @@ export function StatTile({
 			>
 				{/* Proportional figures, not tabular: equal-width digits make a
 				    large standalone number look loose. Tabular belongs in a column. */}
-				<H2 color={tone === "warning" ? colors.warning.ink : undefined}>
+				{/* The text face, not the display one: the display face draws only
+				    capitals and reads as decoration on a figure that is data - the
+				    dashboard rule is no display face on a figure. */}
+				<Title color={tone === "warning" ? colors.warning.ink : undefined}>
 					{compact(value)}
-				</H2>
+				</Title>
 				{delta !== undefined && delta !== 0 && (
 					<View style={{ paddingBottom: spacing[1] }}>
 						<Caption

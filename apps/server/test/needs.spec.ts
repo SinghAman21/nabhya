@@ -66,7 +66,10 @@ describe("NeedsService", () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
 			const need = await createNeed(db, org.id, { quantity: 10 });
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 
 			await service.pledge(volunteer.id, need.id, { quantity: 2 });
 
@@ -79,13 +82,30 @@ describe("NeedsService", () => {
 			expect(sent?.entityId).toBe(need.id);
 		});
 
+		it("refuses a pledge from a volunteer whose identity is not verified", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const need = await createNeed(db, org.id, { quantity: 10 });
+			const volunteer = await createUser(db, { role: "volunteer" });
+
+			await expect(
+				service.pledge(volunteer.id, need.id, { quantity: 2 }),
+			).rejects.toBeInstanceOf(ForbiddenException);
+
+			const pledges = await db.query.needPledges.findMany({});
+			expect(pledges).toHaveLength(0);
+		});
+
 		it("requires a quantity when the need specifies one", async () => {
 			// This is the bug that made fulfilment permanently read "0 of 100":
 			// a pledge with no quantity advances the counter by zero.
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
 			const need = await createNeed(db, org.id, { quantity: 100 });
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 
 			await expect(
 				service.pledge(volunteer.id, need.id, {}),
@@ -96,7 +116,10 @@ describe("NeedsService", () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
 			const need = await createNeed(db, org.id, { quantity: null });
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 
 			const pledge = await service.pledge(volunteer.id, need.id, {});
 			expect(pledge?.status).toBe("PENDING");
@@ -106,7 +129,10 @@ describe("NeedsService", () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
 			const need = await createNeed(db, org.id, { status: "CLOSED" });
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 
 			await expect(
 				service.pledge(volunteer.id, need.id, { quantity: 5 }),
@@ -119,7 +145,10 @@ describe("NeedsService", () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
 			const need = await createNeed(db, org.id, { quantity: 100 });
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 
 			await service.pledge(volunteer.id, need.id, { quantity: 10 });
 			await expect(
@@ -151,7 +180,10 @@ describe("NeedsService", () => {
 			const org = await createOrganization(db, owner.id);
 			const need = await createNeed(db, org.id, { quantity: 100 });
 			for (let i = 0; i < 3; i++) {
-				const volunteer = await createUser(db, { role: "volunteer" });
+				const volunteer = await createUser(db, {
+					role: "volunteer",
+					verificationStatus: "VERIFIED",
+				});
 				await createPledge(db, need.id, volunteer.id, {
 					status: i === 0 ? "ACCEPTED" : "PENDING",
 				});
@@ -166,6 +198,35 @@ describe("NeedsService", () => {
 			expect(pending.items[0]?.status).toBe("PENDING");
 			expect(pending.meta.total).toBe(2);
 		});
+
+		it("counts every state across the need, whatever the filter", async () => {
+			// The drawer's chips read "Pending 2 / Accepted 1" before either is
+			// pressed, so the counts ignore the status filter and the page.
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const need = await createNeed(db, org.id, { quantity: 100 });
+			for (const status of ["ACCEPTED", "PENDING", "PENDING"] as const) {
+				const volunteer = await createUser(db, {
+					role: "volunteer",
+					verificationStatus: "VERIFIED",
+				});
+				await createPledge(db, need.id, volunteer.id, { status });
+			}
+
+			const accepted = await service.listPledges(owner.id, need.id, {
+				page: 1,
+				limit: 1,
+				status: "ACCEPTED",
+			});
+			expect(accepted.counts).toEqual({
+				PENDING: 2,
+				ACCEPTED: 1,
+				REJECTED: 0,
+				COMPLETED: 0,
+				CANCELLED: 0,
+				all: 3,
+			});
+		});
 	});
 
 	describe("fulfilment accounting", () => {
@@ -173,7 +234,10 @@ describe("NeedsService", () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
 			const need = await createNeed(db, org.id, { quantity: 100 });
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 			const pledge = await createPledge(db, need.id, volunteer.id, {
 				quantity: 30,
 			});
@@ -193,7 +257,10 @@ describe("NeedsService", () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
 			const need = await createNeed(db, org.id, { quantity: 50 });
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 			const pledge = await createPledge(db, need.id, volunteer.id, {
 				quantity: 50,
 			});
@@ -213,7 +280,10 @@ describe("NeedsService", () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
 			const need = await createNeed(db, org.id, { quantity: 100 });
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 			const pledge = await createPledge(db, need.id, volunteer.id, {
 				quantity: 40,
 			});
@@ -237,7 +307,10 @@ describe("NeedsService", () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
 			const need = await createNeed(db, org.id, { quantity: 100 });
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 			const pledge = await createPledge(db, need.id, volunteer.id, {
 				quantity: 40,
 			});
@@ -267,7 +340,10 @@ describe("NeedsService", () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
 			const need = await createNeed(db, org.id, { quantity: 100 });
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 			const pledge = await createPledge(db, need.id, volunteer.id, {
 				quantity: 25,
 			});
@@ -289,7 +365,10 @@ describe("NeedsService", () => {
 			const ownerA = await createUser(db, { role: "organisation" });
 			const orgA = await createOrganization(db, ownerA.id);
 			const need = await createNeed(db, orgA.id);
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 			const pledge = await createPledge(db, need.id, volunteer.id);
 
 			const ownerB = await createUser(db, { role: "organisation" });
@@ -308,7 +387,10 @@ describe("NeedsService", () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
 			const need = await createNeed(db, org.id);
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 			await createPledge(db, need.id, volunteer.id, { status: "ACCEPTED" });
 
 			const result = await service.remove(owner.id, need.id);
@@ -351,10 +433,16 @@ describe("NeedsService - correlated counts", () => {
 		const need = await createNeed(db, org.id);
 
 		for (let i = 0; i < 2; i++) {
-			const volunteer = await createUser(db, { role: "volunteer" });
+			const volunteer = await createUser(db, {
+				role: "volunteer",
+				verificationStatus: "VERIFIED",
+			});
 			await createPledge(db, need.id, volunteer.id, { status: "PENDING" });
 		}
-		const accepted = await createUser(db, { role: "volunteer" });
+		const accepted = await createUser(db, {
+			role: "volunteer",
+			verificationStatus: "VERIFIED",
+		});
 		await createPledge(db, need.id, accepted.id, { status: "ACCEPTED" });
 
 		const result = await service.listForMyOrganization(
@@ -407,7 +495,10 @@ describe("NeedsService - correlated counts", () => {
 			const busy = await createNeed(db, org.id);
 			const quiet = await createNeed(db, org.id);
 			for (let i = 0; i < 2; i++) {
-				const volunteer = await createUser(db, { role: "volunteer" });
+				const volunteer = await createUser(db, {
+					role: "volunteer",
+					verificationStatus: "VERIFIED",
+				});
 				await createPledge(db, busy.id, volunteer.id);
 			}
 

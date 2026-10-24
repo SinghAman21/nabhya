@@ -1,10 +1,17 @@
 import { ORG_DOCUMENT_LABELS } from "@nabhya/shared";
+import { type Href, useRouter } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 import { OrgActivityTimeline } from "@/components/admin/activity-timeline";
 import { DocumentReviewRow } from "@/components/admin/document-review-row";
 import { OrgPostsSection } from "@/components/admin/org-posts-section";
-import { FactGroup, ReasonStep, Section } from "@/components/admin/sheet-parts";
+import {
+	DangerButton,
+	DecisionBar,
+	FactGroup,
+	ReasonStep,
+	Section,
+} from "@/components/admin/sheet-parts";
 import {
 	Banner,
 	ErrorState,
@@ -56,7 +63,7 @@ import { formatDate } from "@/lib/format";
  * in a row, they are always there and the primary one is obvious.
  *
  * **A reason is asked for when it is needed, where the press happened.**
- * Reject and Suspend turn the footer into a `ReasonStep`. The reason used to be
+ * Reject, Suspend and Delete turn the footer into a `ReasonStep`. The reason used to be
  * a field at the end of the body, so pressing Reject with it empty put an
  * error on a field below the fold and the button looked dead.
  */
@@ -88,8 +95,11 @@ export function OrgDetailSheet({
 	onNext?: () => void;
 }) {
 	const { spacing } = useTheme();
+	const router = useRouter();
 	// Which reason-needing decision the footer is asking about, if any.
-	const [step, setStep] = useState<"REJECT" | "SUSPEND" | null>(null);
+	const [step, setStep] = useState<"REJECT" | "SUSPEND" | "DELETE" | null>(
+		null,
+	);
 
 	const query = useAdminOrganization(organizationId ?? undefined);
 	const review = useReviewOrganization();
@@ -97,6 +107,8 @@ export function OrgDetailSheet({
 
 	const org = query.data;
 	const busy = review.isPending || setStatus.isPending;
+	const suspended = org?.status === "SUSPENDED";
+	const deleted = org?.status === "DELETED";
 
 	const close = () => {
 		setStep(null);
@@ -144,24 +156,43 @@ export function OrgDetailSheet({
 		);
 	};
 
-	const reinstate = async () => {
+	const remove = (reason: string) => {
 		if (!organizationId) return;
-		const ok = await confirm({
-			title: "Reinstate organization?",
-			message: "They will be able to publish again.",
-			confirmLabel: "Reinstate",
-		});
-		if (!ok) return;
 		setStatus.mutate(
-			{ id: organizationId, input: { status: "ACTIVE" } },
+			{ id: organizationId, input: { status: "DELETED", reason } },
 			{
-				onSuccess: () => toast.success("Organization reinstated."),
+				onSuccess: () => {
+					setStep(null);
+					toast.success(
+						"Organization deleted. Donations and certificates were retained.",
+					);
+				},
 				onError: (error) => toast.error(apiErrorMessage(error)),
 			},
 		);
 	};
 
-	const suspended = org?.status === "SUSPENDED";
+	const reinstate = async () => {
+		if (!organizationId) return;
+		const ok = await confirm({
+			title: deleted ? "Restore organization?" : "Reinstate organization?",
+			message: deleted
+				? "It reappears in the directory and its team can sign in to it again. Cancelled events stay cancelled - the NGO republishes what it wants."
+				: "They will be able to publish again.",
+			confirmLabel: deleted ? "Restore" : "Reinstate",
+		});
+		if (!ok) return;
+		setStatus.mutate(
+			{ id: organizationId, input: { status: "ACTIVE" } },
+			{
+				onSuccess: () =>
+					toast.success(
+						deleted ? "Organization restored." : "Organization reinstated.",
+					),
+				onError: (error) => toast.error(apiErrorMessage(error)),
+			},
+		);
+	};
 
 	return (
 		<Drawer
@@ -195,6 +226,28 @@ export function OrgDetailSheet({
 						onCancel={() => setStep(null)}
 						onConfirm={suspend}
 					/>
+				) : org && step === "DELETE" ? (
+					<ReasonStep
+						title={`Why delete ${org.organizationName}?`}
+						consequence="It disappears from every public page, its live events are cancelled and open needs closed, and pending team invites are revoked. Donations, certificates and the audit trail are kept, and you can restore it later."
+						placeholder="e.g. Registration found to be fraudulent"
+						confirmLabel="Delete organization"
+						pending={setStatus.isPending}
+						onCancel={() => setStep(null)}
+						onConfirm={remove}
+					/>
+				) : org && deleted ? (
+					// A deleted NGO has no verification decision to make - restoring
+					// it is the only action, and it must not sit beside "Approve".
+					<DecisionBar>
+						<Button
+							variant="outline"
+							onPress={reinstate}
+							loading={setStatus.isPending}
+						>
+							Restore organization
+						</Button>
+					</DecisionBar>
 				) : org ? (
 					<DecisionBar>
 						{org.verificationStatus !== "VERIFIED" && (
@@ -248,15 +301,36 @@ export function OrgDetailSheet({
 						{/* Suspension sits apart, at the far end: it is the one action
 						    here that is not part of the verification decision, and a
 						    destructive button beside "Approve" invites the wrong tap. */}
+						{/* Neither is a fill: "Approve" is this footer's one primary,
+						    and two red fills beside it shouted louder than the
+						    decision the drawer is open for. Delete, the rarer act, is
+						    the quietest; both still ask for a reason first. */}
 						<View style={{ flexGrow: 1 }} />
-						<Button
-							variant={suspended ? "outline" : "destructive"}
-							onPress={suspended ? reinstate : () => setStep("SUSPEND")}
+						<DangerButton
+							tone="text"
+							onPress={() => setStep("DELETE")}
 							disabled={busy}
-							loading={setStatus.isPending}
 						>
-							{suspended ? "Reinstate" : "Suspend"}
-						</Button>
+							Delete
+						</DangerButton>
+						{suspended ? (
+							<Button
+								variant="outline"
+								onPress={reinstate}
+								disabled={busy}
+								loading={setStatus.isPending}
+							>
+								Reinstate
+							</Button>
+						) : (
+							<DangerButton
+								onPress={() => setStep("SUSPEND")}
+								disabled={busy}
+								loading={setStatus.isPending}
+							>
+								Suspend
+							</DangerButton>
+						)}
 					</DecisionBar>
 				) : undefined
 			}
@@ -283,7 +357,24 @@ export function OrgDetailSheet({
 							tone={verificationTone(org.verificationStatus)}
 						/>
 						{suspended && <StatusPill label="Suspended" tone="error" />}
+						{deleted && <StatusPill label="Deleted" tone="error" />}
 					</View>
+
+					{org.statusReason && (suspended || deleted) && (
+						<View style={{ marginBottom: spacing[5] }}>
+							<Banner
+								tone="error"
+								title={
+									deleted && org.deletedAt
+										? `Deleted ${formatDate(org.deletedAt)}`
+										: suspended
+											? "Suspended"
+											: "Deleted"
+								}
+								description={org.statusReason}
+							/>
+						</View>
+					)}
 
 					{org.rejectionReason && (
 						<View style={{ marginBottom: spacing[5] }}>
@@ -294,6 +385,20 @@ export function OrgDetailSheet({
 							/>
 						</View>
 					)}
+
+					<View style={{ marginBottom: spacing[5], alignItems: "flex-start" }}>
+						{/* Closes first: the ledger is a page, and a drawer left open
+						    over it would cover the rows it was opened to show. */}
+						<TextAction
+							label="Donations to this NGO →"
+							tone="brand"
+							onPress={() => {
+								close();
+								router.push(`/(admin)/finance?org=${org.id}` as Href);
+							}}
+							accessibilityLabel={`Open the donation ledger for ${org.organizationName}`}
+						/>
+					</View>
 
 					<Section title="Organization">
 						<FactGroup
@@ -457,30 +562,5 @@ export function OrgDetailSheet({
 				</>
 			)}
 		</Drawer>
-	);
-}
-
-/**
- * The dossier footer's button row.
- *
- * Buttons **size to their labels** and wrap; none of them is full width. A
- * 100%-wide "Approve organization" in a 720pt panel is a banner, not a control
- * - the same reason the feed card's CTA hugs its label. Wrapping rather than
- * scrolling because on a narrow panel four buttons on two lines is readable and
- * four buttons you have to push sideways is not.
- */
-function DecisionBar({ children }: { children: React.ReactNode }) {
-	const { spacing } = useTheme();
-	return (
-		<View
-			style={{
-				flexDirection: "row",
-				alignItems: "center",
-				flexWrap: "wrap",
-				gap: spacing[2],
-			}}
-		>
-			{children}
-		</View>
 	);
 }

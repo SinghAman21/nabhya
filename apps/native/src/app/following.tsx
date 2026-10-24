@@ -2,12 +2,13 @@ import { useRouter } from "expo-router";
 import { UserCheck } from "lucide-react-native";
 import { View } from "react-native";
 import { withAppShell } from "@/components/app-shell";
+import { OrgLogo } from "@/components/org-branding";
 import { PAGE_SIZE, PagedList, usePagedQuery } from "@/components/paged-list";
 import { EmptyState, Screen, ScreenHeader } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption, Label } from "@/components/ui/typography";
+import { Body, Caption } from "@/components/ui/typography";
 import { useToggleFollow } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage, engagementApi, queryKeys } from "@/lib/api";
@@ -121,20 +122,13 @@ function Following() {
 								};
 							}}
 						>
-							<View
-								style={{
-									width: 40,
-									height: 40,
-									borderRadius: 20,
-									backgroundColor: colors.primary.tint,
-									alignItems: "center",
-									justifyContent: "center",
-								}}
-							>
-								<Label weight="bold" color={colors.primary.ink}>
-									{item.organization.organizationName[0]?.toUpperCase()}
-								</Label>
-							</View>
+							{/* The NGO's own logo, initials as the fallback - the same
+							    rounded square as its page, not a person's circle. */}
+							<OrgLogo
+								name={item.organization.organizationName}
+								imageKey={item.organization.logo}
+								size={40}
+							/>
 							<View style={{ flex: 1, minWidth: 0 }}>
 								<Body weight="medium" numberOfLines={1}>
 									{item.organization.organizationName}

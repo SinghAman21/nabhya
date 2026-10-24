@@ -33,6 +33,9 @@ flowchart TD
     F --> U[Receive Notifications]
 ```
 
-Identity review controls the volunteer's verification status and badge; it is
-not a prerequisite to browse NGOs, use the public feed, or apply to events.
-Volunteers can continue those flows while review is pending.
+Identity review controls the volunteer's verification status and badge, and it
+gates the two in-person acts: **applying to an event and pledging to a need
+both require a verified identity** (government ID and selfie, both approved).
+Browsing NGOs, the public feed, following, reviewing and donating stay open
+while review is pending; the apply and pledge sheets say what is missing and
+link to verification.

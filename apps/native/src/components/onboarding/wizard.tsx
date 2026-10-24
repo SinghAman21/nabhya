@@ -1,5 +1,12 @@
-import { ChevronLeft } from "lucide-react-native";
-import { Children, type ReactNode, useEffect, useRef } from "react";
+import { Check, ChevronLeft } from "lucide-react-native";
+import {
+	Children,
+	createContext,
+	type ReactNode,
+	useContext,
+	useEffect,
+	useRef,
+} from "react";
 import {
 	KeyboardAvoidingView,
 	Platform,
@@ -8,10 +15,14 @@ import {
 	type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BrandMark } from "@/components/brand";
+import { WizardSurfaceContext } from "@/components/onboarding/wizard-parts";
+import { PanelWash } from "@/components/panel-wash";
 import { Banner } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
 import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption, H2 } from "@/components/ui/typography";
+import { Body, Caption, H4, Label, Title } from "@/components/ui/typography";
+import { panelInk } from "@/constants/design-system";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { focusable } from "@/lib/focus";
@@ -20,8 +31,6 @@ import { verticalScrollbar } from "@/lib/scroll";
 /**
  * The frame both onboarding wizards sit in - NGO and volunteer.
  *
- * Three things it fixes over what each wizard did for itself:
- *
  * **The primary action is pinned.** Continue used to be the last thing in the
  * scroll body, so on the NGO's address step (a four-line address field plus
  * four inputs) it sat below the fold on a 360dp phone: the form looked like it
@@ -29,35 +38,32 @@ import { verticalScrollbar } from "@/lib/scroll";
  * where this design system puts a primary action everywhere else
  * (`events/[id]`, `ngos/[id]`, every sheet).
  *
- * **Progress is a bar, not a rail of labelled dots.** `StepIndicator` draws a
- * numbered circle with a word under each step; at five steps the words truncate
- * to "Orga…", "Addr…" and stop being words. Here the bar carries position and a
- * single line names the step you are actually on, which is the only label
- * anyone reads. `StepIndicator` is still right for the verification screen,
- * where three stages have somewhere to put their names.
+ * **Two shapes.** A phone (and a narrow window) gets the progress bar, the
+ * back chevron, the body and a full-width Continue, with the reassurance list
+ * at the end of the body so it is never a desktop-only reason.
  *
- * **Desktop gets the reassurance column.** These are the highest-stakes forms
- * in the product - an NGO decides here whether we look real - and a 560pt
- * column of inputs centred in a 1440pt window says nothing about why any of it
- * is being asked. The `aside` renders beside the form on desktop and at the
- * end of the scroll body on a phone, so it is never a desktop-only reason.
+ * A wide window gets the **rail**: a deep-blue panel on the left (the sign-in
+ * panel's quieter sibling - this is a working surface, not a welcome), holding every step by name with where you are in it, and the
+ * "why we ask" points under them. This was wrong before: the steps were a
+ * five-segment bar over a "Step 1 of 5" caption, the aside floated in a third
+ * column on the page ground, and Continue was a 720pt orange bar - the
+ * loudest thing on the screen was the one control that needs no explaining.
+ * In the rail the steps have room for their names (a vertical list, so five
+ * of them never truncate), and the footer is a row: Back on the left, Continue
+ * sized to its label on the right, which is where a desktop form puts them.
+ * The back chevron is dropped there, so there is still exactly one Back.
  */
 
 /**
- * Wide enough for two form fields side by side, and no wider.
- *
- * 560 was one field per row, which meant every step scrolled on a desktop with
- * two thirds of the window empty. At 720 the steps pair their fields
- * (`FieldPair`) and the review list runs two columns (`ReviewGrid`), so a step
- * fits a laptop window without scrolling - the body is still a `ScrollView`,
- * because "fits" is a default, not a guarantee: a short window, a browser zoom
- * or a step with every suggestion row open all need somewhere to go.
+ * Wide enough for two form fields side by side, and no wider. At 720 the steps
+ * pair their fields (`FieldPair`) and the review list runs two columns
+ * (`ReviewGrid`), so a step fits a laptop window without scrolling - the body
+ * is still a `ScrollView`, because "fits" is a default, not a guarantee.
  */
 const FORM_COLUMN = 720;
-const ASIDE_COLUMN = 320;
 
-/** Below this the aside goes back into the scroll body, as it does on a phone. */
-const ASIDE_MIN_WIDTH = 1180;
+/** The rail needs this much window to sit beside a full form column. */
+const RAIL_MIN_WIDTH = 1024;
 
 /**
  * Pins the page to the viewport on the web so the flex chain down to the
@@ -68,9 +74,16 @@ const ASIDE_MIN_WIDTH = 1180;
 const WEB_VIEWPORT: ViewStyle =
 	Platform.OS === "web" ? ({ height: "100dvh" } as unknown as ViewStyle) : {};
 
+/** Tells `WizardFooter` which shape it is drawn in, and where Back went. */
+const WizardLayoutContext = createContext<{
+	rail: boolean;
+	onBack?: () => void;
+}>({ rail: false });
+
 export function WizardShell({
 	steps,
 	step,
+	heading,
 	title,
 	lede,
 	onBack,
@@ -83,6 +96,8 @@ export function WizardShell({
 	/** Step names, in order. Used for the count and the current step's name. */
 	steps: readonly string[];
 	step: number;
+	/** What the whole wizard sets up - the rail's heading. */
+	heading?: string;
 	title: string;
 	lede?: string;
 	/** Omit on the first step - there is nowhere back to go. */
@@ -100,6 +115,7 @@ export function WizardShell({
 	const { isDesktop, width } = useMedia();
 	const insets = useSafeAreaInsets();
 	const scrollRef = useRef<ScrollView>(null);
+	const rail = isDesktop && width >= RAIL_MIN_WIDTH;
 
 	/*
 	 * Back to the top on a new step, and when a submit fails. Every step renders
@@ -116,25 +132,10 @@ export function WizardShell({
 		if (error) scrollRef.current?.scrollTo({ y: 0, animated: true });
 	}, [error]);
 
-	// The aside only earns its column when the window can hold both at full
-	// width; below that it goes back to the end of the form, as on a phone.
-	const showAside = Boolean(aside) && isDesktop && width >= ASIDE_MIN_WIDTH;
-
-	const body = (
-		<ScrollView
-			ref={scrollRef}
-			style={{ flex: 1 }}
-			contentContainerStyle={{
-				paddingHorizontal: spacing[5],
-				paddingTop: spacing[1],
-				paddingBottom: spacing[8],
-			}}
-			keyboardShouldPersistTaps="handled"
-			automaticallyAdjustKeyboardInsets
-			{...verticalScrollbar}
-		>
-			<View style={{ marginBottom: spacing[6] }}>
-				<H2 accessibilityRole="header">{title}</H2>
+	const intro = (
+		<>
+			<View style={{ marginBottom: spacing[7] }}>
+				<Title accessibilityRole="header">{title}</Title>
 				{lede ? (
 					<Body color="tertiary" style={{ marginTop: spacing[1.5] }}>
 						{lede}
@@ -147,107 +148,308 @@ export function WizardShell({
 					<Banner tone="error" title="That didn't save" description={error} />
 				</View>
 			) : null}
-
-			{children}
-
-			{aside && !showAside ? (
-				<View style={{ marginTop: spacing[8] }}>{aside}</View>
-			) : null}
-		</ScrollView>
+		</>
 	);
 
-	const formColumn = (
-		<View
-			style={{
-				flex: 1,
-				minHeight: 0,
-				...(isDesktop
-					? { maxWidth: FORM_COLUMN, flexGrow: 1, flexShrink: 1 }
-					: {}),
-			}}
-		>
-			<WizardProgress
-				steps={steps}
-				step={step}
-				onBack={onBack}
-				exit={exit}
-				topInset={insets.top}
-			/>
-
-			{/*
-			 * iOS needs the view lifted; Android resizes the window instead
-			 * (android.softwareKeyboardLayoutMode in app.json), and on web the
-			 * behaviour is the browser's. Same split as `AuthSplitLayout`.
-			 */}
-			<KeyboardAvoidingView
-				style={{ flex: 1, minHeight: 0 }}
-				behavior={Platform.OS === "ios" ? "padding" : undefined}
-			>
-				{body}
-			</KeyboardAvoidingView>
-
-			<View
-				style={{
-					paddingHorizontal: spacing[5],
-					paddingTop: spacing[3],
-					paddingBottom: insets.bottom + spacing[3],
-					borderTopWidth: 1,
-					borderTopColor: colors.border.hairline,
-					backgroundColor: colors.background.warm,
-				}}
-			>
-				{footer}
-			</View>
-		</View>
-	);
-
-	return (
-		<View
-			style={{
-				flex: 1,
-				backgroundColor: colors.background.warm,
-				...WEB_VIEWPORT,
-			}}
-		>
-			<View
-				style={{
-					flex: 1,
-					minHeight: 0,
-					flexDirection: "row",
-					justifyContent: "center",
-					gap: showAside ? spacing[10] : 0,
-					...(isDesktop ? { paddingHorizontal: spacing[8] } : {}),
-				}}
-			>
-				{formColumn}
-
-				{showAside ? (
-					<ScrollView
-						// A fixed-width column in a flex row must spell out its
-						// grow/shrink: react-native-web gives every ScrollView
-						// flexGrow: 1, which beats `width` whenever the row has room.
+	if (rail) {
+		const gutter = spacing[12];
+		return (
+			<WizardLayoutContext.Provider value={{ rail: true, onBack }}>
+				<View
+					style={{
+						flex: 1,
+						flexDirection: "row",
+						backgroundColor: colors.background.warm,
+						...WEB_VIEWPORT,
+					}}
+				>
+					<View
 						style={{
-							width: ASIDE_COLUMN,
+							width: width >= 1400 ? 400 : 340,
 							flexGrow: 0,
 							flexShrink: 0,
 							alignSelf: "stretch",
+							overflow: "hidden",
 						}}
-						contentContainerStyle={{
-							paddingTop: insets.top + spacing[16],
-							paddingBottom: spacing[10],
-						}}
-						{...verticalScrollbar}
 					>
-						{aside}
-					</ScrollView>
-				) : null}
+						<PanelWash ground="dusk" from="top-left" />
+						{/* Chrome: it scrolls for a short window, without a thumb. */}
+						<ScrollView
+							showsVerticalScrollIndicator={false}
+							style={{ flex: 1 }}
+							contentContainerStyle={{
+								flexGrow: 1,
+								padding: spacing[10],
+							}}
+						>
+							<BrandMark />
+							{heading ? (
+								<View style={{ marginTop: spacing[12] }}>
+									<Caption color={panelInk.faint}>Setting up</Caption>
+									<H4 color={colors.brand.ink} style={{ marginTop: 2 }}>
+										{heading}
+									</H4>
+								</View>
+							) : null}
+
+							<RailSteps steps={steps} step={step} />
+
+							{aside ? (
+								<View
+									style={{
+										marginTop: spacing[10],
+										paddingTop: spacing[8],
+										borderTopWidth: 1,
+										borderTopColor: panelInk.border,
+									}}
+								>
+									<WizardSurfaceContext.Provider value="brand">
+										{aside}
+									</WizardSurfaceContext.Provider>
+								</View>
+							) : null}
+						</ScrollView>
+					</View>
+
+					<View style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
+						<View
+							style={{
+								flexDirection: "row",
+								alignItems: "center",
+								justifyContent: "space-between",
+								minHeight: 40,
+								paddingHorizontal: gutter,
+								paddingTop: spacing[6],
+							}}
+						>
+							<Caption color="tertiary">
+								Step {step + 1} of {steps.length}
+							</Caption>
+							{exit}
+						</View>
+
+						<ScrollView
+							ref={scrollRef}
+							style={{ flex: 1 }}
+							contentContainerStyle={{
+								flexGrow: 1,
+								justifyContent: "center",
+								paddingHorizontal: gutter,
+								paddingTop: spacing[6],
+								paddingBottom: spacing[10],
+							}}
+							keyboardShouldPersistTaps="handled"
+							{...verticalScrollbar}
+						>
+							<View
+								style={{
+									width: "100%",
+									maxWidth: FORM_COLUMN,
+									alignSelf: "center",
+								}}
+							>
+								{intro}
+								{children}
+							</View>
+						</ScrollView>
+
+						<View
+							style={{
+								paddingHorizontal: gutter,
+								paddingVertical: spacing[4],
+								borderTopWidth: 1,
+								borderTopColor: colors.border.hairline,
+							}}
+						>
+							<View
+								style={{
+									width: "100%",
+									maxWidth: FORM_COLUMN,
+									alignSelf: "center",
+								}}
+							>
+								{footer}
+							</View>
+						</View>
+					</View>
+				</View>
+			</WizardLayoutContext.Provider>
+		);
+	}
+
+	return (
+		<WizardLayoutContext.Provider value={{ rail: false }}>
+			<View
+				style={{
+					flex: 1,
+					backgroundColor: colors.background.warm,
+					...WEB_VIEWPORT,
+				}}
+			>
+				<View
+					style={{
+						flex: 1,
+						minHeight: 0,
+						width: "100%",
+						maxWidth: isDesktop ? FORM_COLUMN + spacing[10] : undefined,
+						alignSelf: "center",
+					}}
+				>
+					<WizardProgress
+						steps={steps}
+						step={step}
+						onBack={onBack}
+						exit={exit}
+						topInset={insets.top}
+					/>
+
+					{/*
+					 * iOS needs the view lifted; Android resizes the window instead
+					 * (android.softwareKeyboardLayoutMode in app.json), and on web the
+					 * behaviour is the browser's. Same split as `AuthSplitLayout`.
+					 */}
+					<KeyboardAvoidingView
+						style={{ flex: 1, minHeight: 0 }}
+						behavior={Platform.OS === "ios" ? "padding" : undefined}
+					>
+						<ScrollView
+							ref={scrollRef}
+							style={{ flex: 1 }}
+							contentContainerStyle={{
+								paddingHorizontal: spacing[5],
+								paddingTop: spacing[2],
+								paddingBottom: spacing[8],
+							}}
+							keyboardShouldPersistTaps="handled"
+							automaticallyAdjustKeyboardInsets
+							{...verticalScrollbar}
+						>
+							{intro}
+							{children}
+							{aside ? (
+								<View
+									style={{
+										marginTop: spacing[8],
+										paddingTop: spacing[6],
+										borderTopWidth: 1,
+										borderTopColor: colors.border.hairline,
+									}}
+								>
+									{aside}
+								</View>
+							) : null}
+						</ScrollView>
+					</KeyboardAvoidingView>
+
+					<View
+						style={{
+							paddingHorizontal: spacing[5],
+							paddingTop: spacing[3],
+							paddingBottom: insets.bottom + spacing[3],
+							borderTopWidth: 1,
+							borderTopColor: colors.border.hairline,
+							backgroundColor: colors.background.warm,
+						}}
+					>
+						{footer}
+					</View>
+				</View>
 			</View>
+		</WizardLayoutContext.Provider>
+	);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Rail steps                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Every step by name, on the brand ground: done (a filled tick), current (a
+ * ring and the name in full ink) and to come (a quiet number). Display only -
+ * the review is where you jump back, and a tappable list here would let a
+ * person skip a step's validation.
+ */
+function RailSteps({
+	steps,
+	step,
+}: {
+	steps: readonly string[];
+	step: number;
+}) {
+	const { colors, spacing } = useTheme();
+
+	return (
+		<View
+			accessible
+			accessibilityRole="progressbar"
+			accessibilityLabel={`Step ${step + 1} of ${steps.length}: ${steps[step] ?? ""}`}
+			accessibilityValue={{ min: 1, max: steps.length, now: step + 1 }}
+			style={{ marginTop: spacing[8] }}
+		>
+			{steps.map((label, index) => {
+				const done = index < step;
+				const current = index === step;
+				const last = index === steps.length - 1;
+				return (
+					<View key={label} style={{ flexDirection: "row", gap: spacing[3.5] }}>
+						<View style={{ alignItems: "center", width: 26 }}>
+							<View
+								style={{
+									width: 26,
+									height: 26,
+									borderRadius: 13,
+									alignItems: "center",
+									justifyContent: "center",
+									backgroundColor: done ? colors.primary.main : "transparent",
+									borderWidth: done ? 0 : current ? 2 : 1,
+									borderColor: current ? colors.primary.main : panelInk.border,
+								}}
+							>
+								{done ? (
+									<Check
+										size={14}
+										strokeWidth={3}
+										color={colors.primary.contrast}
+									/>
+								) : (
+									<Caption
+										weight="bold"
+										color={current ? colors.brand.ink : panelInk.faint}
+									>
+										{index + 1}
+									</Caption>
+								)}
+							</View>
+							{last ? null : (
+								<View
+									style={{
+										width: 2,
+										height: 14,
+										marginVertical: 3,
+										borderRadius: 1,
+										backgroundColor: done
+											? colors.primary.main
+											: panelInk.border,
+									}}
+								/>
+							)}
+						</View>
+						<Label
+							weight={current ? "semibold" : "medium"}
+							color={current ? colors.brand.ink : panelInk.muted}
+							style={{ marginTop: 3 }}
+						>
+							{label}
+						</Label>
+					</View>
+				);
+			})}
 		</View>
 	);
 }
 
 /* -------------------------------------------------------------------------- */
-/* Progress                                                                   */
+/* Progress (phone)                                                           */
 /* -------------------------------------------------------------------------- */
 
 function WizardProgress({
@@ -309,9 +511,12 @@ function WizardProgress({
 						/>
 					</Pressable>
 				) : (
-					// Holds the row's height so the bar does not jump between the
-					// first step and the second.
-					<View style={{ width: 40, height: 40 }} />
+					// The mark holds the row's height on the first step, so the bar
+					// does not jump on the second - and the first screen of setup
+					// says whose app this is.
+					<View style={{ height: 40, justifyContent: "center" }}>
+						<BrandMark onDark={false} />
+					</View>
 				)}
 				{exit}
 			</View>
@@ -330,10 +535,11 @@ function WizardProgress({
 							flex: 1,
 							height: 4,
 							borderRadius: 2,
+							// The brand fill: a bar is a fill, never ink, so the
+							// 2.53:1 rule does not apply - and done reads as progress
+							// rather than as one more grey rule.
 							backgroundColor:
-								index <= step
-									? (colors.text.primary as string)
-									: colors.border.medium,
+								index <= step ? colors.primary.main : colors.border.medium,
 						}}
 					/>
 				))}
@@ -351,15 +557,13 @@ function WizardProgress({
 /* -------------------------------------------------------------------------- */
 
 /**
- * The step's one primary action, full width. `secondary` is for the one place a
- * wizard offers a real alternative (skipping the NGO wizard to browse first),
- * drawn as a quiet full-width row under it rather than as a second button
- * competing with it.
+ * The step's one primary action. On a phone it is full width, with Back left
+ * to the chevron above. In the rail layout it is a row - Back on the left,
+ * Continue sized to its label on the right - because a 720pt-wide orange bar
+ * on a desktop reads as a banner, not a button, and the chevron is gone there.
  *
- * There is no Back here. It used to sit beside the primary action while the
- * progress row also carried a chevron, so every step after the first offered
- * two Back controls doing the same thing. The chevron stays because it is where
- * every pushed page in the app puts its way back (`ScreenHeader`).
+ * `note` says why the action is off or what it will do. `secondary` is for the
+ * one place a wizard offers a real alternative, drawn quieter than the action.
  */
 export function WizardFooter({
 	primaryLabel,
@@ -378,21 +582,48 @@ export function WizardFooter({
 	secondary?: ReactNode;
 }) {
 	const { spacing } = useTheme();
+	const { rail, onBack } = useContext(WizardLayoutContext);
+
+	const noteText = note ? (
+		<Caption
+			color="quaternary"
+			accessibilityLiveRegion="polite"
+			style={{ textAlign: rail ? "right" : "center" }}
+		>
+			{note}
+		</Caption>
+	) : null;
+
+	if (rail) {
+		return (
+			<View
+				style={{ flexDirection: "row", alignItems: "center", gap: spacing[3] }}
+			>
+				{onBack ? (
+					<Button variant="outline" onPress={onBack} disabled={loading}>
+						Back
+					</Button>
+				) : null}
+				<View style={{ flex: 1, minWidth: 0 }}>{noteText}</View>
+				{secondary}
+				<Button
+					onPress={onPrimary}
+					loading={loading}
+					disabled={disabled}
+					style={{ minWidth: 200 }}
+				>
+					{primaryLabel}
+				</Button>
+			</View>
+		);
+	}
 
 	return (
 		<View style={{ gap: spacing[2] }}>
 			<Button onPress={onPrimary} loading={loading} disabled={disabled}>
 				{primaryLabel}
 			</Button>
-			{note ? (
-				<Caption
-					color="quaternary"
-					accessibilityLiveRegion="polite"
-					style={{ textAlign: "center" }}
-				>
-					{note}
-				</Caption>
-			) : null}
+			{noteText}
 			{secondary}
 		</View>
 	);

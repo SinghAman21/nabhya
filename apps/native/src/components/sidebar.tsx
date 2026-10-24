@@ -10,11 +10,9 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-	APPEARANCE_LABEL,
-	AppearanceSheet,
-	appearanceIcon,
-} from "@/components/appearance-row";
+import { AppearanceMenu } from "@/components/appearance-menu";
+import { APPEARANCE_LABEL, appearanceIcon } from "@/components/appearance-row";
+import { Logo } from "@/components/logo";
 import { Pressable } from "@/components/ui/pressable";
 import { Body, Caption, H5 } from "@/components/ui/typography";
 import { usePendingDocumentCount } from "@/hooks/use-admin";
@@ -43,8 +41,9 @@ import { useAuthStore } from "@/store/auth-store";
  * what keeps the transition seamless instead of a layout swap mid-animation.
  *
  * The footer is where settings live on desktop: an Appearance row that opens
- * the same three-way sheet the phone uses, then the account block - who is
- * signed in, as what, and the way out.
+ * a small anchored menu (`appearance-menu.tsx`; the phone's sheet in the
+ * mobile drawer), then the account block - who is signed in, as what, and the
+ * way out.
  */
 
 export interface NavItem {
@@ -142,6 +141,7 @@ function RailRow({
 	role = "link",
 	accessibilityLabel,
 	dot = false,
+	expanded,
 }: {
 	icon: LucideIcon;
 	label: string;
@@ -155,6 +155,8 @@ function RailRow({
 	labelOpacity?: Animated.AnimatedInterpolation<number>;
 	role?: "link" | "button";
 	accessibilityLabel?: string;
+	/** For a row that opens a menu: whether it is open. */
+	expanded?: boolean;
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
 
@@ -164,6 +166,9 @@ function RailRow({
 			accessibilityRole={role}
 			accessibilityLabel={accessibilityLabel ?? label}
 			{...(role === "link" ? { accessibilityState: { selected: active } } : {})}
+			{...(expanded === undefined
+				? {}
+				: { accessibilityState: { expanded }, "aria-haspopup": "menu" })}
 			{...(role === "link" ? currentPage(active) : {})}
 			{...focusable}
 			style={(state) => {
@@ -374,7 +379,6 @@ function RailFooter({
 	const user = useAuthStore((s) => s.user);
 	const role = useAuthStore((s) => s.role);
 	const signOut = useSignOut();
-	const [appearanceOpen, setAppearanceOpen] = useState(false);
 
 	const initials = useMemo(() => {
 		if (!user?.name) return user?.email?.charAt(0).toUpperCase() ?? "?";
@@ -410,24 +414,25 @@ function RailFooter({
 		</View>
 	);
 
+	// A floating menu beside the row on desktop - above it when the rail is
+	// open, out to the right when it is collapsed to 68pt - and the phone's
+	// sheet in the mobile drawer. `AppearanceMenu` makes that call.
 	const appearanceRow = (
-		<RailRow
-			icon={appearanceIcon(preference)}
-			label="Appearance"
-			value={APPEARANCE_LABEL[preference]}
-			role="button"
-			accessibilityLabel={`Appearance, ${APPEARANCE_LABEL[preference]}`}
-			collapsed={collapsed}
-			onPress={() => setAppearanceOpen(true)}
-			{...(labelOpacity ? { labelOpacity } : {})}
-		/>
-	);
-
-	const sheet = (
-		<AppearanceSheet
-			visible={appearanceOpen}
-			onClose={() => setAppearanceOpen(false)}
-		/>
+		<AppearanceMenu placement={collapsed ? "right-end" : "top-start"}>
+			{({ open, toggle }) => (
+				<RailRow
+					icon={appearanceIcon(preference)}
+					label="Appearance"
+					value={APPEARANCE_LABEL[preference]}
+					role="button"
+					accessibilityLabel={`Appearance, ${APPEARANCE_LABEL[preference]}`}
+					collapsed={collapsed}
+					expanded={open}
+					onPress={toggle}
+					{...(labelOpacity ? { labelOpacity } : {})}
+				/>
+			)}
+		</AppearanceMenu>
 	);
 
 	const signOutButton = (
@@ -465,7 +470,6 @@ function RailFooter({
 					{avatar}
 					{signOutButton}
 				</View>
-				{sheet}
 			</View>
 		);
 	}
@@ -513,7 +517,6 @@ function RailFooter({
 					{signOutButton}
 				</Animated.View>
 			</View>
-			{sheet}
 		</View>
 	);
 }
@@ -537,7 +540,7 @@ function BrandHeader({
 	trailing?: React.ReactNode;
 	collapsed?: boolean;
 }) {
-	const { spacing } = useTheme();
+	const { colors, spacing } = useTheme();
 
 	if (collapsed) {
 		return (
@@ -546,10 +549,10 @@ function BrandHeader({
 					paddingTop: spacing[4],
 					paddingBottom: spacing[2],
 					alignItems: "center",
-					gap: spacing[1],
+					gap: spacing[2],
 				}}
 			>
-				<H5 accessibilityLabel="nabhya">n</H5>
+				<Logo variant="mark" size={22} />
 				{trailing}
 			</View>
 		);
@@ -575,12 +578,16 @@ function BrandHeader({
 				{brandTitle ? (
 					<>
 						<H5 numberOfLines={1}>{brandTitle}</H5>
-						<Caption color="quaternary" numberOfLines={1}>
-							nabhya
-						</Caption>
+						{/* The product, quietly, under the NGO's own name. */}
+						<Logo
+							size={14}
+							color={colors.text.quaternary as string}
+							accent={false}
+							style={{ marginTop: spacing[1] }}
+						/>
 					</>
 				) : (
-					<H5 numberOfLines={1}>nabhya</H5>
+					<Logo size={22} />
 				)}
 			</Animated.View>
 			{trailing}
@@ -788,6 +795,11 @@ export function Sidebar({
 					borderRightColor: colors.border.hairline,
 					height: "100%",
 					overflow: "hidden",
+					// Above the content area beside it. Every RNW View is a
+					// `zIndex: 0` stacking context, so the collapsed rail's
+					// Appearance menu (fixed, out to the right) would otherwise be
+					// painted over by the page, which comes later in the DOM.
+					zIndex: 10,
 				}}
 			>
 				<BrandHeader

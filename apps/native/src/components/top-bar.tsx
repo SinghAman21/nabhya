@@ -1,24 +1,21 @@
 import { useRouter, useSegments } from "expo-router/build/hooks";
-import { History, LogOut, User } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import type { LucideIcon } from "lucide-react-native";
+import { Award, History, LogOut, Sparkles, User } from "lucide-react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform, View } from "react-native";
-import {
-	APPEARANCE_LABEL,
-	AppearanceSheet,
-	appearanceIcon,
-} from "@/components/appearance-row";
-import { ListRow } from "@/components/screen-shell";
-import { SearchField } from "@/components/search-field";
+import { AppearanceMenu } from "@/components/appearance-menu";
+import { APPEARANCE_LABEL, appearanceIcon } from "@/components/appearance-row";
+import { InitialAvatar } from "@/components/initial-avatar";
+import { Logo } from "@/components/logo";
+import { SearchFloat } from "@/components/search-panel";
 import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption, H5, Label } from "@/components/ui/typography";
+import { Body, Caption, Label } from "@/components/ui/typography";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useSignOut } from "@/hooks/use-auth";
 import { useUnreadCount } from "@/hooks/use-engagement";
 import { useTheme } from "@/hooks/use-theme";
 import { currentPage, focusable } from "@/lib/focus";
 import { useAuthStore } from "@/store/auth-store";
-import { useFeedStore } from "@/store/feed-store";
 
 /**
  * Desktop chrome for a shallow, browse-shaped role.
@@ -31,9 +28,11 @@ import { useFeedStore } from "@/store/feed-store";
  * Roles with real depth keep the sidebar: `(ngo)` has nine grouped destinations,
  * `(admin)` five plus tables. No one person sees both chromes.
  *
- * Search lives here on desktop and in the page on mobile - one field either way,
- * reading the same store, so a filtered feed can never disagree with the input
- * the user can see.
+ * Search lives here on desktop and is its own route on mobile; on desktop it
+ * is the field plus `SearchFloat`'s anchored panel. Both the panel and the
+ * account menu hang below the bar, so the bar carries `zIndex` - it precedes
+ * the page in the tree, and without it the page's own positioned children
+ * would paint over anything that overflows the bar.
  */
 
 export const TOP_BAR_HEIGHT = 60;
@@ -46,13 +45,16 @@ export function TopBar({
 	home,
 	activityHref,
 	profileHref,
-	searchable,
+	searchable = true,
 }: {
 	/** Where the wordmark goes - the default surface, so it needs no nav link. */
 	home: string;
 	activityHref: string;
 	profileHref: string;
-	/** Shows the search field. Only the feed consumes the term. */
+	/**
+	 * Shows the search field. On by default now that it is a global search
+	 * rather than a feed filter; hidden on `/search`, which is its own field.
+	 */
 	searchable?: boolean;
 }) {
 	const { colors, spacing, borderRadius } = useTheme();
@@ -65,6 +67,8 @@ export function TopBar({
 		<View
 			accessibilityRole="header"
 			style={{
+				position: "relative",
+				zIndex: 20,
 				height: TOP_BAR_HEIGHT,
 				flexDirection: "row",
 				alignItems: "center",
@@ -93,11 +97,11 @@ export function TopBar({
 					};
 				}}
 			>
-				<H5>nabhya</H5>
+				<Logo size={22} label={null} />
 			</Pressable>
 
 			<View style={{ flex: 1, alignItems: "center" }}>
-				{searchable && <TopBarSearch />}
+				{searchable && !segments.includes("search") && <TopBarSearch />}
 			</View>
 
 			<ActivityButton
@@ -205,18 +209,18 @@ function UnreadBadge({ count }: { count: number }) {
 /* Search                                                                     */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * A global search, not a feed filter. It used to write the feed store's term,
+ * so typing here quietly narrowed the Home feed under the field - on every
+ * other page it did nothing at all. It now drops `SearchFloat`'s panel
+ * (recent, suggestions, live results by kind) and Enter opens `/search`.
+ * 440 and 40pt: the field shares a 60pt row with the wordmark and the
+ * account controls, so it is chrome rather than page content.
+ */
 function TopBarSearch() {
-	const search = useFeedStore((s) => s.search);
-	const setSearch = useFeedStore((s) => s.setSearch);
-
-	// 440 and 40pt: the bar is 60 tall and the field shares the row with the
-	// wordmark and the account controls, so it is the one search in the app that
-	// is chrome rather than page content.
 	return (
-		<SearchField
-			value={search}
-			onChange={setSearch}
-			placeholder="Search items, causes or NGOs"
+		<SearchFloat
+			placeholder="Search NGOs, needs, events"
 			maxWidth={440}
 			compact
 		/>
@@ -227,57 +231,65 @@ function TopBarSearch() {
 /* Account menu                                                               */
 /* -------------------------------------------------------------------------- */
 
-const MENU_WIDTH = 248;
+const MENU_WIDTH = 264;
 
 /**
- * Where settings live on desktop. Appearance opens the same three-way sheet
- * every other surface uses, so a person who switches between phone and laptop
- * meets one control, not two.
+ * Where the account lives on desktop: who you are, your three personal pages,
+ * Appearance, and Sign out.
+ *
+ * **Inline, not portalled.** It used to `createPortal` into `document.body`
+ * to win a z-index fight with later siblings; the bar itself now carries the
+ * `zIndex` (see `TopBar`), so an absolutely positioned panel under the
+ * trigger clears the page without leaving the React tree - which is also what
+ * lets the outside-press check below be a plain `contains`.
+ *
+ * Appearance is `AppearanceMenu`, opening to the left of its row: the three
+ * options next to the control that asked, instead of a centred dialog over
+ * the window. Picking one closes both menus; its Escape closes only itself.
  */
 function AccountMenu({ profileHref }: { profileHref: string }) {
-	const { colors, borderRadius, elevation, isDark } = useTheme();
+	const { colors, spacing, borderRadius, elevation, isDark } = useTheme();
 	const user = useAuthStore((s) => s.user);
 	const [open, setOpen] = useState(false);
-	const [appearanceOpen, setAppearanceOpen] = useState(false);
-	// Viewport position of the trigger, so the panel can be portalled to
-	// document.body on web and escape every ancestor stacking context.
-	const [anchor, setAnchor] = useState({ x: 0, y: 0, width: 40, height: 40 });
+	const containerRef = useRef<View>(null);
 	const triggerRef = useRef<View>(null);
+
+	const close = useCallback((refocus?: boolean) => {
+		setOpen(false);
+		if (refocus) {
+			(triggerRef.current as unknown as HTMLElement | null)?.focus?.();
+		}
+	}, []);
 
 	/*
 	 * A menu closes on Escape and hands focus back to the button that opened
-	 * it. It had neither: the portalled panel sat open until something was
-	 * clicked, and a keyboard user who tabbed into it had no way out but
-	 * through it.
+	 * it, and closes on a press or focus outside it.
 	 */
 	useEffect(() => {
-		if (!open || Platform.OS !== "web" || typeof window === "undefined") {
+		if (!open || Platform.OS !== "web" || typeof document === "undefined") {
 			return;
 		}
+		const node = containerRef.current as unknown as HTMLElement | null;
 		const onKey = (event: KeyboardEvent) => {
-			if (event.key !== "Escape") return;
-			setOpen(false);
-			(triggerRef.current as unknown as HTMLElement | null)?.focus?.();
+			if (event.key === "Escape") close(true);
+		};
+		const outside = (event: Event) => {
+			if (node && !node.contains(event.target as Node)) close();
 		};
 		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [open]);
+		document.addEventListener("mousedown", outside);
+		document.addEventListener("focusin", outside);
+		return () => {
+			window.removeEventListener("keydown", onKey);
+			document.removeEventListener("mousedown", outside);
+			document.removeEventListener("focusin", outside);
+		};
+	}, [open, close]);
 
-	const initials = useMemo(() => {
-		if (!user?.name) return user?.email?.charAt(0).toUpperCase() ?? "?";
-		return user.name
-			.split(" ")
-			.map((part) => part[0])
-			.join("")
-			.toUpperCase()
-			.slice(0, 2);
-	}, [user?.name, user?.email]);
+	const name = user?.name ?? user?.email ?? "Volunteer";
 
-	const trigger = (
-		<View
-			onLayout={(event) => setAnchor(event.nativeEvent.layout)}
-			collapsable={false}
-		>
+	return (
+		<View ref={containerRef} style={{ position: "relative" }}>
 			<Pressable
 				ref={triggerRef}
 				onPress={() => setOpen((value) => !value)}
@@ -290,206 +302,178 @@ function AccountMenu({ profileHref }: { profileHref: string }) {
 					return {
 						width: 40,
 						height: 40,
-						borderRadius: borderRadius.sm,
+						borderRadius: 999,
 						alignItems: "center",
 						justifyContent: "center",
 						backgroundColor:
 							open || pressed || hovered
 								? colors.background.subtle
-								: colors.background.tertiary,
+								: "transparent",
 					};
 				}}
 			>
-				<Caption weight="bold">{initials}</Caption>
+				<InitialAvatar name={name} size={32} />
 			</Pressable>
-		</View>
-	);
 
-	const sheet = (
-		<AppearanceSheet
-			visible={appearanceOpen}
-			onClose={() => setAppearanceOpen(false)}
-		/>
-	);
-
-	const body = (
-		<MenuBody
-			profileHref={profileHref}
-			onClose={() => setOpen(false)}
-			onAppearance={() => {
-				setOpen(false);
-				setAppearanceOpen(true);
-			}}
-		/>
-	);
-
-	if (!open) {
-		return (
-			<>
-				{trigger}
-				{sheet}
-			</>
-		);
-	}
-
-	const panelStyle = {
-		width: MENU_WIDTH,
-		backgroundColor: colors.background.card,
-		borderRadius: borderRadius.lg,
-		borderWidth: isDark ? 1 : 0,
-		borderColor: colors.border.hairline,
-		overflow: "hidden" as const,
-		...(isDark ? {} : elevation.raised),
-	};
-
-	// Web: the inline panel loses the z-index fight with any later sibling that
-	// paints its own stacking context (elevated cards, sticky rails). Portal to
-	// document.body with `position: fixed` - above everything, always.
-	if (Platform.OS === "web") {
-		return (
-			<>
-				{trigger}
-				{sheet}
-				{createPortal(
-					<>
-						<Pressable
-							onPress={() => setOpen(false)}
-							accessibilityRole="button"
-							accessibilityLabel="Close account menu"
-							focusable={false}
-							style={
-								{
-									position: "fixed",
-									inset: 0,
-									zIndex: 9990,
-								} as never
-							}
-						/>
-						<View
-							accessibilityRole="menu"
-							style={
-								{
-									position: "fixed",
-									top: anchor.y + anchor.height + 8,
-									left: Math.max(8, anchor.x + anchor.width - MENU_WIDTH),
-									zIndex: 9999,
-									...panelStyle,
-								} as never
-							}
-						>
-							{body}
-						</View>
-					</>,
-					document.body,
-				)}
-			</>
-		);
-	}
-
-	return (
-		<View>
-			{trigger}
-			{sheet}
-
-			{/* Click-away, behind the panel. */}
-			<Pressable
-				onPress={() => setOpen(false)}
-				accessibilityRole="button"
-				accessibilityLabel="Close account menu"
-				style={{
-					position: "absolute",
-					top: -2000,
-					left: -2000,
-					right: -2000,
-					bottom: -2000,
-					zIndex: 40,
-				}}
-			/>
-
-			<View
-				accessibilityRole="menu"
-				style={{
-					position: "absolute",
-					top: 48,
-					right: 0,
-					zIndex: 50,
-					...panelStyle,
-				}}
-			>
-				{body}
-			</View>
+			{open && (
+				<View
+					accessibilityRole="menu"
+					style={{
+						position: "absolute",
+						top: 40 + spacing[2],
+						right: 0,
+						zIndex: 100,
+						width: MENU_WIDTH,
+						padding: spacing[1.5],
+						backgroundColor: colors.background.card,
+						borderRadius: borderRadius.lg,
+						borderWidth: isDark ? 1 : 0,
+						borderColor: colors.border.hairline,
+						...(isDark ? {} : elevation.raised),
+					}}
+				>
+					<MenuBody profileHref={profileHref} onClose={() => close()} />
+				</View>
+			)}
 		</View>
 	);
 }
 
-/**
- * The menu's contents, shared by the inline (native) render and the
- * document.body portal (web).
- */
 function MenuBody({
 	profileHref,
 	onClose,
-	onAppearance,
 }: {
 	profileHref: string;
 	onClose: () => void;
-	onAppearance: () => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
 	const { preference } = useAppTheme();
 	const router = useRouter();
 	const user = useAuthStore((s) => s.user);
 	const signOut = useSignOut();
+	const name = user?.name ?? "Volunteer";
+
+	const go = (href: string) => {
+		onClose();
+		router.push(href as never);
+	};
 
 	return (
 		<>
 			<View
 				accessible
-				accessibilityRole="text"
+				accessibilityLabel={`Signed in as ${name}${user?.email ? `, ${user.email}` : ""}`}
 				style={{
-					paddingHorizontal: spacing[4],
-					paddingVertical: spacing[3],
-					borderBottomWidth: 1,
-					borderBottomColor: colors.border.hairline,
+					flexDirection: "row",
+					alignItems: "center",
+					gap: spacing[3],
+					paddingHorizontal: spacing[2.5],
+					paddingTop: spacing[2],
+					paddingBottom: spacing[3],
 				}}
 			>
-				<Label weight="semibold" numberOfLines={1}>
-					{user?.name ?? "Volunteer"}
-				</Label>
-				<Caption color="quaternary" numberOfLines={1}>
-					{user?.email ?? ""}
-				</Caption>
+				<InitialAvatar name={user?.name ?? user?.email} size={36} />
+				<View style={{ flex: 1, minWidth: 0 }}>
+					<Label weight="semibold" numberOfLines={1}>
+						{name}
+					</Label>
+					{user?.email ? (
+						<Caption color="tertiary" numberOfLines={1}>
+							{user.email}
+						</Caption>
+					) : null}
+				</View>
 			</View>
-
-			<ListRow
-				icon={User}
-				label="Profile"
-				onPress={() => {
-					onClose();
-					router.push(profileHref as never);
-				}}
+			<Divider />
+			<MenuItem icon={User} label="Profile" onPress={() => go(profileHref)} />
+			<MenuItem icon={Sparkles} label="Impact" onPress={() => go("/impact")} />
+			<MenuItem
+				icon={Award}
+				label="Certificates"
+				onPress={() => go("/certificates")}
 			/>
 			<Divider />
-			<ListRow
-				icon={appearanceIcon(preference)}
-				label="Appearance"
-				value={
-					<Caption color="tertiary">{APPEARANCE_LABEL[preference]}</Caption>
-				}
-				onPress={onAppearance}
-			/>
+			<AppearanceMenu placement="left-start" onPicked={onClose}>
+				{({ open, toggle }) => (
+					<MenuItem
+						icon={appearanceIcon(preference)}
+						label="Appearance"
+						value={APPEARANCE_LABEL[preference]}
+						expanded={open}
+						onPress={toggle}
+					/>
+				)}
+			</AppearanceMenu>
 			<Divider />
-			<ListRow
+			<MenuItem
 				icon={LogOut}
-				label="Sign out"
-				value={<View />}
+				label={signOut.isPending ? "Signing out..." : "Sign out"}
+				disabled={signOut.isPending}
 				onPress={() => {
-					if (signOut.isPending) return;
 					onClose();
 					signOut.mutate();
 				}}
 			/>
 		</>
+	);
+}
+
+/** A 40pt menu row: icon, label, an optional current value at the end. */
+function MenuItem({
+	icon: Icon,
+	label,
+	value,
+	disabled,
+	expanded,
+	onPress,
+}: {
+	icon: LucideIcon;
+	label: string;
+	value?: string;
+	disabled?: boolean;
+	/** For a row that opens a submenu. */
+	expanded?: boolean;
+	onPress: () => void;
+}) {
+	const { colors, spacing, borderRadius } = useTheme();
+	return (
+		<Pressable
+			onPress={onPress}
+			disabled={disabled}
+			accessibilityRole="menuitem"
+			accessibilityLabel={value ? `${label}, ${value}` : label}
+			accessibilityState={{
+				disabled: !!disabled,
+				...(expanded === undefined ? {} : { expanded }),
+			}}
+			{...focusable}
+			style={(state) => {
+				const { pressed, hovered } = state as PressState;
+				return {
+					flexDirection: "row",
+					alignItems: "center",
+					gap: spacing[3],
+					minHeight: 40,
+					paddingHorizontal: spacing[2.5],
+					borderRadius: borderRadius.md,
+					opacity: disabled ? 0.6 : 1,
+					backgroundColor:
+						expanded || pressed || hovered
+							? colors.background.subtle
+							: "transparent",
+				};
+			}}
+		>
+			<Icon
+				size={17}
+				strokeWidth={1.9}
+				color={colors.text.tertiary as string}
+			/>
+			<Body style={{ flex: 1 }} numberOfLines={1}>
+				{label}
+			</Body>
+			{value ? <Caption color="quaternary">{value}</Caption> : null}
+		</Pressable>
 	);
 }
 
@@ -499,7 +483,8 @@ function Divider() {
 		<View
 			style={{
 				height: 1,
-				marginLeft: spacing[4],
+				marginVertical: spacing[1],
+				marginHorizontal: spacing[2.5],
 				backgroundColor: colors.border.hairline,
 			}}
 		/>

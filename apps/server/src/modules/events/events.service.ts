@@ -7,6 +7,7 @@ import {
 } from "@nabhya/db/schema";
 import type {
 	ApplicationQuery,
+	ApplicationStatusCounts,
 	ApplyToEventInput,
 	BulkResult,
 	BulkReviewApplicationsInput,
@@ -40,7 +41,12 @@ import {
 } from "drizzle-orm";
 import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
-import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
+import {
+	assertIdentityVerified,
+	paginate,
+	takeFirstOrThrow,
+	toOffset,
+} from "../../common/utils";
 import { orderBySort } from "../../common/utils/order";
 import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsService } from "../organizations/organizations.service";
@@ -467,6 +473,8 @@ export class EventsService {
 			throw new NotFoundException("Event not found");
 		}
 
+		await assertIdentityVerified(this.db, volunteerId);
+
 		const now = new Date();
 		const deadline = event.applicationDeadline ?? event.startAt;
 		if (deadline < now) {
@@ -544,7 +552,7 @@ export class EventsService {
 			{
 				type: "NEW_APPLICATION",
 				title: `New applicant for ${event.title}`,
-				body: "Review them from Events.",
+				body: "Open it to accept or decline the application.",
 				entityName: "EVENT",
 				entityId: event.id,
 			},
@@ -680,6 +688,7 @@ export class EventsService {
 			}),
 			this.db.select({ value: count() }).from(eventApplications).where(where),
 		]);
+		const counts = await this.applicationCounts(eventId);
 
 		// Attached with a second bounded query rather than a correlated subquery:
 		// the relational builder aliases its FROM, so hand-written qualified SQL
@@ -706,14 +715,45 @@ export class EventsService {
 			issued.map((row) => [row.applicationId, row]),
 		);
 
-		return paginate(
-			items.map((item) => ({
-				...item,
-				certificate: byApplication.get(item.id) ?? null,
-			})),
-			totals?.value ?? 0,
-			query,
-		);
+		return {
+			...paginate(
+				items.map((item) => ({
+					...item,
+					certificate: byApplication.get(item.id) ?? null,
+				})),
+				totals?.value ?? 0,
+				query,
+			),
+			counts,
+		};
+	}
+
+	/**
+	 * Every state's count on one event, ignoring the status filter - so the
+	 * review drawer's chips can read "Pending 3 / Accepted 2" before either is
+	 * pressed, the way `awaitingReplyCount` lets the reviews header say "3
+	 * awaiting". One grouped query; a missing state is a zero, not absent.
+	 */
+	private async applicationCounts(
+		eventId: string,
+	): Promise<ApplicationStatusCounts> {
+		const rows = await this.db
+			.select({ status: eventApplications.status, value: count() })
+			.from(eventApplications)
+			.where(eq(eventApplications.eventId, eventId))
+			.groupBy(eventApplications.status);
+		const counts: ApplicationStatusCounts = {
+			PENDING: 0,
+			ACCEPTED: 0,
+			REJECTED: 0,
+			WITHDRAWN: 0,
+			all: 0,
+		};
+		for (const row of rows) {
+			counts[row.status] = row.value;
+			counts.all += row.value;
+		}
+		return counts;
 	}
 
 	/**

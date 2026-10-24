@@ -93,3 +93,111 @@ export function formatMinor(amountMinor: number, currency = "INR"): string {
 
 /** Suggested amounts on the donate sheet, in paise. */
 export const DONATION_PRESETS_MINOR = [50_000, 100_000, 250_000, 500_000];
+
+// ─── Superadmin ledger ───────────────────────────────────────────────────────
+
+/**
+ * Filters for the platform-wide donation ledger and its CSV export.
+ *
+ * One schema for both so an export is exactly the rows the reviewer is looking
+ * at - an export that quietly ignored a filter would hand finance a different
+ * set of numbers from the one on screen. `from`/`to` are calendar days (IST),
+ * inclusive, matched against when the donation was created; `search` matches
+ * the donor's name or email, the receipt number and the provider's payment id.
+ *
+ * Unlike the NGO's own list, every status is visible by default: a ledger that
+ * hid failed and pending attempts could not reconcile against the provider.
+ */
+export const adminDonationFilterSchema = z
+	.object({
+		status: donationStatusSchema.optional(),
+		organizationId: z.uuid().optional(),
+		from: z.iso.date().optional(),
+		to: z.iso.date().optional(),
+		search: z.string().trim().max(120).optional(),
+	})
+	.refine((v) => !v.from || !v.to || v.from <= v.to, {
+		message: "The start date must be on or before the end date",
+		path: ["to"],
+	});
+
+export type AdminDonationFilter = z.infer<typeof adminDonationFilterSchema>;
+
+export const adminDonationSortSchema = z
+	.enum(["createdAt", "amount", "organization", "status"])
+	.default("createdAt");
+export type AdminDonationSort = z.infer<typeof adminDonationSortSchema>;
+
+export const adminDonationQuerySchema = paginationQuerySchema
+	.extend({
+		status: donationStatusSchema.optional(),
+		organizationId: z.uuid().optional(),
+		from: z.iso.date().optional(),
+		to: z.iso.date().optional(),
+		search: z.string().trim().max(120).optional(),
+		sort: adminDonationSortSchema,
+		dir: z.enum(["asc", "desc"]).default("desc"),
+	})
+	.refine((v) => !v.from || !v.to || v.from <= v.to, {
+		message: "The start date must be on or before the end date",
+		path: ["to"],
+	});
+
+export type AdminDonationQuery = z.infer<typeof adminDonationQuerySchema>;
+
+/**
+ * A ledger row. Superadmins see the donor's real name and email even on an
+ * anonymous gift - anonymity is a promise about the public page and the NGO,
+ * not about the platform that has to answer for the money. `isAnonymous` is
+ * still returned so the console can say so.
+ */
+export interface AdminDonationRow {
+	id: string;
+	amountMinor: number;
+	currency: string;
+	status: DonationStatus;
+	receiptNumber: string | null;
+	providerPaymentId: string | null;
+	provider: string;
+	isAnonymous: boolean;
+	donorUserId: string | null;
+	donorName: string | null;
+	donorEmail: string | null;
+	message: string | null;
+	failureReason: string | null;
+	createdAt: string;
+	completedAt: string | null;
+	organization: { id: string; organizationName: string };
+}
+
+/** Totals over the whole filtered set, not the visible page. */
+export interface AdminDonationSummary {
+	completedMinor: number;
+	completedCount: number;
+	pendingCount: number;
+	failedCount: number;
+	refundedMinor: number;
+	refundedCount: number;
+	donorCount: number;
+}
+
+/** A generated export: a short-lived link to the CSV in private storage. */
+export interface ExportFile {
+	url: string;
+	fileName: string;
+	rowCount: number;
+	/** True when the row cap cut the export short; narrow the filters. */
+	truncated: boolean;
+}
+
+/** Hard ceiling on one export, so a CSV is built in memory safely. */
+export const MAX_EXPORT_ROWS = 50_000;
+
+/** What an NGO exports of its own donations - the same filters as its list. */
+export const orgDonationExportSchema = z.object({
+	status: donationStatusSchema.optional(),
+	from: z.iso.date().optional(),
+	to: z.iso.date().optional(),
+});
+
+export type OrgDonationExportQuery = z.infer<typeof orgDonationExportSchema>;

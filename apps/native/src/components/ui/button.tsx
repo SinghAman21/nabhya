@@ -59,6 +59,8 @@ interface ButtonProps
 	variant?: Variant;
 	size?: Size;
 	loading?: boolean;
+	/** A mark before the label - a provider logo, never a decorative icon. */
+	leading?: React.ReactNode;
 	children: React.ReactNode;
 	style?: ViewStyle;
 }
@@ -88,6 +90,7 @@ export function Button({
 	variant = "default",
 	size = "default",
 	loading,
+	leading,
 	disabled,
 	children,
 	style,
@@ -153,6 +156,9 @@ export function Button({
 			    spinner sits over it. Swapping one for the other collapsed every
 			    button sized to its label to a 20pt spinner mid-press, which
 			    shifted the whole row it sat in. */}
+			{leading ? (
+				<View style={loading ? { opacity: 0 } : undefined}>{leading}</View>
+			) : null}
 			<Label
 				color={resolveColor(colors, v.text)}
 				weight={variant === "link" ? "medium" : "bold"}

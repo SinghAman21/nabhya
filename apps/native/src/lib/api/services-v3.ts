@@ -1,13 +1,25 @@
 import type {
+	AdminDonationFilter,
+	AdminDonationQuery,
+	AdminDonationRow,
+	AdminDonationSummary,
+	AdminFinancialReportQuery,
+	AdminFinancialReportRow,
 	CreateFinancialReportInput,
+	ExportFile,
 	InviteTeamMemberInput,
 	MyAnnouncementQuery,
 	NearbyQuery,
 	OrganizationImpact,
+	Paginated,
 	PaginationQuery,
 	UpdateOrgAdminInput,
 	UpsertAnnouncementInput,
 	VolunteerImpact,
+} from "@nabhya/shared";
+import {
+	adminDonationLedgerResponseSchema,
+	exportFileResponseSchema,
 } from "@nabhya/shared";
 import type {
 	Announcement,
@@ -20,8 +32,29 @@ import type {
 	TeamInvite,
 	TeamListQuery,
 } from "@/lib/types";
-import { ORGANIZATIONS, PUBLISHING } from "./endpoints";
+import { ADMIN, ORGANIZATIONS, PUBLISHING } from "./endpoints";
 import { http } from "./http";
+
+/**
+ * The superadmin money console. Kept apart from `adminApi` because none of it
+ * moderates anything - it reads the ledger and writes exports.
+ */
+export const financeApi = {
+	donations: (query: Partial<AdminDonationQuery>) =>
+		http.get<Paginated<AdminDonationRow> & { summary: AdminDonationSummary }>(
+			ADMIN.DONATIONS,
+			query,
+			adminDonationLedgerResponseSchema,
+		),
+	exportDonations: (filter: AdminDonationFilter) =>
+		http.post<ExportFile>(
+			ADMIN.DONATIONS_EXPORT,
+			filter,
+			exportFileResponseSchema,
+		),
+	financialReports: (query: Partial<AdminFinancialReportQuery>) =>
+		http.getPage<AdminFinancialReportRow>(ADMIN.FINANCIAL_REPORTS, query),
+};
 
 export const orgDirectoryApi = {
 	list: (

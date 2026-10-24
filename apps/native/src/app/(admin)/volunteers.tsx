@@ -173,6 +173,10 @@ export default function AdminVolunteers() {
 			render: (user) =>
 				user.status === "SUSPENDED" ? (
 					<StatusPill label="Suspended" tone="error" />
+				) : user.status === "DELETED" ? (
+					// It read "Active": filtered to Deleted, every row claimed to be
+					// in good standing.
+					<StatusPill label="Deleted" tone="error" />
 				) : !user.onboardedAt ? (
 					// Worth a word: an account that never finished onboarding looks
 					// identical to a healthy one in every other column.
@@ -342,6 +346,9 @@ function UserCard({
 				/>
 				{user.status === "SUSPENDED" && (
 					<StatusPill label="Suspended" tone="error" />
+				)}
+				{user.status === "DELETED" && (
+					<StatusPill label="Deleted" tone="error" />
 				)}
 				{!user.onboardedAt && (
 					<StatusPill label="Onboarding incomplete" tone="neutral" />

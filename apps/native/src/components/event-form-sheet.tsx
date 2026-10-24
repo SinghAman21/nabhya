@@ -3,11 +3,11 @@ import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { DateTimeField } from "@/components/date-time-field";
 import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
+import { FormFooterRow, useFormButtonGrow } from "@/components/ngo/form-footer";
 import { Button } from "@/components/ui/button";
+import { Drawer } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/overlay";
-import { Sheet } from "@/components/ui/sheet";
-import { Caption } from "@/components/ui/typography";
 import {
 	useCreateEvent,
 	useOrgEvent,
@@ -62,6 +62,7 @@ export function EventFormSheet({
 	publishBlockedReason?: string | null;
 }) {
 	const { spacing } = useTheme();
+	const grow = useFormButtonGrow();
 	const inputStyle = useFieldInputStyle();
 	const textAreaStyle = useFieldInputStyle(120);
 	const createEvent = useCreateEvent();
@@ -85,6 +86,8 @@ export function EventFormSheet({
 
 	const [draft, setDraft] = useState<Draft>(emptyDraft);
 	const [errors, setErrors] = useState<Record<string, string>>({});
+	// Which footer button is spinning - only the one that was pressed.
+	const [savingAs, setSavingAs] = useState<"DRAFT" | "PUBLISHED">("PUBLISHED");
 
 	// Load the event being edited. Keyed on id so reopening the sheet for a
 	// different event replaces the form rather than keeping the last one. Prefers
@@ -148,6 +151,7 @@ export function EventFormSheet({
 		}
 
 		setErrors({});
+		setSavingAs(status);
 		const onError = (error: unknown) =>
 			setErrors({ form: apiErrorMessage(error) });
 
@@ -156,7 +160,13 @@ export function EventFormSheet({
 				{ id: event.id, input: parsed.data as CreateEventInput },
 				{
 					onSuccess: () => {
-						toast.success("Event updated.");
+						toast.success(
+							status === "DRAFT"
+								? "Draft saved. Only your team can see it."
+								: event.status === "DRAFT"
+									? "Event published. Volunteers can apply now."
+									: "Event updated.",
+						);
 						close();
 					},
 					onError,
@@ -167,7 +177,11 @@ export function EventFormSheet({
 
 		createEvent.mutate(parsed.data as CreateEventInput, {
 			onSuccess: () => {
-				toast.success("Event published. Volunteers can apply now.");
+				toast.success(
+					status === "DRAFT"
+						? "Draft saved. Only your team can see it."
+						: "Event published. Volunteers can apply now.",
+				);
 				close();
 			},
 			onError,
@@ -181,7 +195,7 @@ export function EventFormSheet({
 	const isDraft = !isEditing || event?.status === "DRAFT";
 
 	return (
-		<Sheet
+		<Drawer
 			visible={visible}
 			onClose={close}
 			title={isEditing ? "Edit event" : "New event"}
@@ -190,45 +204,54 @@ export function EventFormSheet({
 					? "Drafts stay private until you publish."
 					: "Changes go live as soon as you save."
 			}
+			wide
 			footer={
 				<View style={{ gap: spacing[2] }}>
 					<FieldError message={errors.form} />
 					{isDraft && publishBlockedReason ? (
-						<>
-							<Button
-								onPress={() => submit("DRAFT")}
-								loading={saving}
-								disabled={blocked}
-							>
-								{isEditing ? "Save draft" : "Save as draft"}
-							</Button>
-							<Caption color="tertiary" style={{ textAlign: "center" }}>
-								Publishing: {publishBlockedReason}
-							</Caption>
-						</>
-					) : (
-						<>
-							<Button
-								onPress={() => submit("PUBLISHED")}
-								loading={saving}
-								disabled={blocked}
-							>
-								{isEditing && event?.status === "DRAFT"
-									? "Publish this draft"
-									: isEditing
-										? "Save changes"
-										: "Publish event"}
-							</Button>
-							{isDraft && (
+						<FormFooterRow
+							note={`Publishing: ${publishBlockedReason}`}
+							primary={
 								<Button
-									variant="outline"
 									onPress={() => submit("DRAFT")}
+									loading={saving && savingAs === "DRAFT"}
 									disabled={blocked}
+									style={grow}
 								>
-									{isEditing ? "Keep as draft" : "Save as draft"}
+									{isEditing ? "Save draft" : "Save as draft"}
 								</Button>
-							)}
-						</>
+							}
+						/>
+					) : (
+						<FormFooterRow
+							secondary={
+								isDraft ? (
+									<Button
+										variant="outline"
+										onPress={() => submit("DRAFT")}
+										loading={saving && savingAs === "DRAFT"}
+										disabled={blocked}
+										style={grow}
+									>
+										{isEditing ? "Keep as draft" : "Save as draft"}
+									</Button>
+								) : undefined
+							}
+							primary={
+								<Button
+									onPress={() => submit("PUBLISHED")}
+									loading={saving && savingAs === "PUBLISHED"}
+									disabled={blocked}
+									style={grow}
+								>
+									{isEditing && event?.status === "DRAFT"
+										? "Publish this draft"
+										: isEditing
+											? "Save changes"
+											: "Publish event"}
+								</Button>
+							}
+						/>
 					)}
 				</View>
 			}
@@ -309,6 +332,6 @@ export function EventFormSheet({
 					</Field>
 				</View>
 			</View>
-		</Sheet>
+		</Drawer>
 	);
 }

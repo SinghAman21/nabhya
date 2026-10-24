@@ -8,6 +8,7 @@ import type { CompleteOrgOnboardingInput } from "@nabhya/shared";
 import {
 	completeOrgOnboardingSchema,
 	completeVolunteerOnboardingSchema,
+	onboardingStatusResponseSchema,
 } from "@nabhya/shared";
 import { ConflictException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
@@ -106,6 +107,12 @@ describe("OnboardingService", () => {
 			expect(status.isOnboarded).toBe(true);
 			expect(status.organization).not.toBeNull();
 			expect(status.verificationStatus).toBe("PENDING");
+			// The routing gate's runtime contract, as the client will see it.
+			expect(
+				onboardingStatusResponseSchema.safeParse(
+					JSON.parse(JSON.stringify(status)),
+				).error,
+			).toBeUndefined();
 		});
 
 		it("counts a team member as onboarded to the NGO they joined", async () => {

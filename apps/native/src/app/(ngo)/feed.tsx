@@ -19,6 +19,7 @@ import {
 	FeedFilterSheet,
 	FeedTabs,
 	feedContentQuery,
+	feedFilterCount,
 } from "@/components/feed/feed-filters";
 import { NeedPreviewDrawer } from "@/components/need-preview-drawer";
 import { NotificationBell } from "@/components/notification-bell";
@@ -30,6 +31,7 @@ import {
 	Screen,
 	ScreenHeader,
 } from "@/components/screen-shell";
+import { SearchButton, SearchFloat } from "@/components/search-panel";
 import { TAB_BAR_HEIGHT } from "@/components/tab-bar";
 import { Button } from "@/components/ui/button";
 import { confirm, toast } from "@/components/ui/overlay";
@@ -292,7 +294,7 @@ export default function NgoFeed() {
 					onTab={setTab}
 					gutter={GUTTER}
 					onOpenFilters={() => setFiltersOpen(true)}
-					filterActive={categoryIds.length > 0 || content !== "all"}
+					filterCount={feedFilterCount(categoryIds, content)}
 				/>
 			</View>
 			{isDesktop && canPublish && (
@@ -303,17 +305,45 @@ export default function NgoFeed() {
 		</View>
 	);
 
+	/*
+	 * Search: a field on desktop, whose floating panel (`SearchFloat`) drops
+	 * over the cards - hence the `zIndex` on this header, which precedes the
+	 * list in the tree - and the search glyph beside the bell on a phone.
+	 */
 	const pinnedHeader = (
 		<View
 			style={{
+				position: "relative",
+				zIndex: 10,
 				paddingHorizontal: GUTTER,
 				paddingBottom: spacing[3],
 				borderBottomWidth: 1,
 				borderBottomColor: colors.border.hairline,
 			}}
 		>
-			{!isDesktop && (
-				<ScreenHeader title="Feed" action={<NotificationBell />} />
+			{isDesktop ? (
+				// Lifted over the lens row, its later sibling: RNW gives every View
+				// `zIndex: 0`, so the panel otherwise opened *under* the lens chips,
+				// Filters and New post.
+				<View
+					style={{
+						paddingTop: spacing[4],
+						paddingBottom: spacing[3],
+						zIndex: 1,
+					}}
+				>
+					<SearchFloat placeholder="Search NGOs, needs, events" />
+				</View>
+			) : (
+				<ScreenHeader
+					title="Feed"
+					action={
+						<View style={{ flexDirection: "row", alignItems: "center" }}>
+							<SearchButton />
+							<NotificationBell />
+						</View>
+					}
+				/>
 			)}
 			{lensRow}
 		</View>

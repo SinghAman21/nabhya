@@ -97,7 +97,7 @@ interface Entry {
 /** The full, paged list behind a filter's first page. */
 const FULL_LIST: Partial<Record<Filter, { label: string; href: string }>> = {
 	EVENTS: { label: "All applications", href: "/(volunteer)/applications" },
-	GIVING: { label: "All giving", href: "/(volunteer)/donations" },
+	GIVING: { label: "All giving", href: "/(volunteer)/giving" },
 };
 
 export default function Activity() {
@@ -174,7 +174,7 @@ export default function Activity() {
 								? "error"
 								: "warning",
 				},
-				href: "/(volunteer)/donations",
+				href: "/(volunteer)/giving",
 			});
 		}
 

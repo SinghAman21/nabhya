@@ -4,7 +4,6 @@ import { View } from "react-native";
 import { LoadMoreButton } from "@/components/paged-list";
 import { ErrorState, LoadingState, Surface } from "@/components/screen-shell";
 import { humanizeStatus, StatusPill } from "@/components/status-pill";
-import { Button } from "@/components/ui/button";
 import { confirm, toast } from "@/components/ui/overlay";
 import { Body, Caption } from "@/components/ui/typography";
 import { useAdminDeletePost } from "@/hooks/use-admin";
@@ -13,6 +12,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDate, formatRelative } from "@/lib/format";
 import { SelectMenu } from "./select-menu";
+import { DangerButton } from "./sheet-parts";
 
 const TAGS: PostTag[] = ["POST", "EVENT", "NEED", "ANNOUNCEMENT"];
 
@@ -38,6 +38,7 @@ export function OrgPostsSection({
 }) {
 	const { spacing } = useTheme();
 	const [tag, setTag] = useState<PostTag | "ALL">("ALL");
+	const [menuOpen, setMenuOpen] = useState(false);
 	const posts = useAdminOrganizationPostsPaged(organizationId, {
 		...(tag === "ALL" ? {} : { tag }),
 	});
@@ -58,23 +59,44 @@ export function OrgPostsSection({
 		});
 	};
 
+	const options = [
+		{ value: "ALL" as const, label: "All posts" },
+		...TAGS.map((entry) => ({
+			value: entry as PostTag | "ALL",
+			label: humanizeStatus(entry),
+		})),
+	];
+
 	return (
-		<View style={{ gap: spacing[3] }}>
-			<View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing[2] }}>
+		// The last section of the dossier, so an open panel over a short list
+		// would run past the drawer's scroll content and clip: reserve its height
+		// while open. Same recipe as the activity timeline.
+		<View
+			style={{
+				gap: spacing[3],
+				minHeight: menuOpen ? 40 + options.length * 36 + spacing[2] : 0,
+			}}
+		>
+			{/* Raised over the posts below: on the web every View is a stacking
+			    context, so the cards painted through the open panel. */}
+			<View
+				style={{
+					flexDirection: "row",
+					flexWrap: "wrap",
+					alignItems: "center",
+					gap: spacing[2],
+					zIndex: menuOpen ? 20 : 1,
+				}}
+			>
 				<SelectMenu<PostTag | "ALL">
 					label="Tag"
 					value={tag}
 					onChange={setTag}
-					options={[
-						{ value: "ALL", label: "All posts" },
-						...TAGS.map((entry) => ({
-							value: entry as PostTag | "ALL",
-							label: humanizeStatus(entry),
-						})),
-					]}
+					onOpenChange={setMenuOpen}
+					options={options}
 				/>
 				{posts.total > 0 && (
-					<Caption color="quaternary" style={{ alignSelf: "center" }}>
+					<Caption color="quaternary">
 						{posts.total} {posts.total === 1 ? "post" : "posts"}
 					</Caption>
 				)}
@@ -135,9 +157,14 @@ export function OrgPostsSection({
 										? ` · ${post.media.length} attachment${post.media.length === 1 ? "" : "s"}`
 										: ""}
 								</Caption>
-								<View style={{ marginTop: spacing[3] }}>
-									<Button
-										variant="destructive"
+								{/* Sized to its label and quiet: a filled red block on
+								    every post read as the loudest thing in the dossier,
+								    and its wrapper stretched it to the card's width. The
+								    confirm still guards it. */}
+								<View
+									style={{ marginTop: spacing[3], alignItems: "flex-start" }}
+								>
+									<DangerButton
 										size="sm"
 										loading={deleting}
 										disabled={deletePost.isPending}
@@ -145,7 +172,7 @@ export function OrgPostsSection({
 										accessibilityLabel={`Delete post published ${formatDate(post.createdAt)}`}
 									>
 										Delete post
-									</Button>
+									</DangerButton>
 								</View>
 							</Surface>
 						);

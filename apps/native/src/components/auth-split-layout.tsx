@@ -1,3 +1,4 @@
+import { StatusBar } from "expo-status-bar";
 import type { ReactNode } from "react";
 import {
 	KeyboardAvoidingView,
@@ -8,7 +9,10 @@ import {
 	type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Body, Caption, Wordmark } from "@/components/ui/typography";
+import { BrandMark, BrandValues } from "@/components/brand";
+import { PanelWash } from "@/components/panel-wash";
+import { Body, Caption, Display } from "@/components/ui/typography";
+import { panelGrounds, panelInk } from "@/constants/design-system";
 import { useTheme } from "@/hooks/use-theme";
 import { verticalScrollbar } from "@/lib/scroll";
 
@@ -28,12 +32,24 @@ interface AuthSplitLayoutProps {
 }
 
 /**
- * The frame around sign-in and sign-up.
+ * The frame around sign-in, sign-up and the password reset pair.
  *
- * Desktop: a dark brand panel on the left, the form centred on the right.
- * Phone: a short dark brand bar under the status bar, then the form in a scroll
- * view that keeps clear of the keyboard. The brand panel speaks to both kinds
- * of account - a volunteer and an NGO land on the same door.
+ * **The brand side says what we stand for.** It used to be the wordmark, one
+ * paragraph and a rule on 960pt of flat brown - the first screen of a product
+ * about showing up for people, and it said nothing a volunteer or an NGO would
+ * recognise. It now carries the voice line, and the three promises the product
+ * actually keeps (`BRAND_VALUES`), on a near-flat ground with one faint wash
+ * (`PanelWash`). A solid orange sun and rings were tried here and were the
+ * loudest thing on the screen; the panel frames the words, nothing more.
+ *
+ * Desktop: the brand panel on the left, the form centred on the right, each in
+ * its own scroller - a short laptop window or 125% zoom must reach both.
+ *
+ * Phone: a short brand hero, then the form on a sheet that overlaps it by its
+ * corner radius. The hero is **inside** the scroll view, not pinned above it: a
+ * pinned header plus the keyboard left about 200pt for the form on a small
+ * phone, and the focused field scrolled under the header. Inside, it simply
+ * scrolls away when the keyboard opens.
  */
 export function AuthSplitLayout({
 	children,
@@ -63,32 +79,54 @@ export function AuthSplitLayout({
 			<View style={{ flex: 1, flexDirection: "row", ...WEB_VIEWPORT }}>
 				<View
 					style={{
-						flex: 1,
-						backgroundColor: colors.brand.surface,
-						justifyContent: "center",
-						padding: spacing[16],
+						flex: 1.1,
+						overflow: "hidden",
 					}}
 				>
-					<Wordmark color={colors.brand.ink}>NABHYA</Wordmark>
-					<Body
-						color={colors.brand.muted}
-						style={{ maxWidth: 360, marginTop: spacing[4] }}
-					>
-						Verified NGOs and the volunteers who show up for them. Find what's
-						needed near you, help at events, give with confidence.
-					</Body>
-
-					<View
-						style={{
-							height: 1,
-							backgroundColor: colors.brand.rule,
-							marginTop: spacing[10],
+					<PanelWash ground="ember" />
+					{/* Chrome, not a reading pane: no thumb. It still scrolls,
+					    so a short window can reach the values under the line. */}
+					<ScrollView
+						showsVerticalScrollIndicator={false}
+						style={{ flex: 1 }}
+						contentContainerStyle={{
+							flexGrow: 1,
+							justifyContent: "space-between",
+							paddingHorizontal: width >= 1280 ? spacing[20] : spacing[12],
+							paddingVertical: spacing[12],
+							gap: spacing[12],
 						}}
-					/>
+					>
+						<BrandMark />
 
-					<Caption color={colors.brand.faint} style={{ marginTop: spacing[4] }}>
-						For volunteers and NGOs across India
-					</Caption>
+						<View style={{ maxWidth: 520 }}>
+							<Display color={colors.brand.ink} accessibilityRole="header">
+								Help that{"\n"}
+								<Display color={colors.primary.main}>shows up.</Display>
+							</Display>
+							<Body
+								color={panelInk.muted}
+								style={{ maxWidth: 420, marginTop: spacing[5] }}
+							>
+								Nabhya connects verified NGOs with the people nearby who give
+								their time, their things and their money.
+							</Body>
+						</View>
+
+						<View style={{ maxWidth: 440 }}>
+							<BrandValues />
+							<Caption
+								color={panelInk.faint}
+								style={{
+									paddingTop: spacing[4],
+									borderTopWidth: 1,
+									borderTopColor: panelInk.border,
+								}}
+							>
+								For volunteers and NGOs across India
+							</Caption>
+						</View>
+					</ScrollView>
 				</View>
 
 				{/*
@@ -120,42 +158,14 @@ export function AuthSplitLayout({
 	}
 
 	return (
-		<View style={{ flex: 1, backgroundColor: colors.background.warm }}>
-			<View
-				style={{
-					backgroundColor: colors.brand.surface,
-					paddingHorizontal: spacing[5],
-					paddingTop: insets.top + spacing[3],
-					paddingBottom: spacing[4],
-				}}
-			>
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						gap: spacing[2],
-					}}
-				>
-					<View
-						style={{
-							width: 2,
-							height: 12,
-							backgroundColor: colors.primary.main,
-						}}
-					/>
-					<Wordmark size="sm" color={colors.brand.ink}>
-						NABHYA
-					</Wordmark>
-				</View>
-			</View>
-
+		<View style={{ flex: 1, backgroundColor: panelGrounds.ember.ground }}>
+			{/* The hero is dark in both schemes, so the clock and battery over
+			    it must be light whatever the theme says. */}
+			<StatusBar style="light" />
 			{/*
-			 * Scrollable, not a centred flex box: on a short phone the keyboard
-			 * covered the password field and the submit button with no way to
-			 * reach them. `flexGrow` keeps the form optically centred while
-			 * there is room, and `automaticallyAdjustKeyboardInsets` insets the
-			 * scroll view by the keyboard on iOS (Android resizes the window
-			 * instead - see android.softwareKeyboardLayoutMode in app.json).
+			 * `automaticallyAdjustKeyboardInsets` insets the scroll view by the
+			 * keyboard on iOS (Android resizes the window instead - see
+			 * android.softwareKeyboardLayoutMode in app.json).
 			 */}
 			<KeyboardAvoidingView
 				style={{ flex: 1 }}
@@ -163,19 +173,56 @@ export function AuthSplitLayout({
 			>
 				<ScrollView
 					style={{ flex: 1 }}
-					contentContainerStyle={{
-						flexGrow: 1,
-						paddingHorizontal: spacing[5],
-						paddingTop: spacing[8],
-						paddingBottom: insets.bottom + spacing[6],
-						justifyContent: "center",
-					}}
+					contentContainerStyle={{ flexGrow: 1 }}
 					keyboardShouldPersistTaps="handled"
 					automaticallyAdjustKeyboardInsets
 					{...verticalScrollbar}
 				>
-					{children}
-					{alternate}
+					<View
+						style={{
+							overflow: "hidden",
+							paddingTop: insets.top + spacing[5],
+							paddingHorizontal: spacing[5],
+							// Room for the sheet's overlap plus a breath above it.
+							paddingBottom: spacing[12],
+						}}
+					>
+						<PanelWash ground="ember" />
+						<BrandMark />
+						<Display
+							size="md"
+							color={colors.brand.ink}
+							accessibilityRole="header"
+							style={{ marginTop: spacing[7] }}
+						>
+							Help that{"\n"}
+							<Display size="md" color={colors.primary.main}>
+								shows up.
+							</Display>
+						</Display>
+						<Caption
+							color={panelInk.muted}
+							style={{ marginTop: spacing[2.5], maxWidth: 300 }}
+						>
+							Verified NGOs, real needs, and the people who turn up for them.
+						</Caption>
+					</View>
+
+					<View
+						style={{
+							flexGrow: 1,
+							marginTop: -spacing[6],
+							borderTopLeftRadius: 24,
+							borderTopRightRadius: 24,
+							backgroundColor: colors.background.warm,
+							paddingHorizontal: spacing[5],
+							paddingTop: spacing[7],
+							paddingBottom: insets.bottom + spacing[6],
+						}}
+					>
+						{children}
+						{alternate}
+					</View>
 				</ScrollView>
 			</KeyboardAvoidingView>
 		</View>

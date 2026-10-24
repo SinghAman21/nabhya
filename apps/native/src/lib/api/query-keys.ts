@@ -56,6 +56,9 @@ export const queryKeys = {
 		["admin", "documents", "users", params] as const,
 	adminAuditLogs: (params?: unknown) =>
 		["admin", "audit-logs", params] as const,
+	adminDonations: (params?: unknown) => ["admin", "donations", params] as const,
+	adminFinancialReports: (params?: unknown) =>
+		["admin", "financial-reports", params] as const,
 
 	notifications: (params?: unknown) => ["notifications", params] as const,
 	unreadCount: ["notifications", "unread-count"] as const,

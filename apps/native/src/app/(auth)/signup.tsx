@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form";
 import { toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
-import { Body, Caption, H2 } from "@/components/ui/typography";
+import { Body, Caption, Title } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { authService } from "@/lib/api/auth";
 import { apiErrorMessage } from "@/lib/api/http";
@@ -91,19 +91,19 @@ export default function SignUp() {
 						color={colors.primary.ink as string}
 					/>
 				</View>
-				<H2 accessibilityRole="header" style={{ marginBottom: spacing[1] }}>
-					Check your inbox
-				</H2>
-				<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
+				<Title accessibilityRole="header">Check your inbox</Title>
+				<Body
+					color="tertiary"
+					style={{ marginTop: spacing[1], marginBottom: spacing[7] }}
+				>
 					We sent a link to {pendingEmail}. Open it to confirm your email, then
 					sign in. Check spam if it isn't there in a minute.
 				</Body>
-				<Button size="lg" onPress={() => router.replace("/(auth)/login")}>
+				<Button onPress={() => router.replace("/(auth)/login")}>
 					Go to sign in
 				</Button>
 				<Button
 					variant="outline"
-					size="lg"
 					loading={resending}
 					onPress={resend}
 					style={{ marginTop: spacing[3] }}
@@ -140,12 +140,15 @@ export default function SignUp() {
 				</Pressable>
 			}
 		>
-			<H2 accessibilityRole="header" style={{ marginBottom: spacing[1] }}>
-				Create your account
-			</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
+			<Title accessibilityRole="header">Create your account</Title>
+			<Body
+				color="tertiary"
+				style={{ marginTop: spacing[1], marginBottom: spacing[7] }}
+			>
 				Volunteer, or register your NGO - you'll choose on the next step.
 			</Body>
+
+			<GoogleSignInButton onError={(message) => setFailure({ message })} />
 
 			<FormField
 				control={form.control}
@@ -202,8 +205,7 @@ export default function SignUp() {
 			<Button
 				onPress={onSubmit}
 				loading={loading}
-				size="lg"
-				style={{ marginTop: failure ? spacing[4] : spacing[6] }}
+				style={{ marginTop: failure ? spacing[4] : spacing[2] }}
 			>
 				Create account
 			</Button>
@@ -213,8 +215,6 @@ export default function SignUp() {
 			>
 				By continuing you agree to use Nabhya honestly and respectfully.
 			</Caption>
-
-			<GoogleSignInButton onError={(message) => setFailure({ message })} />
 		</AuthSplitLayout>
 	);
 }

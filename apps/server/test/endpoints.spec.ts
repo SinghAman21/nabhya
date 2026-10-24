@@ -39,7 +39,7 @@ vi.mock("@nabhya/db", async (importOriginal) => {
 	};
 });
 
-// 142 endpoints times several cases each would trip the 120/min bucket and turn
+// 147 endpoints times several cases each would trip the 120/min bucket and turn
 // this file into a 429 generator. The limits themselves are covered by the
 // throttler's own config, not here.
 vi.mock("../src/common/guards/throttler.config", () => ({
@@ -261,7 +261,7 @@ describe("HTTP surface", () => {
 	it("exposes the expected number of endpoints", () => {
 		// A bare count, so adding or deleting a route is a deliberate act that
 		// shows up in the diff rather than passing unnoticed.
-		expect(routes.length).toBe(142);
+		expect(routes.length).toBe(147);
 	});
 
 	it("mounts every route under the /api prefix", () => {

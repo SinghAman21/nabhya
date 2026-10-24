@@ -1,13 +1,7 @@
 import type { FeedTab } from "@nabhya/shared";
 import { FlashList } from "@shopify/flash-list";
 import { useRouter } from "expo-router";
-import {
-	Flame,
-	HeartHandshake,
-	Search,
-	Sparkles,
-	UserPlus,
-} from "lucide-react-native";
+import { Flame, HeartHandshake, Sparkles, UserPlus } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ViewStyle } from "react-native";
 import {
@@ -26,6 +20,7 @@ import {
 	FeedFilterSheet,
 	FeedTabs,
 	feedContentQuery,
+	feedFilterCount,
 } from "@/components/feed/feed-filters";
 import { PledgeSheet } from "@/components/pledge-sheet";
 import {
@@ -34,11 +29,10 @@ import {
 	LoadingState,
 	Screen,
 } from "@/components/screen-shell";
+import { SearchButton } from "@/components/search-panel";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/overlay";
-import { Pressable } from "@/components/ui/pressable";
-import { Caption, H2 } from "@/components/ui/typography";
-import { typography } from "@/constants/design-system";
+import { Caption, Title } from "@/components/ui/typography";
 import { useToggleFollow } from "@/hooks/use-engagement";
 import {
 	useFeed,
@@ -47,10 +41,8 @@ import {
 } from "@/hooks/use-feed";
 import { useCategories, useMe } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
-import { useDebounced } from "@/hooks/useDebounced";
 import { useMedia } from "@/hooks/useMedia";
 import { apiErrorMessage } from "@/lib/api";
-import { focusable } from "@/lib/focus";
 import { verticalScrollbar } from "@/lib/scroll";
 import type { FeedItem, FeedNeedItem } from "@/lib/types";
 import { useFeedStore } from "@/store/feed-store";
@@ -82,23 +74,17 @@ export default function Home() {
 	const [content, setContent] = useState<FeedContent>("all");
 	const [filtersOpen, setFiltersOpen] = useState(false);
 	const [responding, setResponding] = useState<FeedNeedItem | null>(null);
-	const [detectedCity, setDetectedCity] = useState<string | null>(null);
-	const [showCityFallback, setShowCityFallback] = useState(false);
 
-	const storeSearch = useFeedStore((s) => s.search);
-	const search = isDesktop ? storeSearch : "";
+	// All India unless the person picked a city themselves - their home city
+	// is offered in the picker, never applied for them. See `feed-store.ts`.
 	const city = useFeedStore((s) => s.city);
 	const setCity = useFeedStore((s) => s.setCity);
-	const cityTouched = useFeedStore((s) => s.cityTouched);
 
 	const me = useMe();
 	const homeCity = me.data?.city ?? null;
-	useEffect(() => {
-		if (!cityTouched && homeCity) setCity(homeCity);
-	}, [cityTouched, homeCity, setCity]);
 
 	const categories = useCategories();
-	const debouncedSearch = useDebounced(search.trim());
+	const filterCount = feedFilterCount(categoryIds, content);
 
 	// One choice in the sheet, two query params: see `feedContentQuery`.
 	const contentQuery = feedContentQuery(content);
@@ -106,38 +92,8 @@ export default function Home() {
 		tab,
 		...(categoryIds.length ? { categoryIds } : {}),
 		...(city === ALL_INDIA ? {} : { city }),
-		...(debouncedSearch ? { search: debouncedSearch } : {}),
 		...contentQuery,
 	});
-	useEffect(() => {
-		const firstPage = feed.data?.pages[0];
-		if (
-			!feed.isLoading &&
-			!feed.isError &&
-			firstPage &&
-			firstPage.items.length === 0 &&
-			detectedCity &&
-			detectedCity !== "Mumbai" &&
-			city === detectedCity &&
-			!debouncedSearch &&
-			categoryIds.length === 0 &&
-			content === "all"
-		) {
-			setDetectedCity(null);
-			setCity("Mumbai");
-			setShowCityFallback(true);
-		}
-	}, [
-		categoryIds.length,
-		city,
-		content,
-		debouncedSearch,
-		detectedCity,
-		feed.data,
-		feed.isError,
-		feed.isLoading,
-		setCity,
-	]);
 	const items = useMemo(
 		() => feed.data?.pages.flatMap((page) => page.items) ?? [],
 		[feed.data],
@@ -167,12 +123,19 @@ export default function Home() {
 
 	const gutter = spacing[4];
 
+	/*
+	 * Two rows: "Home" with the city scope and (on a phone) search at the
+	 * right, then the lenses with the filter button. `Title`, sentence case -
+	 * the display face only has capitals, which made a one-word page title
+	 * the loudest thing on the screen.
+	 */
 	const header = (
 		<View
 			style={{
 				paddingHorizontal: gutter,
+				paddingTop: isDesktop ? spacing[4] : spacing[1],
 				paddingBottom: spacing[3],
-				gap: spacing[2],
+				gap: spacing[3],
 				borderBottomWidth: 1,
 				borderBottomColor: colors.border.hairline,
 				backgroundColor: colors.background.warm,
@@ -183,70 +146,31 @@ export default function Home() {
 					flexDirection: "row",
 					alignItems: "center",
 					justifyContent: "space-between",
+					gap: spacing[3],
 					minHeight: 44,
 				}}
 			>
-				<H2
-					style={{ fontFamily: typography.fontFamily.display }}
-					accessibilityRole="header"
-				>
+				<Title accessibilityRole="header" numberOfLines={1}>
 					Home
-				</H2>
+				</Title>
 				<View
 					style={{
 						flexDirection: "row",
 						alignItems: "center",
-						gap: spacing[2],
+						gap: spacing[1],
+						flexShrink: 1,
 					}}
 				>
-					<CityPicker
-						value={city}
-						onChange={(nextCity) => {
-							setDetectedCity(null);
-							setShowCityFallback(false);
-							setCity(nextCity);
-						}}
-						onDetectedCity={(nextCity) => {
-							setDetectedCity(nextCity);
-							setShowCityFallback(false);
-						}}
-						homeCity={homeCity}
-					/>
-					{!isDesktop && (
-						<Pressable
-							onPress={() => router.push("/search")}
-							accessibilityRole="button"
-							accessibilityLabel="Search"
-							hitSlop={8}
-							{...focusable}
-							style={({ pressed }) => ({
-								width: 38,
-								height: 38,
-								borderRadius: 999,
-								alignItems: "center",
-								justifyContent: "center",
-							})}
-						>
-							<Search
-								size={20}
-								color={colors.text.primary as string}
-								strokeWidth={2}
-							/>
-						</Pressable>
-					)}
+					<CityPicker value={city} onChange={setCity} homeCity={homeCity} />
+					{!isDesktop && <SearchButton />}
 				</View>
 			</View>
-			{showCityFallback && (
-				<Caption color="tertiary" style={{ marginTop: spacing[1] }}>
-					No opportunities found nearby, so showing Mumbai instead.
-				</Caption>
-			)}
 			<FeedTabs
 				tab={tab}
 				onTab={setTab}
 				gutter={gutter}
 				onOpenFilters={() => setFiltersOpen(true)}
-				filterActive={categoryIds.length > 0 || content !== "all"}
+				filterCount={filterCount}
 			/>
 		</View>
 	);
@@ -261,12 +185,11 @@ export default function Home() {
 	) : items.length === 0 ? (
 		<FeedEmpty
 			tab={tab}
-			search={debouncedSearch}
 			city={city}
 			onAllIndia={() => setCity(ALL_INDIA)}
 			onBrowseNgos={() => router.push("/ngos")}
 			onForYou={() => setTab("for_you")}
-			filtered={categoryIds.length > 0 || content !== "all"}
+			filtered={filterCount > 0}
 			onClearFilters={() => {
 				setCategoryIds([]);
 				setContent("all");
@@ -401,7 +324,7 @@ export default function Home() {
 						showsVerticalScrollIndicator={false}
 						style={RAIL}
 						contentContainerStyle={{
-							paddingTop: spacing[1],
+							paddingTop: spacing[4],
 							paddingBottom: spacing[10],
 						}}
 					>
@@ -435,7 +358,6 @@ export default function Home() {
 /* ── Empty states ── */
 function FeedEmpty({
 	tab,
-	search,
 	city,
 	onAllIndia,
 	onBrowseNgos,
@@ -444,7 +366,6 @@ function FeedEmpty({
 	onClearFilters,
 }: {
 	tab: FeedTab;
-	search: string;
 	city: string;
 	onAllIndia: () => void;
 	onBrowseNgos: () => void;
@@ -463,17 +384,6 @@ function FeedEmpty({
 			{label}
 		</Button>
 	);
-
-	if (search) {
-		return (
-			<EmptyState
-				icon={Search}
-				title="No matching posts"
-				description="Try a different word, or a wider area."
-				{...(scoped ? { action: link("Show all of India", onAllIndia) } : {})}
-			/>
-		);
-	}
 
 	// A filter set in the sheet is out of sight once the sheet closes, so an
 	// empty feed under one read as "nothing here" - and the offered fix

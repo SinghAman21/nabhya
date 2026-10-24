@@ -1,4 +1,5 @@
 import { ScrollView, View } from "react-native";
+import { CHIP_RING_ROOM } from "@/components/choice-chips";
 import { Pressable } from "@/components/ui/pressable";
 import { Body } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
@@ -53,15 +54,24 @@ export function PageTabs<T extends string>({
 				marginBottom: spacing[6],
 			}}
 		>
+			{/* The scroller clips on both axes, so the content carries room for
+			    the focus ring (2px at a 2px offset) on the sides and top, and the
+			    scroller gives the sides back as negative margin so the first label
+			    still sits on the page's text edge. */}
 			<ScrollView
 				horizontal
 				showsHorizontalScrollIndicator={false}
 				accessibilityRole="tablist"
-				style={{ flexGrow: 0 }}
+				style={{
+					flexGrow: 0,
+					marginHorizontal: -CHIP_RING_ROOM,
+					marginTop: -CHIP_RING_ROOM,
+				}}
 				contentContainerStyle={{
 					flexDirection: "row",
 					gap: spacing[6],
-					paddingHorizontal: spacing[0.5],
+					paddingHorizontal: CHIP_RING_ROOM,
+					paddingTop: CHIP_RING_ROOM,
 				}}
 			>
 				{tabs.map((tab) => {
@@ -98,6 +108,7 @@ export function PageTabs<T extends string>({
 							<Body
 								weight={active ? "bold" : "medium"}
 								color={active ? undefined : "tertiary"}
+								numberOfLines={1}
 							>
 								{tab.label}
 							</Body>

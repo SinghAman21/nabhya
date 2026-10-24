@@ -51,7 +51,7 @@ export function StatusPill({
 				backgroundColor: bg,
 			}}
 		>
-			<Micro weight="medium" color={ink}>
+			<Micro weight="medium" color={ink} numberOfLines={1}>
 				{label}
 			</Micro>
 		</View>

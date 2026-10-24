@@ -45,7 +45,7 @@ import type { AdminOrgListItem } from "@/lib/types";
  * the URL, so a reload or a shared link lands on the same list.
  */
 type Verification = "ANY" | AdminOrgVerificationFilter;
-type Standing = "ANY" | "ACTIVE" | "SUSPENDED";
+type Standing = "ANY" | "ACTIVE" | "SUSPENDED" | "DELETED";
 
 /**
  * Labels match the pills (`humanizeStatus`): "Under review", not "In review",
@@ -72,6 +72,9 @@ const STANDING = [
 	{ value: "ANY" as const, label: "Any" },
 	{ value: "ACTIVE" as const, label: "Active" },
 	{ value: "SUSPENDED" as const, label: "Suspended" },
+	// "Any" leaves deleted NGOs out (the server does); this is the way back to
+	// them, for a restore.
+	{ value: "DELETED" as const, label: "Deleted" },
 ];
 
 const VERIFICATION_VALUES = VERIFICATION.map((option) => option.value);
@@ -192,6 +195,8 @@ export default function AdminOrganizations() {
 			render: (org) =>
 				org.status === "SUSPENDED" ? (
 					<StatusPill label="Suspended" tone="error" />
+				) : org.status === "DELETED" ? (
+					<StatusPill label="Deleted" tone="error" />
 				) : (
 					<Caption color="quaternary">Active</Caption>
 				),
@@ -413,6 +418,9 @@ function OrgCard({
 				/>
 				{org.status === "SUSPENDED" && (
 					<StatusPill label="Suspended" tone="error" />
+				)}
+				{org.status === "DELETED" && (
+					<StatusPill label="Deleted" tone="error" />
 				)}
 				{org.pendingDocuments > 0 && (
 					<StatusPill

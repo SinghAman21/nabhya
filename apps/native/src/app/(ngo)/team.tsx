@@ -14,6 +14,7 @@ import { DataTable, type TableColumn } from "@/components/admin/data-table";
 import { SwitchRow } from "@/components/composer/switch-row";
 import { Field, FieldError, useFieldInputStyle } from "@/components/form-field";
 import { InitialAvatar } from "@/components/initial-avatar";
+import { RoleMatrix } from "@/components/ngo/role-matrix";
 import {
 	EmptyState,
 	ErrorState,
@@ -140,7 +141,11 @@ export default function OrgTeam() {
 
 	const memberCount =
 		status === "ACTIVE"
-			? `${items.length} active ${items.length === 1 ? "member" : "members"}`
+			? // A legacy owner has no team row, so an empty list is the owner
+				// alone - "0 active members" contradicted "Just you so far" below.
+				items.length === 0
+				? "Just you"
+				: `${items.length} active ${items.length === 1 ? "member" : "members"}`
 			: status === "SUSPENDED"
 				? `${items.length} suspended`
 				: `${items.length} left`;
@@ -149,7 +154,8 @@ export default function OrgTeam() {
 	return (
 		<Screen>
 			<ScreenHeader
-				back
+				// A rail destination on desktop; a pushed page on a phone.
+				back={!isDesktop}
 				title="Team"
 				subtitle={
 					canInvite ? `${memberCount} · ${invites.length} pending` : memberCount
@@ -208,14 +214,9 @@ export default function OrgTeam() {
 						<EmptyState
 							icon={Users}
 							title={empty.title}
+							// No button: the header's Invite is the one way in, and a
+							// second orange "Invite someone" sat 260pt below it.
 							description={empty.description}
-							action={
-								status === "ACTIVE" && canInvite ? (
-									<Button onPress={() => setInviting(true)}>
-										Invite someone
-									</Button>
-								) : undefined
-							}
 						/>
 					) : isDesktop ? (
 						<DataTable
@@ -313,26 +314,7 @@ export default function OrgTeam() {
 									paddingBottom: spacing[4],
 								}}
 							>
-								{(["OWNER", ...ROLES] as const).map((role) => (
-									<View
-										key={role}
-										style={{
-											flexDirection: "row",
-											alignItems: "flex-start",
-											gap: spacing[3],
-										}}
-									>
-										<View style={{ width: 84 }}>
-											<StatusPill
-												label={TEAM_ROLE_LABELS[role]}
-												tone={role === "OWNER" ? "info" : "neutral"}
-											/>
-										</View>
-										<Caption color="tertiary" style={{ flex: 1 }}>
-											{TEAM_ROLE_COPY[role]}
-										</Caption>
-									</View>
-								))}
+								<RoleMatrix />
 								<Caption color="quaternary">
 									A designation ("Field lead - Pune") is only the label shown
 									beside a name; the role is what grants access.

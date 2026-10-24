@@ -3,19 +3,25 @@ import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import {
 	Award,
+	Bell,
 	Bookmark,
 	BookmarkCheck,
 	CalendarCheck,
 	ChevronRight,
 	HandCoins,
-	Moon,
+	LogOut,
 	ShieldCheck,
 	TrendingUp,
 	UserCheck,
 	UserRound,
 } from "lucide-react-native";
-import { useState } from "react";
-import { RefreshControl, ScrollView, View } from "react-native";
+import {
+	ActivityIndicator,
+	RefreshControl,
+	ScrollView,
+	View,
+} from "react-native";
+import { AppearanceRow } from "@/components/appearance-row";
 import {
 	Banner,
 	ErrorState,
@@ -28,10 +34,8 @@ import {
 	SectionTitle,
 	Surface,
 } from "@/components/screen-shell";
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetOption } from "@/components/ui/sheet";
 import { Caption, H3, H4 } from "@/components/ui/typography";
-import { useAppTheme } from "@/hooks/use-app-theme";
+import { useVerifyIdentitySheet } from "@/components/verification/verify-identity-sheet";
 import { useSignOut } from "@/hooks/use-auth";
 import { useMyImpact } from "@/hooks/use-directory";
 import { useMyUserDocuments } from "@/hooks/use-documents";
@@ -49,8 +53,8 @@ import { verticalScrollbar } from "@/lib/scroll";
  *    Tapping it edits the profile; there is no separate edit button to find.
  * 2. What I have done - three numbers, tap for the full impact page.
  * 3. What needs me - the verification banner, only while it does.
- * 4. Where things are - two short groups: my activity, then settings.
- * 5. Sign out - on its own at the end, away from everything else.
+ * 4. Where things are - two short groups: my activity, then settings,
+ *    which ends in Sign out (with the email under it).
  *
  * Email, bio and phone are not shown here; they belong to the edit page. A
  * profile screen is a hub, and every extra line on the hub is a line before
@@ -63,17 +67,17 @@ import { verticalScrollbar } from "@/lib/scroll";
  * column previously used `position: sticky` - which needs a scrolling
  * ancestor it did not have, so it only made the column size to its content.
  */
-const RAIL = { width: 340, flexGrow: 0, flexShrink: 0 } as const;
+const RAIL = { width: 360, flexGrow: 0, flexShrink: 0 } as const;
 
-const APPEARANCE_LABEL = { system: "System", light: "Light", dark: "Dark" };
+/** The page's content width: two columns use it, nothing floats in a 2000pt window. */
+const CONTENT = { width: "100%", maxWidth: 1120, alignSelf: "center" } as const;
 
 export default function VolunteerProfile() {
 	const { colors, spacing } = useTheme();
-	const { preference, setColorScheme } = useAppTheme();
 	const router = useRouter();
 	const signOut = useSignOut();
 	const { isDesktop } = useMedia();
-	const [appearanceOpen, setAppearanceOpen] = useState(false);
+	const verify = useVerifyIdentitySheet();
 
 	const me = useMe();
 	const documents = useMyUserDocuments();
@@ -200,7 +204,7 @@ export default function VolunteerProfile() {
 								? "A reviewer is checking your ID and selfie. Usually a day or two."
 								: "A government ID and a quick selfie. NGOs accept verified volunteers first."
 					}
-					onPress={() => router.push("/verify-identity")}
+					onPress={verify.open}
 				/>
 			</View>
 		);
@@ -230,7 +234,7 @@ export default function VolunteerProfile() {
 					icon={HandCoins}
 					label="Giving"
 					hint="Items pledged and money donated"
-					onPress={() => router.push("/(volunteer)/donations")}
+					onPress={() => router.push("/(volunteer)/giving")}
 				/>
 				<ListRow
 					icon={UserCheck}
@@ -255,8 +259,23 @@ export default function VolunteerProfile() {
 		</View>
 	);
 
+	const identityValue = isVerified
+		? "Verified"
+		: rejected
+			? "Needs another look"
+			: hasSubmitted
+				? "Under review"
+				: "Not started";
+
+	/*
+	 * Settings, ending in Sign out. Sign out is the last row of the group rather
+	 * than a big outline button of its own: it is a setting you reach for once a
+	 * month, and a full-width button made it the loudest control on the page.
+	 * The row carries the email, which is the one thing a person checks before
+	 * signing out of a shared device.
+	 */
 	const settings = (
-		<View style={{ marginBottom: spacing[8] }}>
+		<View>
 			<SectionTitle>Settings</SectionTitle>
 			<ListGroup>
 				<ListRow
@@ -267,82 +286,50 @@ export default function VolunteerProfile() {
 				<ListRow
 					icon={ShieldCheck}
 					label="Identity verification"
-					value={
-						<Caption color="tertiary">
-							{isVerified
-								? "Verified"
-								: rejected
-									? "Needs another look"
-									: hasSubmitted
-										? "Under review"
-										: "Not started"}
-						</Caption>
-					}
-					onPress={() => router.push("/verify-identity")}
+					value={<Caption color="tertiary">{identityValue}</Caption>}
+					onPress={verify.open}
+				/>
+				<AppearanceRow />
+				<ListRow
+					icon={Bell}
+					label="Notifications"
+					onPress={() => router.push("/notifications")}
 				/>
 				<ListRow
-					icon={Moon}
-					label="Appearance"
+					icon={LogOut}
+					label="Sign out"
+					hint={me.data?.email ?? undefined}
+					chevron={false}
 					value={
-						<Caption color="tertiary">{APPEARANCE_LABEL[preference]}</Caption>
+						signOut.isPending ? (
+							<ActivityIndicator
+								size="small"
+								color={colors.text.quaternary as string}
+							/>
+						) : undefined
 					}
-					onPress={() => setAppearanceOpen(true)}
+					onPress={() => {
+						if (!signOut.isPending) signOut.mutate();
+					}}
 				/>
 			</ListGroup>
 		</View>
 	);
 
-	/* 5. Sign out -------------------------------------------------------------- */
-	const signOutButton = (
-		<View style={{ gap: spacing[3], alignItems: "center" }}>
-			<Button
-				variant="outline"
-				onPress={() => signOut.mutate()}
-				loading={signOut.isPending}
-				accessibilityLabel="Sign out"
-				style={{ alignSelf: "stretch" }}
-			>
-				Sign out
-			</Button>
-			<Caption color="quaternary" numberOfLines={1}>
-				{me.data?.email}
-			</Caption>
-		</View>
-	);
-
-	const appearanceSheet = (
-		<Sheet
-			visible={appearanceOpen}
-			onClose={() => setAppearanceOpen(false)}
-			title="Appearance"
-			subtitle="System follows your phone's setting."
-		>
-			<View style={{ paddingBottom: spacing[2] }}>
-				{(["system", "light", "dark"] as const).map((option) => (
-					<SheetOption
-						key={option}
-						label={APPEARANCE_LABEL[option]}
-						selected={preference === option}
-						onPress={() => {
-							setColorScheme(option);
-							setAppearanceOpen(false);
-						}}
-					/>
-				))}
-			</View>
-		</Sheet>
-	);
-
 	/*
 	 * One `ScrollView` for both platforms, varying only the layout inside it.
 	 * The desktop branch used to be a plain `View`, so on a window shorter than
-	 * the page - which is most of them, once the settings group is open - the
-	 * bottom of the profile was drawn into `overflow: hidden` and could not be
-	 * reached at all: no sign-out, no appearance, no certificates.
+	 * the page the bottom of the profile was drawn into `overflow: hidden` and
+	 * could not be reached at all.
+	 *
+	 * Desktop: who I am and my settings on the left (the account), what I have
+	 * done on the right (the record). Phone: one column in reading order.
 	 */
 	return (
 		<Screen>
-			<ScreenHeader title="Profile" />
+			<View style={CONTENT}>
+				<ScreenHeader title="Profile" />
+			</View>
 
 			<ScrollView
 				{...verticalScrollbar}
@@ -360,16 +347,15 @@ export default function VolunteerProfile() {
 				}
 			>
 				{isDesktop ? (
-					<View style={{ flexDirection: "row", gap: spacing[6] }}>
+					<View style={[CONTENT, { flexDirection: "row", gap: spacing[8] }]}>
 						<View style={RAIL}>
 							{identity}
 							{verification}
-							{signOutButton}
+							{settings}
 						</View>
 						<View style={{ flex: 1, minWidth: 0 }}>
 							{numbers}
 							{activity}
-							{settings}
 						</View>
 					</View>
 				) : (
@@ -379,12 +365,11 @@ export default function VolunteerProfile() {
 						{verification}
 						{activity}
 						{settings}
-						{signOutButton}
 					</>
 				)}
 			</ScrollView>
 
-			{appearanceSheet}
+			{verify.sheet}
 		</Screen>
 	);
 }

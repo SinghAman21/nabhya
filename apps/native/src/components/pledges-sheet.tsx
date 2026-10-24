@@ -2,34 +2,38 @@ import type { PledgeStatus } from "@nabhya/shared";
 import { Package } from "lucide-react-native";
 import { useState } from "react";
 import { View } from "react-native";
+import { withCounts } from "@/components/applicants-sheet";
 import { ContactActions } from "@/components/contact-actions";
 import { Field, useFieldInputStyle } from "@/components/form-field";
 import { InitialAvatar } from "@/components/initial-avatar";
 import { LoadMoreFooter } from "@/components/load-more-footer";
+import { useFormButtonGrow } from "@/components/ngo/form-footer";
+import { NeedSummary } from "@/components/ngo/record-summary";
 import { usePagedQuery } from "@/components/paged-list";
 import {
 	EmptyState,
 	ErrorState,
 	FilterChips,
-	LoadingState,
+	SectionTitle,
+	SkeletonList,
 	Surface,
 } from "@/components/screen-shell";
 import {
-	humanizeStatus,
 	pledgeStatusLabel,
 	pledgeTone,
 	StatusPill,
 } from "@/components/status-pill";
+import { TextAction } from "@/components/text-action";
 import { Button } from "@/components/ui/button";
+import { Drawer } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { confirm, toast } from "@/components/ui/overlay";
-import { Sheet, SheetFlatList } from "@/components/ui/sheet";
 import { Body, BodySmall, Caption } from "@/components/ui/typography";
-import { useReviewPledge } from "@/hooks/use-needs";
+import { useReviewPledge, useUpdateNeed } from "@/hooks/use-needs";
 import { useOrgAccess } from "@/hooks/use-org-access";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage, orgNeedsApi, queryKeys } from "@/lib/api";
-import { formatProgress, formatRelative } from "@/lib/format";
+import { formatRelative } from "@/lib/format";
 import type { NeedPledge, OrgNeedListItem } from "@/lib/types";
 
 type StatusFilter = "ALL" | PledgeStatus;
@@ -43,21 +47,32 @@ const FILTERS: Array<{ value: StatusFilter; label: string }> = [
 ];
 
 /**
- * Pledge review for one post - the organisation side of the donation loop.
+ * One need as a record: the post itself, then every pledge on it - the
+ * organisation side of the donation loop.
  *
  * Accepting advances the need's `fulfilledQuantity` by the pledged amount and
  * auto-closes it once the target is met; completing marks the handover done.
+ *
+ * A right-hand `Drawer` (`xl`) on desktop and a sheet on a phone, opening on
+ * `NeedSummary` - direction, urgency, the quantity over its bar, the closing
+ * date, Edit - for the same reason `ApplicantsDrawer` does: it used to be a
+ * centred dialog whose only fact about the post was "12 of 40 blankets". The
+ * chips carry the server's per-state `counts`, so "Pending 3" reads before it
+ * is pressed.
  *
  * The note to the volunteer lives on the row it is for. It used to be one
  * field above the list, "sent with your next decision" - a mode error: a
  * pickup address typed for one person went to whoever was tapped next.
  */
-export function PledgesSheet({
+export function PledgesDrawer({
 	need,
 	onClose,
+	onEdit,
 }: {
 	need: OrgNeedListItem | null;
 	onClose: () => void;
+	/** Closes this drawer, then opens the editor - one drawer at a time. */
+	onEdit?: (need: OrgNeedListItem) => void;
 }) {
 	const { spacing } = useTheme();
 	const [filter, setFilter] = useState<StatusFilter>("PENDING");
@@ -65,7 +80,7 @@ export function PledgesSheet({
 	// Paged and filtered by the server - filtering page 1 here hid every
 	// pending pledge past the twentieth.
 	const params = filter === "ALL" ? {} : { status: filter };
-	const { query, items, loadMore } = usePagedQuery({
+	const { query, items, first, loadMore } = usePagedQuery({
 		queryKey: queryKeys.orgNeedPledges(need?.id ?? "", params),
 		fetchPage: (page) =>
 			orgNeedsApi.pledges(need?.id as string, { ...params, page, limit: 20 }),
@@ -75,7 +90,46 @@ export function PledgesSheet({
 
 	// Accepting, declining or completing is `people.review` - plus suspension,
 	// which the role check alone missed.
-	const reviewBlocked = useOrgAccess().blocked("people.review");
+	const access = useOrgAccess();
+	const reviewBlocked = access.blocked("people.review");
+	// Closing or reopening is an edit of the post (`content.publish`, as the
+	// server checks). The editor had no status control at all, so "open until
+	// the target is met or you close it" named an action nobody could take.
+	const canChangeStatus = !access.blocked("content.publish");
+	const updateNeed = useUpdateNeed();
+
+	const setOpen = async (target: OrgNeedListItem, open: boolean) => {
+		if (!open) {
+			const ok = await confirm({
+				title: "Close this post?",
+				message:
+					"It leaves the feed and stops taking new offers. Accepted offers stay as they are, and you can reopen it later.",
+				confirmLabel: "Close post",
+				destructive: false,
+			});
+			if (!ok) return;
+		}
+		updateNeed.mutate(
+			{ id: target.id, input: { status: open ? "OPEN" : "CLOSED" } },
+			{
+				onSuccess: () =>
+					toast.success(
+						open
+							? "Post reopened - it's back in the feed."
+							: "Post closed - no new offers.",
+					),
+				onError: (error) =>
+					toast.error(
+						`Couldn't ${open ? "reopen" : "close"} the post. ${apiErrorMessage(error, "Try again in a moment.")}`,
+					),
+			},
+		);
+	};
+
+	const counts = first?.counts;
+	const chipOptions = withCounts(FILTERS, (value) =>
+		counts ? (value === "ALL" ? counts.all : counts[value]) : undefined,
+	);
 
 	const close = () => {
 		setFilter("PENDING");
@@ -114,86 +168,107 @@ export function PledgesSheet({
 		);
 	};
 
-	const header = (
-		<View style={{ paddingTop: spacing[1], paddingBottom: spacing[2] }}>
-			{need && (
-				<Caption
-					weight="medium"
-					color="secondary"
-					style={{ marginBottom: spacing[3] }}
-				>
-					{formatProgress(need.fulfilledQuantity, need.quantity, need.unit)}
-					{need.status !== "OPEN" ? ` · ${humanizeStatus(need.status)}` : ""}
-				</Caption>
-			)}
-			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
-		</View>
-	);
+	let list: React.ReactNode;
+	if (query.isLoading) {
+		list = <SkeletonList variant="card" count={3} />;
+	} else if (query.isError) {
+		list = (
+			<ErrorState
+				message={apiErrorMessage(query.error)}
+				onRetry={() => query.refetch()}
+			/>
+		);
+	} else if (items.length === 0) {
+		list = (
+			<EmptyState
+				icon={Package}
+				title={filter === "PENDING" ? "No one waiting" : "No responses here"}
+				description={
+					filter === "PENDING"
+						? (counts?.all ?? 0) > 0
+							? "Every response has a decision. The other filters hold them."
+							: "When a volunteer offers to help with this post, it shows up here for your decision."
+						: "Nothing matches this filter yet."
+				}
+			/>
+		);
+	} else {
+		list = (
+			<View style={{ gap: spacing[3] }}>
+				{items.map((item) => (
+					<PledgeRow
+						key={item.id}
+						pledge={item}
+						unit={need?.unit ?? null}
+						reviewBlocked={reviewBlocked}
+						deciding={
+							review.isPending && review.variables?.pledgeId === item.id
+								? review.variables.input.status
+								: null
+						}
+						onDecide={(status, note) => decide(item, status, note)}
+					/>
+				))}
+				<LoadMoreFooter
+					hasMore={!!query.hasNextPage}
+					loading={query.isFetchingNextPage}
+					onLoadMore={loadMore}
+					count={items.length}
+					noun="responses"
+				/>
+			</View>
+		);
+	}
 
 	return (
-		<Sheet
+		<Drawer
 			visible={!!need}
 			onClose={close}
-			title="Responses"
-			subtitle={need?.title}
-			scrollable={false}
-			detents={["60%", "92%"]}
+			title={need?.title ?? "Need"}
+			subtitle={
+				need?.type === "OFFER" ? "Offer and responses" : "Need and responses"
+			}
+			xl
 		>
-			{query.isLoading ? (
-				<LoadingState label="Loading responses" />
-			) : query.isError ? (
-				<ErrorState
-					message={apiErrorMessage(query.error)}
-					onRetry={() => query.refetch()}
-				/>
-			) : (
-				<SheetFlatList
-					data={items}
-					keyExtractor={(item) => item.id}
-					ListHeaderComponent={header}
-					onEndReached={loadMore}
-					onEndReachedThreshold={0.6}
-					ListFooterComponent={
-						items.length > 0 ? (
-							<LoadMoreFooter
-								hasMore={!!query.hasNextPage}
-								loading={query.isFetchingNextPage}
-								onLoadMore={loadMore}
-								count={items.length}
-								noun="responses"
-							/>
-						) : null
-					}
-					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
-					ListEmptyComponent={
-						<EmptyState
-							icon={Package}
-							title={
-								filter === "PENDING" ? "No one waiting" : "No responses here"
-							}
-							description={
-								filter === "PENDING"
-									? "When a volunteer offers to help with this post, it shows up here for your decision."
-									: "Nothing matches this filter yet."
-							}
-						/>
-					}
-					renderItem={({ item }) => (
-						<PledgeRow
-							pledge={item}
-							unit={need?.unit ?? null}
-							reviewBlocked={reviewBlocked}
-							deciding={
-								review.isPending && review.variables?.pledgeId === item.id
-									? review.variables.input.status
-									: null
-							}
-							onDecide={(status, note) => decide(item, status, note)}
-						/>
-					)}
+			{need && (
+				<NeedSummary
+					need={need}
+					onEdit={onEdit ? () => onEdit(need) : undefined}
 				/>
 			)}
-		</Sheet>
+			{need && canChangeStatus && need.status !== "FULFILLED" ? (
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						justifyContent: "space-between",
+						gap: spacing[3],
+						marginTop: spacing[3],
+					}}
+				>
+					<Caption color="tertiary" style={{ flex: 1 }}>
+						{need.status === "OPEN"
+							? "Taking offers in the feed."
+							: "Closed - hidden from the feed, no new offers."}
+					</Caption>
+					<TextAction
+						label={need.status === "OPEN" ? "Close post" : "Reopen"}
+						disabled={updateNeed.isPending}
+						onPress={() => void setOpen(need, need.status !== "OPEN")}
+					/>
+				</View>
+			) : null}
+			<View style={{ marginTop: spacing[6] }}>
+				<SectionTitle>Responses</SectionTitle>
+				<FilterChips
+					label="Filter responses"
+					options={chipOptions}
+					value={filter}
+					onChange={setFilter}
+				/>
+				{list}
+			</View>
+		</Drawer>
 	);
 }
 
@@ -213,6 +288,7 @@ function PledgeRow({
 	onDecide: (status: Decision, note: string) => void;
 }) {
 	const { colors, spacing } = useTheme();
+	const grow = useFormButtonGrow();
 	const inputStyle = useFieldInputStyle();
 	const [note, setNote] = useState("");
 	const [noteOpen, setNoteOpen] = useState(false);
@@ -323,7 +399,7 @@ function PledgeRow({
 					}}
 				>
 					<Button
-						style={{ flex: 1 }}
+						style={grow}
 						disabled={busy || !canReview}
 						loading={deciding === "ACCEPTED"}
 						onPress={() => onDecide("ACCEPTED", note)}
@@ -333,7 +409,7 @@ function PledgeRow({
 					</Button>
 					<Button
 						variant="outline"
-						style={{ flex: 1 }}
+						style={grow}
 						disabled={busy || !canReview}
 						loading={deciding === "REJECTED"}
 						onPress={() => onDecide("REJECTED", note)}
@@ -344,8 +420,9 @@ function PledgeRow({
 				</View>
 			)}
 			{pledge.status === "ACCEPTED" && (
-				<View style={{ marginTop: spacing[4] }}>
+				<View style={{ marginTop: spacing[4], flexDirection: "row" }}>
 					<Button
+						style={grow}
 						disabled={busy || !canReview}
 						loading={deciding === "COMPLETED"}
 						onPress={() => onDecide("COMPLETED", note)}

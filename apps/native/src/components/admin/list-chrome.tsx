@@ -9,7 +9,7 @@ import {
 	type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Caption, H2, H5 } from "@/components/ui/typography";
+import { Caption, H5, Title } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { verticalScrollbar } from "@/lib/scroll";
@@ -192,6 +192,7 @@ export function AdminScreen({
 				<View
 					style={{
 						flexDirection: "row",
+						flexWrap: "wrap",
 						alignItems: "flex-end",
 						justifyContent: "space-between",
 						gap: spacing[3],
@@ -200,13 +201,22 @@ export function AdminScreen({
 						paddingBottom: spacing[4],
 					}}
 				>
-					<View style={{ flex: 1, minWidth: 0 }}>
+					{/* Wraps rather than squeezes: on a phone the overview's three
+					    buttons left "Overview" a sliver to wrap in. With a 200pt floor
+					    the action drops under the title instead. */}
+					<View
+						style={{ flexGrow: 1, flexShrink: 1, flexBasis: 200, minWidth: 0 }}
+					>
 						{subtitle && (
-							<Caption color="tertiary" numberOfLines={1}>
+							<Caption color="tertiary" numberOfLines={2}>
 								{subtitle}
 							</Caption>
 						)}
-						<H2 accessibilityRole="header">{title}</H2>
+						{/* `Title`, sentence case. `H2` is the display face, which draws
+						    only capitals - every console page read VOLUNTEERS, FINANCE. */}
+						<Title accessibilityRole="header" numberOfLines={2}>
+							{title}
+						</Title>
 					</View>
 					{action}
 				</View>

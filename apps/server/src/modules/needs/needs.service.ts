@@ -6,6 +6,7 @@ import type {
 	OrgNeedQuery,
 	PaginationQuery,
 	PledgeQuery,
+	PledgeStatusCounts,
 	PublicNeedQuery,
 	ReviewPledgeInput,
 	UpdateNeedInput,
@@ -32,7 +33,12 @@ import {
 } from "drizzle-orm";
 import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
-import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
+import {
+	assertIdentityVerified,
+	paginate,
+	takeFirstOrThrow,
+	toOffset,
+} from "../../common/utils";
 import { orderBySort } from "../../common/utils/order";
 import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsService } from "../organizations/organizations.service";
@@ -413,6 +419,9 @@ export class NeedsService {
 		if (!need) {
 			throw new NotFoundException("Post not found");
 		}
+
+		await assertIdentityVerified(this.db, userId);
+
 		if (need.status !== "OPEN") {
 			throw new BadRequestException("This post is no longer accepting offers.");
 		}
@@ -495,7 +504,7 @@ export class NeedsService {
 			{
 				type: "NEW_PLEDGE",
 				title: `Someone offered to help: ${need.title}`,
-				body: "Review the offer from Needs.",
+				body: "Open it to accept or decline the offer.",
 				entityName: "ORGANIZATION_NEED",
 				entityId: need.id,
 			},
@@ -595,8 +604,35 @@ export class NeedsService {
 			}),
 			this.db.select({ value: count() }).from(needPledges).where(where),
 		]);
+		const counts = await this.pledgeCounts(needId);
 
-		return paginate(items, totals?.value ?? 0, query);
+		return { ...paginate(items, totals?.value ?? 0, query), counts };
+	}
+
+	/**
+	 * Every state's count on one need, ignoring the status filter - the pledge
+	 * drawer's chips read "Pending 3 / Accepted 2" before either is pressed.
+	 * See `EventsService.applicationCounts`.
+	 */
+	private async pledgeCounts(needId: string): Promise<PledgeStatusCounts> {
+		const rows = await this.db
+			.select({ status: needPledges.status, value: count() })
+			.from(needPledges)
+			.where(eq(needPledges.needId, needId))
+			.groupBy(needPledges.status);
+		const counts: PledgeStatusCounts = {
+			PENDING: 0,
+			ACCEPTED: 0,
+			REJECTED: 0,
+			COMPLETED: 0,
+			CANCELLED: 0,
+			all: 0,
+		};
+		for (const row of rows) {
+			counts[row.status] = row.value;
+			counts.all += row.value;
+		}
+		return counts;
 	}
 
 	/**

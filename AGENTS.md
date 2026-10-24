@@ -87,7 +87,7 @@ client-side traps: `apps/native/AGENTS.md`.
 ### Server (`apps/server`)
 
 NestJS 11, global `/api` prefix, deny-by-default JWT guard + role guard, response
-envelope `{ success, data, timestamp }`, Swagger at `/api/docs`. 142 routes across
+envelope `{ success, data, timestamp }`, Swagger at `/api/docs`. 147 routes across
 15 feature modules (18 controllers, including the app probes).
 `apps/server/test/endpoints.spec.ts` inventories all registered controllers and
 asserts that count, so adding a route is a deliberate act that shows up in the diff. Architecture,
@@ -160,11 +160,13 @@ Supabase wizard.
   client against a deployed API.
 
 Wired services: Supabase (Postgres + Auth + Storage, stubbed in dev without
-credentials), Razorpay (donations, native checkout SDK). No email provider.
+credentials), Razorpay (donations, native checkout SDK), Resend (team invites and
+donation receipts; required in production, logged-and-skipped in dev without
+`RESEND_API_KEY`).
 
 ## Current state
 
-**Built:** auth end-to-end; 142 HTTP routes across `users`, `onboarding`,
+**Built:** auth end-to-end; 147 HTTP routes across `users`, `onboarding`,
 `organizations`, `categories`, `events`, `needs`, `feed`, `admin`, `uploads`,
 `engagement`, `publishing`, `certificates`, `donations` and `notifications`.
 NGO + volunteer onboarding; org events and needs management with
@@ -460,8 +462,40 @@ exceptions:
 
 When adding an endpoint, wire it to a screen or explain here why it has none.
 
-**Not built:** `apps/web`, and email/push delivery (notifications are in-app
-only). Paging *is* wired: `apps/native/src/components/paged-list.tsx`
+### Money, deletion and the identity gate
+
+- **NGO deletion is a soft delete.** `org_status` has `DELETED`, with
+  `status_reason`, `deleted_at` and `deleted_by` (migration `0017`). It hides
+  the NGO exactly as suspension does (public queries require `ACTIVE`), pulls
+  live events and open needs, and additionally revokes pending team invites and
+  ownership transfers. Nothing is hard-deleted - donations, certificates and the
+  audit trail keep pointing at the row - and `ACTIVE` restores it without
+  republishing anything. The admin directory leaves deleted NGOs out unless
+  filtered to them; the team sees `OrgSuspended` with the reviewer's reason.
+- **Applying and pledging need a verified identity.** `assertIdentityVerified`
+  (`common/utils/identity.ts`) refuses both unless `users.verification_status`
+  is `VERIFIED` (both documents approved). Both end with a stranger meeting an
+  NGO in person; browsing, following, reviewing and donating stay open. The
+  client mirrors it with `useIdentityGate()` in `verification-note.tsx`, which
+  disables the submit button beside the reason.
+- **Receipts are a PDF and an email.** `receipt-pdf.ts` renders an
+  acknowledgement of payment (not an 80G certificate, and it says so) into the
+  private bucket at `ngo_verification/receipts/<donation>/<receipt>.pdf`,
+  rebuilt on demand if lost. The webhook emails it to the donor (account email,
+  or the guest's typed one) with the PDF attached, fire-and-forget after the
+  payment is committed. `GET /me/donations/:id/receipt/pdf` returns a signed
+  link.
+- **The superadmin Finance console** (`(admin)/finance.tsx`, `FinanceService`):
+  a platform ledger over every status with totals over the whole filter, CSV
+  export of exactly the filtered rows (`POST /admin/donations/export`, audited as
+  `DONATIONS_EXPORTED`), and every NGO's financial reports. Superadmins see the
+  real donor behind an anonymous gift; NGOs never do, and their own
+  `POST /org/donations/export` ("Download report") omits donor emails entirely.
+  CSVs are formula-guarded and BOM-prefixed (`common/utils/csv.ts`), capped at
+  `MAX_EXPORT_ROWS`, and live in private storage behind a signed link.
+
+**Not built:** `apps/web`, and push delivery (notifications are in-app;
+email covers team invites and receipts only). Paging *is* wired: `apps/native/src/components/paged-list.tsx`
 (`usePagedQuery` + `PagedList`) turns any `Paginated<T>` endpoint into an
 infinite list, and the two screens that do not use it say why in the file - the
 team endpoint returns the whole team, and the volunteer activity timeline merges
@@ -501,11 +535,15 @@ announcements take `status`, the org's reviews take `awaitingReply` (and return
 - Zod schemas live in `@nabhya/shared` and are the contract for both sides - the server
   validates with `new ZodValidationPipe(schema)`, the client imports the same schema
   into `react-hook-form`. Never hand-write a duplicate shape.
-- Request payloads have runtime Zod validation. Response payloads currently use
-  client TypeScript types; `http.unwrap<T>` trusts the expected envelope and extracts
-  its `data` field without runtime validation. Per-endpoint runtime response parsing
-  is not implemented and remains a contract-drift risk, rather than an adopted
-  current requirement.
+- Request payloads have runtime Zod validation, and so do responses, in three
+  layers (`packages/shared/src/responses.ts`): every response's envelope, every
+  page's `{ items, meta }`, and full schemas for the payloads money and routing
+  depend on (onboarding status, checkout, receipts, exports, the ledger), passed
+  as the last argument to `http.get/post/getPage`. A mismatch throws in dev and
+  warns in production. Schemas are `looseObject` - only a missing or mistyped
+  field is drift - and the server specs parse real service output through them,
+  so drift fails CI. Add a schema when a screen's correctness depends on a
+  field; most list rows are still covered by the page check only.
 - Organisation-scoped routes live under `org/*` and resolve the org from the token via
   `OrganizationsService.requireOwnedOrganization` - an org id is never accepted from the
   client. `requireVerifiedOrganization` additionally gates anything that becomes

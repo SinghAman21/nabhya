@@ -1,6 +1,9 @@
 import type {
 	AdminActivityQuery,
 	AdminAnalyticsQuery,
+	AdminDonationFilter,
+	AdminDonationQuery,
+	AdminFinancialReportQuery,
 	AdminOrgPostsQuery,
 	AdminOrgQuery,
 	AdminTrendQuery,
@@ -16,6 +19,9 @@ import type {
 import {
 	adminActivityQuerySchema,
 	adminAnalyticsQuerySchema,
+	adminDonationFilterSchema,
+	adminDonationQuerySchema,
+	adminFinancialReportQuerySchema,
 	adminOrgPostsQuerySchema,
 	adminOrgQuerySchema,
 	adminTrendQuerySchema,
@@ -51,6 +57,7 @@ import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthUser } from "../../common/types";
 import { FeedService } from "../feed/feed.service";
 import { AdminService } from "./admin.service";
+import { FinanceService } from "./finance.service";
 
 /**
  * Superadmin monitoring surface. The class-level @Roles guard means every route
@@ -64,6 +71,7 @@ export class AdminController {
 	constructor(
 		@Inject(AdminService) private readonly adminService: AdminService,
 		@Inject(FeedService) private readonly feedService: FeedService,
+		@Inject(FinanceService) private readonly financeService: FinanceService,
 	) {}
 
 	@Get("overview")
@@ -325,6 +333,47 @@ export class AdminController {
 		@Param("id", ParseUUIDPipe) id: string,
 	) {
 		return this.feedService.remove(admin, id);
+	}
+
+	// ─── Finance ─────────────────────────────────────────────────────────────
+
+	@Get("donations")
+	@ApiOperation({
+		summary:
+			"Platform-wide donation ledger, every status, with totals over the filter",
+	})
+	listDonations(
+		@Query(new ZodValidationPipe(adminDonationQuerySchema))
+		query: AdminDonationQuery,
+	) {
+		return this.financeService.listDonations(query);
+	}
+
+	/**
+	 * `POST` because it creates something - a file in storage and an audit
+	 * row - even though it takes the same filters as the `GET` above.
+	 */
+	@Post("donations/export")
+	@ApiOperation({
+		summary: "Export the filtered ledger as CSV; returns a signed link",
+	})
+	exportDonations(
+		@CurrentUser() admin: AuthUser,
+		@Body(new ZodValidationPipe(adminDonationFilterSchema))
+		body: AdminDonationFilter,
+	) {
+		return this.financeService.exportDonations(admin.id, body);
+	}
+
+	@Get("financial-reports")
+	@ApiOperation({
+		summary: "Every NGO's transparency documents, newest financial year first",
+	})
+	listFinancialReports(
+		@Query(new ZodValidationPipe(adminFinancialReportQuerySchema))
+		query: AdminFinancialReportQuery,
+	) {
+		return this.financeService.listFinancialReports(query);
 	}
 
 	// ─── Audit ───────────────────────────────────────────────────────────────

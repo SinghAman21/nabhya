@@ -211,7 +211,13 @@ export function LocationFields({
 				</View>
 			</Pressable>
 
-			<FieldError message={detectError} />
+			{detectError ? (
+				// Under the control it answers, at the note's spacing - with the
+				// button's own margin above, it sat flush against the City label.
+				<View style={{ marginTop: -spacing[4], marginBottom: spacing[4] }}>
+					<FieldError message={detectError} />
+				</View>
+			) : null}
 			{detectNote && !detectError ? (
 				<Caption
 					accessibilityLiveRegion="polite"
@@ -223,7 +229,9 @@ export function LocationFields({
 			) : null}
 
 			<FieldPair>
-				<Field label="City" error={cityError}>
+				{/* Errors go under the input, above the suggestions: below a
+				    wrapped row of pills, "City is required" sat a row from its box. */}
+				<Field label="City">
 					<Input
 						placeholder="e.g. Mumbai"
 						value={value.city}
@@ -235,6 +243,7 @@ export function LocationFields({
 						accessibilityLabel="City"
 						style={inputStyle}
 					/>
+					<FieldError message={cityError} />
 					{cityOptions.length > 0 ? (
 						<SuggestionRow
 							label="Suggested cities"
@@ -244,7 +253,7 @@ export function LocationFields({
 					) : null}
 				</Field>
 
-				<Field label="State" error={stateError}>
+				<Field label="State">
 					<Input
 						placeholder="e.g. Maharashtra"
 						value={value.state}
@@ -255,6 +264,7 @@ export function LocationFields({
 						accessibilityLabel="State"
 						style={inputStyle}
 					/>
+					<FieldError message={stateError} />
 					{stateOptions.length > 0 ? (
 						<SuggestionRow
 							label="Suggested states"

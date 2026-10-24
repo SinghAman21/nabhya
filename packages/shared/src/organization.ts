@@ -108,4 +108,8 @@ export interface OrgOverview {
 	eventsWithApplicants: number;
 	pendingPledges: number;
 	needsWithPledges: number;
+	/** Events saved but not yet published - work the team started. */
+	draftEvents: number;
+	/** Volunteers following the org, the same count its public page shows. */
+	followers: number;
 }

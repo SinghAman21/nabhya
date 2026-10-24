@@ -7,12 +7,15 @@ import { ContactActions } from "@/components/contact-actions";
 import { Field, useFieldInputStyle } from "@/components/form-field";
 import { InitialAvatar } from "@/components/initial-avatar";
 import { LoadMoreFooter } from "@/components/load-more-footer";
+import { useFormButtonGrow } from "@/components/ngo/form-footer";
+import { EventSummary } from "@/components/ngo/record-summary";
 import { usePagedQuery } from "@/components/paged-list";
 import {
 	EmptyState,
 	ErrorState,
 	FilterChips,
-	LoadingState,
+	SectionTitle,
+	SkeletonList,
 	Surface,
 } from "@/components/screen-shell";
 import {
@@ -21,10 +24,10 @@ import {
 	StatusPill,
 } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
+import { Drawer } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { confirm, toast } from "@/components/ui/overlay";
 import { Pressable } from "@/components/ui/pressable";
-import { Sheet, SheetFlatList } from "@/components/ui/sheet";
 import { Body, BodySmall, Caption, Label } from "@/components/ui/typography";
 import {
 	useBulkAttendance,
@@ -34,6 +37,7 @@ import {
 } from "@/hooks/use-engagement";
 import {
 	useBulkReviewApplications,
+	useOrgEvent,
 	useReviewApplication,
 } from "@/hooks/use-events";
 import { useOrgAccess } from "@/hooks/use-org-access";
@@ -41,7 +45,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage, orgEventsApi, queryKeys } from "@/lib/api";
 import { focusable } from "@/lib/focus";
 import { formatRelative } from "@/lib/format";
-import type { EventApplicant } from "@/lib/types";
+import type { EventApplicant, OrgEventListItem } from "@/lib/types";
 
 type StatusFilter = "ALL" | ApplicationStatus;
 
@@ -61,51 +65,72 @@ const SELECTABLE: Partial<Record<StatusFilter, ApplicationStatus>> = {
 };
 
 /**
- * Applicant review for a single event: decide, then - after the event - mark
- * attendance and issue certificates.
+ * One event as a record: the event itself, then everyone who applied to it -
+ * decide, then, after the event, mark attendance and issue certificates.
+ *
+ * ## A drawer, not a dialog
+ *
+ * This was a centred `Sheet` titled "Applicants" whose only fact about the
+ * event was "100 places left". Reviewing is not leaving the events list - the
+ * organiser works down it - so on desktop it is a right-hand `Drawer` (`xl`,
+ * like the admin dossiers) with the list still visible behind it, and it opens
+ * on the event's summary (`EventSummary`: state, when, where, how full, Edit)
+ * before the people. On a phone `Drawer` is a sheet, as before. The rows are
+ * rendered inline rather than in a `SheetFlatList`, because the drawer's body
+ * is already the scroller; paging is the footer's explicit "Load more".
+ *
+ * ## Counts on the chips
+ *
+ * The server returns every state's count with each page (`counts`, across the
+ * event, whatever the filter), so "Pending 3 / Accepted 2" is legible before a
+ * chip is pressed and an empty filter is not a tap to find out.
  *
  * ## Selection
  *
  * Reviewing fifty applicants used to be fifty Accept taps, and certifying
  * thirty volunteers about ninety (mark attended, issue, confirm). The Pending
- * and Accepted filters now take a tick per row and a select-all, and the
- * pinned footer acts on the selection through the server's bulk endpoints,
- * which apply each row through the single-row path and report per-row
- * outcomes. Rows that fail stay ticked with the reason on them, so "18 of 20"
- * names the two. Filters are four peers, so they stay chips.
+ * and Accepted filters take a tick per row and a select-all, and the pinned
+ * footer acts on the selection through the server's bulk endpoints, which
+ * apply each row through the single-row path and report per-row outcomes.
+ * Rows that fail stay ticked with the reason on them, so "18 of 20" names the
+ * two. Filters are four peers, so they stay chips.
  *
  * ## Notes travel with one person
  *
- * The note used to be a single field above the list, "sent with your next
- * decision" - so a note written with one applicant in mind went to whoever was
- * clicked next. It now lives on the row it is for.
+ * The note lives on the row it is for, never in one field "sent with your
+ * next decision" - which sent a note meant for one applicant to whoever was
+ * clicked next.
  *
  * ## Who may do what
  *
  * Every control asks `useOrgAccess()`: review is `people.review`, attendance
- * `people.attendance`, issuing `certs.issue`, revoking `certs.revoke`. Attendance
- * and certificates used to check nothing, so a Viewer saw "Mark attended" and
- * a Manager saw "Revoke", and both got a 403.
+ * `people.attendance`, issuing `certs.issue`, revoking `certs.revoke`.
  */
-export function ApplicantsSheet({
-	eventId,
-	eventTitle,
-	remainingPlaces,
+export function ApplicantsDrawer({
+	event,
 	onClose,
+	onEdit,
 }: {
-	eventId: string | null;
-	eventTitle: string;
-	remainingPlaces: number;
+	event: OrgEventListItem | null;
 	onClose: () => void;
+	/**
+	 * Opens the editor. The screen closes this drawer first and opens the form
+	 * after it - sequentially, never a drawer inside a drawer.
+	 */
+	onEdit?: (event: OrgEventListItem) => void;
 }) {
-	const { colors, spacing } = useTheme();
+	const { spacing } = useTheme();
+	const eventId = event?.id ?? null;
+	const remainingPlaces = event
+		? Math.max(event.volunteersNeeded - event.acceptedCount, 0)
+		: 0;
 	const [filter, setFilterState] = useState<StatusFilter>("PENDING");
 	const [selected, setSelected] = useState<Set<string>>(new Set());
 	// Per-row reasons from the last bulk action, shown on the row itself.
 	const [failures, setFailures] = useState<Record<string, string>>({});
 
 	const params = filter === "ALL" ? {} : { status: filter };
-	const { query, items, loadMore } = usePagedQuery({
+	const { query, items, first, loadMore } = usePagedQuery({
 		queryKey: queryKeys.orgEventApplicants(eventId ?? "", params),
 		fetchPage: (page) =>
 			orgEventsApi.applicants(eventId as string, {
@@ -115,6 +140,7 @@ export function ApplicantsSheet({
 			}),
 		enabled: !!eventId,
 	});
+	const detail = useOrgEvent(eventId ?? undefined);
 	const review = useReviewApplication(eventId ?? "");
 	const bulkReview = useBulkReviewApplications(eventId ?? "");
 	const bulkAttendance = useBulkAttendance(eventId ?? "");
@@ -126,6 +152,11 @@ export function ApplicantsSheet({
 		issue: access.blocked("certs.issue"),
 		revoke: access.blocked("certs.revoke"),
 	};
+
+	const counts = first?.counts;
+	const chipOptions = withCounts(FILTERS, (value) =>
+		counts ? (value === "ALL" ? counts.all : counts[value]) : undefined,
+	);
 
 	const selectableStatus = SELECTABLE[filter];
 	const selectable = selectableStatus
@@ -265,48 +296,6 @@ export function ApplicantsSheet({
 
 	const bulkBusy = bulkReview.isPending || bulkAttendance.isPending;
 
-	const header = (
-		<View style={{ paddingTop: spacing[1], paddingBottom: spacing[2] }}>
-			<Caption
-				weight="medium"
-				color={
-					remainingPlaces > 0 ? "secondary" : (colors.warning.ink as string)
-				}
-				style={{ marginBottom: spacing[3] }}
-			>
-				{remainingPlaces > 0
-					? `${remainingPlaces} place${remainingPlaces === 1 ? "" : "s"} left`
-					: "All places are filled - raise the volunteer count to accept more."}
-			</Caption>
-			<FilterChips options={FILTERS} value={filter} onChange={setFilter} />
-			{selectable.length > 1 ? (
-				<View
-					style={{
-						flexDirection: "row",
-						alignItems: "center",
-						gap: spacing[3],
-						paddingHorizontal: spacing[4],
-						paddingBottom: spacing[1],
-					}}
-				>
-					<Tick
-						checked={allSelected}
-						partial={!allSelected && selected.size > 0}
-						onPress={toggleAll}
-						label={
-							allSelected ? "Clear selection" : "Select every applicant shown"
-						}
-					/>
-					<Caption color="tertiary">
-						{selected.size > 0
-							? `${selected.size} of ${selectable.length} selected`
-							: `Select all ${selectable.length} shown`}
-					</Caption>
-				</View>
-			) : null}
-		</View>
-	);
-
 	const footer =
 		selected.size > 0 ? (
 			<BulkBar
@@ -329,78 +318,152 @@ export function ApplicantsSheet({
 			/>
 		) : undefined;
 
+	let list: React.ReactNode;
+	if (query.isLoading) {
+		list = <SkeletonList variant="card" count={3} />;
+	} else if (query.isError) {
+		list = (
+			<ErrorState
+				message={apiErrorMessage(query.error)}
+				onRetry={() => query.refetch()}
+			/>
+		);
+	} else if (items.length === 0) {
+		list = (
+			<EmptyState
+				icon={Users}
+				title={
+					event?.status === "DRAFT"
+						? "Not taking applications yet"
+						: (event?.status === "COMPLETED" ||
+									event?.status === "CANCELLED") &&
+								(counts?.all ?? 0) === 0
+							? "No applications on record"
+							: filter === "PENDING"
+								? "No one waiting"
+								: "No applicants here"
+				}
+				description={
+					// A draft is invisible to volunteers; "new applications land
+					// here" promised something that cannot happen until it is
+					// published.
+					event?.status === "DRAFT"
+						? "Volunteers can't see a draft. Publish it and applications land here."
+						: (event?.status === "COMPLETED" ||
+									event?.status === "CANCELLED") &&
+								(counts?.all ?? 0) === 0
+							? "This event is over and took no applications through Nabhya."
+							: filter === "PENDING"
+								? (counts?.all ?? 0) > 0
+									? "Every application has a decision. The other filters hold them."
+									: "New applications land here. The events list shows a count too."
+								: "Nothing matches this filter yet."
+				}
+			/>
+		);
+	} else {
+		list = (
+			<View style={{ gap: spacing[3] }}>
+				{items.map((item) => (
+					<ApplicantRow
+						key={item.id}
+						applicant={item}
+						eventId={eventId ?? ""}
+						canAccept={remainingPlaces > 0}
+						blocked={blocked}
+						selectable={item.status === selectableStatus}
+						selected={selected.has(item.id)}
+						onToggleSelect={() => toggle(item.id)}
+						failure={failures[item.id] ?? null}
+						deciding={
+							review.isPending && review.variables?.applicationId === item.id
+								? review.variables.input.status
+								: null
+						}
+						onDecide={(status, note) => decide(item, status, note)}
+					/>
+				))}
+				<LoadMoreFooter
+					hasMore={!!query.hasNextPage}
+					loading={query.isFetchingNextPage}
+					onLoadMore={loadMore}
+					count={items.length}
+					noun="applicants"
+				/>
+			</View>
+		);
+	}
+
 	return (
-		<Sheet
-			visible={!!eventId}
+		<Drawer
+			visible={!!event}
 			onClose={close}
-			title="Applicants"
-			subtitle={eventTitle}
-			scrollable={false}
-			detents={["60%", "92%"]}
-			wide
+			title={event?.title ?? "Event"}
+			subtitle="Event and applicants"
+			xl
 			footer={footer}
 		>
-			{query.isLoading ? (
-				<LoadingState label="Loading applicants" />
-			) : query.isError ? (
-				<ErrorState
-					message={apiErrorMessage(query.error)}
-					onRetry={() => query.refetch()}
-				/>
-			) : (
-				<SheetFlatList
-					data={items}
-					keyExtractor={(item) => item.id}
-					ListHeaderComponent={header}
-					onEndReached={loadMore}
-					onEndReachedThreshold={0.6}
-					ListFooterComponent={
-						items.length > 0 ? (
-							<LoadMoreFooter
-								hasMore={!!query.hasNextPage}
-								loading={query.isFetchingNextPage}
-								onLoadMore={loadMore}
-								count={items.length}
-								noun="applicants"
-							/>
-						) : null
-					}
-					ItemSeparatorComponent={() => <View style={{ height: spacing[3] }} />}
-					ListEmptyComponent={
-						<EmptyState
-							icon={Users}
-							title={
-								filter === "PENDING" ? "No one waiting" : "No applicants here"
-							}
-							description={
-								filter === "PENDING"
-									? "New applications land here. You'll also see a count on the event."
-									: "Nothing matches this filter yet."
-							}
-						/>
-					}
-					renderItem={({ item }) => (
-						<ApplicantRow
-							applicant={item}
-							eventId={eventId ?? ""}
-							canAccept={remainingPlaces > 0}
-							blocked={blocked}
-							selectable={item.status === selectableStatus}
-							selected={selected.has(item.id)}
-							onToggleSelect={() => toggle(item.id)}
-							failure={failures[item.id] ?? null}
-							deciding={
-								review.isPending && review.variables?.applicationId === item.id
-									? review.variables.input.status
-									: null
-							}
-							onDecide={(status, note) => decide(item, status, note)}
-						/>
-					)}
+			{event && (
+				<EventSummary
+					event={event}
+					detail={detail.data}
+					onEdit={onEdit ? () => onEdit(event) : undefined}
 				/>
 			)}
-		</Sheet>
+
+			<View style={{ marginTop: spacing[6] }}>
+				<SectionTitle>Applicants</SectionTitle>
+				<FilterChips
+					label="Filter applicants"
+					options={chipOptions}
+					value={filter}
+					onChange={setFilter}
+				/>
+				{selectable.length > 1 ? (
+					<View
+						style={{
+							flexDirection: "row",
+							alignItems: "center",
+							gap: spacing[3],
+							paddingHorizontal: spacing[4],
+							marginTop: -spacing[2],
+							marginBottom: spacing[3],
+						}}
+					>
+						<Tick
+							checked={allSelected}
+							partial={!allSelected && selected.size > 0}
+							onPress={toggleAll}
+							label={
+								allSelected ? "Clear selection" : "Select every applicant shown"
+							}
+						/>
+						<Caption color="tertiary">
+							{selected.size > 0
+								? `${selected.size} of ${selectable.length} selected`
+								: `Select all ${selectable.length} shown`}
+						</Caption>
+					</View>
+				) : null}
+				{list}
+			</View>
+		</Drawer>
 	);
+}
+
+/**
+ * Filter chips with each option's count - "Pending 3". A count the server
+ * has not sent yet is left off rather than shown as 0. Shared with the pledge
+ * drawer.
+ */
+export function withCounts<T extends string>(
+	options: Array<{ value: T; label: string }>,
+	countOf: (value: T) => number | undefined,
+): Array<{ value: T; label: string; count?: number }> {
+	return options.map((option) => {
+		const count = countOf(option.value);
+		return count === undefined ? option : { ...option, count };
+	});
 }
 
 type Blocked = Record<
@@ -433,6 +496,7 @@ function BulkBar({
 	onClear: () => void;
 }) {
 	const { spacing } = useTheme();
+	const grow = useFormButtonGrow();
 
 	const reason =
 		mode === "review"
@@ -462,7 +526,7 @@ function BulkBar({
 			{mode === "review" ? (
 				<View style={{ flexDirection: "row", gap: spacing[2] }}>
 					<Button
-						style={{ flex: 1 }}
+						style={grow}
 						disabled={busy || !!blocked.review || placesLeft === 0}
 						loading={pending === "ACCEPT"}
 						onPress={() => onRun("ACCEPT")}
@@ -471,7 +535,7 @@ function BulkBar({
 					</Button>
 					<Button
 						variant="outline"
-						style={{ flex: 1 }}
+						style={grow}
 						disabled={busy || !!blocked.review}
 						loading={pending === "REJECT"}
 						onPress={() => onRun("REJECT")}
@@ -483,7 +547,7 @@ function BulkBar({
 				<View style={{ flexDirection: "row", gap: spacing[2] }}>
 					<Button
 						variant="outline"
-						style={{ flex: 1 }}
+						style={grow}
 						disabled={busy || !!blocked.attendance}
 						loading={pending === "MARK_ATTENDED"}
 						onPress={() => onRun("MARK_ATTENDED")}
@@ -491,7 +555,7 @@ function BulkBar({
 						Mark attended
 					</Button>
 					<Button
-						style={{ flex: 1 }}
+						style={grow}
 						disabled={busy || !!blocked.issue}
 						loading={pending === "ISSUE_CERTIFICATE"}
 						onPress={() => onRun("ISSUE_CERTIFICATE")}
@@ -534,6 +598,7 @@ function ApplicantRow({
 	onDecide: (status: "ACCEPTED" | "REJECTED", note: string) => void;
 }) {
 	const { colors, spacing } = useTheme();
+	const grow = useFormButtonGrow();
 	const inputStyle = useFieldInputStyle();
 	const [note, setNote] = useState("");
 	const [noteOpen, setNoteOpen] = useState(false);
@@ -658,7 +723,7 @@ function ApplicantRow({
 						}}
 					>
 						<Button
-							style={{ flex: 1 }}
+							style={grow}
 							disabled={busy || !canAccept || !!blocked.review}
 							loading={deciding === "ACCEPTED"}
 							onPress={() => onDecide("ACCEPTED", note)}
@@ -668,7 +733,7 @@ function ApplicantRow({
 						</Button>
 						<Button
 							variant="outline"
-							style={{ flex: 1 }}
+							style={grow}
 							disabled={busy || !!blocked.review}
 							loading={deciding === "REJECTED"}
 							onPress={() => onDecide("REJECTED", note)}

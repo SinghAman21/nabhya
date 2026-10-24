@@ -42,6 +42,12 @@ interface FormFieldProps
 	 * the error it was meant to prevent. The error replaces it while one shows.
 	 */
 	hint?: string;
+	/**
+	 * A control on the label's row, right-aligned - "Forgot?" beside Password.
+	 * It used to be a link on its own line under the field, which cost a row
+	 * and sat between the password and the button it belongs before.
+	 */
+	labelAction?: React.ReactNode;
 }
 
 export function FormField({
@@ -50,6 +56,7 @@ export function FormField({
 	label,
 	revealable,
 	hint,
+	labelAction,
 	...inputProps
 }: FormFieldProps) {
 	const { colors, spacing } = useTheme();
@@ -64,8 +71,20 @@ export function FormField({
 				field: { onChange, onBlur, value },
 				fieldState: { error },
 			}) => (
-				<View className="mb-2 grid gap-1">
-					<Label className="ml-1.5">{label}</Label>
+				// Flush with the input's edge: the label was inset 6pt, so every
+				// field's name sat visibly right of the box it named.
+				<View style={{ marginBottom: spacing[4], gap: spacing[1.5] }}>
+					<View
+						style={{
+							flexDirection: "row",
+							alignItems: "center",
+							justifyContent: "space-between",
+							minHeight: 20,
+						}}
+					>
+						<Label style={{ marginBottom: 0 }}>{label}</Label>
+						{labelAction}
+					</View>
 					<View style={{ position: "relative", justifyContent: "center" }}>
 						<Input
 							value={value}
@@ -121,12 +140,7 @@ export function FormField({
 					{error?.message ? (
 						<ErrorLine message={error.message} />
 					) : hint ? (
-						<Caption
-							color="tertiary"
-							style={{ marginTop: spacing[1.5], marginLeft: spacing[0.5] }}
-						>
-							{hint}
-						</Caption>
+						<Caption color="tertiary">{hint}</Caption>
 					) : null}
 				</View>
 			)}
@@ -136,7 +150,7 @@ export function FormField({
 
 /** A field's error, read out when it appears - see `announce` in `lib/motion.ts`. */
 function ErrorLine({ message }: { message: string }) {
-	const { colors, spacing } = useTheme();
+	const { colors } = useTheme();
 
 	useEffect(() => {
 		announce(message);
@@ -146,7 +160,6 @@ function ErrorLine({ message }: { message: string }) {
 		<Caption
 			accessibilityLiveRegion="polite"
 			color={colors.error.ink as string}
-			style={{ marginTop: spacing[1.5], marginLeft: spacing[0.5] }}
 		>
 			{message}
 		</Caption>

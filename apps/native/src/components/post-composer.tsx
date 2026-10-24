@@ -148,7 +148,8 @@ const COPY: Record<ComposerType, CanvasCopy> = {
 	NEED: {
 		headlineLabel: "Headline",
 		headlinePlaceholder: "e.g. 200 winter blankets",
-		bodyLabel: "Details",
+		// Not "Details": that is the section title right below the box.
+		bodyLabel: "Description",
 		bodyPlaceholder: "Condition, sizes, pickup or drop-off…",
 		bodyHint: "Anything a helper needs to know before pledging.",
 		bodyMax: 2000,
@@ -556,7 +557,11 @@ export function PostComposer({
 				need.quantity && Number(need.quantity) > 0
 					? Number(need.quantity)
 					: undefined;
-			const parsed = createNeedSchema.safeParse({
+			// Validate the input, then post the *input*, not `parsed.data`: the
+			// parse is not idempotent (`optionalText` turns "" into null, which is
+			// invalid input), so a parsed payload 400s server-side - see
+			// "Post the raw form values" in apps/native/AGENTS.md.
+			const input = {
 				type: need.needType,
 				title,
 				description: body,
@@ -567,12 +572,17 @@ export function PostComposer({
 				city: placeCity,
 				state: placeState,
 				...(need.expiresAt ? { expiresAt: need.expiresAt } : {}),
-			});
+			};
+			const parsed = createNeedSchema.safeParse(input);
 			if (!parsed.success) {
-				setErrors(applyIssues(parsed.error.issues));
+				const next = applyIssues(parsed.error.issues);
+				// An NGO with no city on file fails here with the place field
+				// still folded away - Publish did nothing visible. Open it.
+				if (next.city || next.state) patchNeed({ placeOpen: true });
+				setErrors(next);
 				return;
 			}
-			createNeed.mutate(parsed.data as CreateNeedInput, {
+			createNeed.mutate(input as CreateNeedInput, {
 				onSuccess: () =>
 					void finish(
 						need.needType === "OFFER"
@@ -586,7 +596,10 @@ export function PostComposer({
 		}
 
 		if (type === "EVENT") {
-			const parsed = createEventSchema.safeParse({
+			// Raw input, as for a need: venue and address are `optionalText`, so
+			// the parsed payload carried `null` and every event without a venue
+			// failed with "expected string, received null".
+			const input = {
 				title,
 				description: body,
 				venue: event.venueOpen ? event.venue.trim() : "",
@@ -600,19 +613,23 @@ export function PostComposer({
 				volunteersNeeded: event.volunteers
 					? Number(event.volunteers)
 					: undefined,
-				status: "PUBLISHED",
+				status: "PUBLISHED" as const,
 				isUrgent: urgent,
-			});
+			};
+			const parsed = createEventSchema.safeParse(input);
 			if (!parsed.success) {
 				const next = applyIssues(parsed.error.issues);
 				if (!event.startAt) next.startAt = "Enter a start date and time";
 				if (!event.endAt) next.endAt = "Enter an end date and time";
 				if (!event.volunteers)
 					next.volunteersNeeded = "How many volunteers do you need?";
+				// Same as a need: a missing city is only visible once the place
+				// field is open.
+				if (next.city || next.state) patchEvent({ placeOpen: true });
 				setErrors(next);
 				return;
 			}
-			createEvent.mutate(parsed.data as CreateEventInput, {
+			createEvent.mutate(input as CreateEventInput, {
 				onSuccess: () =>
 					void finish(
 						"Event published - volunteers can apply now.",
@@ -624,19 +641,20 @@ export function PostComposer({
 		}
 
 		if (type === "ANNOUNCEMENT") {
-			const parsed = upsertAnnouncementSchema.safeParse({
+			const input = {
 				title,
 				body,
-				status: "PUBLISHED",
+				status: "PUBLISHED" as const,
 				isPinned: announcement.pinned,
 				isUrgent: urgent,
 				...(coverImage ? { coverImageKey: coverImage } : {}),
-			});
+			};
+			const parsed = upsertAnnouncementSchema.safeParse(input);
 			if (!parsed.success) {
 				setErrors(applyIssues(parsed.error.issues));
 				return;
 			}
-			createAnnouncement.mutate(parsed.data as UpsertAnnouncementInput, {
+			createAnnouncement.mutate(input as UpsertAnnouncementInput, {
 				onSuccess: () =>
 					void finish("Announcement published.", "/(ngo)/announcements"),
 				onError,
@@ -868,15 +886,19 @@ export function PostComposer({
 				{/* 3 · Details */}
 				<SectionTitle>Details</SectionTitle>
 				{type !== "NEED" && (
-					<SwitchRow
-						icon={AlertTriangle}
-						tone="error"
-						title="Mark as urgent"
-						hint="Urgent posts rank higher and appear in the Urgent lens. Use sparingly."
-						value={urgent}
-						onChange={setUrgent}
-						disabled={saving}
-					/>
+					// An event's fields open on a bare "Starts" label, which sat
+					// flush against the bottom of this row.
+					<View style={type === "EVENT" ? { marginBottom: spacing[4] } : null}>
+						<SwitchRow
+							icon={AlertTriangle}
+							tone="error"
+							title="Mark as urgent"
+							hint="Urgent posts rank higher and appear in the Urgent lens. Use sparingly."
+							value={urgent}
+							onChange={setUrgent}
+							disabled={saving}
+						/>
+					</View>
 				)}
 				{type === "NEED" && (
 					<NeedFields

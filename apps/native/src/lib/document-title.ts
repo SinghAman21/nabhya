@@ -31,8 +31,8 @@ const TITLES: Record<string, string> = {
 	"(volunteer)": "Home",
 	"(volunteer)/activity": "Activity",
 	"(volunteer)/applications": "Your applications",
-	"(volunteer)/donations": "Your giving",
-	"(volunteer)/profile": "Profile",
+	"(volunteer)/giving": "Your giving",
+	"(volunteer)/me": "Profile",
 
 	"(ngo)": "Dashboard",
 	"(ngo)/feed": "Feed",
@@ -52,6 +52,7 @@ const TITLES: Record<string, string> = {
 	"(admin)/organizations": "NGOs",
 	"(admin)/volunteers": "Volunteers",
 	"(admin)/audit": "Activity log",
+	"(admin)/finance": "Finance",
 
 	notifications: "Notifications",
 	bookmarks: "Saved NGOs",

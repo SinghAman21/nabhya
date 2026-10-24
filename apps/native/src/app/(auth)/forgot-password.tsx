@@ -12,7 +12,7 @@ import { AuthError, authErrorCopy } from "@/components/auth-error";
 import { AuthSplitLayout } from "@/components/auth-split-layout";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form";
-import { Body, H2 } from "@/components/ui/typography";
+import { Body, Title } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
 import { authService } from "@/lib/api/auth";
 import { apiErrorMessage } from "@/lib/api/http";
@@ -66,15 +66,16 @@ export default function ForgotPassword() {
 						color={colors.primary.ink as string}
 					/>
 				</View>
-				<H2 accessibilityRole="header" style={{ marginBottom: spacing[1] }}>
-					Check your inbox
-				</H2>
-				<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
+				<Title accessibilityRole="header">Check your inbox</Title>
+				<Body
+					color="tertiary"
+					style={{ marginTop: spacing[1], marginBottom: spacing[7] }}
+				>
 					If there's an account for {sentTo}, a reset link is on its way. Open
 					it on this device to choose a new password. Check spam if it isn't
 					there in a minute.
 				</Body>
-				<Button size="lg" onPress={() => router.replace("/(auth)/login")}>
+				<Button onPress={() => router.replace("/(auth)/login")}>
 					Back to sign in
 				</Button>
 				<Button
@@ -90,10 +91,11 @@ export default function ForgotPassword() {
 
 	return (
 		<AuthSplitLayout alternateLink={null}>
-			<H2 accessibilityRole="header" style={{ marginBottom: spacing[1] }}>
-				Reset your password
-			</H2>
-			<Body color="tertiary" style={{ marginBottom: spacing[8] }}>
+			<Title accessibilityRole="header">Reset your password</Title>
+			<Body
+				color="tertiary"
+				style={{ marginTop: spacing[1], marginBottom: spacing[7] }}
+			>
 				Enter the email you signed up with and we'll send you a link to choose a
 				new password.
 			</Body>
@@ -118,8 +120,7 @@ export default function ForgotPassword() {
 			<Button
 				onPress={onSubmit}
 				loading={loading}
-				size="lg"
-				style={{ marginTop: failure ? spacing[4] : spacing[6] }}
+				style={{ marginTop: failure ? spacing[4] : spacing[2] }}
 			>
 				Send reset link
 			</Button>

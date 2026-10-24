@@ -71,6 +71,10 @@ export const ADMIN = {
 	ORG_DOCUMENTS_BULK: `${API_PREFIX}/admin/documents/organizations/bulk`,
 	USER_DOCUMENTS_BULK: `${API_PREFIX}/admin/documents/users/bulk`,
 	AUDIT_LOGS: `${API_PREFIX}/admin/audit-logs`,
+	DONATIONS: `${API_PREFIX}/admin/donations`,
+	// POST: an export writes a file and an audit row.
+	DONATIONS_EXPORT: `${API_PREFIX}/admin/donations/export`,
+	FINANCIAL_REPORTS: `${API_PREFIX}/admin/financial-reports`,
 	organization: (id: string) => `${API_PREFIX}/admin/organizations/${id}`,
 	organizationActivity: (id: string) =>
 		`${API_PREFIX}/admin/organizations/${id}/activity`,
@@ -158,7 +162,9 @@ export const DONATIONS = {
 	CHECKOUT: `${API_PREFIX}/donations/checkout`,
 	MINE: `${API_PREFIX}/me/donations`,
 	ORG: `${API_PREFIX}/org/donations`,
+	ORG_EXPORT: `${API_PREFIX}/org/donations/export`,
 	receipt: (id: string) => `${API_PREFIX}/me/donations/${id}/receipt`,
+	receiptPdf: (id: string) => `${API_PREFIX}/me/donations/${id}/receipt/pdf`,
 } as const;
 
 export const PUBLISHING = {

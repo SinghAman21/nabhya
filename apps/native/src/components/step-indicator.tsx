@@ -40,11 +40,16 @@ export function StepIndicator({
 		<View
 			accessible
 			accessibilityRole="progressbar"
-			accessibilityLabel={`Step ${currentStep + 1} of ${steps.length}: ${steps[currentStep] ?? ""}`}
+			// `currentStep === steps.length` means every step is done.
+			accessibilityLabel={
+				currentStep >= steps.length
+					? `All ${steps.length} steps complete`
+					: `Step ${currentStep + 1} of ${steps.length}: ${steps[currentStep] ?? ""}`
+			}
 			accessibilityValue={{
 				min: 1,
 				max: steps.length,
-				now: currentStep + 1,
+				now: Math.min(currentStep + 1, steps.length),
 			}}
 			style={
 				embedded
