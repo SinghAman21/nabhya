@@ -118,7 +118,7 @@ export default function Login() {
 				autoComplete="current-password"
 				textContentType="password"
 				returnKeyType="go"
-				onSubmitEditing={onSubmit}
+				onSubmitEditing={() => onSubmit()}
 				accessibilityLabel="Password"
 				labelAction={
 					<TextAction
@@ -147,7 +147,7 @@ export default function Login() {
 			/>
 
 			<Button
-				onPress={onSubmit}
+				onPress={() => onSubmit()}
 				loading={loading}
 				style={{ marginTop: failure ? spacing[4] : spacing[2] }}
 			>

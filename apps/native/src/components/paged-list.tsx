@@ -242,7 +242,7 @@ export function PagedList<T>({
 		refreshControl: (
 			<RefreshControl
 				refreshing={query.isRefetching && !query.isFetchingNextPage}
-				onRefresh={() => query.refetch()}
+				onRefresh={() => void query.refetch()}
 				tintColor={colors.text.quaternary as string}
 			/>
 		),
@@ -279,7 +279,7 @@ export function PagedList<T>({
 			{...listProps}
 			ListHeaderComponent={header}
 			ItemSeparatorComponent={
-				columns > 1 ? null : () => <View style={{ height: spacing[3] }} />
+				columns > 1 ? undefined : () => <View style={{ height: spacing[3] }} />
 			}
 			columnWrapperStyle={
 				columns > 1 ? { marginHorizontal: -spacing[1.5] } : undefined

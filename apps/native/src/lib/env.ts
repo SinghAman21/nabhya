@@ -71,6 +71,18 @@ function packagerHost(): string | null {
  */
 function resolveApiUrl(): string {
 	const explicit = process.env.EXPO_PUBLIC_API_URL;
+	// A static web export with no explicit URL calls the API on the host the
+	// page was opened from (port 3000): `localhost` on the machine serving it,
+	// its LAN IP from a phone. Baking an IP in broke the whole app the moment
+	// the network changed - every request hung until the client's timeout and
+	// read as a "slow server". Native builds still need EXPO_PUBLIC_API_URL.
+	if (!explicit && Platform.OS === "web") {
+		// No `window` while the static export renders each page in Node at
+		// build time; nothing calls the API then, so any URL will do.
+		return typeof window === "undefined"
+			? `http://localhost:${API_PORT}`
+			: `${window.location.protocol}//${window.location.hostname}:${API_PORT}`;
+	}
 	const derived = __DEV__
 		? (() => {
 				const host = packagerHost();

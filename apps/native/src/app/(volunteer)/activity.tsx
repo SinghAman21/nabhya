@@ -164,7 +164,16 @@ export default function Activity() {
 				group: "GIVING",
 				at: donation.completedAt ?? donation.createdAt,
 				title: formatMinor(donation.amountMinor, donation.currency),
-				detail: `Donated to ${donation.organization.organizationName}`,
+				// "Donated to" only once the money moved: a checkout closed before
+				// paying stays PENDING, and read as a gift that was never made.
+				detail:
+					donation.status === "PENDING"
+						? `Payment to ${donation.organization.organizationName} not confirmed yet`
+						: donation.status === "FAILED"
+							? `Payment to ${donation.organization.organizationName} failed - nothing was charged`
+							: donation.status === "REFUNDED"
+								? `Donation to ${donation.organization.organizationName} refunded`
+								: `Donated to ${donation.organization.organizationName}`,
 				status: {
 					label: humanizeStatus(donation.status),
 					tone:

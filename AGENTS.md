@@ -22,7 +22,7 @@ These are hard rules. Do not work around them.
 - **Do not use Playwright** (or any browser automation) until the user explicitly asks
   for it. The client also renders through Expo Web; there is no separate `apps/web` app.
 - **Read `apps/native/AGENTS.md` before writing Expo code** - it requires checking the
-  versioned Expo SDK 57 docs rather than working from memory. Likewise read
+  versioned Expo SDK 58 docs rather than working from memory. Likewise read
   `apps/server/AGENTS.md` before server work; it carries the DI and SQL traps that
   typecheck cannot catch.
 
@@ -46,7 +46,7 @@ pnpm workspaces + Turborepo. Node >= 22, `pnpm@10.10.0`. Biome for lint/format
 (not ESLint/Prettier). Husky + lint-staged.
 
 ```
-apps/native      Expo SDK 57 + Expo Router (Android + Expo Web)
+apps/native      Expo SDK 58 + Expo Router (Android + Expo Web)
 apps/server      NestJS 11 API, global prefix /api, port 3000
 packages/db      Drizzle schema + pg client        (@nabhya/db)
 packages/env     t3-oss env validation              (@nabhya/env)
@@ -79,15 +79,15 @@ directory.
 
 ### Client (`apps/native`)
 
-Expo SDK 57 + Expo Router file-based routing, typed routes + React Compiler on.
-React 19.2.3 / RN 0.86.3. Zustand (persisted) for auth state, TanStack Query for server state,
+Expo SDK 58 + Expo Router file-based routing, typed routes + React Compiler on.
+React 19.3.0 / RN 0.88.0. Zustand (persisted) for auth state, TanStack Query for server state,
 react-hook-form + zodResolver for forms, axios for HTTP. Details, styling rules and
 client-side traps: `apps/native/AGENTS.md`.
 
 ### Server (`apps/server`)
 
 NestJS 11, global `/api` prefix, deny-by-default JWT guard + role guard, response
-envelope `{ success, data, timestamp }`, Swagger at `/api/docs`. 147 routes across
+envelope `{ success, data, timestamp }`, Swagger at `/api/docs`. 148 routes across
 15 feature modules (18 controllers, including the app probes).
 `apps/server/test/endpoints.spec.ts` inventories all registered controllers and
 asserts that count, so adding a route is a deliberate act that shows up in the diff. Architecture,
@@ -166,7 +166,7 @@ donation receipts; required in production, logged-and-skipped in dev without
 
 ## Current state
 
-**Built:** auth end-to-end; 147 HTTP routes across `users`, `onboarding`,
+**Built:** auth end-to-end; 148 HTTP routes across `users`, `onboarding`,
 `organizations`, `categories`, `events`, `needs`, `feed`, `admin`, `uploads`,
 `engagement`, `publishing`, `certificates`, `donations` and `notifications`.
 NGO + volunteer onboarding; org events and needs management with
@@ -235,7 +235,11 @@ Client: `lib/feed-adapter.ts` maps the server row to the card's `FeedItem`
 searches NGOs and posts with kind tabs. The composer is
 `components/post-composer.tsx` - `PostComposer` (the drawer) plus
 `PostComposerBar` (the prompt row) - mounted from `(ngo)/feed.tsx` and the NGO
-dashboard; `app/feed.tsx` is only a back-compat redirect to `(ngo)/feed`.
+dashboard. There is no `app/feed.tsx` any more: route groups don't appear in
+URLs, so a root `feed.tsx` and `(ngo)/feed.tsx` both claimed `/feed` and a reload
+could render the wrong one. **Never give two route files the same URL** - check
+across groups (`(ngo)/events` vs the public `events/` was the same bug; the NGO
+pages are now `/my-events` and `/dashboard`).
 
 **The composer creates all four feed row types, each through the endpoint that
 owns it** - Update → `POST /api/feed`, Need → `POST /api/org/needs`, Event →

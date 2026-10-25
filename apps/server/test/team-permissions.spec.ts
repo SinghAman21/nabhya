@@ -73,7 +73,6 @@ describe("team permission matrix", () => {
 			certificates: new CertificatesService(
 				database as never,
 				audit,
-				new StubStorageProvider(),
 				notifications,
 				organizations,
 			),

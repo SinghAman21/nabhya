@@ -45,6 +45,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDateRange, formatDateTime } from "@/lib/format";
+import { signInAndReturn } from "@/lib/return-to";
 import { verticalScrollbar } from "@/lib/scroll";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -112,7 +113,7 @@ export default function EventDetail() {
 
 	const startApply = () => {
 		if (!email) {
-			router.push("/(auth)/login");
+			void signInAndReturn(`/events/${id}`);
 			return;
 		}
 		if (!isVolunteer) {

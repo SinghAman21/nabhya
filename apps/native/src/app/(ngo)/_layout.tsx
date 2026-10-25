@@ -127,7 +127,7 @@ export default function NgoLayout() {
 					}}
 				/>
 				<Tabs.Screen
-					name="index"
+					name="dashboard"
 					options={{
 						title: "Dashboard",
 						tabBarIcon: ({ color, size }) => (
@@ -145,7 +145,7 @@ export default function NgoLayout() {
 					}}
 				/>
 				<Tabs.Screen
-					name="events"
+					name="my-events"
 					options={{
 						title: "Events",
 						tabBarIcon: ({ color, size }) => (

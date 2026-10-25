@@ -89,7 +89,7 @@ Guard order (all global `APP_GUARD`s in `app.module.ts`):
   and `POST /api/admin/events/close-finished` (cron target - the only thing that
   moves events out of PUBLISHED). If you add an endpoint, wire it to a screen or
   document in the root `AGENTS.md` why it has none.
-- The current HTTP surface is 147 routes across 18 controllers, including the
+- The current HTTP surface is 148 routes across 18 controllers, including the
   health probes. `test/endpoints.spec.ts` builds its route inventory from every
   registered controller and keeps the public and optional-auth allowlists
   explicit. Health probes, the first-superadmin grant, legacy `GET /api/feed`,

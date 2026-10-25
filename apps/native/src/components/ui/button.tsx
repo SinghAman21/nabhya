@@ -119,7 +119,8 @@ export function Button({
 				// only ever sets `pressed`.
 				const { pressed, hovered } = state as PressableState;
 				const isIcon = size === "icon";
-				const base: ViewStyle = {
+				// RN 0.88's `ViewStyle` is readonly; this one is built up below.
+				const base: { -readonly [K in keyof ViewStyle]: ViewStyle[K] } = {
 					backgroundColor:
 						pressed && v.bgActive
 							? resolveColor(colors, v.bgActive)

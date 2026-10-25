@@ -1019,7 +1019,17 @@ function InviteSheet({
 			return;
 		}
 		setErrors({});
-		invite.mutate(parsed.data, {
+		// Send the input, not the parse: `optionalText` turns an empty
+		// designation into `null`, which the server's copy of the same schema
+		// (string | undefined on the way in) refuses - every invite without a
+		// designation failed with "Validation failed".
+		const trimmed = designation.trim();
+		const input = {
+			email: parsed.data.email,
+			role: parsed.data.role,
+			...(trimmed ? { designation: trimmed } : {}),
+		};
+		invite.mutate(input, {
 			onSuccess: (createdInvite) => {
 				setCreated(createdInvite);
 				toast.success(`Invite created for ${createdInvite.email}.`);

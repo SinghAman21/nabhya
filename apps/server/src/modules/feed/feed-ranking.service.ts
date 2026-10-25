@@ -66,6 +66,8 @@ type Candidate = {
 };
 
 const SOURCE_LIMIT = 150;
+/** How long the viewer-independent candidate pool is reused. */
+const POOL_TTL_MS = 15_000;
 
 @Injectable()
 export class FeedRankingService {
@@ -136,7 +138,38 @@ export class FeedRankingService {
 		return this.page(selected, selected.length, query, user.id);
 	}
 
+	/**
+	 * The candidate pool before any viewer is applied, cached for
+	 * POOL_TTL_MS. Building it is four queries returning up to 4 x
+	 * SOURCE_LIMIT joined rows plus their media, from a database across the
+	 * internet - most of a feed request's time - and it is identical for every
+	 * caller within seconds. Engagement counts and the viewer's own state are
+	 * still computed per request by `hydrate()`, on a clone, so likes, saves
+	 * and follows are never stale. Concurrent misses share one load.
+	 */
+	private pool: { at: number; items: Candidate[] } | null = null;
+	private poolLoading: Promise<Candidate[]> | null = null;
+
+	/** Drops the cached pool - after a write that adds or removes a candidate. */
+	invalidatePool() {
+		this.pool = null;
+	}
+
 	private async candidates(user: AuthUser | undefined): Promise<Candidate[]> {
+		if (!this.pool || Date.now() - this.pool.at > POOL_TTL_MS) {
+			this.poolLoading ??= this.loadPool().finally(() => {
+				this.poolLoading = null;
+			});
+			const items = await this.poolLoading;
+			this.pool = { at: Date.now(), items };
+		}
+		// Callers score and hydrate in place; never let that reach the cache.
+		const result = structuredClone(this.pool.items);
+		await this.hydrate(result, user?.id);
+		return result;
+	}
+
+	private async loadPool(): Promise<Candidate[]> {
 		const visibleOrg = and(
 			eq(organizations.verificationStatus, "VERIFIED"),
 			eq(organizations.status, "ACTIVE"),
@@ -234,7 +267,8 @@ export class FeedRankingService {
 							(mediaByPost.get(post.id) ?? []).map(async (item) => ({
 								id: item.id,
 								type: item.mediaType,
-								url: await this.storage.createDownloadUrl(item.objectKey),
+								// A storage key until `page()` signs it - see `signItem`.
+								url: item.objectKey,
 								sortOrder: item.sortOrder,
 							})),
 						),
@@ -261,9 +295,7 @@ export class FeedRankingService {
 					content: {
 						title: event.title,
 						description: event.description,
-						coverImage: event.coverImage
-							? await this.storage.createDownloadUrl(event.coverImage)
-							: null,
+						coverImage: event.coverImage ? event.coverImage : null,
 						venue: event.venue,
 						startAt: event.startAt,
 						endAt: event.endAt,
@@ -293,9 +325,7 @@ export class FeedRankingService {
 						type: need.type,
 						title: need.title,
 						description: need.description,
-						coverImage: need.coverImage
-							? await this.storage.createDownloadUrl(need.coverImage)
-							: null,
+						coverImage: need.coverImage ? need.coverImage : null,
 						quantity: need.quantity,
 						unit: need.unit,
 						fulfilledQuantity: need.fulfilledQuantity,
@@ -324,14 +354,13 @@ export class FeedRankingService {
 						title: announcement.title,
 						body: announcement.body,
 						coverImage: announcement.coverImageKey
-							? await this.storage.createDownloadUrl(announcement.coverImageKey)
+							? announcement.coverImageKey
 							: null,
 						isPinned: announcement.isPinned,
 					},
 				})),
 			)),
 		];
-		await this.hydrate(result, user?.id);
 		return result;
 	}
 
@@ -350,6 +379,7 @@ export class FeedRankingService {
 			applications,
 			pledges,
 			followingRows,
+			viewerRows,
 		] = await Promise.all([
 			organizationIds.length
 				? this.db
@@ -370,13 +400,33 @@ export class FeedRankingService {
 			// index still blocked them from liking it again, so the client had no
 			// way to recover. The impression window in `viewerContext` below is a
 			// separate, intentionally recent-only signal - don't conflate the two.
-			this.db.select().from(postInteractions),
+			// Counted by Postgres, not shipped to Node: this used to select every
+			// interaction row (impressions included - tens of thousands) and then
+			// scan them once per candidate, three times over.
+			this.db
+				.select({
+					targetType: postInteractions.targetType,
+					postId: postInteractions.postId,
+					interactionType: postInteractions.interactionType,
+					count: sql<number>`count(*)::int`,
+				})
+				.from(postInteractions)
+				.where(
+					inArray(postInteractions.interactionType, ["LIKE", "SAVE", "SHARE"]),
+				)
+				.groupBy(
+					postInteractions.targetType,
+					postInteractions.postId,
+					postInteractions.interactionType,
+				),
 			this.db
 				.select({
 					targetType: postComments.targetType,
 					postId: postComments.postId,
+					count: sql<number>`count(*)::int`,
 				})
-				.from(postComments),
+				.from(postComments)
+				.groupBy(postComments.targetType, postComments.postId),
 			this.db
 				.select({
 					id: eventApplications.eventId,
@@ -394,13 +444,40 @@ export class FeedRankingService {
 						.from(follows)
 						.where(eq(follows.userId, viewerId))
 				: [],
+			// Only the viewer's own likes and saves, for the filled heart/bookmark.
+			viewerId
+				? this.db
+						.select({
+							targetType: postInteractions.targetType,
+							postId: postInteractions.postId,
+							interactionType: postInteractions.interactionType,
+						})
+						.from(postInteractions)
+						.where(
+							and(
+								eq(postInteractions.userId, viewerId),
+								inArray(postInteractions.interactionType, ["LIKE", "SAVE"]),
+							),
+						)
+				: [],
 		]);
 		const categoryByOrg = Map.groupBy(
 			categoryRows,
 			(row) => row.organizationId,
 		);
-		const commentsByTarget = countBy(
-			commentRows.map((row) => `${row.targetType}:${row.postId}`),
+		const commentsByTarget = new Map(
+			commentRows.map((row) => [`${row.targetType}:${row.postId}`, row.count]),
+		);
+		const interactionCounts = new Map(
+			interactionRows.map((row) => [
+				`${row.targetType}:${row.postId}:${row.interactionType}`,
+				row.count,
+			]),
+		);
+		const mine = new Set(
+			viewerRows.map(
+				(row) => `${row.targetType}:${row.postId}:${row.interactionType}`,
+			),
 		);
 		const applicationCounts = new Map(
 			applications.map((row) => [row.id, row.count]),
@@ -419,37 +496,17 @@ export class FeedRankingService {
 					: 0;
 			candidate.engagement.pledges =
 				candidate.type === "NEED" ? (pledgeCounts.get(candidate.id) ?? 0) : 0;
-			for (const interaction of interactionRows)
-				if (
-					interaction.targetType === candidate.type &&
-					interaction.postId === candidate.id
-				) {
-					if (interaction.interactionType === "LIKE")
-						candidate.engagement.likes++;
-					if (interaction.interactionType === "SAVE")
-						candidate.engagement.saves++;
-					if (interaction.interactionType === "SHARE")
-						candidate.engagement.shares++;
-				}
+			const key = `${candidate.type}:${candidate.id}`;
+			candidate.engagement.likes = interactionCounts.get(`${key}:LIKE`) ?? 0;
+			candidate.engagement.saves = interactionCounts.get(`${key}:SAVE`) ?? 0;
+			candidate.engagement.shares = interactionCounts.get(`${key}:SHARE`) ?? 0;
 			if (viewerId)
 				candidate.viewer = {
 					followsOrganization:
 						!!candidate.organizationId &&
 						followsSet.has(candidate.organizationId),
-					liked: interactionRows.some(
-						(item) =>
-							item.userId === viewerId &&
-							item.targetType === candidate.type &&
-							item.postId === candidate.id &&
-							item.interactionType === "LIKE",
-					),
-					saved: interactionRows.some(
-						(item) =>
-							item.userId === viewerId &&
-							item.targetType === candidate.type &&
-							item.postId === candidate.id &&
-							item.interactionType === "SAVE",
-					),
+					liked: mine.has(`${key}:LIKE`),
+					saved: mine.has(`${key}:SAVE`),
 				};
 		}
 	}
@@ -628,17 +685,63 @@ export class FeedRankingService {
 		return selected;
 	}
 
-	private page(
+	/**
+	 * Slices the ranked list and signs the images of *that page only*.
+	 *
+	 * Candidates carry storage keys, not URLs. They used to be signed while the
+	 * pool was built - every logo, cover and photo of up to 4 x SOURCE_LIMIT
+	 * rows, one Supabase round trip each - and then ranking kept ten of them:
+	 * the feed took 2.5-3.5s per request, nearly all of it signing images
+	 * nobody would see. Signing after the slice is ~10 items' worth.
+	 */
+	private async page(
 		items: Candidate[],
 		total: number,
 		query: { page: number; limit: number },
 		_viewerId?: string,
 	) {
 		const { limit, offset } = toOffset(query);
-		const page = items
-			.slice(offset, offset + limit)
-			.map(({ score: _score, ...item }) => item);
+		const page = await Promise.all(
+			items
+				.slice(offset, offset + limit)
+				.map(({ score: _score, ...item }) => this.signItem(item)),
+		);
 		return paginate(page, total, query);
+	}
+
+	/** Swaps the keys in one feed item for signed URLs. */
+	private async signItem<T extends Omit<Candidate, "score">>(
+		item: T,
+	): Promise<T> {
+		// A missing or unsignable image degrades to no image, never a 500 for
+		// the whole page.
+		const sign = async (key: unknown): Promise<string | null> => {
+			if (typeof key !== "string" || !key) return null;
+			try {
+				return await this.storage.createDownloadUrl(key);
+			} catch {
+				return null;
+			}
+		};
+		const content = { ...item.content };
+		if ("coverImage" in content) {
+			content.coverImage = await sign(content.coverImage);
+		}
+		if (Array.isArray(content.media)) {
+			content.media = await Promise.all(
+				(content.media as Array<{ url: unknown }>).map(async (media) => ({
+					...media,
+					url: await sign(media.url),
+				})),
+			);
+		}
+		return {
+			...item,
+			organization: item.organization
+				? { ...item.organization, logo: await sign(item.organization.logo) }
+				: null,
+			content,
+		};
 	}
 }
 
@@ -724,12 +827,13 @@ function emptyEngagement() {
 }
 async function orgSummary(
 	org: typeof organizations.$inferSelect,
-	storage: StorageProvider,
+	_storage: StorageProvider,
 ) {
 	return {
 		id: org.id,
 		name: org.organizationName,
-		logo: org.logo ? await storage.createDownloadUrl(org.logo) : null,
+		// A storage key until `page()` signs it.
+		logo: org.logo ?? null,
 	};
 }
 function userSummary(user: typeof users.$inferSelect) {
@@ -741,11 +845,6 @@ function userSummary(user: typeof users.$inferSelect) {
 }
 function numberOrNull(value: unknown) {
 	return value === null || value === undefined ? null : Number(value);
-}
-function countBy(values: string[]) {
-	const result = new Map<string, number>();
-	for (const value of values) result.set(value, (result.get(value) ?? 0) + 1);
-	return result;
 }
 function byScore(a: Candidate, b: Candidate) {
 	return (b.score ?? 0) - (a.score ?? 0);

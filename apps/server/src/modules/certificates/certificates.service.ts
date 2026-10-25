@@ -20,6 +20,7 @@ import type {
 import {
 	BadRequestException,
 	ForbiddenException,
+	GoneException,
 	Inject,
 	Injectable,
 	NotFoundException,
@@ -27,7 +28,6 @@ import {
 import { and, count, desc, eq } from "drizzle-orm";
 import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
-import { STORAGE_TOKEN, type StorageProvider } from "../../common/storage";
 import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
 import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsService } from "../organizations/organizations.service";
@@ -41,7 +41,6 @@ export class CertificatesService {
 	constructor(
 		@Inject(DB_TOKEN) private readonly db: typeof dbType,
 		@Inject(AuditService) private readonly audit: AuditService,
-		@Inject(STORAGE_TOKEN) private readonly storage: StorageProvider,
 		@Inject(NotificationsService)
 		private readonly notifications: NotificationsService,
 		@Inject(OrganizationsService)
@@ -73,7 +72,7 @@ export class CertificatesService {
 				eq(eventApplications.id, applicationId),
 				eq(eventApplications.eventId, eventId),
 			),
-			with: { event: { columns: { organizationId: true } } },
+			with: { event: { columns: { organizationId: true, startAt: true } } },
 		});
 
 		if (!application) throw new NotFoundException("Application not found");
@@ -86,6 +85,13 @@ export class CertificatesService {
 			throw new BadRequestException(
 				"Only accepted volunteers can be marked as attended.",
 			);
+		}
+
+		// Nobody has turned up to an event that has not begun. Without this a
+		// certificate could be issued - and verified publicly - for a day that
+		// had not happened yet.
+		if (input.attended && application.event.startAt.getTime() > Date.now()) {
+			throw new BadRequestException("Attendance opens when the event starts.");
 		}
 
 		// Un-marking would orphan an issued certificate.
@@ -191,9 +197,9 @@ export class CertificatesService {
 	/**
 	 * Issues a certificate for an attended application.
 	 *
-	 * The record is created first and the PDF rendered after: a storage failure
-	 * must not lose the certificate, and `pdfKey` staying null is a recoverable
-	 * state that `regeneratePdf` can fix.
+	 * No PDF is stored: it is rendered on request (`renderPdf`). Issuing used to
+	 * write one here, to a key naming a bucket that does not exist - so on real
+	 * storage the write threw and the issue failed after the row was inserted.
 	 */
 	async issue(
 		userId: string,
@@ -252,8 +258,6 @@ export class CertificatesService {
 				.returning(),
 			"issue certificate",
 		);
-
-		await this.generateAndStorePdf(certificate.id);
 
 		void this.notifications.notify({
 			userId: application.volunteerId,
@@ -403,8 +407,16 @@ export class CertificatesService {
 		};
 	}
 
-	/** Signed link to the PDF, regenerating it if storage lost or never had it. */
-	async getPdfUrl(userId: string, certificateId: string) {
+	/**
+	 * Where the caller's PDF can be downloaded: the public render route for its
+	 * code. Kept returning `{ url }` so app builds already on phones still work.
+	 *
+	 * The PDF is no longer stored. It was written to a key whose first segment
+	 * named a bucket that does not exist, so no certificate PDF was ever saved
+	 * and every download failed; rendering on request needs no storage at all
+	 * and always reflects the current record (a name fix, a revocation).
+	 */
+	async getPdfUrl(userId: string, certificateId: string, apiBaseUrl: string) {
 		const certificate = await this.db.query.certificates.findFirst({
 			where: eq(certificates.id, certificateId),
 		});
@@ -414,22 +426,24 @@ export class CertificatesService {
 			throw new ForbiddenException("That certificate belongs to someone else.");
 		}
 
-		let key = certificate.pdfKey;
-		if (!key || !(await this.storage.head(key))) {
-			key = await this.generateAndStorePdf(certificate.id);
-		}
-
-		return { url: await this.storage.createDownloadUrl(key) };
+		return {
+			url: `${apiBaseUrl}/certificates/${encodeURIComponent(certificate.code)}/pdf`,
+		};
 	}
 
-	// ─── Internals ───────────────────────────────────────────────────────────
-
-	private async generateAndStorePdf(certificateId: string): Promise<string> {
+	/**
+	 * Renders the certificate PDF for a public code, in memory. Public for the
+	 * same reason `verify` is - the code is what a third party is handed - and
+	 * it shows nothing the verification page does not. A withdrawn certificate
+	 * is not rendered: a PDF outlives the revocation it would hide.
+	 */
+	async renderPdf(code: string): Promise<{ code: string; pdf: Uint8Array }> {
 		const [row] = await this.db
 			.select({
 				code: certificates.code,
 				note: certificates.note,
 				issuedAt: certificates.issuedAt,
+				revokedAt: certificates.revokedAt,
 				volunteerName: users.fullName,
 				volunteerEmail: users.email,
 				organizationName: organizations.organizationName,
@@ -449,16 +463,20 @@ export class CertificatesService {
 				organizations,
 				eq(certificates.organizationId, organizations.id),
 			)
-			.where(eq(certificates.id, certificateId))
+			.where(eq(certificates.code, code.trim().toUpperCase()))
 			.limit(1);
 
-		if (!row) throw new NotFoundException("Certificate not found");
+		if (!row) throw new NotFoundException("No certificate with that code");
+		if (row.revokedAt) {
+			throw new GoneException("This certificate was withdrawn by the NGO.");
+		}
 
 		const formatDate = (value: Date) =>
 			new Intl.DateTimeFormat("en-IN", {
 				day: "numeric",
 				month: "long",
 				year: "numeric",
+				timeZone: "Asia/Kolkata",
 			}).format(value);
 
 		const formatTime = (value: Date) =>
@@ -466,6 +484,7 @@ export class CertificatesService {
 				hour: "numeric",
 				minute: "2-digit",
 				hour12: true,
+				timeZone: "Asia/Kolkata",
 			}).format(value);
 
 		// The hours the NGO recorded for this volunteer, else the event's length.
@@ -476,7 +495,6 @@ export class CertificatesService {
 						(row.eventEndAt.getTime() - row.eventStartAt.getTime()) / 3_600_000,
 						0,
 					);
-		const hoursText = formatHours(durationHours);
 
 		const pdf = await renderCertificatePdf({
 			code: row.code,
@@ -487,25 +505,13 @@ export class CertificatesService {
 			eventTitle: row.eventTitle,
 			eventDate: formatDate(row.eventStartAt),
 			eventTimeRange: `${formatTime(row.eventStartAt)} to ${formatTime(row.eventEndAt)}`,
-			hoursText,
+			hoursText: formatHours(durationHours),
 			issuedAt: formatDate(row.issuedAt),
 			note: row.note,
 			verifyUrl: `${env.CORS_ORIGIN.split(",")[0]}/certificates/${row.code}`,
 		});
 
-		const key = `certificates/${certificateId}/${row.code}.pdf`;
-		await this.storage.putObject({
-			key,
-			body: pdf,
-			contentType: "application/pdf",
-		});
-
-		await this.db
-			.update(certificates)
-			.set({ pdfKey: key })
-			.where(eq(certificates.id, certificateId));
-
-		return key;
+		return { code: row.code, pdf };
 	}
 
 	/** Retries on the astronomically unlikely collision rather than assuming. */

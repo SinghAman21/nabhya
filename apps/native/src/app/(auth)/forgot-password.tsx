@@ -111,14 +111,14 @@ export default function ForgotPassword() {
 				textContentType="emailAddress"
 				autoCorrect={false}
 				returnKeyType="go"
-				onSubmitEditing={onSubmit}
+				onSubmitEditing={() => onSubmit()}
 				accessibilityLabel="Email"
 			/>
 
 			<AuthError message={failure} />
 
 			<Button
-				onPress={onSubmit}
+				onPress={() => onSubmit()}
 				loading={loading}
 				style={{ marginTop: failure ? spacing[4] : spacing[2] }}
 			>

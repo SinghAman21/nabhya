@@ -96,7 +96,7 @@ function Impact() {
 					refreshControl={
 						<RefreshControl
 							refreshing={query.isRefetching}
-							onRefresh={() => query.refetch()}
+							onRefresh={() => void query.refetch()}
 							tintColor={colors.text.quaternary as string}
 						/>
 					}

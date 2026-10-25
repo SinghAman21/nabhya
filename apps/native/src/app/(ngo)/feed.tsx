@@ -9,7 +9,6 @@ import {
 	ScrollView,
 	View,
 	type ViewStyle,
-	type ViewToken,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DiscoverRail } from "@/components/discover-rail";
@@ -156,7 +155,11 @@ export default function NgoFeed() {
 	const impression = useRecordFeedInteraction("impression");
 	const seen = useRef(new Set<string>());
 	const onViewableItemsChanged = useRef(
-		({ viewableItems }: { viewableItems: ViewToken[] }) => {
+		({
+			viewableItems,
+		}: {
+			viewableItems: ReadonlyArray<{ item: unknown }>;
+		}) => {
 			for (const token of viewableItems) {
 				const item = token.item as FeedItem | undefined;
 				if (!item) continue;
@@ -454,7 +457,7 @@ export default function NgoFeed() {
 			refreshControl={
 				<RefreshControl
 					refreshing={feed.isRefetching && !feed.isFetchingNextPage}
-					onRefresh={() => feed.refetch()}
+					onRefresh={() => void feed.refetch()}
 					tintColor={colors.text.quaternary as string}
 				/>
 			}

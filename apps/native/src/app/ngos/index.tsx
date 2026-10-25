@@ -22,6 +22,7 @@ import { orgDirectoryApi, queryKeys } from "@/lib/api";
 import { cityCoordinates } from "@/lib/cities";
 import { focusable } from "@/lib/focus";
 import { READING_COLUMN } from "@/lib/reading-column";
+import { signInAndReturn } from "@/lib/return-to";
 import { useAuthStore } from "@/store/auth-store";
 
 type Mode = "all" | "nearby";
@@ -169,7 +170,7 @@ export default function NgoDirectory() {
 							<Button
 								size="sm"
 								variant="outline"
-								onPress={() => router.push("/(auth)/login")}
+								onPress={() => void signInAndReturn("/ngos")}
 							>
 								Sign in
 							</Button>

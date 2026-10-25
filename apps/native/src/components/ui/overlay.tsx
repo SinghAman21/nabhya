@@ -6,7 +6,13 @@ import {
 	X,
 } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
-import { Animated, Easing, Platform, View } from "react-native";
+import {
+	Animated,
+	Easing,
+	Platform,
+	View,
+	type ViewInstance,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TAB_BAR_HEIGHT } from "@/components/tab-bar";
 import { Button } from "@/components/ui/button";
@@ -564,7 +570,7 @@ function ConfirmDialog({ record }: { record: ConfirmRecord }) {
 	const destructive = record.destructive !== false;
 
 	const cancel = useCallback(() => settleConfirm(false), []);
-	const cancelRef = useRef<View>(null);
+	const cancelRef = useRef<ViewInstance>(null);
 
 	/*
 	 * Escape cancels it on the web, where a dialog with no keyboard exit is a

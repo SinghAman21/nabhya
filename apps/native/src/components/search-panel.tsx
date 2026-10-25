@@ -16,8 +16,9 @@ import {
 	ActivityIndicator,
 	Platform,
 	ScrollView,
-	type TextInput,
+	type TextInputInstance,
 	View,
+	type ViewInstance,
 } from "react-native";
 import { OrgLogo } from "@/components/org-branding";
 import { SearchField } from "@/components/search-field";
@@ -500,8 +501,8 @@ export function SearchFloat({
 	const [query, setQuery] = useState("");
 	const [open, setOpen] = useState(false);
 	const [cursor, setCursor] = useState(-1);
-	const containerRef = useRef<View>(null);
-	const inputRef = useRef<TextInput>(null);
+	const containerRef = useRef<ViewInstance>(null);
+	const inputRef = useRef<TextInputInstance>(null);
 
 	const term = useDebounced(query.trim());
 	const result = useSearch(term, "all", open && term.length > 0, 12);

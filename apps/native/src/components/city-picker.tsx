@@ -416,7 +416,7 @@ export function CityPicker({
 							>
 								No city by that name.
 							</Caption>
-						) : null
+						) : undefined
 					}
 				/>
 			</Sheet>

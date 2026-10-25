@@ -71,7 +71,7 @@ const STATUSES: Array<SelectOption<StatusFilter>> = [
  * waiting on a decision, are numbers to compare down a column, and a sortable
  * header answers "what needs me" without reading every card. Sorting is a
  * server round trip (`orgNeedQuerySchema`), because the list pages at 20.
- * See `(ngo)/events.tsx`, which has the same two shapes.
+ * See `(ngo)/my-events.tsx`, which has the same two shapes.
  */
 export default function NgoNeeds() {
 	const { spacing } = useTheme();

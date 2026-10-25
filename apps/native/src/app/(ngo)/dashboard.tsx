@@ -283,8 +283,8 @@ export default function NgoDashboard() {
 	const openApplicants = () =>
 		router.push(
 			pendingEventId
-				? { pathname: "/(ngo)/events", params: { review: pendingEventId } }
-				: "/(ngo)/events",
+				? { pathname: "/(ngo)/my-events", params: { review: pendingEventId } }
+				: "/(ngo)/my-events",
 		);
 	const openPledges = () =>
 		router.push(
@@ -395,22 +395,22 @@ export default function NgoDashboard() {
 					icon={CalendarDays}
 					label="Published events"
 					value={<Count value={publishedEvents} tone="neutral" />}
-					accessibilityLabel={`${publishedEvents} published events. Open events`}
-					onPress={() => router.push("/(ngo)/events")}
+					accessibilityLabel={`${plural(publishedEvents, "published event")}. Open events`}
+					onPress={() => router.push("/(ngo)/my-events")}
 				/>
 				<ListRow
 					icon={PenLine}
 					label="Draft events"
 					hint={draftEvents > 0 ? "Only your team can see these" : undefined}
 					value={<Count value={draftEvents} tone="neutral" />}
-					accessibilityLabel={`${draftEvents} draft events. Open events`}
-					onPress={() => router.push("/(ngo)/events")}
+					accessibilityLabel={`${plural(draftEvents, "draft event")}. Open events`}
+					onPress={() => router.push("/(ngo)/my-events")}
 				/>
 				<ListRow
 					icon={HeartHandshake}
 					label="Open needs"
 					value={<Count value={openNeeds} tone="neutral" />}
-					accessibilityLabel={`${openNeeds} open needs. Open needs`}
+					accessibilityLabel={`${plural(openNeeds, "open need")}. Open needs`}
 					onPress={() => router.push("/(ngo)/needs")}
 				/>
 				<ListRow

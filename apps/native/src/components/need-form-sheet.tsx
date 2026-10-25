@@ -109,6 +109,20 @@ export function NeedFormSheet({
 		setFormError(null);
 	}, [need, form, defaultState]);
 
+	// `defaultValues` is read once, on mount - and the sheet mounts with its
+	// screen, before the organisation has loaded, so a new need opened with an
+	// empty city and state and failed with "City is required". Fill them from
+	// the org whenever a fresh form opens with them still blank.
+	useEffect(() => {
+		if (!visible || need) return;
+		if (!form.getValues("city") && defaultCity) {
+			form.setValue("city", defaultCity);
+		}
+		if (!form.getValues("state") && defaultState) {
+			form.setValue("state", defaultState);
+		}
+	}, [visible, need, defaultCity, defaultState, form]);
+
 	const close = () => {
 		form.reset();
 		setFormError(null);
@@ -165,7 +179,7 @@ export function NeedFormSheet({
 					<FieldError message={formError} />
 					<FormFooterRow
 						primary={
-							<Button onPress={onSubmit} loading={saving} style={grow}>
+							<Button onPress={() => onSubmit()} loading={saving} style={grow}>
 								{isEditing ? "Save changes" : `Publish ${noun}`}
 							</Button>
 						}

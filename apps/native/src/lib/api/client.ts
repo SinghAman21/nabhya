@@ -8,7 +8,15 @@ import { useAuthStore } from "@/store/auth-store";
 const apiClient = axios.create({
 	baseURL: API_URL,
 	timeout: 30000,
-	headers: { "Content-Type": "application/json" },
+	headers: {
+		"Content-Type": "application/json",
+		// A build pointed at an ngrok tunnel (a local API for a demo): ngrok's
+		// free plan can answer with its "you are about to visit" HTML page
+		// instead of proxying, which the app would read as a broken response.
+		// The header skips that page. Sent only for ngrok hosts, so the web
+		// build's CORS preflight never sees an extra custom header.
+		...(/ngrok/.test(API_URL) ? { "ngrok-skip-browser-warning": "1" } : {}),
+	},
 });
 
 apiClient.interceptors.request.use(

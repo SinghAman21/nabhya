@@ -169,7 +169,7 @@ function SavedFeed() {
 				refreshControl={
 					<RefreshControl
 						refreshing={feed.isRefetching && !feed.isFetchingNextPage}
-						onRefresh={() => feed.refetch()}
+						onRefresh={() => void feed.refetch()}
 						tintColor={colors.text.quaternary as string}
 					/>
 				}

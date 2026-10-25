@@ -66,8 +66,11 @@ import { verticalScrollbar } from "@/lib/scroll";
  * fixed `width` alone loses to flex when the row has spare space, and this
  * column previously used `position: sticky` - which needs a scrolling
  * ancestor it did not have, so it only made the column size to its content.
+ * `zIndex: 1` lifts it over the record column: RNW gives every `View`
+ * `zIndex: 0`, so the Appearance popover anchored in Settings was painted
+ * under the Impact list beside it.
  */
-const RAIL = { width: 360, flexGrow: 0, flexShrink: 0 } as const;
+const RAIL = { width: 360, flexGrow: 0, flexShrink: 0, zIndex: 1 } as const;
 
 /** The page's content width: two columns use it, nothing floats in a 2000pt window. */
 const CONTENT = { width: "100%", maxWidth: 1120, alignSelf: "center" } as const;

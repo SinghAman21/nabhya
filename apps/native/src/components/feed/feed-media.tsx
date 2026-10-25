@@ -23,6 +23,7 @@ import {
 	PanResponder,
 	Platform,
 	ScrollView,
+	type ScrollViewInstance,
 	useWindowDimensions,
 	View,
 } from "react-native";
@@ -611,7 +612,7 @@ export function FeedMediaViewer({
 		actions.onToggleSave ||
 		actions.onShare
 	);
-	const scrollRef = useRef<ScrollView>(null);
+	const scrollRef = useRef<ScrollViewInstance>(null);
 
 	// Swipe-down to dismiss, production-style: the content follows the
 	// finger, the backdrop fades, past a distance/velocity it closes,

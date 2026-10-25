@@ -24,7 +24,7 @@ export function notificationDestination(
 	switch (item.entityName) {
 		case "EVENT":
 			// An NGO is sent to the applicant queue for that event.
-			if (ngo) return id ? `/(ngo)/events?review=${id}` : "/(ngo)/events";
+			if (ngo) return id ? `/(ngo)/my-events?review=${id}` : "/(ngo)/my-events";
 			return id ? `/events/${id}` : null;
 		case "ORGANIZATION_NEED":
 			if (ngo) return id ? `/(ngo)/needs?review=${id}` : "/(ngo)/needs";

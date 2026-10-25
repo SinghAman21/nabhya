@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
+import { FieldError } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/overlay";
@@ -65,6 +66,9 @@ function PledgeSheetContent({
 	const [quantity, setQuantity] = useState("");
 	const [message, setMessage] = useState("");
 	const [error, setError] = useState<string | null>(null);
+	// The quantity's own problem sits under the quantity box; `error` is
+	// what the server said and stays under the whole form.
+	const [quantityError, setQuantityError] = useState<string | null>(null);
 	const pledge = useCreatePledge(need.id);
 	const router = useRouter();
 	const gate = useIdentityGate();
@@ -86,14 +90,19 @@ function PledgeSheetContent({
 		const parsed = quantity ? Number(quantity) : undefined;
 
 		if (need.quantity !== null && !parsed) {
-			setError(`Enter how many ${need.unit ?? "items"} you can provide.`);
+			setQuantityError(
+				`Enter how many ${need.unit ?? "items"} you can provide.`,
+			);
 			return;
 		}
 		if (parsed !== undefined && remaining !== null && parsed > remaining) {
-			setError(`Only ${remaining} ${need.unit ?? "items"} still needed.`);
+			setQuantityError(
+				`Only ${remaining} ${need.unit ?? "items"} still needed.`,
+			);
 			return;
 		}
 
+		setQuantityError(null);
 		setError(null);
 		pledge.mutate(
 			{ quantity: parsed, message: message.trim() || undefined },
@@ -162,10 +171,14 @@ function PledgeSheetContent({
 						placeholder={remaining ? `Up to ${remaining}` : "e.g. 10"}
 						accessibilityLabel={`How many ${need.unit ?? "items"}`}
 						value={quantity}
-						onChangeText={(v) => setQuantity(v.replace(/\D/g, ""))}
+						onChangeText={(v) => {
+							setQuantity(v.replace(/\D/g, ""));
+							setQuantityError(null);
+						}}
 						keyboardType="number-pad"
 						style={[inputStyle, { maxWidth: 160 }]}
 					/>
+					<FieldError message={quantityError} />
 				</>
 			)}
 
@@ -192,14 +205,14 @@ function PledgeSheetContent({
 				style={{ ...inputStyle, minHeight: 96, textAlignVertical: "top" }}
 			/>
 
-			{error && (
+			{error ? (
 				<Caption
 					color={colors.error.ink as string}
 					style={{ marginTop: spacing[3] }}
 				>
 					{error}
 				</Caption>
-			)}
+			) : null}
 		</Sheet>
 	);
 }

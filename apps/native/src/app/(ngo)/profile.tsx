@@ -90,7 +90,7 @@ import { verticalScrollbar } from "@/lib/scroll";
  *
  * No "Manage" list of Events / Needs / Updates / Reviews / Donations / Reports
  * / Team. Every one of those is a tab-bar or sidebar destination, and
- * `(ngo)/index.tsx` already keeps a platform-aware list of the ones the phone's
+ * `(ngo)/dashboard.tsx` already keeps a platform-aware list of the ones the phone's
  * tab bar cannot fit. A hub that restates the navigation is a hub people learn
  * to scroll past.
  *
@@ -202,8 +202,10 @@ export default function NgoProfile() {
 					size="sm"
 					style={actionStyle}
 					onPress={() => router.push(`/ngos/${data.id}`)}
+					accessibilityLabel="View public page"
 				>
-					View public page
+					{/* Half a 390pt row cut "View public page" to "View public pa…". */}
+					{isDesktop ? "View public page" : "Public page"}
 				</Button>
 			)}
 			<Button size="sm" style={actionStyle} onPress={goEdit}>
@@ -266,7 +268,9 @@ export default function NgoProfile() {
 					) : (
 						<Caption color="quaternary">Add your city</Caption>
 					)}
-					<Caption color="quaternary">·</Caption>
+					{/* On a phone the badge wraps to its own line, which left the
+					    dot dangling at the end of the city. */}
+					{isDesktop ? <Caption color="quaternary">·</Caption> : null}
 					<View
 						style={{
 							flexDirection: "row",

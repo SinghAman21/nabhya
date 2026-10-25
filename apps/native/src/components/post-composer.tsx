@@ -633,7 +633,7 @@ export function PostComposer({
 				onSuccess: () =>
 					void finish(
 						"Event published - volunteers can apply now.",
-						"/(ngo)/events",
+						"/(ngo)/my-events",
 					),
 				onError,
 			});

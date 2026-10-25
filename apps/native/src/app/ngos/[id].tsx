@@ -80,6 +80,7 @@ import {
 } from "@/lib/api";
 import { focusable } from "@/lib/focus";
 import { formatDate, formatRelative } from "@/lib/format";
+import { signInAndReturn } from "@/lib/return-to";
 import { verticalScrollbar } from "@/lib/scroll";
 import type { ReviewItem } from "@/lib/types";
 import { useAuthStore } from "@/store/auth-store";
@@ -160,7 +161,7 @@ export default function NgoProfilePage() {
 
 	const requireSignIn = (next: () => void) => {
 		if (!email) {
-			router.push("/(auth)/login");
+			void signInAndReturn(`/ngos/${id}`);
 			return;
 		}
 		next();
@@ -289,7 +290,9 @@ export default function NgoProfilePage() {
 	const stats = [
 		{ label: "Followers", value: data?.followerCount ?? 0 },
 		{ label: "Volunteers", value: impact.data?.volunteersEngaged },
-		{ label: "Hours given", value: impact.data?.volunteerHours },
+		// "Hours", not "Hours given": four columns on a 390pt phone cut the
+		// longer label to "Hours giv…".
+		{ label: "Hours", value: impact.data?.volunteerHours },
 		{ label: "Events", value: impact.data?.eventsHosted },
 	];
 
@@ -952,25 +955,32 @@ function ReviewsTab({
 						gap: spacing[3],
 					}}
 				>
-					<View>
-						<View
-							style={{
-								flexDirection: "row",
-								alignItems: "center",
-								gap: spacing[1.5],
-							}}
-						>
-							<H3>{summary?.count ? summary.average.toFixed(1) : "-"}</H3>
-							<Star
-								size={16}
-								color={colors.warning.ink}
-								fill={colors.warning.ink}
-							/>
+					{summary?.count ? (
+						<View>
+							<View
+								style={{
+									flexDirection: "row",
+									alignItems: "center",
+									gap: spacing[1.5],
+								}}
+							>
+								<H3>{summary.average.toFixed(1)}</H3>
+								<Star
+									size={16}
+									color={colors.warning.ink}
+									fill={colors.warning.ink}
+								/>
+							</View>
+							<Caption color="tertiary">
+								{summary.count} review{summary.count === 1 ? "" : "s"}
+							</Caption>
 						</View>
-						<Caption color="tertiary">
-							{summary?.count ?? 0} review{summary?.count === 1 ? "" : "s"}
-						</Caption>
-					</View>
+					) : (
+						// "- ★ 0 reviews" read as a score of dash; say it plainly.
+						<Body weight="medium" color="secondary">
+							No ratings yet
+						</Body>
+					)}
 					{!email || canReview ? (
 						<Button
 							size="sm"

@@ -132,14 +132,14 @@ export default function ResetPassword() {
 				autoComplete="new-password"
 				textContentType="newPassword"
 				returnKeyType="go"
-				onSubmitEditing={onSubmit}
+				onSubmitEditing={() => onSubmit()}
 				accessibilityLabel="New password"
 			/>
 
 			<AuthError message={failure} />
 
 			<Button
-				onPress={onSubmit}
+				onPress={() => onSubmit()}
 				loading={loading}
 				style={{ marginTop: failure ? spacing[4] : spacing[2] }}
 			>

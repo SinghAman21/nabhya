@@ -305,11 +305,9 @@ function WebDateTimeField({
 						paddingHorizontal: spacing[3.5],
 					}}
 				>
-					<CalendarDays
-						size={16}
-						strokeWidth={2}
-						color={colors.text.tertiary as string}
-					/>
+					{/* No leading icon: the browser draws its own calendar
+					    button at the end of the field, and a second one beside
+					    it read as two controls. */}
 					{createElement("input", {
 						type: "date",
 						value: value ? toISODate(value) : "",
@@ -332,11 +330,6 @@ function WebDateTimeField({
 						paddingHorizontal: spacing[3.5],
 					}}
 				>
-					<Clock3
-						size={16}
-						strokeWidth={2}
-						color={colors.text.tertiary as string}
-					/>
 					{createElement("input", {
 						type: "time",
 						value: value ? formatTime(value) : "",

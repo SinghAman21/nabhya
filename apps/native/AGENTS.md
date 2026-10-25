@@ -2,15 +2,21 @@
 
 ## Expo HAS CHANGED
 
-Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before
-writing Expo code. Do not work from memory; SDK 57 is the version pinned by this
+Read the exact versioned docs at https://docs.expo.dev/versions/v58.0.0/ before
+writing Expo code. Do not work from memory; SDK 58 is the version pinned by this
 app's package manifest.
 
-Repo-wide rules and context live in the root `AGENTS.md`. Expo SDK 57 (`expo`
-`~57.0.15`) + Expo Router (file-based, typed routes, React Compiler on), React
-19.2.3 / RN 0.86.3. The app has an Android target and an Expo Web target
+Repo-wide rules and context live in the root `AGENTS.md`. Expo SDK 58 (`expo`
+`~58.0.19`) + Expo Router (file-based, typed routes, React Compiler on), React
+19.3.0 / RN 0.88.0. The app has an Android target and an Expo Web target
 (`web.output: "static"`, Metro bundler); there is no separate `apps/web` app.
 **No Playwright or browser automation** until the user explicitly asks for it.
+
+`react-native-reanimated` (4.7.1) and `react-native-worklets` (0.13.0) are
+pinned **exactly** to what SDK 58's Expo Go bundles - its native side must match
+the JS version. Bump them only with `npx expo install --check`. Release builds
+keep R8 off (`expo-build-properties` `android.enableMinifyInReleaseBuilds:
+false`, an SDK 58 default flipped back) until Razorpay has keep rules.
 
 **Expo Go no longer works for this app.** `react-native-razorpay` (donation
 checkout) is a real native module and does not run in Expo Go. Every

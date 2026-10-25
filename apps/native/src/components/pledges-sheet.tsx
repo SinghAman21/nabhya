@@ -384,7 +384,13 @@ function PledgeRow({
 					variant="link"
 					size="sm"
 					onPress={() => setNoteOpen(true)}
-					style={{ alignSelf: "flex-start", marginTop: spacing[2] }}
+					// The link's own 14pt padding is pulled back so its text lines up
+					// with the message and the meta line above it.
+					style={{
+						alignSelf: "flex-start",
+						marginTop: spacing[2],
+						marginLeft: -spacing[3.5],
+					}}
 					accessibilityLabel={`Add a note for ${name}`}
 				>
 					Add a note

@@ -22,8 +22,11 @@ import {
 	Patch,
 	Post,
 	Query,
+	Req,
+	Res,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import type { Request, Response } from "express";
 import { CurrentUser, Public, Roles } from "../../common/decorators";
 import { ZodValidationPipe } from "../../common/pipes";
 import type { AuthUser } from "../../common/types";
@@ -124,13 +127,17 @@ export class CertificatesController {
 	@Roles("volunteer")
 	@ApiBearerAuth("access-token")
 	@ApiOperation({
-		summary: "Signed download link, regenerating the PDF if lost",
+		summary: "Link to the certificate's PDF (the public render route)",
 	})
 	getPdf(
 		@CurrentUser() user: AuthUser,
 		@Param("id", ParseUUIDPipe) id: string,
+		@Req() req: Request,
 	) {
-		return this.certificatesService.getPdfUrl(user.id, id);
+		// This API's own public base, so the link works from any client:
+		// `trust proxy` makes protocol and host the ones the client used.
+		const apiBaseUrl = `${req.protocol}://${req.get("host")}/api`;
+		return this.certificatesService.getPdfUrl(user.id, id, apiBaseUrl);
 	}
 
 	// ─── Public verification ─────────────────────────────────────────────────
@@ -144,5 +151,27 @@ export class CertificatesController {
 	})
 	verify(@Param("code") code: string) {
 		return this.certificatesService.verify(code);
+	}
+
+	@Public()
+	@Get("certificates/:code/pdf")
+	@ApiOperation({
+		summary:
+			"The certificate as a PDF, rendered on request with a verification QR. " +
+			"Public like verify: it shows nothing the verification page does not.",
+	})
+	async pdf(@Param("code") code: string, @Res() res: Response) {
+		// Written directly: the global envelope interceptor would wrap a
+		// returned buffer in { success, data } JSON.
+		const { code: canonical, pdf } =
+			await this.certificatesService.renderPdf(code);
+		res
+			.status(200)
+			.set({
+				"Content-Type": "application/pdf",
+				"Content-Disposition": `inline; filename="nabhya-certificate-${canonical}.pdf"`,
+				"Cache-Control": "no-store",
+			})
+			.send(Buffer.from(pdf));
 	}
 }

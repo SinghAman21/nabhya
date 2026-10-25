@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { type Href, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, View } from "react-native";
 import { ErrorState } from "@/components/screen-shell";
@@ -7,6 +7,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { apiErrorStatus } from "@/lib/api";
 import { authService } from "@/lib/api/auth";
 import { takePendingInvite } from "@/lib/pending-invite";
+import { takeReturnTo } from "@/lib/return-to";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
@@ -120,17 +121,26 @@ export default function Index() {
 
 		if (status.needsRoleSelection) {
 			router.replace("/role-select");
-		} else if (status.role === "superadmin") {
-			router.replace("/(admin)");
-		} else if (status.role === "organisation") {
-			// Feed first - the dashboard and everything else hang off the
-			// sidebar/tab bar, which stay mounted on every (ngo) route.
-			router.replace(status.isOnboarded ? "/(ngo)/feed" : "/(onboarding)");
-		} else {
-			router.replace(
-				status.isOnboarded ? "/(volunteer)" : "/(onboarding)/volunteer",
-			);
+			return;
 		}
+		if (status.role !== "superadmin" && !status.isOnboarded) {
+			router.replace(
+				status.role === "organisation"
+					? "/(onboarding)"
+					: "/(onboarding)/volunteer",
+			);
+			return;
+		}
+		// Set up: go back to the page that asked them to sign in (see
+		// `lib/return-to.ts`), or home. Feed first for an NGO - the dashboard
+		// and everything else hang off the sidebar/tab bar.
+		const home: Href =
+			status.role === "superadmin"
+				? "/(admin)"
+				: status.role === "organisation"
+					? "/(ngo)/feed"
+					: "/(volunteer)";
+		void takeReturnTo().then((path) => router.replace((path ?? home) as Href));
 	}, [
 		email,
 		status,

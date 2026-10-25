@@ -1,8 +1,8 @@
-import { useRouter, useSegments } from "expo-router/build/hooks";
+import { useRouter, useSegments } from "expo-router";
 import type { LucideIcon } from "lucide-react-native";
 import { Award, History, LogOut, Sparkles, User } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Platform, View } from "react-native";
+import { Platform, View, type ViewInstance } from "react-native";
 import { AppearanceMenu } from "@/components/appearance-menu";
 import { APPEARANCE_LABEL, appearanceIcon } from "@/components/appearance-row";
 import { InitialAvatar } from "@/components/initial-avatar";
@@ -251,8 +251,8 @@ function AccountMenu({ profileHref }: { profileHref: string }) {
 	const { colors, spacing, borderRadius, elevation, isDark } = useTheme();
 	const user = useAuthStore((s) => s.user);
 	const [open, setOpen] = useState(false);
-	const containerRef = useRef<View>(null);
-	const triggerRef = useRef<View>(null);
+	const containerRef = useRef<ViewInstance>(null);
+	const triggerRef = useRef<ViewInstance>(null);
 
 	const close = useCallback((refocus?: boolean) => {
 		setOpen(false);

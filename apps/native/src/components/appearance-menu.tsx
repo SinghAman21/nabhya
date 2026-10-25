@@ -6,7 +6,12 @@ import {
 	SunMoon,
 } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Platform, View, type ViewStyle } from "react-native";
+import {
+	Platform,
+	View,
+	type ViewInstance,
+	type ViewStyle,
+} from "react-native";
 import { Pressable } from "@/components/ui/pressable";
 import { Sheet, SheetOption } from "@/components/ui/sheet";
 import { Body } from "@/components/ui/typography";
@@ -145,7 +150,7 @@ export function AppearanceMenu({
 }) {
 	const { isDesktop } = useMedia();
 	const [open, setOpen] = useState(false);
-	const anchorRef = useRef<View>(null);
+	const anchorRef = useRef<ViewInstance>(null);
 	const [frame, setFrame] = useState<ViewStyle | null>(null);
 
 	const anchored = Platform.OS === "web" && isDesktop;
@@ -267,7 +272,7 @@ function MenuPanel({
 	onPicked: () => void;
 }) {
 	const { colors, spacing, borderRadius, isDark } = useTheme();
-	const panelRef = useRef<View>(null);
+	const panelRef = useRef<ViewInstance>(null);
 
 	const items = useCallback(() => {
 		const panel = panelRef.current as unknown as HTMLElement | null;

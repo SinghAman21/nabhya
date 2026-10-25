@@ -12,6 +12,7 @@ import {
 	Inject,
 	Injectable,
 	NotFoundException,
+	Optional,
 } from "@nestjs/common";
 import { and, count, desc, eq, type SQL } from "drizzle-orm";
 import { AuditService } from "../../common/audit";
@@ -21,6 +22,7 @@ import type { AuthUser } from "../../common/types";
 import { paginate, takeFirstOrThrow, toOffset } from "../../common/utils";
 import { OrganizationsService } from "../organizations/organizations.service";
 import { UploadsService } from "../uploads/uploads.service";
+import { FeedRankingService } from "./feed-ranking.service";
 
 @Injectable()
 export class FeedService {
@@ -31,6 +33,11 @@ export class FeedService {
 		@Inject(AuditService) private readonly audit: AuditService,
 		@Inject(OrganizationsService)
 		private readonly organizationsService: OrganizationsService,
+		// Optional so specs that build this service by hand need not supply it;
+		// a new or deleted post must not wait out the ranked pool's cache.
+		@Optional()
+		@Inject(FeedRankingService)
+		private readonly ranking?: FeedRankingService,
 	) {}
 
 	async createMediaIntents(user: AuthUser, input: CreateFeedMediaIntentsInput) {
@@ -92,6 +99,7 @@ export class FeedService {
 			}
 			return created;
 		});
+		this.ranking?.invalidatePool();
 		void this.audit.record({
 			performedBy: user.id,
 			action: "CREATE_POST",
@@ -188,6 +196,7 @@ export class FeedService {
 			.from(postsMedia)
 			.where(eq(postsMedia.postId, postId));
 		await this.db.delete(posts).where(eq(posts.id, postId));
+		this.ranking?.invalidatePool();
 		await Promise.all(media.map((item) => this.storage.delete(item.objectKey)));
 		void this.audit.record({
 			performedBy: user.id,

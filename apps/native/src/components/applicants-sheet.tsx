@@ -44,7 +44,7 @@ import { useOrgAccess } from "@/hooks/use-org-access";
 import { useTheme } from "@/hooks/use-theme";
 import { apiErrorMessage, orgEventsApi, queryKeys } from "@/lib/api";
 import { focusable } from "@/lib/focus";
-import { formatRelative } from "@/lib/format";
+import { formatDateTime, formatRelative } from "@/lib/format";
 import type { EventApplicant, OrgEventListItem } from "@/lib/types";
 
 type StatusFilter = "ALL" | ApplicationStatus;
@@ -146,9 +146,16 @@ export function ApplicantsDrawer({
 	const bulkAttendance = useBulkAttendance(eventId ?? "");
 
 	const access = useOrgAccess();
+	// The server refuses attendance before the event starts (a certificate
+	// for a day that has not happened), so the tick says so up front.
+	const notStarted = !!event && new Date(event.startAt).getTime() > Date.now();
 	const blocked = {
 		review: access.blocked("people.review"),
-		attendance: access.blocked("people.attendance"),
+		attendance:
+			access.blocked("people.attendance") ??
+			(notStarted
+				? `Attendance opens when the event starts, ${formatDateTime(event.startAt)}.`
+				: null),
 		issue: access.blocked("certs.issue"),
 		revoke: access.blocked("certs.revoke"),
 	};
@@ -709,7 +716,13 @@ function ApplicantRow({
 							variant="link"
 							size="sm"
 							onPress={() => setNoteOpen(true)}
-							style={{ alignSelf: "flex-start", marginTop: spacing[2] }}
+							// The link's own 14pt padding is pulled back so its text lines up
+							// with the message and the meta line above it.
+							style={{
+								alignSelf: "flex-start",
+								marginTop: spacing[2],
+								marginLeft: -spacing[3.5],
+							}}
 							accessibilityLabel={`Add a note for ${name}`}
 						>
 							Add a note

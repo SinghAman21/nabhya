@@ -1,7 +1,11 @@
-import { BadRequestException, ForbiddenException } from "@nestjs/common";
+import {
+	BadRequestException,
+	ForbiddenException,
+	GoneException,
+	NotFoundException,
+} from "@nestjs/common";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { AuditService } from "../src/common/audit";
-import { StubStorageProvider } from "../src/common/storage";
 import { CertificatesService } from "../src/modules/certificates/certificates.service";
 import { EventsService } from "../src/modules/events/events.service";
 import { NotificationsService } from "../src/modules/notifications/notifications.service";
@@ -15,17 +19,17 @@ import {
 } from "./factories";
 import { createTestDb, type TestDb, truncateAll } from "./harness";
 
+const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000);
+
 describe("CertificatesService", () => {
 	let db: TestDb;
 	let close: () => Promise<void>;
 	let service: CertificatesService;
 	let eventsService: EventsService;
-	let storage: StubStorageProvider;
 
 	beforeAll(async () => {
 		({ db, close } = await createTestDb());
 		const audit = new AuditService(db as never);
-		storage = new StubStorageProvider();
 		const notifications = new NotificationsService(db as never);
 		const organizations = new OrganizationsService(
 			db as never,
@@ -35,7 +39,6 @@ describe("CertificatesService", () => {
 		service = new CertificatesService(
 			db as never,
 			audit,
-			storage,
 			notifications,
 			organizations,
 		);
@@ -60,7 +63,8 @@ describe("CertificatesService", () => {
 	async function scenario(options: { attended?: boolean } = {}) {
 		const owner = await createUser(db, { role: "organisation" });
 		const org = await createOrganization(db, owner.id);
-		const event = await createEvent(db, org.id);
+		// Started two hours ago: attendance is refused before an event begins.
+		const event = await createEvent(db, org.id, { startAt: hoursAgo(2) });
 		const volunteer = await createUser(db, {
 			role: "volunteer",
 			fullName: "Aditi Sharma",
@@ -73,6 +77,22 @@ describe("CertificatesService", () => {
 	}
 
 	describe("attendance", () => {
+		it("refuses to mark attendance before the event starts", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+			const event = await createEvent(db, org.id);
+			const volunteer = await createUser(db, { role: "volunteer" });
+			const application = await createApplication(db, event.id, volunteer.id, {
+				status: "ACCEPTED",
+			});
+
+			await expect(
+				service.markAttendance(owner.id, event.id, application.id, {
+					attended: true,
+				}),
+			).rejects.toThrow(/starts/);
+		});
+
 		it("refuses to mark a volunteer who was never accepted", async () => {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
@@ -157,11 +177,11 @@ describe("CertificatesService", () => {
 
 			expect(certificate.code).toMatch(/^NBH-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
 
-			// The PDF is generated after the record so a storage failure cannot
-			// lose the certificate; by now it should exist.
-			const stored = await db.query.certificates.findFirst({});
-			expect(stored?.pdfKey).toBeTruthy();
-			expect(await storage.head(stored?.pdfKey as string)).not.toBeNull();
+			// Nothing is written to storage on issue any more: the PDF is
+			// rendered on request, so issuing cannot fail on a storage write.
+			const { pdf, code } = await service.renderPdf(certificate.code);
+			expect(code).toBe(certificate.code);
+			expect(Buffer.from(pdf).subarray(0, 5).toString()).toBe("%PDF-");
 		});
 
 		it("refuses a second certificate for the same participation", async () => {
@@ -190,7 +210,11 @@ describe("CertificatesService", () => {
 		async function crowd(count: number, status: "PENDING" | "ACCEPTED") {
 			const owner = await createUser(db, { role: "organisation" });
 			const org = await createOrganization(db, owner.id);
-			const event = await createEvent(db, org.id, { volunteersNeeded: 2 });
+			// Accepted crowds are for attendance, which opens once the event starts.
+			const event = await createEvent(db, org.id, {
+				volunteersNeeded: 2,
+				...(status === "ACCEPTED" ? { startAt: hoursAgo(2) } : {}),
+			});
 			const applications = [];
 			for (let i = 0; i < count; i++) {
 				const volunteer = await createUser(db, { role: "volunteer" });
@@ -337,11 +361,11 @@ describe("CertificatesService", () => {
 			const stranger = await createUser(db, { role: "volunteer" });
 
 			await expect(
-				service.getPdfUrl(stranger.id, certificate.id),
+				service.getPdfUrl(stranger.id, certificate.id, "https://api.test/api"),
 			).rejects.toBeInstanceOf(ForbiddenException);
 		});
 
-		it("regenerates the PDF if storage lost it", async () => {
+		it("links the owner to the public render route for its code", async () => {
 			const { owner, event, application, volunteer } = await scenario({
 				attended: true,
 			});
@@ -352,11 +376,37 @@ describe("CertificatesService", () => {
 				{},
 			);
 
-			const stored = await db.query.certificates.findFirst({});
-			await storage.delete(stored?.pdfKey as string);
+			const result = await service.getPdfUrl(
+				volunteer.id,
+				certificate.id,
+				"https://api.test/api",
+			);
+			expect(result.url).toBe(
+				`https://api.test/api/certificates/${certificate.code}/pdf`,
+			);
+		});
 
-			const result = await service.getPdfUrl(volunteer.id, certificate.id);
-			expect(result.url).toContain("stub-download");
+		it("renders by code case-insensitively, and refuses a withdrawn one", async () => {
+			const { owner, event, application } = await scenario({ attended: true });
+			const certificate = await service.issue(
+				owner.id,
+				event.id,
+				application.id,
+				{},
+			);
+
+			const lower = await service.renderPdf(certificate.code.toLowerCase());
+			expect(lower.code).toBe(certificate.code);
+
+			await service.revoke(owner.id, certificate.id, {
+				reason: "Issued in error",
+			});
+			await expect(service.renderPdf(certificate.code)).rejects.toBeInstanceOf(
+				GoneException,
+			);
+			await expect(service.renderPdf("NBH-NOPE-NOPE")).rejects.toBeInstanceOf(
+				NotFoundException,
+			);
 		});
 	});
 

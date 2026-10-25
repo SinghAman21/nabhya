@@ -32,7 +32,7 @@ import type { NavItem } from "@/components/sidebar";
 export const NGO_NAV_ITEMS: NavItem[] = [
 	// Feed is the landing page, so it leads - unsectioned, like Dashboard.
 	{ label: "Feed", href: "/(ngo)/feed", icon: Newspaper },
-	{ label: "Dashboard", href: "/(ngo)", icon: House },
+	{ label: "Dashboard", href: "/(ngo)/dashboard", icon: House },
 	// An NGO's inbox is where approval, rejection, applicants and pledges
 	// arrive, so it sits with the two landing rows rather than under Account -
 	// it had no rail row at all, only a link at the bottom of Profile.
@@ -50,7 +50,7 @@ export const NGO_NAV_ITEMS: NavItem[] = [
 	},
 	{
 		label: "Events",
-		href: "/(ngo)/events",
+		href: "/(ngo)/my-events",
 		icon: CalendarDays,
 		section: "Programmes",
 	},

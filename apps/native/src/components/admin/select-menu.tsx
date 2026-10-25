@@ -1,6 +1,6 @@
 import { Check, ChevronDown } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
-import { Platform, View } from "react-native";
+import { Platform, View, type ViewInstance } from "react-native";
 import { Pressable } from "@/components/ui/pressable";
 import { Caption, Label } from "@/components/ui/typography";
 import { useTheme } from "@/hooks/use-theme";
@@ -36,7 +36,7 @@ export interface SelectOption<T extends string> {
 }
 
 /** On the web a ref to a host component is its DOM node. */
-function domFocus(node: View | null) {
+function domFocus(node: ViewInstance | null) {
 	(node as unknown as HTMLElement | null)?.focus?.();
 }
 
@@ -69,9 +69,9 @@ export function SelectMenu<T extends string>({
 	useEffect(() => {
 		onOpenChange?.(open);
 	}, [open, onOpenChange]);
-	const wrapper = useRef<View>(null);
-	const trigger = useRef<View>(null);
-	const optionRefs = useRef<Array<View | null>>([]);
+	const wrapper = useRef<ViewInstance>(null);
+	const trigger = useRef<ViewInstance>(null);
+	const optionRefs = useRef<Array<ViewInstance | null>>([]);
 
 	const active = options.find((option) => option.value === value);
 	const selectedIndex = Math.max(

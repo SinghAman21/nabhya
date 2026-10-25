@@ -78,6 +78,8 @@ export const phoneSchema = z.preprocess(
 		typeof value === "string" ? value.replace(/[\s()\-.]/g, "") : value,
 	z
 		.string()
+		// Empty is a missing field, not a malformed one.
+		.min(1, "Enter a phone number")
 		.min(10, "Enter a valid phone number")
 		.max(15, "Enter a valid phone number")
 		.regex(/^\+?\d{10,14}$/, "Enter a valid phone number"),

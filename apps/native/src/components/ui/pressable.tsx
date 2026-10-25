@@ -3,7 +3,7 @@ import {
 	Pressable as NativePressable,
 	Platform,
 	type PressableProps,
-	type View,
+	type ViewInstance,
 } from "react-native";
 
 /**
@@ -54,7 +54,7 @@ const warned = new Set<string>();
  * should still be fixed - put the inner control beside the outer one, as
  * `ListRow`'s `action` and `Surface`'s `footer` do.
  */
-export const Pressable = forwardRef<View, PressableProps>(
+export const Pressable = forwardRef<ViewInstance, PressableProps>(
 	function Pressable(props, ref) {
 		const nested = useContext(InsideButton);
 		const role = props.accessibilityRole ?? props.role;

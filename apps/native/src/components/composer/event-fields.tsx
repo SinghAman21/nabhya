@@ -40,9 +40,11 @@ import { useTheme } from "@/hooks/use-theme";
  *   guess for an event at its own premises, which most are. Prefilled, not
  *   silent: unlike the city, an address is often *not* the NGO's, so it is
  *   shown for confirmation rather than assumed.
- * - **Urgency is not on offer.** `toFeedItem` derives it from the start date -
- *   an event is urgent inside three days - so a chip would be a control that
- *   disagrees with the card. It is a `PropertyNote` instead.
+ * - **Urgency is partly automatic.** `toFeedItem` and the ranker treat an
+ *   event as urgent inside three days of its start whatever the author chose,
+ *   so the composer's "Mark as urgent" switch can only add urgency earlier.
+ *   The `PropertyNote` says so, so the switch being off near the date is not
+ *   read as the event losing its flag.
  */
 
 export interface EventFieldsValue {
@@ -216,7 +218,7 @@ export function EventFields({
 			<PropertyNote>
 				{value.placeOpen || !homeCity
 					? "An event becomes urgent on its own in the three days before it starts."
-					: `In ${homeCity} - your NGO's city. Urgent is automatic in the last three days.`}
+					: `In ${homeCity} - your NGO's city. It also becomes urgent on its own in the three days before it starts.`}
 			</PropertyNote>
 
 			<RevealedFields>

@@ -9,6 +9,9 @@ import type {
 
 const UPLOAD_URL_TTL_SECONDS = 5 * 60;
 const DOWNLOAD_URL_TTL_SECONDS = 10 * 60;
+/** A cached signed link is reused only while it has this long left. */
+const SIGNED_URL_MIN_LIFE_MS = 3 * 60 * 1000;
+const SIGNED_URL_CACHE_MAX = 5000;
 
 export interface SupabaseStorageConfig {
 	url: string;
@@ -56,18 +59,42 @@ export class SupabaseStorageProvider implements StorageProvider {
 		};
 	}
 
+	/**
+	 * Signed links, reused while they have plenty of life left. Every list
+	 * endpoint signs each logo, cover and photo it returns - one Supabase round
+	 * trip apiece - and the same few hundred images appear on every request.
+	 * A link is handed out again only with at least SIGNED_URL_MIN_LIFE_MS to
+	 * run, so a client never receives one about to expire. Bounded: cleared
+	 * wholesale past SIGNED_URL_CACHE_MAX entries, which costs one re-sign each.
+	 */
+	private readonly signedUrls = new Map<
+		string,
+		{ url: string; expiresAt: number }
+	>();
+
 	async createDownloadUrl(
 		key: string,
 		expiresInSeconds = DOWNLOAD_URL_TTL_SECONDS,
 	) {
 		if (key.startsWith("http://") || key.startsWith("https://")) return key;
+		const cacheKey = `${expiresInSeconds}:${key}`;
+		const cached = this.signedUrls.get(cacheKey);
+		if (cached && cached.expiresAt - Date.now() > SIGNED_URL_MIN_LIFE_MS) {
+			return cached.url;
+		}
 		const { bucket, path } = splitKey(key);
 		const { data, error } = await this.client.storage
 			.from(bucket)
 			.createSignedUrl(path, expiresInSeconds);
 		if (error || !data)
 			throw new Error(`Could not create download URL: ${error?.message}`);
-		return new URL(data.signedUrl, this.url).toString();
+		const url = new URL(data.signedUrl, this.url).toString();
+		if (this.signedUrls.size >= SIGNED_URL_CACHE_MAX) this.signedUrls.clear();
+		this.signedUrls.set(cacheKey, {
+			url,
+			expiresAt: Date.now() + expiresInSeconds * 1000,
+		});
+		return url;
 	}
 
 	async head(key: string): Promise<StoredObject | null> {

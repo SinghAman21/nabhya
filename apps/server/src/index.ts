@@ -26,7 +26,12 @@ async function bootstrap() {
 	// same effect for the opposite reason, trusting a forwarded-for chain
 	// nothing is providing. Only turn it on where `Deploying` in AGENTS.md
 	// says a load balancer is assumed.
-	if (env.NODE_ENV === "production") app.set("trust proxy", 1);
+	// `TRUST_PROXY=1` is the opt-in for a local server behind a tunnel (ngrok
+	// for a demo): without it every phone arrives as ngrok's address and shares
+	// one rate-limit bucket. Never set it on a server reachable directly.
+	if (env.NODE_ENV === "production" || process.env.TRUST_PROXY === "1") {
+		app.set("trust proxy", 1);
+	}
 
 	// Give in-flight requests a chance to finish on SIGTERM instead of dropping
 	// them mid-transaction during a rolling deploy.

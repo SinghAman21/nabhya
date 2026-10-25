@@ -40,7 +40,12 @@ export function useTabBarOptions(): TabScreenOptions {
  * Monochrome, like the desktop rail: orange is reserved for actions, and the
  * tab you are already on is not one.
  */
-export function AppTabBar({ state, descriptors, navigation }: TabBarProps) {
+export function AppTabBar({
+	state,
+	descriptors,
+	emitter,
+	navigateToTab,
+}: TabBarProps) {
 	const { colors, spacing } = useTheme();
 	const insets = useSafeAreaInsets();
 
@@ -87,13 +92,13 @@ export function AppTabBar({ state, descriptors, navigation }: TabBarProps) {
 							: String(rawBadge);
 
 				const onPress = () => {
-					const event = navigation.emit({
+					const event = emitter.emit({
 						type: "tabPress",
 						target: route.key,
 						canPreventDefault: true,
 					});
 					if (!focused && !event.defaultPrevented) {
-						navigation.navigate(route.name);
+						navigateToTab(route.key);
 					}
 				};
 
@@ -102,7 +107,7 @@ export function AppTabBar({ state, descriptors, navigation }: TabBarProps) {
 						key={route.key}
 						onPress={onPress}
 						onLongPress={() =>
-							navigation.emit({ type: "tabLongPress", target: route.key })
+							emitter.emit({ type: "tabLongPress", target: route.key })
 						}
 						accessibilityRole="tab"
 						accessibilityState={{ selected: focused }}

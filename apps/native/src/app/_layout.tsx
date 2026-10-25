@@ -70,7 +70,6 @@ export default function RootLayout() {
 							<Stack.Screen name="edit-profile" />
 							<Stack.Screen name="verify-identity" />
 							<Stack.Screen name="search" />
-							<Stack.Screen name="feed" />
 							<Stack.Screen name="team/invites/[token]" />
 						</Stack>
 						<DocumentTitle />

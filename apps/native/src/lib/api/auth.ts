@@ -251,14 +251,13 @@ export class AuthService {
 
 	async logout(): Promise<void> {
 		try {
-			// Supabase's default `scope: "global"` calls its Auth server to revoke
-			// the session everywhere, which is a network request with no timeout
-			// of its own - on a flaky connection it can hang well past what
-			// anyone waits for a "sign out" tap. Race it: server-side revocation
-			// still wins when the network cooperates, but a stalled request can
-			// never trap the device sign-out below it, which is the part the
-			// person actually asked for and the part `finally` cannot skip.
-			await withTimeout(supabase.auth.signOut(), 5000);
+			// `scope: "local"`: sign out *this* device. Supabase's default is
+			// "global", which revokes every refresh token on the account - signing
+			// out of the phone also logged out the laptop an hour later, when its
+			// access token expired. It is still a network call with no timeout of
+			// its own, so it is raced: a stalled request can never trap the device
+			// sign-out below it, which `finally` cannot skip.
+			await withTimeout(supabase.auth.signOut({ scope: "local" }), 5000);
 		} catch {
 			// Revocation failed or timed out - the device still signs out below.
 		} finally {

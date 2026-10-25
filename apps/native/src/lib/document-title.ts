@@ -14,8 +14,7 @@ import { Platform } from "react-native";
  * navigation.
  *
  * Keyed by segments *with* their groups, because the path alone collides:
- * `(ngo)/index`, `(admin)/index`, `(volunteer)/index` and the NGO wizard are
- * all `/`. A detail page gets its noun ("Event", "NGO") rather than its
+ * `(admin)/index`, `(volunteer)/index` and the NGO wizard are all `/`. A detail page gets its noun ("Event", "NGO") rather than its
  * record's name - the name arrives with the data, after this runs - which is
  * still the difference between a tab you can find and one you cannot.
  */
@@ -34,10 +33,10 @@ const TITLES: Record<string, string> = {
 	"(volunteer)/giving": "Your giving",
 	"(volunteer)/me": "Profile",
 
-	"(ngo)": "Dashboard",
+	"(ngo)/dashboard": "Dashboard",
 	"(ngo)/feed": "Feed",
 	"(ngo)/needs": "Needs",
-	"(ngo)/events": "Events",
+	"(ngo)/my-events": "Events",
 	"(ngo)/announcements": "Updates",
 	"(ngo)/reviews": "Reviews",
 	"(ngo)/donations": "Donations",
@@ -77,8 +76,8 @@ const APP_NAME = "Nabhya";
 /** Mounted once, in the root layout. A no-op off the web. */
 export function useDocumentTitle() {
 	const segments = useSegments() as string[];
-	// `index` is implicit in a segment list; drop it so `(ngo)/index` and
-	// `(ngo)` are the same key.
+	// `index` is implicit in a segment list; drop it so `(admin)/index` and
+	// `(admin)` are the same key.
 	const key = segments.filter((segment) => segment !== "index").join("/");
 
 	useEffect(() => {

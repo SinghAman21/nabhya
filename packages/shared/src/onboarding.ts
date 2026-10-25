@@ -18,11 +18,13 @@ export const step1BasicInfoSchema = z.object({
 	orgName: z
 		.string()
 		.trim()
-		.min(2, "Organization name must be at least 2 characters")
-		.max(100, "Organization name must be under 100 characters"),
+		// "Organisation", as the UI spells it everywhere else.
+		.min(1, "Enter your organisation's name")
+		.min(2, "Organisation name must be at least 2 characters")
+		.max(100, "Organisation name must be under 100 characters"),
 	phone: phoneSchema,
 	orgType: z.enum(["trust", "society", "section8", "others"] as const, {
-		message: "Select your organization type",
+		message: "Choose how your organisation is registered",
 	}),
 	// The single most important field for verifying an Indian NGO - a
 	// superadmin checks this against the uploaded registration certificate.
@@ -37,7 +39,8 @@ export const step2AddressSchema = z.object({
 	address: z
 		.string()
 		.trim()
-		.min(10, "Please enter your full address")
+		.min(1, "Enter your address")
+		.min(10, "Add the full address - street, area and pincode")
 		.max(500, "Address must be under 500 characters"),
 	city: z.string().trim().min(2, "City is required").max(80),
 	state: z.string().trim().min(2, "State is required").max(80),

@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import {
 	type LayoutChangeEvent,
 	ScrollView,
+	type ScrollViewInstance,
 	View,
 	type ViewStyle,
 } from "react-native";
@@ -239,7 +240,7 @@ export default function EditOrganization() {
 	const [coverPreview, setCoverPreview] = useState<string | null>(null);
 	const [logoPreview, setLogoPreview] = useState<string | null>(null);
 	const [attempted, setAttempted] = useState(false);
-	const scroller = useRef<ScrollView>(null);
+	const scroller = useRef<ScrollViewInstance>(null);
 	const sectionY = useRef<Partial<Record<Section, number>>>({});
 	const track = (section: Section) => (event: LayoutChangeEvent) => {
 		sectionY.current[section] = event.nativeEvent.layout.y;

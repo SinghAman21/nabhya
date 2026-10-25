@@ -186,7 +186,7 @@ export default function SignUp() {
 				autoComplete="new-password"
 				textContentType="newPassword"
 				returnKeyType="go"
-				onSubmitEditing={onSubmit}
+				onSubmitEditing={() => onSubmit()}
 				accessibilityLabel="Password"
 			/>
 
@@ -203,7 +203,7 @@ export default function SignUp() {
 			/>
 
 			<Button
-				onPress={onSubmit}
+				onPress={() => onSubmit()}
 				loading={loading}
 				style={{ marginTop: failure ? spacing[4] : spacing[2] }}
 			>

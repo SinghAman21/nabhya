@@ -35,6 +35,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { useMedia } from "@/hooks/useMedia";
 import { apiErrorMessage } from "@/lib/api";
 import { formatDateTime, formatProgress } from "@/lib/format";
+import { signInAndReturn } from "@/lib/return-to";
 import { verticalScrollbar } from "@/lib/scroll";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -84,7 +85,7 @@ export default function NeedDetail() {
 
 	const startPledge = () => {
 		if (!email) {
-			router.push("/(auth)/login");
+			void signInAndReturn(`/needs/${id}`);
 			return;
 		}
 		if (!isVolunteer) {

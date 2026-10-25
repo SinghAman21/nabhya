@@ -9,7 +9,7 @@ import {
 	Search,
 } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, type ViewToken } from "react-native";
+import { View } from "react-native";
 import { withAppShell } from "@/components/app-shell";
 import { BackButton } from "@/components/back-button";
 import { FeedCard, toPublicNeed } from "@/components/feed/feed-card";
@@ -50,6 +50,7 @@ import { useDebounced } from "@/hooks/useDebounced";
 import { apiErrorMessage } from "@/lib/api";
 import { focusable, type PressState } from "@/lib/focus";
 import { useRecentSearches } from "@/lib/recent-searches";
+import { signInAndReturn } from "@/lib/return-to";
 import { verticalScrollbar } from "@/lib/scroll";
 import type { FeedItem, FeedNeedItem } from "@/lib/types";
 import { useAuthStore } from "@/store/auth-store";
@@ -123,7 +124,11 @@ function SearchScreen() {
 	const impression = useRecordFeedInteraction("impression");
 	const seen = useRef(new Set<string>());
 	const onViewableItemsChanged = useRef(
-		({ viewableItems }: { viewableItems: ViewToken[] }) => {
+		({
+			viewableItems,
+		}: {
+			viewableItems: ReadonlyArray<{ item: unknown }>;
+		}) => {
 			for (const token of viewableItems) {
 				const item = token.item as FeedItem | undefined;
 				if (!item) continue;
@@ -138,7 +143,7 @@ function SearchScreen() {
 		if (email) return true;
 		toast.info("Sign in to follow NGOs, like posts, or save posts.", {
 			label: "Sign in",
-			onPress: () => router.push("/(auth)/login"),
+			onPress: () => void signInAndReturn("/search"),
 		});
 		return false;
 	}, [email, router]);

@@ -18,7 +18,9 @@
 		"db:studio": "drizzle-kit studio",
 		"db:migrate": "drizzle-kit migrate",
 		"db:seed": "tsx src/seed.ts",
-		"db:seed:demo": "tsx src/seed-demo.ts"
+		"db:seed:demo": "tsx src/seed-demo.ts",
+		"db:seed:flex": "tsx src/seed-flex.ts",
+		"db:seed:flex:cleanup": "tsx src/seed-flex-cleanup.ts"
 	},
 	"dependencies": {
 		"@nabhya/env": "workspace:*",

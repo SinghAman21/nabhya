@@ -112,6 +112,22 @@ export function EventFormSheet({
 		setErrors({});
 	}, [event, detail]);
 
+	// The initial draft is built on mount, usually before the organisation has
+	// loaded, so a new event opened with no city or state. Fill the blanks from
+	// the org when a fresh form opens.
+	useEffect(() => {
+		if (!visible || event) return;
+		setDraft((d) =>
+			(d.city || !defaultCity) && (d.state || !defaultState)
+				? d
+				: {
+						...d,
+						city: d.city || (defaultCity ?? ""),
+						state: d.state || (defaultState ?? ""),
+					},
+		);
+	}, [visible, event, defaultCity, defaultState]);
+
 	const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
 		setDraft((d) => ({ ...d, [key]: value }));
 

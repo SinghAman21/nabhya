@@ -9,7 +9,6 @@ import {
 	RefreshControl,
 	ScrollView,
 	View,
-	type ViewToken,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ALL_INDIA, CityPicker } from "@/components/city-picker";
@@ -105,7 +104,11 @@ export default function Home() {
 	const impression = useRecordFeedInteraction("impression");
 	const seen = useRef(new Set<string>());
 	const onViewableItemsChanged = useRef(
-		({ viewableItems }: { viewableItems: ViewToken[] }) => {
+		({
+			viewableItems,
+		}: {
+			viewableItems: ReadonlyArray<{ item: unknown }>;
+		}) => {
 			for (const token of viewableItems) {
 				const item = token.item as FeedItem | undefined;
 				if (!item) continue;
@@ -290,7 +293,7 @@ export default function Home() {
 			refreshControl={
 				<RefreshControl
 					refreshing={feed.isRefetching && !feed.isFetchingNextPage}
-					onRefresh={() => feed.refetch()}
+					onRefresh={() => void feed.refetch()}
 					tintColor={colors.text.quaternary as string}
 				/>
 			}

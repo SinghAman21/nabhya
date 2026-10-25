@@ -11,6 +11,7 @@ import {
 	KeyboardAvoidingView,
 	Platform,
 	ScrollView,
+	type ScrollViewInstance,
 	View,
 	type ViewStyle,
 } from "react-native";
@@ -114,7 +115,7 @@ export function WizardShell({
 	const { colors, spacing } = useTheme();
 	const { isDesktop, width } = useMedia();
 	const insets = useSafeAreaInsets();
-	const scrollRef = useRef<ScrollView>(null);
+	const scrollRef = useRef<ScrollViewInstance>(null);
 	const rail = isDesktop && width >= RAIL_MIN_WIDTH;
 
 	/*

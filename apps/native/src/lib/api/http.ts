@@ -147,6 +147,9 @@ function humanise(
 	if (/^Cannot (GET|POST|PUT|PATCH|DELETE) \//.test(message)) {
 		return "This isn't available yet. Try again after the next update.";
 	}
+	if (status === 429 || /ThrottlerException|Too Many Requests/i.test(message)) {
+		return "Too many requests in a short time. Wait a moment and try again.";
+	}
 	if (message === "Network Error" || /^timeout of \d+ms/.test(message)) {
 		return "Couldn't reach Nabhya. Check your connection and try again.";
 	}

@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { EventFeed } from "@/components/event-feed";
 import { Screen, ScreenHeader } from "@/components/screen-shell";
 import { Button } from "@/components/ui/button";
+import { signInAndReturn } from "@/lib/return-to";
 import { useAuthStore } from "@/store/auth-store";
 
 /**
@@ -26,7 +27,7 @@ export default function PublicEvents() {
 							action={
 								<Button
 									size="sm"
-									onPress={() => router.push("/(auth)/login")}
+									onPress={() => void signInAndReturn("/events")}
 									accessibilityLabel="Sign in to apply to events"
 								>
 									Sign in
