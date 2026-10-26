@@ -15,6 +15,9 @@ export const env = createEnv({
 		NODE_ENV: z
 			.enum(["development", "production", "test"])
 			.default("development"),
+		// Local k6 runs can raise the IP bucket without weakening production.
+		// The throttler configuration additionally checks NODE_ENV.
+		PERF_TEST_MODE: z.enum(["0", "1"]).default("0"),
 		SUPABASE_AUTH_JWKS_URL: z.string().url(),
 
 		// Supabase Storage is the current bucket backend for uploads when the app

@@ -24,7 +24,7 @@ import type {
 	TrendingFeedQuery,
 } from "@nabhya/shared";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { DB_TOKEN } from "../../common/database";
 import { STORAGE_TOKEN, type StorageProvider } from "../../common/storage";
 import type { AuthUser } from "../../common/types";
@@ -78,7 +78,7 @@ export class FeedRankingService {
 
 	async forYou(user: AuthUser | undefined, query: ForYouFeedQuery) {
 		const candidates = applyFilters(await this.candidates(user), query);
-		const context = await this.viewerContext(user?.id);
+		const context = await this.viewerContext(user?.id, candidates);
 		for (const candidate of candidates)
 			candidate.score = this.forYouScore(candidate, context);
 		return this.page(
@@ -91,7 +91,7 @@ export class FeedRankingService {
 
 	async trending(user: AuthUser | undefined, query: TrendingFeedQuery) {
 		const candidates = applyFilters(await this.candidates(user), query);
-		const context = await this.viewerContext(user?.id);
+		const context = await this.viewerContext(user?.id, candidates);
 		for (const candidate of candidates)
 			candidate.score = this.trendingScore(candidate, context);
 		return this.page(
@@ -365,6 +365,23 @@ export class FeedRankingService {
 	}
 
 	private async hydrate(candidates: Candidate[], viewerId?: string) {
+		const idsByType = new Map<PostTag, string[]>();
+		for (const candidate of candidates) {
+			const ids = idsByType.get(candidate.type) ?? [];
+			ids.push(candidate.id);
+			idsByType.set(candidate.type, ids);
+		}
+		const targets = [...idsByType].map(([type, ids]) =>
+			and(
+				eq(postInteractions.targetType, type),
+				inArray(postInteractions.postId, ids),
+			),
+		);
+		const commentTargets = [...idsByType].map(([type, ids]) =>
+			and(eq(postComments.targetType, type), inArray(postComments.postId, ids)),
+		);
+		const eventIds = idsByType.get("EVENT") ?? [];
+		const needIds = idsByType.get("NEED") ?? [];
 		const organizationIds = [
 			...new Set(
 				candidates.flatMap((candidate) =>
@@ -403,49 +420,75 @@ export class FeedRankingService {
 			// Counted by Postgres, not shipped to Node: this used to select every
 			// interaction row (impressions included - tens of thousands) and then
 			// scan them once per candidate, three times over.
-			this.db
-				.select({
-					targetType: postInteractions.targetType,
-					postId: postInteractions.postId,
-					interactionType: postInteractions.interactionType,
-					count: sql<number>`count(*)::int`,
-				})
-				.from(postInteractions)
-				.where(
-					inArray(postInteractions.interactionType, ["LIKE", "SAVE", "SHARE"]),
-				)
-				.groupBy(
-					postInteractions.targetType,
-					postInteractions.postId,
-					postInteractions.interactionType,
-				),
-			this.db
-				.select({
-					targetType: postComments.targetType,
-					postId: postComments.postId,
-					count: sql<number>`count(*)::int`,
-				})
-				.from(postComments)
-				.groupBy(postComments.targetType, postComments.postId),
-			this.db
-				.select({
-					id: eventApplications.eventId,
-					count: sql<number>`count(*)::int`,
-				})
-				.from(eventApplications)
-				.groupBy(eventApplications.eventId),
-			this.db
-				.select({ id: needPledges.needId, count: sql<number>`count(*)::int` })
-				.from(needPledges)
-				.groupBy(needPledges.needId),
-			viewerId
+			targets.length
+				? this.db
+						.select({
+							targetType: postInteractions.targetType,
+							postId: postInteractions.postId,
+							interactionType: postInteractions.interactionType,
+							count: sql<number>`count(*)::int`,
+						})
+						.from(postInteractions)
+						.where(
+							and(
+								inArray(postInteractions.interactionType, [
+									"LIKE",
+									"SAVE",
+									"SHARE",
+								]),
+								or(...targets),
+							),
+						)
+						.groupBy(
+							postInteractions.targetType,
+							postInteractions.postId,
+							postInteractions.interactionType,
+						)
+				: [],
+			commentTargets.length
+				? this.db
+						.select({
+							targetType: postComments.targetType,
+							postId: postComments.postId,
+							count: sql<number>`count(*)::int`,
+						})
+						.from(postComments)
+						.where(or(...commentTargets))
+						.groupBy(postComments.targetType, postComments.postId)
+				: [],
+			eventIds.length
+				? this.db
+						.select({
+							id: eventApplications.eventId,
+							count: sql<number>`count(*)::int`,
+						})
+						.from(eventApplications)
+						.where(inArray(eventApplications.eventId, eventIds))
+						.groupBy(eventApplications.eventId)
+				: [],
+			needIds.length
+				? this.db
+						.select({
+							id: needPledges.needId,
+							count: sql<number>`count(*)::int`,
+						})
+						.from(needPledges)
+						.where(inArray(needPledges.needId, needIds))
+						.groupBy(needPledges.needId)
+				: [],
+			viewerId && organizationIds.length
 				? this.db
 						.select({ organizationId: follows.organizationId })
 						.from(follows)
-						.where(eq(follows.userId, viewerId))
+						.where(
+							and(
+								eq(follows.userId, viewerId),
+								inArray(follows.organizationId, organizationIds),
+							),
+						)
 				: [],
 			// Only the viewer's own likes and saves, for the filled heart/bookmark.
-			viewerId
+			viewerId && targets.length
 				? this.db
 						.select({
 							targetType: postInteractions.targetType,
@@ -457,6 +500,7 @@ export class FeedRankingService {
 							and(
 								eq(postInteractions.userId, viewerId),
 								inArray(postInteractions.interactionType, ["LIKE", "SAVE"]),
+								or(...targets),
 							),
 						)
 				: [],
@@ -511,7 +555,10 @@ export class FeedRankingService {
 		}
 	}
 
-	private async viewerContext(userId?: string) {
+	private async viewerContext(
+		userId: string | undefined,
+		candidates: Candidate[],
+	) {
 		if (!userId)
 			return {
 				city: null,
@@ -522,32 +569,43 @@ export class FeedRankingService {
 				following: new Set<string>(),
 				seen: new Set<string>(),
 			};
-		const [viewer, interests, following, impressions] = await Promise.all([
+		const idsByType = new Map<PostTag, string[]>();
+		for (const candidate of candidates) {
+			const ids = idsByType.get(candidate.type) ?? [];
+			ids.push(candidate.id);
+			idsByType.set(candidate.type, ids);
+		}
+		const impressionTargets = [...idsByType].map(([type, ids]) =>
+			and(
+				eq(postInteractions.targetType, type),
+				inArray(postInteractions.postId, ids),
+			),
+		);
+		const [viewer, interests, impressions] = await Promise.all([
 			this.db.query.users.findFirst({ where: eq(users.id, userId) }),
 			this.db
 				.select({ categoryId: userCategories.categoryId })
 				.from(userCategories)
 				.where(eq(userCategories.userId, userId)),
-			this.db
-				.select({ organizationId: follows.organizationId })
-				.from(follows)
-				.where(eq(follows.userId, userId)),
-			this.db
-				.select({
-					targetType: postInteractions.targetType,
-					postId: postInteractions.postId,
-				})
-				.from(postInteractions)
-				.where(
-					and(
-						eq(postInteractions.userId, userId),
-						eq(postInteractions.interactionType, "IMPRESSION"),
-						gte(
-							postInteractions.createdAt,
-							new Date(Date.now() - 7 * 86_400_000),
-						),
-					),
-				),
+			impressionTargets.length
+				? this.db
+						.select({
+							targetType: postInteractions.targetType,
+							postId: postInteractions.postId,
+						})
+						.from(postInteractions)
+						.where(
+							and(
+								eq(postInteractions.userId, userId),
+								eq(postInteractions.interactionType, "IMPRESSION"),
+								gte(
+									postInteractions.createdAt,
+									new Date(Date.now() - 7 * 86_400_000),
+								),
+								or(...impressionTargets),
+							),
+						)
+				: [],
 		]);
 		return {
 			city: viewer?.city?.toLowerCase() ?? null,
@@ -555,7 +613,13 @@ export class FeedRankingService {
 			latitude: numberOrNull(viewer?.latitude),
 			longitude: numberOrNull(viewer?.longitude),
 			categoryIds: new Set(interests.map((row) => row.categoryId)),
-			following: new Set(following.map((row) => row.organizationId)),
+			following: new Set(
+				candidates.flatMap((candidate) =>
+					candidate.organizationId && candidate.viewer?.followsOrganization
+						? [candidate.organizationId]
+						: [],
+				),
+			),
 			seen: new Set(
 				impressions.map((row) => `${row.targetType}:${row.postId}`),
 			),
@@ -724,21 +788,28 @@ export class FeedRankingService {
 			}
 		};
 		const content = { ...item.content };
-		if ("coverImage" in content) {
-			content.coverImage = await sign(content.coverImage);
-		}
-		if (Array.isArray(content.media)) {
-			content.media = await Promise.all(
-				(content.media as Array<{ url: unknown }>).map(async (media) => ({
-					...media,
-					url: await sign(media.url),
-				})),
-			);
-		}
+		const [coverImage, logo, media] = await Promise.all([
+			"coverImage" in content
+				? sign(content.coverImage)
+				: Promise.resolve(undefined),
+			item.organization
+				? sign(item.organization.logo)
+				: Promise.resolve(undefined),
+			Array.isArray(content.media)
+				? Promise.all(
+						(content.media as Array<{ url: unknown }>).map(async (entry) => ({
+							...entry,
+							url: await sign(entry.url),
+						})),
+					)
+				: Promise.resolve(undefined),
+		]);
+		if ("coverImage" in content) content.coverImage = coverImage ?? null;
+		if (media) content.media = media;
 		return {
 			...item,
 			organization: item.organization
-				? { ...item.organization, logo: await sign(item.organization.logo) }
+				? { ...item.organization, logo: logo ?? null }
 				: null,
 			content,
 		};

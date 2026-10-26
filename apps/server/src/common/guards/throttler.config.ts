@@ -1,4 +1,14 @@
+import { env } from "@nabhya/env/server";
 import type { ThrottlerModuleOptions } from "@nestjs/throttler";
+
+/**
+ * Lets k6 exercise local application capacity rather than the ordinary IP
+ * bucket. Production always keeps the normal rate limit, even if somebody
+ * accidentally sets PERF_TEST_MODE=1 there.
+ */
+const isLocalPerformanceTest =
+	env.NODE_ENV === "development" && env.PERF_TEST_MODE === "1";
+const defaultLimit = isLocalPerformanceTest ? 100_000 : 120;
 
 /**
  * Request limits.
@@ -16,7 +26,7 @@ export const throttlerConfig: ThrottlerModuleOptions = {
 		{
 			name: "default",
 			ttl: 60_000,
-			limit: 120,
+			limit: defaultLimit,
 		},
 		// @nestjs/throttler v6 applies EVERY named throttler to EVERY route, so
 		// this default is what an un-annotated route gets: it must not bind
@@ -26,7 +36,7 @@ export const throttlerConfig: ThrottlerModuleOptions = {
 		{
 			name: "strict",
 			ttl: 60_000,
-			limit: 120,
+			limit: defaultLimit,
 		},
 	],
 };
