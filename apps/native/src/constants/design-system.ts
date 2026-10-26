@@ -133,6 +133,30 @@ export const lightColors = {
 	shadow: "#00000050",
 } as const;
 
+/** Public editorial palette, built on the app's original orange brand tokens. */
+export const landingColors = {
+	primary: lightColors.primary.main,
+	"primary-hover": lightColors.primary.light,
+	"primary-contrast": lightColors.primary.contrast,
+	"brand-ink": lightColors.primary.ink,
+	heading: lightColors.brand.surface,
+	panel: lightColors.brand.surface,
+	ivory: "#F7F5EF",
+	white: lightColors.neutral.white,
+	accent: lightColors.primary.main,
+	"accent-ink": lightColors.primary.ink,
+	tint: lightColors.primary.tint,
+	text: "#2C241F",
+	muted: "#6B625C",
+	border: "#E8DFD6",
+	"on-panel-muted": "#E0CFC2",
+	"on-panel-border": "#735D4C",
+	"illustration-skin": "#BC7954",
+	"illustration-skin-light": "#E4AE88",
+	"illustration-denim": "#718793",
+	"illustration-wall": "#E9DCCB",
+} as const;
+
 export const darkColors = {
 	primary: {
 		main: "#FF7E40",

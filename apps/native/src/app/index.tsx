@@ -1,6 +1,7 @@
 import { type Href, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, View } from "react-native";
+import PublicLandingPage from "@/components/landing";
 import { ErrorState } from "@/components/screen-shell";
 import { useOnboardingStatus } from "@/hooks/use-profile";
 import { useTheme } from "@/hooks/use-theme";
@@ -90,7 +91,7 @@ export default function Index() {
 		if (!webSessionChecked) return;
 
 		if (!email) {
-			router.replace("/(auth)/login");
+			if (Platform.OS !== "web") router.replace("/(auth)/login");
 			return;
 		}
 
@@ -151,6 +152,8 @@ export default function Index() {
 		pendingInvite,
 		syncFromStatus,
 	]);
+
+	if (Platform.OS === "web" && !email) return <PublicLandingPage />;
 
 	return (
 		<View

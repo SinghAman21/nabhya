@@ -403,6 +403,9 @@ importers:
       '@nabhya/env':
         specifier: workspace:*
         version: link:../env
+      '@nabhya/shared':
+        specifier: workspace:*
+        version: link:../shared
       dotenv:
         specifier: 'catalog:'
         version: 17.4.2

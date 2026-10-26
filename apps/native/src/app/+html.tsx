@@ -21,9 +21,9 @@ import type { PropsWithChildren } from "react";
  * `assets/images/brand-src/render-brand.mjs`.
  */
 const SITE_URL = (process.env.EXPO_PUBLIC_SITE_URL ?? "").replace(/\/+$/, "");
-const TITLE = "Nabhya - Help that shows up";
+const TITLE = "Nabhya - Volunteering, without the back-and-forth";
 const DESCRIPTION =
-	"Verified NGOs and volunteers across India. Find a need you can meet or an event to turn up to, and get a certificate anyone can check.";
+	"Discover verified NGOs, local volunteering opportunities, and community needs across India. Find a meaningful way to help with Nabhya.";
 const OG_IMAGE = `${SITE_URL}/og-image.png`;
 
 /** Paints the app ground before the bundle runs, so dark mode has no white flash. */

@@ -1,3 +1,4 @@
+import { DEFAULT_CAUSE_CATEGORIES } from "@nabhya/shared";
 import { db } from "./index";
 import { categories } from "./schema/categories";
 import { roles } from "./schema/users";
@@ -8,18 +9,7 @@ const DEFAULT_ROLES = [
 	{ name: "superadmin", description: "System super administrator" },
 ];
 
-const DEFAULT_CATEGORIES = [
-	{ name: "Education", slug: "education", icon: "GraduationCap" },
-	{ name: "Healthcare", slug: "healthcare", icon: "Stethoscope" },
-	{ name: "Environment", slug: "environment", icon: "Leaf" },
-	{ name: "Women & Child Welfare", slug: "women-child", icon: "Baby" },
-	{ name: "Animal Welfare", slug: "animal-welfare", icon: "PawPrint" },
-	{ name: "Disaster Relief", slug: "disaster-relief", icon: "LifeBuoy" },
-	{ name: "Food & Nutrition", slug: "food-nutrition", icon: "Utensils" },
-	{ name: "Livelihood & Skills", slug: "livelihood", icon: "Hammer" },
-	{ name: "Elderly Care", slug: "elderly-care", icon: "HeartHandshake" },
-	{ name: "Rural Development", slug: "rural-development", icon: "Sprout" },
-];
+const DEFAULT_CATEGORIES = DEFAULT_CAUSE_CATEGORIES;
 
 async function main() {
 	console.log("Seeding database...");

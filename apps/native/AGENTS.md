@@ -32,7 +32,9 @@ a dev client.
 
 ## Routing
 
-- Gate is `src/app/index.tsx`: no email → `/(auth)/login`, no role → `/role-select`,
+- Gate is `src/app/index.tsx`: signed-out web visitors see the public landing page
+  (`components/landing/index.web.tsx`); native still sends no email → `/(auth)/login`.
+  Signed-in routing stays in the gate: no role → `/role-select`,
   NGO not onboarded → `/(onboarding)`, volunteer not onboarded →
   `/(onboarding)/volunteer`, else the role tab group. It reconciles the persisted
   store against `GET /api/onboarding/status` before routing, never after.

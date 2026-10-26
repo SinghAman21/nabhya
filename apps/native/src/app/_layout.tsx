@@ -3,9 +3,9 @@ import "../global.css";
 import { PortalHost } from "@rn-primitives/portal";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
-import { SplashScreen, Stack } from "expo-router";
+import { SplashScreen, Stack, useSegments } from "expo-router";
 import { useEffect, useState } from "react";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { OverlayHost } from "@/components/ui/overlay";
 import { ThemeProvider } from "@/hooks/use-app-theme";
@@ -31,6 +31,14 @@ export default function RootLayout() {
 
 	const [themeRestored, setThemeRestored] = useState(false);
 	const isAuthHydrated = useAuthStore((s) => s.isHydrated);
+	const email = useAuthStore((s) => s.email);
+	const segments = useSegments() as string[];
+	// Public web content can render during static export and before fonts or
+	// persisted state settle. Protected screens retain their existing boot gate.
+	const publicLanding =
+		Platform.OS === "web" &&
+		!email &&
+		segments.every((segment) => segment === "index");
 
 	useEffect(() => {
 		storage.get(THEME_KEY).then(() => setThemeRestored(true));
@@ -44,7 +52,7 @@ export default function RootLayout() {
 		}
 	}, [ready]);
 
-	if (!ready) return null;
+	if (!ready && !publicLanding) return null;
 
 	return (
 		<QueryClientProvider client={queryClient}>

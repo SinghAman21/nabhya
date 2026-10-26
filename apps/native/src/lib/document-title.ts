@@ -19,6 +19,7 @@ import { Platform } from "react-native";
  * still the difference between a tab you can find and one you cannot.
  */
 const TITLES: Record<string, string> = {
+	"": "Volunteering, without the back-and-forth",
 	"(auth)/login": "Sign in",
 	"(auth)/signup": "Create an account",
 	"(auth)/forgot-password": "Reset your password",

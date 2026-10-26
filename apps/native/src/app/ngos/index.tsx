@@ -1,6 +1,6 @@
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Building2, MapPin } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { OrgLogo } from "@/components/org-branding";
 import { PAGE_SIZE, PagedList, usePagedQuery } from "@/components/paged-list";
@@ -59,6 +59,9 @@ const MODES: Array<{ value: Mode; label: string }> = [
 export default function NgoDirectory() {
 	const { colors, spacing } = useTheme();
 	const router = useRouter();
+	const params = useLocalSearchParams<{ city?: string }>();
+	const [city, setCity] = useState(params.city?.slice(0, 80) ?? "");
+	useEffect(() => setCity(params.city?.slice(0, 80) ?? ""), [params.city]);
 	const [mode, setMode] = useState<Mode>("all");
 	const [search, setSearch] = useState("");
 	const debouncedSearch = useDebounced(search.trim());
@@ -66,7 +69,10 @@ export default function NgoDirectory() {
 	const email = useAuthStore((s) => s.email);
 	const { data: me } = useMe(!!email);
 
-	const listFilters = debouncedSearch ? { search: debouncedSearch } : {};
+	const listFilters = {
+		...(debouncedSearch ? { search: debouncedSearch } : {}),
+		...(city ? { city } : {}),
+	};
 	const list = usePagedQuery({
 		queryKey: queryKeys.organizations({ ...listFilters, limit: PAGE_SIZE }),
 		fetchPage: (page) =>
@@ -145,6 +151,31 @@ export default function NgoDirectory() {
 			) : null}
 
 			<FilterChips options={MODES} value={mode} onChange={setMode} />
+
+			{mode === "all" && city ? (
+				<View
+					style={{
+						flexDirection: "row",
+						alignItems: "center",
+						gap: spacing[3],
+						marginBottom: spacing[3],
+					}}
+				>
+					<Caption color="secondary" style={{ flex: 1 }}>
+						Showing NGOs in {city}
+					</Caption>
+					<Button
+						size="sm"
+						variant="outline"
+						onPress={() => {
+							setCity("");
+							router.setParams({ city: undefined });
+						}}
+					>
+						All cities
+					</Button>
+				</View>
+			) : null}
 
 			{showingNearby && !hasFix ? (
 				<EmptyState
