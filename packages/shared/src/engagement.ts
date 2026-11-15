@@ -70,6 +70,8 @@ export const notificationTypeSchema = z.enum([
 	"TEAM_ROLE_CHANGED",
 	"TEAM_REMOVED",
 	"OWNERSHIP_TRANSFERRED",
+	"PAYOUT_ACTIVATED",
+	"PAYOUT_ONBOARDING_FAILED",
 ]);
 
 export type NotificationType = z.infer<typeof notificationTypeSchema>;

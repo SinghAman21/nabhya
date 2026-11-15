@@ -18,6 +18,7 @@ import { NeedsModule } from "../modules/needs/needs.module";
 import { NotificationsModule } from "../modules/notifications/notifications.module";
 import { OnboardingModule } from "../modules/onboarding/onboarding.module";
 import { OrganizationsModule } from "../modules/organizations/organizations.module";
+import { PayoutsModule } from "../modules/payouts/payouts.module";
 import { PublishingModule } from "../modules/publishing/publishing.module";
 import { SearchModule } from "../modules/search/search.module";
 import { UploadsModule } from "../modules/uploads/uploads.module";
@@ -46,6 +47,7 @@ import { AppController } from "./app.controller";
 		SearchModule,
 		DonationsModule,
 		AdminModule,
+		PayoutsModule,
 	],
 	providers: [
 		// Order matters - guards run top to bottom. Rate limiting comes first so

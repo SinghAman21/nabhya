@@ -1,6 +1,7 @@
 import { env } from "@nabhya/env/server";
 import { Logger, Module } from "@nestjs/common";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { PayoutsModule } from "../payouts/payouts.module";
 import { DonationsController } from "./donations.controller";
 import { DonationsService } from "./donations.service";
 import { PAYMENT_PROVIDER_TOKEN, type PaymentProvider } from "./payment.types";
@@ -42,7 +43,7 @@ function createPaymentProvider(): PaymentProvider {
 }
 
 @Module({
-	imports: [OrganizationsModule],
+	imports: [OrganizationsModule, PayoutsModule],
 	controllers: [DonationsController],
 	providers: [
 		DonationsService,

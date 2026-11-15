@@ -109,6 +109,8 @@ export const notificationTypeEnum = pgEnum("notification_type", [
 	"TEAM_ROLE_CHANGED",
 	"TEAM_REMOVED",
 	"OWNERSHIP_TRANSFERRED",
+	"PAYOUT_ACTIVATED",
+	"PAYOUT_ONBOARDING_FAILED",
 ]);
 
 /**

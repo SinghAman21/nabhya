@@ -28,6 +28,8 @@ import { DonationsService } from "../src/modules/donations/donations.service";
 import { StubPaymentProvider } from "../src/modules/donations/stub-payment.provider";
 import { NotificationsService } from "../src/modules/notifications/notifications.service";
 import { OrganizationsService } from "../src/modules/organizations/organizations.service";
+import { PayoutsService } from "../src/modules/payouts/payouts.service";
+import { RazorpayRouteService } from "../src/modules/payouts/razorpay-route.service";
 import { createOrganization, createUser, seedRoles } from "./factories";
 import { createTestDb, type TestDb, truncateAll } from "./harness";
 
@@ -54,6 +56,12 @@ describe("DonationsService", () => {
 			null as never,
 		);
 		storage = new StubStorageProvider();
+		const payoutsService = new PayoutsService(
+			db as never,
+			audit,
+			notifications,
+			new RazorpayRouteService(),
+		);
 		service = new DonationsService(
 			db as never,
 			audit,
@@ -62,6 +70,7 @@ describe("DonationsService", () => {
 			organizationsService,
 			storage,
 			mail,
+			payoutsService,
 		);
 	});
 
@@ -561,6 +570,150 @@ describe("DonationsService", () => {
 				(d) => d.id,
 			);
 			expect(new Set(ids).size).toBe(6);
+		});
+	});
+
+	describe("Razorpay Route & 80G", () => {
+		it("records 80G tax receipt opt-in and donor PAN on checkout", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+
+			const checkout = await service.createCheckout(
+				{
+					organizationId: org.id,
+					amountMinor: 25_000,
+					wants80G: true,
+					donorPan: "ABCDE1234F",
+					donorAddress: "123 MG Road, Bengaluru, Karnataka",
+					donorEmail: "taxpayer@example.com",
+					donorName: "Ananya Sharma",
+				},
+				null,
+			);
+
+			const row = await db.query.donations.findFirst({
+				where: eq(donations.id, checkout.donationId),
+			});
+
+			expect(row?.wants80G).toBe(true);
+			expect(row?.donorPan).toBe("ABCDE1234F");
+			expect(row?.donorAddress).toBe("123 MG Road, Bengaluru, Karnataka");
+		});
+
+		it("handles transfer.processed webhook and marks transfer PROCESSED", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+
+			const checkout = await service.createCheckout(
+				{
+					organizationId: org.id,
+					amountMinor: 10_000,
+					donorEmail: "donor@example.com",
+				},
+				null,
+			);
+
+			// First settle the payment
+			await service.handleWebhook(
+				JSON.stringify({
+					event: "payment.captured",
+					payload: {
+						payment: {
+							entity: {
+								id: "pay_test_route_1",
+								amount: 10_000,
+								notes: { referenceId: checkout.donationId },
+							},
+						},
+					},
+				}),
+				{},
+			);
+
+			// Then handle transfer.processed
+			await service.handleWebhook(
+				JSON.stringify({
+					event: "transfer.processed",
+					referenceId: checkout.donationId,
+					payload: {
+						transfer: {
+							entity: {
+								id: "trf_test_123",
+								amount: 10_000,
+								notes: { referenceId: checkout.donationId },
+							},
+						},
+					},
+				}),
+				{},
+			);
+
+			const row = await db.query.donations.findFirst({
+				where: eq(donations.id, checkout.donationId),
+			});
+
+			expect(row?.status).toBe("COMPLETED");
+			expect(row?.transferStatus).toBe("PROCESSED");
+			expect(row?.razorpayTransferId).toBe("trf_test_123");
+		});
+
+		it("handles transfer.failed webhook and marks transfer FAILED", async () => {
+			const owner = await createUser(db, { role: "organisation" });
+			const org = await createOrganization(db, owner.id);
+
+			const checkout = await service.createCheckout(
+				{
+					organizationId: org.id,
+					amountMinor: 15_000,
+					donorEmail: "donor@example.com",
+				},
+				null,
+			);
+
+			// First settle the payment
+			await service.handleWebhook(
+				JSON.stringify({
+					event: "payment.captured",
+					payload: {
+						payment: {
+							entity: {
+								id: "pay_test_route_2",
+								amount: 15_000,
+								notes: { referenceId: checkout.donationId },
+							},
+						},
+					},
+				}),
+				{},
+			);
+
+			// Then handle transfer.failed
+			await service.handleWebhook(
+				JSON.stringify({
+					event: "transfer.failed",
+					referenceId: checkout.donationId,
+					payload: {
+						transfer: {
+							entity: {
+								id: "trf_test_fail_456",
+								amount: 15_000,
+								notes: { referenceId: checkout.donationId },
+								error: { description: "Beneficiary bank down" },
+							},
+						},
+					},
+				}),
+				{},
+			);
+
+			const row = await db.query.donations.findFirst({
+				where: eq(donations.id, checkout.donationId),
+			});
+
+			expect(row?.status).toBe("COMPLETED");
+			expect(row?.transferStatus).toBe("FAILED");
+			expect(row?.razorpayTransferId).toBe("trf_test_fail_456");
+			expect(row?.transferFailureReason).toBe("Beneficiary bank down");
 		});
 	});
 });

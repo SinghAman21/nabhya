@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { optionalText, paginationQuerySchema } from "./common";
+import { PAN_REGEX } from "./payout";
 
 export const donationStatusSchema = z.enum([
 	"PENDING",
@@ -14,23 +15,45 @@ export type DonationStatus = z.infer<typeof donationStatusSchema>;
 export const MIN_DONATION_MINOR = 1_000;
 export const MAX_DONATION_MINOR = 50_000_000;
 
-export const createDonationSchema = z.object({
-	organizationId: z.uuid(),
-	/**
-	 * Minor units (paise). Integer-only so no float rounding can ever reach the
-	 * ledger - the client sends paise, never rupees.
-	 */
-	amountMinor: z.coerce
-		.number()
-		.int("Enter a whole amount")
-		.min(MIN_DONATION_MINOR, "Minimum donation is ₹10")
-		.max(MAX_DONATION_MINOR, "Please contact the NGO directly for this amount"),
-	message: optionalText(500),
-	isAnonymous: z.boolean().default(false),
-	/** Required for guests; ignored when signed in. */
-	donorName: optionalText(100),
-	donorEmail: z.email("Enter a valid email").optional(),
-});
+export const createDonationSchema = z
+	.object({
+		organizationId: z.uuid(),
+		/**
+		 * Minor units (paise). Integer-only so no float rounding can ever reach the
+		 * ledger - the client sends paise, never rupees.
+		 */
+		amountMinor: z.coerce
+			.number()
+			.int("Enter a whole amount")
+			.min(MIN_DONATION_MINOR, "Minimum donation is ₹10")
+			.max(
+				MAX_DONATION_MINOR,
+				"Please contact the NGO directly for this amount",
+			),
+		message: optionalText(500),
+		isAnonymous: z.boolean().default(false),
+		/** Required for guests; ignored when signed in. */
+		donorName: optionalText(100),
+		donorEmail: z.email("Enter a valid email").optional(),
+		wants80G: z.boolean().default(false),
+		donorPan: z
+			.string()
+			.trim()
+			.toUpperCase()
+			.regex(PAN_REGEX, "Enter a valid 10-character PAN")
+			.optional(),
+		donorAddress: optionalText(500),
+	})
+	.refine(
+		(data) => {
+			if (data.wants80G && !data.donorPan) return false;
+			return true;
+		},
+		{
+			message: "PAN is required to claim an 80G tax receipt",
+			path: ["donorPan"],
+		},
+	);
 
 export type CreateDonationInput = z.infer<typeof createDonationSchema>;
 

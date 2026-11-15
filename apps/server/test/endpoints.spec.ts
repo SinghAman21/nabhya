@@ -206,6 +206,7 @@ describe("HTTP surface", () => {
 					"../src/modules/organizations/organizations.controller",
 					"OrganizationsController",
 				],
+				["../src/modules/payouts/payouts.controller", "PayoutsController"],
 				[
 					"../src/modules/publishing/publishing.controller",
 					"PublishingController",
@@ -261,7 +262,7 @@ describe("HTTP surface", () => {
 	it("exposes the expected number of endpoints", () => {
 		// A bare count, so adding or deleting a route is a deliberate act that
 		// shows up in the diff rather than passing unnoticed.
-		expect(routes.length).toBe(148);
+		expect(routes.length).toBe(153);
 	});
 
 	it("mounts every route under the /api prefix", () => {

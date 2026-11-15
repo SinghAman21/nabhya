@@ -12,6 +12,12 @@ export interface ReceiptContent {
 	organizationRegistration: string | null;
 	paymentReference: string | null;
 	provider: string;
+	// Direct settlement & 80G Tax Exemption
+	wants80G?: boolean;
+	donorPan?: string | null;
+	donorAddress?: string | null;
+	organizationPan?: string | null;
+	isDirectSettlement?: boolean;
 }
 
 const BRAND = rgb(1, 0.494, 0.251); // #FF7E40, the certificate's accent
@@ -119,6 +125,9 @@ export async function renderReceiptPdf(
 	const rows: Array<[string, string]> = [
 		["Received from", content.donorName ?? "Donor"],
 		["Donor email", content.donorEmail ?? "-"],
+		...(content.wants80G && content.donorPan
+			? ([["Donor PAN (80G)", content.donorPan]] as Array<[string, string]>)
+			: []),
 		[
 			"In support of",
 			[content.organizationName, content.organizationCity]
@@ -126,7 +135,15 @@ export async function renderReceiptPdf(
 				.join(", "),
 		],
 		["NGO registration", content.organizationRegistration ?? "-"],
-		["Payment method", humanizeProvider(content.provider)],
+		...(content.organizationPan
+			? ([["NGO PAN", content.organizationPan]] as Array<[string, string]>)
+			: []),
+		[
+			"Settlement",
+			content.isDirectSettlement
+				? "Direct Settlement via Razorpay Route"
+				: humanizeProvider(content.provider),
+		],
 		["Payment reference", content.paymentReference ?? "-"],
 		["Receipt number", content.receiptNumber],
 	];
@@ -137,14 +154,18 @@ export async function renderReceiptPdf(
 		text(label, left, y, 10, sans, MUTED);
 		rightAlign(truncate(value, 60), y, 10, sansBold);
 		rule(y - 12);
-		y -= 32;
+		y -= 28;
 	}
 
 	// What this document is, and is not.
 	const notes = [
-		"This receipt acknowledges a donation made through Nabhya to the NGO named above.",
-		"It is not a tax-exemption (80G) certificate. If you need one, ask the NGO directly;",
-		"only an NGO registered under section 80G of the Income Tax Act can issue it.",
+		content.isDirectSettlement
+			? "This receipt acknowledges a donation settled directly into the receiving NGO's bank account."
+			: "This receipt acknowledges a donation made through Nabhya to the NGO named above.",
+		content.wants80G
+			? "80G Note: Donor requested tax exemption under Section 80G. Recipient NGO will file Form 10BD."
+			: "It is not a tax-exemption (80G) certificate. Only an NGO registered under Section 80G can issue it.",
+		"Platform fee: INR 0.00. 100% of your donation is delivered to the organization.",
 	];
 	let noteY = y - 24;
 	for (const line of notes) {

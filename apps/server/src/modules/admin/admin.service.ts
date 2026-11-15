@@ -72,6 +72,7 @@ import { AuditService } from "../../common/audit";
 import { DB_TOKEN } from "../../common/database";
 import { paginate, toOffset } from "../../common/utils";
 import { NotificationsService } from "../notifications/notifications.service";
+import { PayoutsService } from "../payouts/payouts.service";
 
 /**
  * Turns a validated sort key into an `ORDER BY`.
@@ -156,6 +157,8 @@ export class AdminService {
 		@Inject(AuditService) private readonly audit: AuditService,
 		@Inject(NotificationsService)
 		private readonly notifications: NotificationsService,
+		@Inject(PayoutsService)
+		private readonly payoutsService: PayoutsService,
 	) {}
 
 	// ─── Overview ────────────────────────────────────────────────────────────
@@ -635,6 +638,12 @@ export class AdminService {
 				entityName: "ORGANIZATION",
 				entityId: organizationId,
 			});
+		}
+
+		// Kick off Razorpay Route linked-account onboarding in the background.
+		// Must NOT be awaited: a Razorpay timeout must never fail NGO approval.
+		if (input.verificationStatus === "VERIFIED") {
+			void this.payoutsService.startOnboarding(organizationId);
 		}
 
 		return updated;

@@ -7,5 +7,6 @@ export * from "./events";
 export * from "./feed";
 export * from "./needs";
 export * from "./organizations";
+export * from "./payouts";
 export * from "./publishing";
 export * from "./users";

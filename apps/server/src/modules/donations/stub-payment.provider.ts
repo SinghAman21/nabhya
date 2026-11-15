@@ -5,6 +5,8 @@ import type {
 	CheckoutResult,
 	PaymentEvent,
 	PaymentProvider,
+	RefundRequest,
+	RefundResult,
 } from "./payment.types";
 
 /**
@@ -20,7 +22,10 @@ export class StubPaymentProvider implements PaymentProvider {
 
 	async createCheckout(input: CheckoutRequest): Promise<CheckoutResult> {
 		this.logger.warn(
-			`Payment stub issued a checkout for donation ${input.referenceId} - no money will move.`,
+			`Payment stub issued a checkout for donation ${input.referenceId} - no money will move.` +
+				(input.destinationAccountId
+					? ` (Route transfer simulated to ${input.destinationAccountId})`
+					: ""),
 		);
 		return {
 			providerCheckoutId: `stub_${randomUUID()}`,
@@ -35,6 +40,8 @@ export class StubPaymentProvider implements PaymentProvider {
 			referenceId?: string;
 			paymentId?: string;
 			amountMinor?: number;
+			transferId?: string;
+			accountId?: string;
 			payload?: {
 				payment?: {
 					entity?: {
@@ -43,19 +50,89 @@ export class StubPaymentProvider implements PaymentProvider {
 						notes?: { referenceId?: string };
 					};
 				};
+				transfer?: {
+					entity?: {
+						id?: string;
+						amount?: number;
+						recipient?: string;
+						notes?: { referenceId?: string };
+						error?: { description?: string };
+					};
+				};
+				account?: {
+					entity?: {
+						id?: string;
+					};
+				};
 			};
 		};
+
 		const entity = event.payload?.payment?.entity;
+		const transferEntity = event.payload?.transfer?.entity;
+		const eventName = event.event ?? event.type;
+
+		if (eventName === "transfer.processed") {
+			return {
+				kind: "TRANSFER_PROCESSED",
+				referenceId:
+					event.referenceId ?? transferEntity?.notes?.referenceId ?? null,
+				providerPaymentId: null,
+				amountMinor: transferEntity?.amount ?? null,
+				transferId:
+					event.transferId ?? transferEntity?.id ?? `stub_trf_${randomUUID()}`,
+			};
+		}
+
+		if (eventName === "transfer.failed") {
+			return {
+				kind: "TRANSFER_FAILED",
+				referenceId:
+					event.referenceId ?? transferEntity?.notes?.referenceId ?? null,
+				providerPaymentId: null,
+				amountMinor: transferEntity?.amount ?? null,
+				transferId:
+					event.transferId ?? transferEntity?.id ?? `stub_trf_${randomUUID()}`,
+				failureReason:
+					transferEntity?.error?.description ?? "Simulated transfer failure",
+			};
+		}
+
+		if (eventName?.startsWith("account.")) {
+			return {
+				kind: "ACCOUNT_UPDATED",
+				referenceId: null,
+				providerPaymentId: null,
+				amountMinor: null,
+				accountEventType: eventName,
+				accountId:
+					event.accountId ??
+					event.payload?.account?.entity?.id ??
+					`acc_stub_${randomUUID()}`,
+			};
+		}
 
 		return {
 			kind:
-				event.type === "payment.failed" || event.event === "payment.failed"
+				eventName === "payment.failed"
 					? "FAILED"
-					: "SUCCEEDED",
+					: eventName === "refund.processed"
+						? "REFUNDED"
+						: "SUCCEEDED",
 			referenceId: event.referenceId ?? entity?.notes?.referenceId ?? null,
 			providerPaymentId:
 				event.paymentId ?? entity?.id ?? `stub_${randomUUID()}`,
 			amountMinor: event.amountMinor ?? entity?.amount ?? null,
+		};
+	}
+
+	async refund(input: RefundRequest): Promise<RefundResult> {
+		this.logger.warn(
+			`Payment stub issued a refund for payment ${input.providerPaymentId} - no money will move.`,
+		);
+		return {
+			refundId: `stub_rfnd_${randomUUID()}`,
+			amountMinor: input.amountMinor ?? 0,
+			status: "processed",
 		};
 	}
 }

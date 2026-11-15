@@ -5,6 +5,8 @@ import type {
 	CheckoutResult,
 	PaymentEvent,
 	PaymentProvider,
+	RefundRequest,
+	RefundResult,
 } from "./payment.types";
 
 export interface RazorpayConfig {
@@ -18,12 +20,10 @@ export interface RazorpayConfig {
  * on the client - the client opens an in-app sheet with the order id + key id
  * this provider returns, it never navigates to a hosted page.
  *
- * Two things worth knowing:
- *
- * 1. Razorpay's Orders API takes an arbitrary integer amount in paise - no
- *    whole-rupee restriction.
- * 2. A new order must be created per payment attempt; reusing an order id after
- *    a failed attempt is rejected by Razorpay.
+ * Route Direct Settlement:
+ * When `destinationAccountId` is supplied, an order-level `transfers` block is
+ * attached, directing Razorpay to settle funds directly into the linked account
+ * upon successful payment capture.
  */
 export class RazorpayPaymentProvider implements PaymentProvider {
 	readonly name = "razorpay";
@@ -32,24 +32,43 @@ export class RazorpayPaymentProvider implements PaymentProvider {
 
 	constructor(private readonly config: RazorpayConfig) {}
 
-	async createCheckout(input: CheckoutRequest): Promise<CheckoutResult> {
-		const auth = Buffer.from(
+	private get authHeader(): string {
+		return `Basic ${Buffer.from(
 			`${this.config.keyId}:${this.config.keySecret}`,
-		).toString("base64");
+		).toString("base64")}`;
+	}
+
+	async createCheckout(input: CheckoutRequest): Promise<CheckoutResult> {
+		const payload: Record<string, unknown> = {
+			amount: input.amountMinor,
+			currency: input.currency,
+			// Donation ids are uuids (36 chars) - well within the 40-char limit.
+			receipt: input.referenceId,
+			notes: { referenceId: input.referenceId },
+		};
+
+		// Razorpay Route direct-settlement transfer instruction
+		if (input.destinationAccountId) {
+			payload.transfers = [
+				{
+					account: input.destinationAccountId,
+					amount: input.transferAmountMinor ?? input.amountMinor,
+					currency: input.currency,
+					notes: {
+						referenceId: input.referenceId,
+					},
+					on_hold: 0,
+				},
+			];
+		}
 
 		const response = await fetch(`${this.baseUrl}/orders`, {
 			method: "POST",
 			headers: {
-				Authorization: `Basic ${auth}`,
+				Authorization: this.authHeader,
 				"Content-Type": "application/json",
 			},
-			body: JSON.stringify({
-				amount: input.amountMinor,
-				currency: input.currency,
-				// Donation ids are uuids (36 chars) - well within the 40-char limit.
-				receipt: input.referenceId,
-				notes: { referenceId: input.referenceId },
-			}),
+			body: JSON.stringify(payload),
 		});
 
 		if (!response.ok) {
@@ -87,6 +106,7 @@ export class RazorpayPaymentProvider implements PaymentProvider {
 
 		const event = JSON.parse(rawBody) as {
 			event?: string;
+			account_id?: string;
 			payload?: {
 				payment?: {
 					entity?: {
@@ -96,33 +116,94 @@ export class RazorpayPaymentProvider implements PaymentProvider {
 						error_description?: string;
 					};
 				};
+				transfer?: {
+					entity?: {
+						id?: string;
+						amount?: number;
+						recipient?: string;
+						payment_id?: string;
+						notes?: Record<string, string>;
+						error?: { description?: string };
+					};
+				};
+				account?: {
+					entity?: {
+						id?: string;
+						status?: string;
+					};
+				};
 			};
 		};
 
-		const entity = event.payload?.payment?.entity ?? {};
-		const referenceId = entity.notes?.referenceId ?? null;
-		const providerPaymentId = entity.id ?? null;
-		const amountMinor = entity.amount ?? null;
+		const paymentEntity = event.payload?.payment?.entity ?? {};
+		const transferEntity = event.payload?.transfer?.entity ?? {};
+		const eventName = event.event ?? "";
 
-		switch (event.event) {
+		// ─── Transfer Events (Route) ─────────────────────────────────────────────
+		if (eventName === "transfer.processed") {
+			return {
+				kind: "TRANSFER_PROCESSED",
+				referenceId:
+					transferEntity.notes?.referenceId ??
+					transferEntity.notes?.donationId ??
+					null,
+				providerPaymentId: transferEntity.payment_id ?? null,
+				amountMinor: transferEntity.amount ?? null,
+				transferId: transferEntity.id ?? null,
+				destinationAccountId: transferEntity.recipient ?? null,
+			};
+		}
+
+		if (eventName === "transfer.failed") {
+			return {
+				kind: "TRANSFER_FAILED",
+				referenceId:
+					transferEntity.notes?.referenceId ??
+					transferEntity.notes?.donationId ??
+					null,
+				providerPaymentId: transferEntity.payment_id ?? null,
+				amountMinor: transferEntity.amount ?? null,
+				transferId: transferEntity.id ?? null,
+				destinationAccountId: transferEntity.recipient ?? null,
+				failureReason:
+					transferEntity.error?.description ?? "Transfer failed at bank",
+			};
+		}
+
+		// ─── Linked Account Events (Route) ───────────────────────────────────────
+		if (eventName.startsWith("account.")) {
+			return {
+				kind: "ACCOUNT_UPDATED",
+				referenceId: null,
+				providerPaymentId: null,
+				amountMinor: null,
+				accountEventType: eventName,
+				accountId:
+					event.payload?.account?.entity?.id ?? event.account_id ?? null,
+			};
+		}
+
+		// ─── Payment Events ──────────────────────────────────────────────────────
+		const referenceId = paymentEntity.notes?.referenceId ?? null;
+		const providerPaymentId = paymentEntity.id ?? null;
+		const amountMinor = paymentEntity.amount ?? null;
+
+		switch (eventName) {
 			case "payment.captured":
+			case "order.paid":
 				return {
 					kind: "SUCCEEDED",
 					referenceId,
 					providerPaymentId,
 					amountMinor,
 				};
-			// TODO(payments): the exact failed-payment and refund event names below
-			// were not confirmed against a live webhook at implementation time -
-			// verify them (Razorpay dashboard → Webhooks → event log) during test-mode
-			// QA and correct if different.
 			case "payment.failed":
 				return {
 					kind: "FAILED",
 					referenceId,
 					providerPaymentId,
 					amountMinor,
-					failureReason: entity.error_description ?? null,
+					failureReason: paymentEntity.error_description ?? null,
 				};
 			case "refund.processed":
 				return {
@@ -139,13 +220,55 @@ export class RazorpayPaymentProvider implements PaymentProvider {
 		}
 	}
 
+	async refund(input: RefundRequest): Promise<RefundResult> {
+		const payload: Record<string, unknown> = {};
+		if (input.amountMinor) payload.amount = input.amountMinor;
+		if (input.reverseAll) payload.reverse_all = 1;
+		if (input.notes) payload.notes = input.notes;
+
+		const response = await fetch(
+			`${this.baseUrl}/payments/${input.providerPaymentId}/refund`,
+			{
+				method: "POST",
+				headers: {
+					Authorization: this.authHeader,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify(payload),
+			},
+		);
+
+		if (!response.ok) {
+			const detail = await response.text().catch(() => "");
+			this.logger.error(
+				`Razorpay refund failed (${response.status}): ${detail.slice(0, 500)}`,
+			);
+			throw new BadRequestException(
+				"Refund request failed with payment provider.",
+			);
+		}
+
+		const body = (await response.json()) as {
+			id?: string;
+			amount?: number;
+			status?: string;
+		};
+		if (!body.id) {
+			throw new BadRequestException(
+				"Payment provider did not return a refund id.",
+			);
+		}
+
+		return {
+			refundId: body.id,
+			amountMinor: body.amount ?? input.amountMinor ?? 0,
+			status: body.status ?? "processed",
+		};
+	}
+
 	/**
 	 * Razorpay webhooks: HMAC-SHA256(rawBody, webhookSecret), hex digest, in the
-	 * `X-Razorpay-Signature` header. Razorpay does not include a timestamp in
-	 * the signature - there is no replay-window check possible here. Idempotency
-	 * is instead enforced entirely downstream, by the PENDING-only guard and the
-	 * unique index on `provider_payment_id` in DonationsService - this is
-	 * deliberate, not an oversight.
+	 * `X-Razorpay-Signature` header.
 	 */
 	private verifySignature(rawBody: string, headers: Record<string, string>) {
 		const signature = headers["x-razorpay-signature"];

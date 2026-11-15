@@ -1,5 +1,9 @@
 import type { db as dbType } from "@nabhya/db";
-import { donations, organizations } from "@nabhya/db/schema";
+import {
+	donations,
+	organizationPayoutProfiles,
+	organizations,
+} from "@nabhya/db/schema";
 import { env } from "@nabhya/env/server";
 import type {
 	CreateDonationInput,
@@ -39,6 +43,7 @@ import {
 import { orderBySort } from "../../common/utils/order";
 import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsService } from "../organizations/organizations.service";
+import { PayoutsService } from "../payouts/payouts.service";
 import { PAYMENT_PROVIDER_TOKEN, type PaymentProvider } from "./payment.types";
 import { formatReceiptAmount, renderReceiptPdf } from "./receipt-pdf";
 
@@ -57,6 +62,8 @@ export class DonationsService {
 		private readonly organizationsService: OrganizationsService,
 		@Inject(STORAGE_TOKEN) private readonly storage: StorageProvider,
 		@Inject(MailService) private readonly mail: MailService,
+		@Inject(PayoutsService)
+		private readonly payoutsService: PayoutsService,
 	) {}
 
 	/**
@@ -81,6 +88,27 @@ export class DonationsService {
 			);
 		}
 
+		// Look up NGO payout profile for Route settlement
+		const payoutProfile =
+			await this.db.query.organizationPayoutProfiles.findFirst({
+				where: eq(organizationPayoutProfiles.organizationId, organization.id),
+			});
+
+		// In live environments, gate direct donations on an activated payout profile
+		if (
+			this.payments.name !== "stub" &&
+			(!payoutProfile ||
+				payoutProfile.razorpayStatus !== "ACTIVATED" ||
+				!payoutProfile.razorpayAccountId)
+		) {
+			throw new BadRequestException(
+				"This organization cannot receive direct donations yet. Payout onboarding is pending.",
+			);
+		}
+
+		const destinationAccountId = payoutProfile?.razorpayAccountId ?? null;
+		const transferAmountMinor = input.amountMinor;
+
 		const donation = takeFirstOrThrow(
 			await this.db
 				.insert(donations)
@@ -95,6 +123,15 @@ export class DonationsService {
 					isAnonymous: input.isAnonymous,
 					donorName: donor?.name ?? input.donorName ?? null,
 					donorEmail: donor?.email ?? input.donorEmail ?? null,
+					wants80G: input.wants80G ?? false,
+					donorPan: input.donorPan ?? null,
+					donorAddress: input.donorAddress ?? null,
+					platformFeeMinor: 0,
+					transferAmountMinor: destinationAccountId
+						? transferAmountMinor
+						: null,
+					destinationAccountId: destinationAccountId,
+					transferStatus: destinationAccountId ? "PENDING" : null,
 				})
 				.returning(),
 			"create donation",
@@ -107,6 +144,8 @@ export class DonationsService {
 			organizationName: organization.organizationName,
 			donorName: donation.donorName,
 			donorEmail: donation.donorEmail,
+			destinationAccountId: destinationAccountId,
+			transferAmountMinor: transferAmountMinor,
 			returnUrl: `${env.CORS_ORIGIN.split(",")[0]}/donations/${donation.id}`,
 		});
 
@@ -138,7 +177,51 @@ export class DonationsService {
 	async handleWebhook(rawBody: string, headers: Record<string, string>) {
 		const event = this.payments.parseWebhook(rawBody, headers);
 
-		if (event.kind === "IGNORED" || !event.referenceId) {
+		if (event.kind === "IGNORED") {
+			return { handled: false };
+		}
+
+		// Handle Account lifecycle events
+		if (event.kind === "ACCOUNT_UPDATED") {
+			if (event.accountId && event.accountEventType) {
+				await this.payoutsService.handleAccountWebhook({
+					type: event.accountEventType,
+					accountId: event.accountId,
+				});
+				return { handled: true };
+			}
+			return { handled: false };
+		}
+
+		// Handle Route transfer events
+		if (event.kind === "TRANSFER_PROCESSED") {
+			if (!event.referenceId) return { handled: false };
+			await this.db
+				.update(donations)
+				.set({
+					transferStatus: "PROCESSED",
+					razorpayTransferId: event.transferId ?? undefined,
+					updatedAt: new Date(),
+				})
+				.where(eq(donations.id, event.referenceId));
+			return { handled: true };
+		}
+
+		if (event.kind === "TRANSFER_FAILED") {
+			if (!event.referenceId) return { handled: false };
+			await this.db
+				.update(donations)
+				.set({
+					transferStatus: "FAILED",
+					razorpayTransferId: event.transferId ?? undefined,
+					transferFailureReason: event.failureReason ?? null,
+					updatedAt: new Date(),
+				})
+				.where(eq(donations.id, event.referenceId));
+			return { handled: true };
+		}
+
+		if (!event.referenceId) {
 			return { handled: false };
 		}
 
@@ -216,6 +299,10 @@ export class DonationsService {
 					status: event.kind === "REFUNDED" ? "REFUNDED" : "FAILED",
 					providerPaymentId: event.providerPaymentId,
 					failureReason: event.failureReason ?? null,
+					transferStatus:
+						event.kind === "REFUNDED" && donation.destinationAccountId
+							? "REVERSED"
+							: donation.transferStatus,
 					updatedAt: new Date(),
 				})
 				.where(eq(donations.id, donation.id));
@@ -495,12 +582,21 @@ export class DonationsService {
 				donorUserId: donations.donorUserId,
 				provider: donations.provider,
 				paymentReference: donations.providerPaymentId,
+				wants80G: donations.wants80G,
+				donorPan: donations.donorPan,
+				donorAddress: donations.donorAddress,
+				destinationAccountId: donations.destinationAccountId,
 				organizationName: organizations.organizationName,
 				organizationCity: organizations.city,
 				organizationRegistration: organizations.registrationNumber,
+				organizationPan: organizationPayoutProfiles.pan,
 			})
 			.from(donations)
 			.innerJoin(organizations, eq(donations.organizationId, organizations.id))
+			.leftJoin(
+				organizationPayoutProfiles,
+				eq(organizationPayoutProfiles.organizationId, organizations.id),
+			)
 			.where(eq(donations.id, donationId))
 			.limit(1);
 		return row;
@@ -527,6 +623,11 @@ export class DonationsService {
 			organizationRegistration: row.organizationRegistration,
 			paymentReference: row.paymentReference,
 			provider: row.provider,
+			wants80G: row.wants80G,
+			donorPan: row.donorPan,
+			donorAddress: row.donorAddress,
+			organizationPan: row.organizationPan,
+			isDirectSettlement: Boolean(row.destinationAccountId),
 		});
 
 		await this.storage.putObject({

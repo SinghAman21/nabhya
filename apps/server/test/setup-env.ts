@@ -16,6 +16,8 @@ const TEST_ENV: Record<string, string> = {
 	DIRECT_URL: "postgres://test:test@localhost:5432/test",
 	CORS_ORIGIN: "http://localhost:8081",
 	SUPABASE_AUTH_JWKS_URL: "https://auth.test.invalid/.well-known/jwks.json",
+	ENCRYPTION_MASTER_KEY:
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 };
 
 for (const [key, value] of Object.entries(TEST_ENV)) {

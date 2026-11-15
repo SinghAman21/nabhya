@@ -127,6 +127,20 @@
 			"when": 1790000400000,
 			"tag": "0017_org_soft_delete",
 			"breakpoints": true
+		},
+		{
+			"idx": 18,
+			"version": "7",
+			"when": 1790000500000,
+			"tag": "0018_payout_profiles_and_transfers",
+			"breakpoints": true
+		},
+		{
+			"idx": 19,
+			"version": "7",
+			"when": 1790000600000,
+			"tag": "0019_payout_notification_types",
+			"breakpoints": true
 		}
 	]
 }

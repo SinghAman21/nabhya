@@ -43,6 +43,18 @@ export const env = createEnv({
 		MAIL_FROM_EMAIL: z.email().default("noreply@graphex.me"),
 		MAIL_FROM_NAME: z.string().min(1).default("Nabhya"),
 		TEAM_INVITE_URL_BASE: z.string().url().optional(),
+
+		// Field-level encryption for sensitive financial credentials (bank accounts).
+		// Must be a 32-byte hex string (64 characters) used for AES-256-GCM.
+		ENCRYPTION_MASTER_KEY: z
+			.string()
+			.regex(
+				/^[0-9a-fA-F]{64}$/,
+				"Must be a 64-character hex string (32 bytes)",
+			)
+			.default(
+				"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			),
 	},
 	runtimeEnv: process.env,
 	emptyStringAsUndefined: true,

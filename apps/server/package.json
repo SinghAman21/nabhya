@@ -8,6 +8,7 @@
 		"start": "node dist/index.mjs",
 		"verify:di": "tsx scripts/verify-di.ts",
 		"simulate:razorpay-webhook": "tsx scripts/simulate-razorpay-webhook.ts",
+		"simulate:route-webhook": "tsx scripts/simulate-razorpay-route-webhook.ts",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage"

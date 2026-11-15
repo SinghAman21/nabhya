@@ -21,6 +21,13 @@ export const donationStatusEnum = pgEnum("donation_status", [
 	"REFUNDED",
 ]);
 
+export const transferStatusEnum = pgEnum("transfer_status", [
+	"PENDING",
+	"PROCESSED",
+	"FAILED",
+	"REVERSED",
+]);
+
 /**
  * A monetary donation to an organization.
  *
@@ -63,6 +70,19 @@ export const donations = pgTable(
 
 		donorName: varchar("donor_name"),
 		donorEmail: varchar("donor_email"),
+
+		// 80G Tax Exemption & Form 10BD Compliance
+		wants80G: boolean("wants_80g").notNull().default(false),
+		donorPan: varchar("donor_pan", { length: 10 }),
+		donorAddress: text("donor_address"),
+
+		// Razorpay Route Direct Settlement Tracking
+		platformFeeMinor: integer("platform_fee_minor").notNull().default(0),
+		transferAmountMinor: integer("transfer_amount_minor"),
+		destinationAccountId: varchar("destination_account_id", { length: 50 }),
+		razorpayTransferId: varchar("razorpay_transfer_id", { length: 50 }),
+		transferStatus: transferStatusEnum("transfer_status"),
+		transferFailureReason: text("transfer_failure_reason"),
 
 		completedAt: timestamp("completed_at"),
 		failureReason: text("failure_reason"),

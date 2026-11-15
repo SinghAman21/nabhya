@@ -18,6 +18,7 @@ full write-up.
 | [`architecture/schema.md`](architecture/schema.md) | The 19-entity target domain model with a vertical relationship diagram. Read the **Amendments** section: item donations are the core differentiator, drop hand-rolled auth tables, store object-storage keys rather than URLs. |
 | [`architecture/data-model.md`](architecture/data-model.md) | Table-by-table longform of the schema, v1. Predates the amendments above. |
 | [`architecture/system-diagrams.md`](architecture/system-diagrams.md) | The system's component, module and deployment diagrams in one place. |
+| [`architecture/razorpay-route-flow.md`](architecture/razorpay-route-flow.md) | Razorpay Route direct-settlement architecture: user flow, gap analysis, and 80G tax compliance. |
 | [`architecture/bts.jsonc`](architecture/bts.jsonc) | **Stale scaffold metadata** from the original `better-t-stack` generator. Says `nestjs` but also `auth: none`. Ignore it. |
 
 ## API
@@ -36,6 +37,12 @@ full write-up.
 | [`product/flows/organisation.md`](product/flows/organisation.md) | The NGO flow: signup, verification, publishing, team management. |
 | [`product/flows/volunteer.md`](product/flows/volunteer.md) | The volunteer flow: signup, discovery, applying, certificates. |
 | [`product/flows/superadmin.md`](product/flows/superadmin.md) | The superadmin flow: verification queues, moderation, audit. |
+
+## Plans
+
+| File | What it covers |
+|---|---|
+| [`plans/razorpay-route.md`](plans/razorpay-route.md) | Direct-to-NGO donations via Razorpay Route: audit gaps, schema, webhook and refund plan. |
 
 ## Audits
 
